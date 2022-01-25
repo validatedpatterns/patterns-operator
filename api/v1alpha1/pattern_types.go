@@ -23,13 +23,26 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type PatternParameter struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
 // PatternSpec defines the desired state of Pattern
 type PatternSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Name           string             `json:"name,omitempty"`
+	OriginRepo     string             `json:"originRepo,omitempty"`
+	TargetRevision string             `json:"targetRevision,omitempty"`
+	Validation     bool               `json:"validation,omitempty"`
+	Parameters     []PatternParameter `json:"parameters,omitempty"`
 }
 
 // PatternStatus defines the observed state of Pattern
