@@ -72,6 +72,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "f2850479.hybrid-cloud-patterns.io",
+		// LeaderElectionNamespace: "default", // Use this if we ever want to enforce a single instance per cluster
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
