@@ -20,30 +20,74 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+//  https://pkg.go.dev/encoding/json#Marshal
 
 type PatternParameter struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // PatternSpec defines the desired state of Pattern
 type PatternSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
-	Name           string             `json:"name,omitempty"`
-	OriginRepo     string             `json:"originRepo,omitempty"`
-	TargetRevision string             `json:"targetRevision,omitempty"`
-	Validation     bool               `json:"validation,omitempty"`
-	Parameters     []PatternParameter `json:"parameters,omitempty"`
+	Name     string `json:"name"`
+	SiteName string `json:"siteName"`
+
+	GitSpec    GitSpec           `json:"gitSpec"`
+	GitOpsSpec GitOpsSpec        `json:"gitOpsSpec,omitempty"`
+	ImageSpec  ImageRegistrySpec `json:"imageSpec"`
+
+	Validation     bool `json:"validation,omitempty"`
+	AnonymousUsage bool `json:"anonymousUsage,omitempty"`
+
+	Parameters []PatternParameter `json:"parameters,omitempty"`
 }
+
+type GitSpec struct {
+	Hostname string `json:"hostname,omitempty"`
+	Account  string `json:"account"`
+	Secret   string `json:"secret,omitempty"`
+
+	OriginRepo     string `json:"originRepo,omitempty"`
+	TargetRepo     string `json:"targetRepo"`
+	TargetRevision string `json:"targetRevision,omitempty"`
+
+	ValuesDirectoryURL string `json:"valuesDirectoryURL,omitempty"`
+}
+
+type ImageRegistrySpec struct {
+	Hostname string `json:"hostname,omitempty"`
+	Account  string `json:"account"`
+	Secret   string `json:"secret,omitempty"`
+}
+
+type InstallPlanType string
+
+const (
+	InstallAutomatic InstallPlanType = "Automatic"
+	InstallManual    InstallPlanType = "Manual"
+)
+
+type GitOpsSpec struct {
+	OperatorChannel string `json:"operatorChannel,omitempty"`
+	OperatorSource  string `json:"operatorSource,omitempty"`
+	OperatorCSV     string `json:"operatorCSV,omitempty"`
+
+	SyncPolicy          InstallPlanType `json:"syncPolicy,omitempty"`
+	InstallPlanApproval InstallPlanType `json:"installPlanApproval,omitempty"`
+	UseCSV              bool            `json:"useCSV,omitempty"`
+}
+
+//global:
+//  imageregistry:
+//   type: quay
 
 // PatternStatus defines the observed state of Pattern
 type PatternStatus struct {
