@@ -1,0 +1,9 @@
+domain: hybrid-cloud-patterns.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: patterns-operator
+repo: github.com/hybrid-cloud-patterns/patterns-operator
+version: "3"
