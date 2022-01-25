@@ -1,0 +1,24 @@
+# permissions for end users to edit patterns.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pattern-editor-role
+rules:
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - patterns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - patterns/status
+  verbs:
+  - get

@@ -6,4 +6,14 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: patterns-operator
 repo: github.com/hybrid-cloud-patterns/patterns-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: hybrid-cloud-patterns.io
+  group: gitops
+  kind: Pattern
+  path: github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

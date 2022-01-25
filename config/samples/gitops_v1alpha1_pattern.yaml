@@ -1,0 +1,6 @@
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: Pattern
+metadata:
+  name: pattern-sample
+spec:
+  # TODO(user): Add fields here
