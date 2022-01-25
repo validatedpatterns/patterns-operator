@@ -39,7 +39,7 @@ type PatternReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
+// The Reconcile function compares the state specified by
 // the Pattern object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
@@ -49,7 +49,11 @@ type PatternReconciler struct {
 func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Fill in defaults
+	// Update/create the gitops subscription
+	// Update/create the argo application
+	// Perform validation of the site values file(s)
+	// Report statistics
 
 	return ctrl.Result{}, nil
 }
