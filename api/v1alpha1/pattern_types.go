@@ -44,8 +44,9 @@ type PatternSpec struct {
 	GitOpsSpec GitOpsSpec        `json:"gitOpsSpec,omitempty"`
 	ImageSpec  ImageRegistrySpec `json:"imageSpec"`
 
-	Validation     bool `json:"validation,omitempty"`
-	AnonymousUsage bool `json:"anonymousUsage,omitempty"`
+	AnonymousUsage  bool   `json:"anonymousUsage,omitempty"`
+	Validation      bool   `json:"validation,omitempty"`
+	ValidationImage string `json:"validationImage,omitempty"`
 
 	Parameters []PatternParameter `json:"parameters,omitempty"`
 }
