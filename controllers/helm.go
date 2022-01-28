@@ -32,15 +32,23 @@ import (
 	// "k8s.io/helm/pkg/helm/portforwarder"
 )
 
-func installChart(releaseName string, releaseNamespace string) {
-	chartPath := "/mypath"
+type Values map[string]interface{}
 
+type HelmChart struct {
+	Name       string
+	Namespace  string
+	Version    int32
+	Path       string
+	Parameters Values
+}
+
+func installChart(chart HelmChart) (error, int) {
 	settings := cli.New()
 
 	actionConfig := new(action.Configuration)
 	// You can pass an empty string instead of settings.Namespace() to list
 	// all namespaces
-	if err := actionConfig.Init(settings.RESTClientGetter(), releaseNamespace,
+	if err := actionConfig.Init(settings.RESTClientGetter(), chart.Namespace,
 		os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
 		log.Printf("%+v", err)
 		os.Exit(1)
@@ -53,42 +61,70 @@ func installChart(releaseName string, releaseNamespace string) {
 	//	}
 
 	// define values
-	vals := map[string]interface{}{
-		"redis": map[string]interface{}{
-			"sentinel": map[string]interface{}{
-				"masterName": "BigMaster",
-				"pass":       "random",
-				"addr":       "localhost",
-				"port":       "26379",
-			},
-		},
-	}
+	//	chart.Parameters := map[string]interface{}{
+	//		"redis": map[string]interface{}{
+	//			"sentinel": map[string]interface{}{
+	//				"masterName": "BigMaster",
+	//				"pass":       "random",
+	//				"addr":       "localhost",
+	//				"port":       "26379",
+	//			},
+	//		},
+	//	}
 
 	// load chart from the path
-	chart, err := loader.Load(chartPath)
+	chartobj, err := loader.Load(chart.Path)
 	if err != nil {
 		panic(err)
 	}
 
+	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+	// vendor/helm.sh/helm/v3/pkg/release/release.go
 	client := action.NewInstall(actionConfig)
-	client.Namespace = releaseNamespace
-	client.ReleaseName = releaseName
+	client.Namespace = chart.Namespace
+	client.ReleaseName = chart.Name
 	// client.DryRun = true - very handy!
 
 	// install the chart here
-	rel, err := client.Run(chart, vals)
+	rel, err := client.Run(chartobj, chart.Parameters)
 	if err != nil {
-		panic(err)
+		return err, -1
 	}
 
-	log.Printf("Installed Chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
+	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, chart.Path, rel.Namespace)
 	// this will confirm the values set during installation
 	log.Println(rel.Config)
+	return nil, rel.Version
 }
 
 // https://stackoverflow.com/questions/45692719/samples-on-kubernetes-helm-golang-client
-func listCharts() {
+func installedCharts() []HelmChart {
+	// ./vendor/k8s.io/helm/pkg/proto/hapi/release/release.pb.go
 
+	// type Release struct {
+	//         // Name is the name of the release
+	//         Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	//         // Info provides information about a release
+	//         Info *Info `protobuf:"bytes,2,opt,name=info,proto3" json:"info,omitempty"`
+	//         // Chart is the chart that was released.
+	//         Chart *chart.Chart `protobuf:"bytes,3,opt,name=chart,proto3" json:"chart,omitempty"`
+	//         // Config is the set of extra Values added to the chart.
+	//         // These values override the default values inside of the chart.
+	//         Config *chart.Config `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
+	//         // Manifest is the string representation of the rendered template.
+	//         Manifest string `protobuf:"bytes,5,opt,name=manifest,proto3" json:"manifest,omitempty"`
+	//         // Hooks are all of the hooks declared for this release.
+	//         Hooks []*Hook `protobuf:"bytes,6,rep,name=hooks,proto3" json:"hooks,omitempty"`
+	//         // Version is an int32 which represents the version of the release.
+	//         Version int32 `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`
+	//         // Namespace is the kubernetes namespace of the release.
+	//         Namespace            string   `protobuf:"bytes,8,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	//         XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	//         XXX_unrecognized     []byte   `json:"-"`
+	//         XXX_sizecache        int32    `json:"-"`
+	// }
+
+	var charts []HelmChart
 	// omit getting kubeConfig, see: https://github.com/kubernetes/client-go/tree/master/examples
 
 	// get kubernetes client
@@ -105,5 +141,11 @@ func listCharts() {
 	resp, _ := helmClient.ListReleases()
 	for _, release := range resp.Releases {
 		log.Println(release.GetName())
+		charts = append(charts, HelmChart{
+			Name:      release.GetName(),
+			Namespace: release.GetNamespace(),
+			Version:   release.GetVersion(),
+		})
 	}
+	return charts
 }
