@@ -48,7 +48,8 @@ type PatternSpec struct {
 	Validation      bool   `json:"validation,omitempty"`
 	ValidationImage string `json:"validationImage,omitempty"`
 
-	Parameters []PatternParameter `json:"parameters,omitempty"`
+	Parameters      []PatternParameter `json:"parameters,omitempty"`
+	RequiredSecrets []string           `json:"requiredSecrets,omitempty"`
 }
 
 type GitSpec struct {
@@ -69,11 +70,11 @@ type ImageRegistrySpec struct {
 	Secret   string `json:"secret,omitempty"`
 }
 
-type InstallPlanType string
+type ApplyChangeType string
 
 const (
-	InstallAutomatic InstallPlanType = "Automatic"
-	InstallManual    InstallPlanType = "Manual"
+	InstallAutomatic ApplyChangeType = "Automatic"
+	InstallManual    ApplyChangeType = "Manual"
 )
 
 type GitOpsSpec struct {
@@ -81,8 +82,8 @@ type GitOpsSpec struct {
 	OperatorSource  string `json:"operatorSource,omitempty"`
 	OperatorCSV     string `json:"operatorCSV,omitempty"`
 
-	SyncPolicy          InstallPlanType `json:"syncPolicy,omitempty"`
-	InstallPlanApproval InstallPlanType `json:"installPlanApproval,omitempty"`
+	SyncPolicy          ApplyChangeType `json:"syncPolicy,omitempty"`
+	ApplyChangeApproval ApplyChangeType `json:"installPlanApproval,omitempty"`
 	UseCSV              bool            `json:"useCSV,omitempty"`
 }
 
