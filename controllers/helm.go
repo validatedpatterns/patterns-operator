@@ -30,6 +30,12 @@ import (
 	//"k8s.io/client-go/kubernetes"
 	"k8s.io/helm/pkg/helm"
 	// "k8s.io/helm/pkg/helm/portforwarder"
+
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+)
+
+var (
+	helmhost = "tiller-deploy.kube-system.svc:44134"
 )
 
 type Values map[string]interface{}
@@ -97,6 +103,23 @@ func installChart(chart HelmChart) (error, int) {
 	return nil, rel.Version
 }
 
+func chartForPattern(pattern api.Pattern) *HelmChart {
+	helmClient := helm.NewClient(helm.Host(helmhost))
+
+	// list/print releases
+	resp, _ := helmClient.ListReleases()
+	for _, release := range resp.Releases {
+		if pattern.Name == release.GetName() && pattern.Namespace == release.GetNamespace() {
+			return &HelmChart{
+				Name:      release.GetName(),
+				Namespace: release.GetNamespace(),
+				Version:   release.GetVersion(),
+			}
+		}
+	}
+	return nil
+}
+
 // https://stackoverflow.com/questions/45692719/samples-on-kubernetes-helm-golang-client
 func installedCharts() []HelmChart {
 	// ./vendor/k8s.io/helm/pkg/proto/hapi/release/release.pb.go
@@ -132,10 +155,9 @@ func installedCharts() []HelmChart {
 
 	// port forward tiller
 	// tillerTunnel, _ := portforwarder.New("kube-system", client, config)
-	host := "tiller-deploy.kube-system.svc:44134"
 
 	// new helm client
-	helmClient := helm.NewClient(helm.Host(host))
+	helmClient := helm.NewClient(helm.Host(helmhost))
 
 	// list/print releases
 	resp, _ := helmClient.ListReleases()

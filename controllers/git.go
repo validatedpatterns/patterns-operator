@@ -28,7 +28,7 @@ import (
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
 
-func checkout(url string, directory string, token *string, commit *string) {
+func checkout(url string, directory string, token *string, commit *string) error {
 	//	CheckArgs("<url>", "<directory>", "<github_access_token>", "<commit>")
 	//	url, directory, token, commit := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
 
@@ -53,28 +53,40 @@ func checkout(url string, directory string, token *string, commit *string) {
 		Auth:     auth,
 	})
 
-	CheckIfError(err)
+	if err != nil {
+		return err
+	}
 
 	// ... retrieving the commit being pointed by HEAD
 	Info("git show-ref --head HEAD")
 	ref, err := r.Head()
-	CheckIfError(err)
+	if err != nil {
+		return err
+	}
 	Info("%s", ref.Hash())
 
 	w, err := r.Worktree()
-	CheckIfError(err)
+	if err != nil {
+		return err
+	}
 
 	// ... checking out to commit
 	Info("git checkout %s", *commit)
 	err = w.Checkout(&git.CheckoutOptions{
 		Hash: plumbing.NewHash(*commit),
 	})
-	CheckIfError(err)
+	if err != nil {
+		return err
+	}
 
 	// ... retrieving the commit being pointed by HEAD, it shows that the
 	// repository is pointing to the giving commit in detached mode
 	Info("git show-ref --head HEAD")
 	ref, err = r.Head()
-	CheckIfError(err)
+	if err != nil {
+		return err
+	}
+
 	Info("%s", ref.Hash())
+	return err
 }

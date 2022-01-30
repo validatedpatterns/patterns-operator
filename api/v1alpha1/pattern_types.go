@@ -37,7 +37,6 @@ type PatternSpec struct {
 	// SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Name     string `json:"name"`
 	SiteName string `json:"siteName"`
 
 	GitSpec    GitSpec           `json:"gitSpec"`
@@ -55,7 +54,7 @@ type PatternSpec struct {
 type GitSpec struct {
 	Hostname string `json:"hostname,omitempty"`
 	Account  string `json:"account"`
-	Secret   string `json:"secret,omitempty"`
+	Token    string `json:"secret,omitempty"`
 
 	OriginRepo     string `json:"originRepo,omitempty"`
 	TargetRepo     string `json:"targetRepo"`
@@ -95,6 +94,9 @@ type GitOpsSpec struct {
 type PatternStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	LastError string `json:"lastError,omitempty"`
+	Path      string `json:"path,omitempty"`
+	Version   int    `json:"version,omitempty"`
 }
 
 //+kubebuilder:object:root=true
