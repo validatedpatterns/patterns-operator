@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"path/filepath"
@@ -34,12 +35,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
+	configv1 "github.com/openshift/api/config/v1"
+	networkv1 "github.com/openshift/api/config/v1"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+
+	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
 
 // PatternReconciler reconciles a Pattern object
@@ -97,8 +103,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 
-	// Check for gitops subscription
-	needGitops := true
+	// Set needGitops based on existance of the argo subscription
+	var needSubscription = true
+	var clusterSubscriptions olmapi.SubscriptionList
+	//	if tokenSecret, err = r.Client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
+
+	if err := r.Client.List(context.TODO(), &clusterSubscriptions, &client.ListOptions{}); err == nil {
+		for _, sub := range clusterSubscriptions.Items {
+			if sub.Spec.Package == "openshift-gitops-operator" && sub.Namespace == "openshift-operators" {
+				needSubscription = false
+			}
+		}
+
+	}
 
 	// Update/create the argo application
 
@@ -130,7 +147,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if chart == nil {
-		err := r.deployPattern(qualifiedInstance, needGitops, false)
+		err := r.deployPattern(qualifiedInstance, needSubscription, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
 
@@ -187,11 +204,48 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	output := input.DeepCopy()
 
-	// Look up cluster name
-	// Look up cluster domain name
-	// Set needGitops based on existance of the argo subscription
+	// Cluster ID:
+	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
+	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
+	clusterVersion := &configv1.ClusterVersion{}
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "versiom"}, clusterVersion); err != nil {
+		return err, output
+	}
+
+	r.logger.Info("clusterID:", clusterVersion.Spec.ClusterID)
+
+	// Derive cluster and domain names
+	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
+
+	clusterIngress := &networkv1.Ingress{}
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, clusterIngress); err != nil {
+		return err, output
+	}
+
+	//appDomain := "apps.mycluster.blueprints.rhecoeng.com"
+	appDomain := clusterIngress.Spec.Domain
+	domainElements := strings.Split(appDomain, ".")
+
+	clustername := domainElements[1]
+	domainname := domainElements[2:]
+	r.logger.Info("cluster:", clustername, domainname)
+
+	//global:
+	//  datacenter:
+	//    domain: blueprints.rhecoeng.com
+	//    clustername: beekhof-gitops
+
+	if len(output.Spec.GitConfig.Hostname) == 0 {
+		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
+		output.Spec.GitConfig.Hostname = ss[1]
+	}
+
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
-	// Set output.Spec.GitConfig.Hostname based on TargetRepo
+
+	if len(output.Spec.GitConfig.Hostname) == 0 {
+		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
+		output.Spec.GitConfig.Hostname = ss[1]
+	}
 
 	if len(output.Spec.GitOpsConfig.SyncPolicy) == 0 {
 		output.Spec.GitOpsConfig.SyncPolicy = api.InstallAutomatic
@@ -217,12 +271,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	//     if len(output.Spec.) == 0 {
 	//     	output.Spec. =
 	//     }
-
-	//	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
-	//	if err != nil {
-	//		if errors.IsNotFound(err) {
-	//		}
-	//	}
 
 	return nil, input
 }
@@ -253,7 +301,7 @@ func (r *PatternReconciler) authTokenFromSecret(secret types.NamespacedName, key
 	return fmt.Errorf("No key '%s' found in %s/%s", key, secret.Name, secret.Namespace), ""
 }
 
-func inputsForPattern(p api.Pattern, needGitOps bool) map[string]interface{} {
+func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface{} {
 	inputs := map[string]interface{}{
 		"main": map[string]interface{}{
 			"git": map[string]interface{}{
@@ -265,7 +313,7 @@ func inputsForPattern(p api.Pattern, needGitOps bool) map[string]interface{} {
 				"syncPolicy":          p.Spec.GitOpsConfig.SyncPolicy,
 				"installPlanApproval": p.Spec.GitOpsConfig.InstallPlanApproval,
 				"useCSV":              p.Spec.GitOpsConfig.UseCSV,
-				"bootstrap":           needGitOps,
+				"bootstrap":           needSubscription,
 			},
 			"gitops": map[string]interface{}{
 				"channel": p.Spec.GitOpsConfig.OperatorChannel,
@@ -289,14 +337,14 @@ func inputsForPattern(p api.Pattern, needGitOps bool) map[string]interface{} {
 	return inputs
 }
 
-func (r *PatternReconciler) deployPattern(p *api.Pattern, needGitOps bool, isUpdate bool) error {
+func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool, isUpdate bool) error {
 
 	chart := HelmChart{
 		Name:       p.Name,
 		Namespace:  p.ObjectMeta.Namespace,
 		Version:    0,
 		Path:       p.Status.Path,
-		Parameters: inputsForPattern(*p, needGitOps),
+		Parameters: inputsForPattern(*p, needSubscription),
 	}
 
 	var err error
