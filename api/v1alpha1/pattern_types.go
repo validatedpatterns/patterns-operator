@@ -96,6 +96,7 @@ type PatternStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 	LastError string `json:"lastError,omitempty"`
 	Path      string `json:"path,omitempty"`
+	Revision  string `json:"revision,omitempty"`
 	Version   int    `json:"version,omitempty"`
 }
 

@@ -109,28 +109,39 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
 	}
 
-	gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-
-		var token string
+	var token = ""
+	if len(qualifiedInstance.Spec.GitConfig.TokenSecret.Name) > 0 {
 		if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
 			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
 		}
+	}
 
+	gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		err := cloneRepo(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token)
 		return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 	}
 
-	if err := checkoutRevision(qualifiedInstance.Status.Path, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
+	if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
 		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
 	}
-	
+
 	if chart == nil {
 		err := r.deployPattern(qualifiedInstance, needGitops, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
 
 	// Reconcile any changes
+	var needSync = false
+
+	err, hash := repoHash(qualifiedInstance.Status.Path)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, "obtain git hash", err)
+	}
+
+	if needSync == false && qualifiedInstance.Status.Revision != hash {
+		needSync = true
+	}
 
 	// Force a consistent value for bootstrap, which doesn't matter
 	m := chart.Parameters["main"].(map[string]interface{})
@@ -140,8 +151,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	actual, _ := yaml.Marshal(chart.Parameters)
 	calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
 
-	if string(calculated) != string(actual) {
+	if needSync == false && string(calculated) != string(actual) {
 		r.logger.Info("Parameters changed", "calculated:", string(calculated), "active:", string(actual))
+		needSync = true
+	}
+
+	if needSync {
 		err := r.deployPattern(qualifiedInstance, false, false)
 		return r.actionPerformed(qualifiedInstance, "updating the pattern", err)
 	}
@@ -229,18 +244,25 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needGitOps bool, isUpd
 	}
 
 	var err error
+	err, hash := repoHash(p.Status.Path)
+	if err != nil {
+		return err
+	}
+
 	var version = 0
 	if isUpdate {
 		err, version = updateChart(chart)
 	} else {
 		err, version = installChart(chart)
 	}
-	if err == nil {
-		r.logger.Info("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version)
-	} else {
-		p.Status.Version = version
+	if err != nil {
+		return err
 	}
-	return err
+
+	r.logger.Info("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version)
+	p.Status.Version = version
+	p.Status.Revision = hash
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

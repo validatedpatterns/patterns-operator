@@ -38,15 +38,15 @@ func checkout(url string, directory string, token string, commit string) error {
 		// Nothing more to do
 		return nil
 	}
-	
-	if err := checkoutRevision(directory, commit); err != nil {
+
+	if err := checkoutRevision(directory, token, commit); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func checkoutRevision(directory string, commit string) error {
+func checkoutRevision(directory string, token string, commit string) error {
 	var hash = "HEAD"
 	if len(commit) > 0 {
 		hash = commit
@@ -54,6 +54,30 @@ func checkoutRevision(directory string, commit string) error {
 
 	Info("git checkout %s for %s", commit, directory)
 	repo, err := git.PlainOpen(directory)
+	if err != nil {
+		return err
+	}
+
+	var options = &git.FetchOptions{
+		Depth:           0,
+		Force:           true,
+		InsecureSkipTLS: true,
+		Tags:            git.AllTags,
+	}
+
+	if len(token) > 0 {
+		// The intended use of a GitHub personal access token is in replace of your password
+		// because access tokens can easily be revoked.
+		// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
+		options.Auth = &http.BasicAuth{
+			Username: "abc123", // yes, this can be anything except an empty string
+			Password: token,
+		}
+	}
+
+	if err := repo.Fetch(options); err != nil {
+		return err
+	}
 
 	w, err := repo.Worktree()
 	if err != nil {
@@ -72,14 +96,14 @@ func checkoutRevision(directory string, commit string) error {
 	// ... retrieving the commit being pointed by HEAD, it shows that the
 	// repository is pointing to the giving commit in detached mode
 	Info("git show-ref --head HEAD")
-	ref, err = repo.Head()
+	ref, err := repo.Head()
 	if err != nil {
 		return err
 	}
 
 	Info("%s", ref.Hash())
 	return err
-	
+
 }
 
 func cloneRepo(url string, directory string, token string) error {
@@ -114,4 +138,20 @@ func cloneRepo(url string, directory string, token string) error {
 		return err
 	}
 	Info("%s", ref.Hash())
+	return nil
+}
+
+func repoHash(directory string) (error, string) {
+	repo, err := git.PlainOpen(directory)
+	if err != nil {
+		return err, ""
+	}
+
+	// ... checking out to commit
+	ref, err := repo.Head()
+	if err != nil {
+		return err, ""
+	}
+
+	return nil, ref.Hash().String()
 }
