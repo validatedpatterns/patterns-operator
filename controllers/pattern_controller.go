@@ -87,8 +87,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	err, done := r.handleFinalizer(instance)
-	if done {
+	if err, done := r.handleFinalizer(instance); done {
 		return r.actionPerformed(instance, "updated finalizer", err)
 	}
 
@@ -141,19 +140,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if needSync == false && qualifiedInstance.Status.Revision != hash {
 		needSync = true
-	}
 
-	// Force a consistent value for bootstrap, which doesn't matter
-	m := chart.Parameters["main"].(map[string]interface{})
-	o := m["options"].(map[string]interface{})
-	o["bootstrap"] = false
+	} else {
 
-	actual, _ := yaml.Marshal(chart.Parameters)
-	calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
+		// Force a consistent value for bootstrap, which doesn't matter
+		m := chart.Parameters["main"].(map[string]interface{})
+		o := m["options"].(map[string]interface{})
+		o["bootstrap"] = false
 
-	if needSync == false && string(calculated) != string(actual) {
-		r.logger.Info("Parameters changed", "calculated:", string(calculated), "active:", string(actual))
-		needSync = true
+		actual, _ := yaml.Marshal(chart.Parameters)
+		calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
+
+		if string(calculated) != string(actual) {
+			r.logger.Info("Parameters changed", "calculated:", string(calculated), "active:", string(actual))
+			needSync = true
+		}
 	}
 
 	if needSync {
