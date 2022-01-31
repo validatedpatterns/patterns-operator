@@ -117,10 +117,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
 		}
 
-		err := checkout(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision)
+		err := cloneRepo(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token)
 		return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 	}
 
+	if err := checkoutRevision(qualifiedInstance.Status.Path, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
+		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
+	}
+	
 	if chart == nil {
 		err := r.deployPattern(qualifiedInstance, needGitops, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)

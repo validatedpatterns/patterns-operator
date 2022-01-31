@@ -30,11 +30,61 @@ import (
 
 func checkout(url string, directory string, token string, commit string) error {
 
-	if len(commit) > 0 {
-		Info("git clone %s@%s into %s", url, commit, directory)
-	} else {
-		Info("git clone %s into %s", url, directory)
+	if err := cloneRepo(url, directory, token); err != nil {
+		return err
 	}
+
+	if len(commit) == 0 {
+		// Nothing more to do
+		return nil
+	}
+	
+	if err := checkoutRevision(directory, commit); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkoutRevision(directory string, commit string) error {
+	var hash = "HEAD"
+	if len(commit) > 0 {
+		hash = commit
+	}
+
+	Info("git checkout %s for %s", commit, directory)
+	repo, err := git.PlainOpen(directory)
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	// ... checking out to commit
+	Info("git checkout %s", hash)
+	err = w.Checkout(&git.CheckoutOptions{
+		Hash: plumbing.NewHash(hash),
+	})
+	if err != nil {
+		return err
+	}
+
+	// ... retrieving the commit being pointed by HEAD, it shows that the
+	// repository is pointing to the giving commit in detached mode
+	Info("git show-ref --head HEAD")
+	ref, err = repo.Head()
+	if err != nil {
+		return err
+	}
+
+	Info("%s", ref.Hash())
+	return err
+	
+}
+
+func cloneRepo(url string, directory string, token string) error {
+
+	Info("git clone %s into %s", url, directory)
 
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
@@ -64,34 +114,4 @@ func checkout(url string, directory string, token string, commit string) error {
 		return err
 	}
 	Info("%s", ref.Hash())
-
-	w, err := repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	if len(commit) == 0 {
-		// Nothing more to do
-		return nil
-	}
-
-	// ... checking out to commit
-	Info("git checkout %s", commit)
-	err = w.Checkout(&git.CheckoutOptions{
-		Hash: plumbing.NewHash(commit),
-	})
-	if err != nil {
-		return err
-	}
-
-	// ... retrieving the commit being pointed by HEAD, it shows that the
-	// repository is pointing to the giving commit in detached mode
-	Info("git show-ref --head HEAD")
-	ref, err = repo.Head()
-	if err != nil {
-		return err
-	}
-
-	Info("%s", ref.Hash())
-	return err
 }
