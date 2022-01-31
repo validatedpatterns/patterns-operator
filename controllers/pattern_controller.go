@@ -69,7 +69,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Reconcile() should perform at most one action in any invocation
 	// in order to simplify testing.
 	r.logger = log.FromContext(ctx)
-	r.logger.Info("Reconciling NodeMaintenance")
+	r.logger.Info("Reconciling Pattern")
 
 	// Fetch the NodeMaintenance instance
 	instance := &api.Pattern{}
@@ -87,7 +87,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	if err, done := r.handleFinalizer(instance); done {
+	if err, done := r.handleFinalizer(instance); done || err != nil {
 		return r.actionPerformed(instance, "updated finalizer", err)
 	}
 
@@ -123,6 +123,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
 		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
+	}
+
+	if err := r.preValidation(qualifiedInstance); err != nil {
+		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
 	if chart == nil {
@@ -163,12 +167,63 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Perform validation of the site values file(s)
+	if err := r.postValidation(qualifiedInstance); err != nil {
+		return r.actionPerformed(qualifiedInstance, "validation", err)
+	}
 	// Report statistics
 
 	return r.actionPerformed(qualifiedInstance, "done", nil)
 }
 
+func (r *PatternReconciler) preValidation(input *api.Pattern) error {
+	return nil
+}
+
+func (r *PatternReconciler) postValidation(input *api.Pattern) error {
+	return nil
+}
+
 func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
+
+	output := input.DeepCopy()
+
+	// Look up cluster name
+	// Look up cluster domain name
+	// Set needGitops based on existance of the argo subscription
+	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
+	// Set output.Spec.GitConfig.Hostname based on TargetRepo
+
+	if len(output.Spec.GitOpsConfig.SyncPolicy) == 0 {
+		output.Spec.GitOpsConfig.SyncPolicy = api.InstallAutomatic
+	}
+
+	if len(output.Spec.GitOpsConfig.InstallPlanApproval) == 0 {
+		output.Spec.GitOpsConfig.InstallPlanApproval = api.InstallAutomatic
+	}
+
+	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
+		output.Spec.GitOpsConfig.OperatorChannel = "stable"
+	}
+
+	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
+		output.Spec.GitOpsConfig.OperatorSource = "redhat-operators"
+	}
+	if len(output.Spec.GitOpsConfig.OperatorCSV) == 0 {
+		output.Spec.GitOpsConfig.OperatorCSV = "v1.4.0"
+	}
+	if len(output.Spec.SiteName) == 0 {
+		output.Spec.SiteName = "default"
+	}
+	//     if len(output.Spec.) == 0 {
+	//     	output.Spec. =
+	//     }
+
+	//	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+	//	if err != nil {
+	//		if errors.IsNotFound(err) {
+	//		}
+	//	}
+
 	return nil, input
 }
 
