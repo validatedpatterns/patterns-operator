@@ -26,10 +26,9 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	//	"helm.sh/helm/v3/pkg/release"
 
-	// listCharts
-	//"k8s.io/client-go/kubernetes"
+	"helm.sh/helm/v3/pkg/chart"
+	"k8s.io/helm/pkg/chartutil"
 	"k8s.io/helm/pkg/helm"
-	// "k8s.io/helm/pkg/helm/portforwarder"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
@@ -38,23 +37,21 @@ var (
 	helmhost = "tiller-deploy.kube-system.svc:44134"
 )
 
-type Values map[string]interface{}
-
 type HelmChart struct {
 	Name       string
 	Namespace  string
 	Version    int32
 	Path       string
-	Parameters Values
+	Parameters chartutil.Values
 }
 
-func installChart(chart HelmChart) (error, int) {
+func getChartObj(c HelmChart) (error, *action.Configuration, *chart.Chart) {
 	settings := cli.New()
 
 	actionConfig := new(action.Configuration)
 	// You can pass an empty string instead of settings.Namespace() to list
 	// all namespaces
-	if err := actionConfig.Init(settings.RESTClientGetter(), chart.Namespace,
+	if err := actionConfig.Init(settings.RESTClientGetter(), c.Namespace,
 		os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
 		log.Printf("%+v", err)
 		os.Exit(1)
@@ -66,38 +63,54 @@ func installChart(chart HelmChart) (error, int) {
 	//		panic(err)
 	//	}
 
-	// define values
-	//	chart.Parameters := map[string]interface{}{
-	//		"redis": map[string]interface{}{
-	//			"sentinel": map[string]interface{}{
-	//				"masterName": "BigMaster",
-	//				"pass":       "random",
-	//				"addr":       "localhost",
-	//				"port":       "26379",
-	//			},
-	//		},
-	//	}
-
 	// load chart from the path
-	chartobj, err := loader.Load(chart.Path)
+	chartobj, err := loader.Load(c.Path)
+	return err, actionConfig, chartobj
+}
+
+func installChart(c HelmChart) (error, int) {
+	err, actionConfig, chartobj := getChartObj(c)
 	if err != nil {
-		panic(err)
+		return err, -1
 	}
 
 	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
 	// vendor/helm.sh/helm/v3/pkg/release/release.go
 	client := action.NewInstall(actionConfig)
-	client.Namespace = chart.Namespace
-	client.ReleaseName = chart.Name
+	client.Namespace = c.Namespace
+	client.ReleaseName = c.Name
 	// client.DryRun = true - very handy!
 
 	// install the chart here
-	rel, err := client.Run(chartobj, chart.Parameters)
+	rel, err := client.Run(chartobj, c.Parameters)
 	if err != nil {
 		return err, -1
 	}
 
-	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, chart.Path, rel.Namespace)
+	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, c.Path, rel.Namespace)
+	// this will confirm the values set during installation
+	log.Println(rel.Config)
+	return nil, rel.Version
+}
+
+func updateChart(c HelmChart) (error, int) {
+
+	err, actionConfig, chartobj := getChartObj(c)
+	if err != nil {
+		return err, -1
+	}
+
+	client := action.NewUpgrade(actionConfig)
+	client.Namespace = c.Namespace
+	// client.DryRun = true - very handy!
+
+	// install the chart here
+	rel, err := client.Run(c.Name, chartobj, c.Parameters)
+	if err != nil {
+		return err, -1
+	}
+
+	log.Printf("Updated Chart %s from path: %s in namespace: %s\n", rel.Name, c.Path, rel.Namespace)
 	// this will confirm the values set during installation
 	log.Println(rel.Config)
 	return nil, rel.Version
@@ -110,10 +123,22 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 	resp, _ := helmClient.ListReleases()
 	for _, release := range resp.Releases {
 		if pattern.Name == release.GetName() && pattern.Namespace == release.GetNamespace() {
+			nv, err := chartutil.ReadValues([]byte(release.Chart.Values.Raw))
+			log.Printf("Error: Reading chart '%s' default values (%s): %s", release.Chart.Metadata.Name, release.Chart.Values.Raw, err)
+
 			return &HelmChart{
-				Name:      release.GetName(),
-				Namespace: release.GetNamespace(),
-				Version:   release.GetVersion(),
+				Name:       release.GetName(),
+				Namespace:  release.GetNamespace(),
+				Version:    release.GetVersion(),
+				Path:       pattern.Status.Path,
+				Parameters: nv.AsMap(),
+
+				// type Config struct {
+				//        Raw                  string            `protobuf:"bytes,1,opt,name=raw,proto3" json:"raw,omitempty"`
+				//        Values               map[string]*Value `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+				//...
+				// Raw == yaml.Marshal(chartutil.Values)
+
 			}
 		}
 	}

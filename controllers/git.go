@@ -28,52 +28,57 @@ import (
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
 
-func checkout(url string, directory string, token *string, commit *string) error {
-	//	CheckArgs("<url>", "<directory>", "<github_access_token>", "<commit>")
-	//	url, directory, token, commit := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
+func checkout(url string, directory string, token string, commit string) error {
 
-	if commit == nil {
-		*commit = "HEAD"
+	if len(commit) > 0 {
+		Info("git clone %s@%s into %s", url, commit, directory)
+	} else {
+		Info("git clone %s into %s", url, directory)
 	}
 
 	// Clone the given repository to the given directory
-	Info("git clone %s@%s %s", url, *commit, directory)
-
-	// The intended use of a GitHub personal access token is in replace of your password
-	// because access tokens can easily be revoked.
-	// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
-	auth := &http.BasicAuth{
-		Username: "abc123", // yes, this can be anything except an empty string
-		Password: *token,
-	}
-
-	r, err := git.PlainClone(directory, false, &git.CloneOptions{
+	var options = &git.CloneOptions{
 		URL:      url,
 		Progress: os.Stdout,
-		Auth:     auth,
-	})
+	}
 
+	if len(token) > 0 {
+		// The intended use of a GitHub personal access token is in replace of your password
+		// because access tokens can easily be revoked.
+		// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
+		options.Auth = &http.BasicAuth{
+			Username: "abc123", // yes, this can be anything except an empty string
+			Password: token,
+		}
+	}
+
+	repo, err := git.PlainClone(directory, false, options)
 	if err != nil {
 		return err
 	}
 
 	// ... retrieving the commit being pointed by HEAD
 	Info("git show-ref --head HEAD")
-	ref, err := r.Head()
+	ref, err := repo.Head()
 	if err != nil {
 		return err
 	}
 	Info("%s", ref.Hash())
 
-	w, err := r.Worktree()
+	w, err := repo.Worktree()
 	if err != nil {
 		return err
 	}
 
+	if len(commit) == 0 {
+		// Nothing more to do
+		return nil
+	}
+
 	// ... checking out to commit
-	Info("git checkout %s", *commit)
+	Info("git checkout %s", commit)
 	err = w.Checkout(&git.CheckoutOptions{
-		Hash: plumbing.NewHash(*commit),
+		Hash: plumbing.NewHash(commit),
 	})
 	if err != nil {
 		return err
@@ -82,7 +87,7 @@ func checkout(url string, directory string, token *string, commit *string) error
 	// ... retrieving the commit being pointed by HEAD, it shows that the
 	// repository is pointing to the giving commit in detached mode
 	Info("git show-ref --head HEAD")
-	ref, err = r.Head()
+	ref, err = repo.Head()
 	if err != nil {
 		return err
 	}

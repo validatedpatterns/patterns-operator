@@ -19,13 +19,20 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
+	"path/filepath"
+
+	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,35 +87,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	// Add finalizer when object is created
-	// 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
-	// 		if !ContainsString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer) {
-	// 			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer)
-	// 			if err := r.Client.Update(context.TODO(), instance); err != nil {
-	// 				return r.onReconcileError(instance, err)
-	// 			}
-	// 		}
-	// 	} else {
-	// 		r.logger.Info("Deletion timestamp not zero")
-	//
-	// 		// The object is being deleted
-	// 		if ContainsString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
-	// 			// Stop node maintenance - uncordon and remove live migration taint from the node.
-	// 			if err := r.stopNodeMaintenanceOnDeletion(instance.Spec.NodeName); err != nil {
-	// 				r.logger.Error(err, "error stopping node maintenance")
-	// 				if errors.IsNotFound(err) == false {
-	// 					return r.onReconcileError(instance, err)
-	// 				}
-	// 			}
-	//
-	// 			// Remove our finalizer from the list and update it.
-	// 			instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, nodemaintenancev1beta1.NodeMaintenanceFinalizer)
-	// 			if err := r.Client.Update(context.Background(), instance); err != nil {
-	// 				return r.onReconcileError(instance, err)
-	// 			}
-	// 		}
-	// 		return reconcile.Result{}, nil
-	// 	}
+	err, done := r.handleFinalizer(instance)
+	if done {
+		return r.actionPerformed(instance, "updated finalizer", err)
+	}
 
 	// Fill in defaults - Make changes in the copy?
 	err, qualifiedInstance := r.applyDefaults(instance)
@@ -116,23 +98,49 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 
-	// Update/create the gitops subscription
+	// Check for gitops subscription
+	needGitops := true
 
 	// Update/create the argo application
 
 	chart := chartForPattern(*qualifiedInstance)
-
 	if chart == nil && len(qualifiedInstance.Status.Path) == 0 {
-		err := r.Prepare(qualifiedInstance)
+		err := r.prepareForClone(qualifiedInstance)
+		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
+	}
+
+	gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+
+		var token string
+		if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
+			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
+		}
+
+		err := checkout(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision)
 		return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 	}
 
 	if chart == nil {
-		err := r.Deploy(qualifiedInstance)
+		err := r.deployPattern(qualifiedInstance, needGitops, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
 
 	// Reconcile any changes
+
+	// Force a consistent value for bootstrap, which doesn't matter
+	m := chart.Parameters["main"].(map[string]interface{})
+	o := m["options"].(map[string]interface{})
+	o["bootstrap"] = false
+
+	actual, _ := yaml.Marshal(chart.Parameters)
+	calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
+
+	if string(calculated) != string(actual) {
+		r.logger.Info("Parameters changed", "calculated:", string(calculated), "active:", string(actual))
+		err := r.deployPattern(qualifiedInstance, false, false)
+		return r.actionPerformed(qualifiedInstance, "updating the pattern", err)
+	}
 
 	// Perform validation of the site values file(s)
 	// Report statistics
@@ -144,39 +152,85 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	return nil, input
 }
 
-func (r *PatternReconciler) Prepare(p *api.Pattern) error {
-	if len(p.Status.Path) > 0 {
-		volumePath := "/"
-		unique := uuid.New().URN()
-		p.Status.Path = fmt.Sprintf("%s/%s/%s/%s", volumePath, p.Namespace, p.Name, unique)
-	}
+func (r *PatternReconciler) prepareForClone(p *api.Pattern) error {
+	unique := uuid.New().URN()
+	p.Status.Path = filepath.Join(os.TempDir(), p.Namespace, p.Name, unique)
 
-	// if directory != exists...
-	err := checkout(p.Spec.GitSpec.TargetRepo, p.Status.Path, &p.Spec.GitSpec.Token, &p.Spec.GitSpec.TargetRevision)
-	return err
+	return os.MkdirAll(p.Status.Path, os.ModePerm)
 }
 
-func (r *PatternReconciler) Deploy(p *api.Pattern) error {
-	sampleValues := map[string]interface{}{
-		"redis": map[string]interface{}{
-			"sentinel": map[string]interface{}{
-				"masterName": "BigMaster",
-				"pass":       "random",
-				"addr":       "localhost",
-				"port":       "26379",
+func (r *PatternReconciler) authTokenFromSecret(secret types.NamespacedName, key string) (error, string) {
+	if len(key) == 0 {
+		return nil, ""
+	}
+	tokenSecret := &corev1.Secret{}
+	err := r.Client.Get(context.TODO(), secret, tokenSecret)
+	if err != nil {
+		//	if tokenSecret, err = r.Client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
+		r.logger.Error(fmt.Errorf("Could not obtain secret"), secret.Name, secret.Namespace)
+		return err, ""
+	}
+
+	if val, ok := tokenSecret.Data[key]; ok {
+		// See also https://github.com/kubernetes/client-go/issues/198
+		return nil, string(val)
+	}
+	return fmt.Errorf("No key '%s' found in %s/%s", key, secret.Name, secret.Namespace), ""
+}
+
+func inputsForPattern(p api.Pattern, needGitOps bool) map[string]interface{} {
+	inputs := map[string]interface{}{
+		"main": map[string]interface{}{
+			"git": map[string]interface{}{
+				"repoURL":            p.Spec.GitConfig.TargetRepo,
+				"revision":           p.Spec.GitConfig.TargetRevision,
+				"valuesDirectoryURL": p.Spec.GitConfig.ValuesDirectoryURL,
+			},
+			"options": map[string]interface{}{
+				"syncPolicy":          p.Spec.GitOpsConfig.SyncPolicy,
+				"installPlanApproval": p.Spec.GitOpsConfig.InstallPlanApproval,
+				"useCSV":              p.Spec.GitOpsConfig.UseCSV,
+				"bootstrap":           needGitOps,
+			},
+			"gitops": map[string]interface{}{
+				"channel": p.Spec.GitOpsConfig.OperatorChannel,
+				"source":  p.Spec.GitOpsConfig.OperatorSource,
+				"csv":     p.Spec.GitOpsConfig.OperatorCSV,
+			},
+			"siteName": p.Spec.SiteName,
+
+			"global": map[string]interface{}{
+				"imageregistry": map[string]interface{}{
+					"type": "quay",
+				},
+				"git": map[string]interface{}{
+					"hostname": p.Spec.GitConfig.Hostname,
+					// Account is the user or organization under which the pattern repo lives
+					"account": p.Spec.GitConfig.Account,
+				},
 			},
 		},
 	}
+	return inputs
+}
+
+func (r *PatternReconciler) deployPattern(p *api.Pattern, needGitOps bool, isUpdate bool) error {
 
 	chart := HelmChart{
 		Name:       p.Name,
 		Namespace:  p.ObjectMeta.Namespace,
 		Version:    0,
 		Path:       p.Status.Path,
-		Parameters: sampleValues,
+		Parameters: inputsForPattern(*p, needGitOps),
 	}
 
-	err, version := installChart(chart)
+	var err error
+	var version = 0
+	if isUpdate {
+		err, version = updateChart(chart)
+	} else {
+		err, version = installChart(chart)
+	}
 	if err == nil {
 		r.logger.Info("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version)
 	} else {
@@ -210,4 +264,52 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 		return ctrl.Result{}, nil
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+}
+
+func (r *PatternReconciler) handleFinalizer(instance *api.Pattern) (error, bool) {
+
+	// Add finalizer when object is created
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+			err := r.Client.Update(context.TODO(), instance)
+			return err, true
+		}
+
+	} else {
+		r.logger.Info("Deletion timestamp not zero")
+
+		// The object is being deleted
+		if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
+			// Do any required cleanup here
+
+			// Remove our finalizer from the list and update it.
+			instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+			err := r.Client.Update(context.Background(), instance)
+			return err, true
+		}
+	}
+
+	return nil, false
+}
+
+// ContainsString checks if the string array contains the given string.
+func ContainsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveString removes the given string from the string array if exists.
+func RemoveString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
 }

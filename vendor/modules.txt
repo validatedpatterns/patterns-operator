@@ -155,6 +155,7 @@ github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.5.1
 github.com/fsnotify/fsnotify
 # github.com/ghodss/yaml v1.0.0
+## explicit
 github.com/ghodss/yaml
 # github.com/go-errors/errors v1.0.1
 github.com/go-errors/errors
@@ -688,6 +689,7 @@ helm.sh/helm/v3/pkg/storage/driver
 helm.sh/helm/v3/pkg/time
 helm.sh/helm/v3/pkg/uploader
 # k8s.io/api v0.23.3
+## explicit
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1

@@ -18,6 +18,12 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	// NodeMaintenanceFinalizer is a finalizer for a NodeMaintenance CR deletion
+	PatternFinalizer string = "foregroundDeletePattern"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -39,9 +45,8 @@ type PatternSpec struct {
 
 	SiteName string `json:"siteName"`
 
-	GitSpec    GitSpec           `json:"gitSpec"`
-	GitOpsSpec GitOpsSpec        `json:"gitOpsSpec,omitempty"`
-	ImageSpec  ImageRegistrySpec `json:"imageSpec"`
+	GitConfig    GitConfig    `json:"gitSpec"`
+	GitOpsConfig GitOpsConfig `json:"gitOpsSpec,omitempty"`
 
 	AnonymousUsage  bool   `json:"anonymousUsage,omitempty"`
 	Validation      bool   `json:"validation,omitempty"`
@@ -51,22 +56,17 @@ type PatternSpec struct {
 	RequiredSecrets []string           `json:"requiredSecrets,omitempty"`
 }
 
-type GitSpec struct {
-	Hostname string `json:"hostname,omitempty"`
-	Account  string `json:"account"`
-	Token    string `json:"secret,omitempty"`
+type GitConfig struct {
+	Hostname       string               `json:"hostname,omitempty"`
+	Account        string               `json:"account"`
+	TokenSecret    types.NamespacedName `json:"tokenSecret,omitempty"`
+	TokenSecretKey string               `json:"tokenSecretKey,omitempty"`
 
 	OriginRepo     string `json:"originRepo,omitempty"`
 	TargetRepo     string `json:"targetRepo"`
 	TargetRevision string `json:"targetRevision,omitempty"`
 
 	ValuesDirectoryURL string `json:"valuesDirectoryURL,omitempty"`
-}
-
-type ImageRegistrySpec struct {
-	Hostname string `json:"hostname,omitempty"`
-	Account  string `json:"account"`
-	Secret   string `json:"secret,omitempty"`
 }
 
 type ApplyChangeType string
@@ -76,13 +76,13 @@ const (
 	InstallManual    ApplyChangeType = "Manual"
 )
 
-type GitOpsSpec struct {
+type GitOpsConfig struct {
 	OperatorChannel string `json:"operatorChannel,omitempty"`
 	OperatorSource  string `json:"operatorSource,omitempty"`
 	OperatorCSV     string `json:"operatorCSV,omitempty"`
 
 	SyncPolicy          ApplyChangeType `json:"syncPolicy,omitempty"`
-	ApplyChangeApproval ApplyChangeType `json:"installPlanApproval,omitempty"`
+	InstallPlanApproval ApplyChangeType `json:"installPlanApproval,omitempty"`
 	UseCSV              bool            `json:"useCSV,omitempty"`
 }
 
