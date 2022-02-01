@@ -180,7 +180,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
 
 		if string(calculated) != string(actual) {
-			r.logger.Info(fmt.Sprintf("Parameters changed", "calculated:", string(calculated), "active:", string(actual)))
+			r.logger.Info(fmt.Sprintf("Parameters changed, calculated: %s, active: %s", string(calculated), string(actual)))
 			needSync = true
 		}
 	}
@@ -226,7 +226,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		return err, output
 	}
 
-	r.logger.Info(fmt.Sprintf("clusterID:", clusterVersion.Spec.ClusterID))
+	r.logger.Info(fmt.Sprintf("clusterID: %s", clusterVersion.Spec.ClusterID))
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
@@ -241,7 +241,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	clustername := domainElements[1]
 	domainname := domainElements[2:]
-	r.logger.Info(fmt.Sprintf("cluster:", clustername, domainname))
+	r.logger.Info(fmt.Sprintf("cluster: %s @ %s", clustername, domainname))
 
 	//global:
 	//  datacenter:
@@ -309,7 +309,7 @@ func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
 		//	if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
-		r.logger.Error(fmt.Errorf("Could not obtain secret %s/%s" secret, namespace))
+		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", secret, namespace))
 		return err, ""
 	}
 
