@@ -395,7 +395,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
 	p.Status.LastError = err.Error()
-	r.logger.Error(err, "[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason)
+	r.logger.Error(err, fmt.Sprintf("[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason))
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
