@@ -129,7 +129,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Update/create the argo application
 
 	chart := chartForPattern(*qualifiedInstance)
-	if chart == nil && len(qualifiedInstance.Status.Path) == 0 {
+	if len(qualifiedInstance.Status.Path) == 0 {
+		err := r.prepareForClone(qualifiedInstance)
+		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
+
+	} else if _, err := os.Stat(qualifiedInstance.Status.Path); os.IsNotExist(err) {
 		err := r.prepareForClone(qualifiedInstance)
 		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
 	}
