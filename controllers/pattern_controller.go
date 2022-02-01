@@ -75,8 +75,6 @@ type PatternReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
 	// Reconcile() should perform at most one action in any invocation
 	// in order to simplify testing.
 	r.logger = log.FromContext(ctx)
@@ -85,7 +83,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Logger includes name and namespace
 	// Its also wants arguments in pairs, eg.
 	// r.logger.Error(err, fmt.Sprintf("[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason))
-	// Or r.logger.Error(err, "name", p.Name, "namespace", p.ObjectMeta.Namespace, "reason", reason))
+	// Or r.logger.Error(err, "message", "name", p.Name, "namespace", p.ObjectMeta.Namespace, "reason", reason))
 
 	// Fetch the NodeMaintenance instance
 	instance := &api.Pattern{}
@@ -95,7 +93,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.logger.Info("Pattern not found", "name", req.NamespacedName)
+			r.logger.Info("Pattern not found")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -182,7 +180,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
 
 		if string(calculated) != string(actual) {
-			r.logger.Info("Parameters changed", "calculated:", string(calculated), "active:", string(actual))
+			r.logger.Info(fmt.Sprintf("Parameters changed", "calculated:", string(calculated), "active:", string(actual)))
 			needSync = true
 		}
 	}
@@ -228,7 +226,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		return err, output
 	}
 
-	r.logger.Info("clusterID:", clusterVersion.Spec.ClusterID)
+	r.logger.Info(fmt.Sprintf("clusterID:", clusterVersion.Spec.ClusterID))
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
@@ -243,7 +241,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	clustername := domainElements[1]
 	domainname := domainElements[2:]
-	r.logger.Info("cluster:", clustername, domainname)
+	r.logger.Info(fmt.Sprintf("cluster:", clustername, domainname))
 
 	//global:
 	//  datacenter:
@@ -311,7 +309,7 @@ func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
 		//	if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
-		r.logger.Error(fmt.Errorf("Could not obtain secret"), secret, namespace)
+		r.logger.Error(fmt.Errorf("Could not obtain secret %s/%s" secret, namespace))
 		return err, ""
 	}
 
@@ -389,7 +387,7 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 		return err
 	}
 
-	r.logger.Info("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version)
+	r.logger.Info(fmt.Sprintf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version))
 	p.Status.Version = version
 	p.Status.Revision = hash
 	return nil
