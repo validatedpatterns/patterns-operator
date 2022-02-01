@@ -58,7 +58,7 @@ func checkoutRevision(directory string, token string, commit string) error {
 		return err
 	}
 
-	var options = &git.FetchOptions{
+	var foptions = &git.FetchOptions{
 		Depth:           0,
 		Force:           true,
 		InsecureSkipTLS: true,
@@ -69,13 +69,13 @@ func checkoutRevision(directory string, token string, commit string) error {
 		// The intended use of a GitHub personal access token is in replace of your password
 		// because access tokens can easily be revoked.
 		// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
-		options.Auth = &http.BasicAuth{
+		foptions.Auth = &http.BasicAuth{
 			Username: "abc123", // yes, this can be anything except an empty string
 			Password: token,
 		}
 	}
 
-	if err := repo.Fetch(options); err != nil {
+	if err := repo.Fetch(foptions); err != nil  && err != git.NoErrAlreadyUpToDate {
 		return err
 	}
 
@@ -86,10 +86,10 @@ func checkoutRevision(directory string, token string, commit string) error {
 
 	// ... checking out to commit
 	Info("git checkout %s", hash)
-	err = w.Checkout(&git.CheckoutOptions{
+	coptions := git.CheckoutOptions{
 		Hash: plumbing.NewHash(hash),
-	})
-	if err != nil {
+	}
+	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		return err
 	}
 
