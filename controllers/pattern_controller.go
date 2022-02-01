@@ -192,6 +192,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
+
+	//ss := strings.Compare(input.Spec.GitConfig.TargetRepo, "git")
+	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
+	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "git@"); index == 0 {
+		return fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo)
+	}
+
 	return nil
 }
 
