@@ -1,5 +1,10 @@
+FROM quay.io/centos/centos:stream9 AS builder
+RUN dnf install git golang -y
+RUN go version
+
+
 # Build the manager binary
-FROM golang:1.17 as builder
+#FROM golang:1.17 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
