@@ -76,11 +76,13 @@ func checkoutRevision(directory string, token string, commit string) error {
 	}
 
 	if err := repo.Fetch(foptions); err != nil  && err != git.NoErrAlreadyUpToDate {
+		Info("Error fetching")
 		return err
 	}
 
 	w, err := repo.Worktree()
 	if err != nil {
+		Info("Error obtaining worktree")
 		return err
 	}
 
@@ -90,6 +92,7 @@ func checkoutRevision(directory string, token string, commit string) error {
 		Hash: plumbing.NewHash(hash),
 	}
 	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
+		Info("Error during checkout")
 		return err
 	}
 
@@ -98,6 +101,7 @@ func checkoutRevision(directory string, token string, commit string) error {
 	Info("git show-ref --head HEAD")
 	ref, err := repo.Head()
 	if err != nil {
+		Info("Error obtaining HEAD")
 		return err
 	}
 
