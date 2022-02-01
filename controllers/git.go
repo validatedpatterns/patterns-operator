@@ -55,7 +55,6 @@ func checkoutRevision(directory, token, branch, commit string) error {
 	}
 
 	var foptions = &git.FetchOptions{
-		Depth:           0,
 		Force:           true,
 		InsecureSkipTLS: true,
 		Tags:            git.AllTags,
