@@ -415,8 +415,13 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
 	// err is logged by the reconcileHandler
-	p.Status.LastError = err.Error()
-	r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
+	if err != nil {
+		p.Status.LastError = err.Error()
+		r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
+	} else {
+		p.Status.LastError = ""
+		r.logger.Info(reason)
+	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
@@ -431,8 +436,8 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
 	if err == nil {
-		r.logger.Info(reason)
-		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		delay := time.Second * 5
+		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
 }
