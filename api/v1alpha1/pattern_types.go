@@ -64,6 +64,7 @@ type GitConfig struct {
 
 	OriginRepo     string `json:"originRepo,omitempty"`
 	TargetRepo     string `json:"targetRepo"`
+	TargetBranch   string `json:"targetBranch,omitempty"`
 	TargetRevision string `json:"targetRevision,omitempty"`
 
 	ValuesDirectoryURL string `json:"valuesDirectoryURL,omitempty"`

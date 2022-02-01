@@ -28,7 +28,7 @@ import (
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
 
-func checkout(url string, directory string, token string, commit string) error {
+func checkout(url, directory, token, branch, commit string) error {
 
 	if err := cloneRepo(url, directory, token); err != nil {
 		return err
@@ -39,20 +39,16 @@ func checkout(url string, directory string, token string, commit string) error {
 		return nil
 	}
 
-	if err := checkoutRevision(directory, token, commit); err != nil {
+	if err := checkoutRevision(directory, token, branch, commit); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func checkoutRevision(directory string, token string, commit string) error {
-	var hash = "main"
-	if len(commit) > 0 {
-		hash = commit
-	}
+func checkoutRevision(directory, token, branch, commit string) error {
 
-	Info("git checkout %s for %s", commit, directory)
+	Info("Accessing %s", directory)
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return err
@@ -75,7 +71,7 @@ func checkoutRevision(directory string, token string, commit string) error {
 		}
 	}
 
-	if err := repo.Fetch(foptions); err != nil  && err != git.NoErrAlreadyUpToDate {
+	if err := repo.Fetch(foptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		Info("Error fetching")
 		return err
 	}
@@ -86,10 +82,18 @@ func checkoutRevision(directory string, token string, commit string) error {
 		return err
 	}
 
-	// ... checking out to commit
-	Info("git checkout %s", hash)
 	coptions := git.CheckoutOptions{
-		Hash: plumbing.NewHash(hash),
+		Force: true,
+	}
+	if len(commit) > 0 {
+		Info("git checkout %s (hash)", commit)
+		coptions.Hash = plumbing.NewHash(commit)
+	} else if len(branch) > 0 {
+		Info("git checkout %s (branch)", branch)
+		coptions.Branch = plumbing.ReferenceName(branch)
+	} else {
+		Info("git checkout main (default)")
+		coptions.Branch = plumbing.ReferenceName("main")
 	}
 	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		Info("Error during checkout")
