@@ -114,7 +114,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				needSubscription = false
 			}
 		}
-
 	}
 
 	// Update/create the argo application
@@ -241,6 +240,15 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
+	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 && output.Spec.GitConfig.Hostname == "github.com" {
+		// https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
+		var hash = "HEAD"
+		if len(output.Spec.GitConfig.TargetRevision) > 0 {
+			hash = output.Spec.GitConfig.TargetRevision
+		}
+		ss := fmt.Sprintf("%s/raw/%s/", output.Spec.GitConfig.TargetRepo, hash)
+		output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
+	}
 
 	if len(output.Spec.GitConfig.Hostname) == 0 {
 		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
@@ -268,9 +276,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if len(output.Spec.SiteName) == 0 {
 		output.Spec.SiteName = "default"
 	}
-	//     if len(output.Spec.) == 0 {
-	//     	output.Spec. =
-	//     }
 
 	return nil, input
 }
@@ -302,13 +307,18 @@ func (r *PatternReconciler) authTokenFromSecret(secret types.NamespacedName, key
 }
 
 func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface{} {
+	gitMap := map[string]interface{}{
+		"repoURL":  p.Spec.GitConfig.TargetRepo,
+		"revision": p.Spec.GitConfig.TargetRevision,
+	}
+
+	if len(p.Spec.GitConfig.ValuesDirectoryURL) > 0 {
+		gitMap["valuesDirectoryURL"] = p.Spec.GitConfig.ValuesDirectoryURL
+	}
+
 	inputs := map[string]interface{}{
 		"main": map[string]interface{}{
-			"git": map[string]interface{}{
-				"repoURL":            p.Spec.GitConfig.TargetRepo,
-				"revision":           p.Spec.GitConfig.TargetRevision,
-				"valuesDirectoryURL": p.Spec.GitConfig.ValuesDirectoryURL,
-			},
+			"git": gitMap,
 			"options": map[string]interface{}{
 				"syncPolicy":          p.Spec.GitOpsConfig.SyncPolicy,
 				"installPlanApproval": p.Spec.GitOpsConfig.InstallPlanApproval,
@@ -321,16 +331,16 @@ func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface
 				"csv":     p.Spec.GitOpsConfig.OperatorCSV,
 			},
 			"siteName": p.Spec.SiteName,
+		},
 
-			"global": map[string]interface{}{
-				"imageregistry": map[string]interface{}{
-					"type": "quay",
-				},
-				"git": map[string]interface{}{
-					"hostname": p.Spec.GitConfig.Hostname,
-					// Account is the user or organization under which the pattern repo lives
-					"account": p.Spec.GitConfig.Account,
-				},
+		"global": map[string]interface{}{
+			"imageregistry": map[string]interface{}{
+				"type": "quay",
+			},
+			"git": map[string]interface{}{
+				"hostname": p.Spec.GitConfig.Hostname,
+				// Account is the user or organization under which the pattern repo lives
+				"account": p.Spec.GitConfig.Account,
 			},
 		},
 	}
