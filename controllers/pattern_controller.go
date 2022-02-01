@@ -77,6 +77,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	r.logger = log.FromContext(ctx)
 	r.logger.Info("Reconciling Pattern")
 
+	// Logger includes name and namespace
+	// Its also wants arguments in pairs, eg.
+	// r.logger.Error(err, fmt.Sprintf("[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason))
+	// Or r.logger.Error(err, "name", p.Name, "namespace", p.ObjectMeta.Namespace, "reason", reason))
+
 	// Fetch the NodeMaintenance instance
 	instance := &api.Pattern{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
@@ -394,20 +399,24 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
+	// err is logged by the reconcileHandler
 	p.Status.LastError = err.Error()
-	r.logger.Error(err, fmt.Sprintf("[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason))
+	r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update Pattern status")
 	}
-	//		return reconcile.Result{RequeueAfter: *duration}, nil
-	r.logger.Info("Reconciling with exponential duration")
+	if duration != nil {
+		return reconcile.Result{RequeueAfter: *duration}, err
+	}
+	//	r.logger.Info("Reconciling with exponential duration")
 	return reconcile.Result{}, err
 }
 
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
 	if err == nil {
+		r.logger.Info(reason)
 		return ctrl.Result{}, nil
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
