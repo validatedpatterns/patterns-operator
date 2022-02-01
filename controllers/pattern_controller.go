@@ -125,8 +125,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	var token = ""
-	if len(qualifiedInstance.Spec.GitConfig.TokenSecret.Name) > 0 {
-		if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
+	if len(qualifiedInstance.Spec.GitConfig.TokenSecret) > 0 {
+		if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
 			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
 		}
 	}
@@ -294,15 +294,15 @@ func (r *PatternReconciler) prepareForClone(p *api.Pattern) error {
 	return os.MkdirAll(p.Status.Path, os.ModePerm)
 }
 
-func (r *PatternReconciler) authTokenFromSecret(secret types.NamespacedName, key string) (error, string) {
+func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (error, string) {
 	if len(key) == 0 {
 		return nil, ""
 	}
 	tokenSecret := &corev1.Secret{}
-	err := r.Client.Get(context.TODO(), secret, tokenSecret)
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
-		//	if tokenSecret, err = r.Client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
-		r.logger.Error(fmt.Errorf("Could not obtain secret"), secret.Name, secret.Namespace)
+		//	if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
+		r.logger.Error(fmt.Errorf("Could not obtain secret"), secret, namespace)
 		return err, ""
 	}
 
@@ -310,7 +310,7 @@ func (r *PatternReconciler) authTokenFromSecret(secret types.NamespacedName, key
 		// See also https://github.com/kubernetes/client-go/issues/198
 		return nil, string(val)
 	}
-	return fmt.Errorf("No key '%s' found in %s/%s", key, secret.Name, secret.Namespace), ""
+	return fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace), ""
 }
 
 func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface{} {

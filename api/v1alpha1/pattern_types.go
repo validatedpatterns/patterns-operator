@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -57,10 +56,11 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
-	Hostname       string               `json:"hostname,omitempty"`
-	Account        string               `json:"account"`
-	TokenSecret    types.NamespacedName `json:"tokenSecret,omitempty"`
-	TokenSecretKey string               `json:"tokenSecretKey,omitempty"`
+	Hostname             string `json:"hostname,omitempty"`
+	Account              string `json:"account"`
+	TokenSecret          string `json:"tokenSecret,omitempty"`
+	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
+	TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
 	OriginRepo     string `json:"originRepo,omitempty"`
 	TargetRepo     string `json:"targetRepo"`
