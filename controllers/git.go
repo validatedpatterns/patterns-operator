@@ -47,7 +47,7 @@ func checkout(url string, directory string, token string, commit string) error {
 }
 
 func checkoutRevision(directory string, token string, commit string) error {
-	var hash = "HEAD"
+	var hash = "main"
 	if len(commit) > 0 {
 		hash = commit
 	}
