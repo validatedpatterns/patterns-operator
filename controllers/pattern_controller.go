@@ -198,7 +198,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// Report statistics
 
-	return r.actionPerformed(qualifiedInstance, "done", nil)
+	return ctrl.Result{}, nil
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
@@ -242,7 +242,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	domainElements := strings.Split(appDomain, ".")
 
 	clustername := domainElements[1]
-	domainname := domainElements[2:]
+	domainname := strings.Join(domainElements[2:], ".")
 	r.logger.Info(fmt.Sprintf("cluster: %s @ %s", clustername, domainname))
 
 	//global:
@@ -432,7 +432,7 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
 	if err == nil {
 		r.logger.Info(reason)
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
 }
