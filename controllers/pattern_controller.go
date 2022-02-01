@@ -34,18 +34,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-
-	configv1 "github.com/openshift/api/config/v1"
-	networkv1 "github.com/openshift/api/config/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
 
 	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
+
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
 // PatternReconciler reconciles a Pattern object
@@ -54,6 +55,10 @@ type PatternReconciler struct {
 	Scheme *runtime.Scheme
 
 	logger logr.Logger
+
+	config       *rest.Config
+	configClient configclient.Interface
+	fullClient   kubernetes.Interface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -218,8 +223,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// Cluster ID:
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
 	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
-	clusterVersion := &configv1.ClusterVersion{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "versiom"}, clusterVersion); err != nil {
+	clusterVersion, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
+	if err != nil {
 		return err, output
 	}
 
@@ -227,9 +232,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
-
-	clusterIngress := &networkv1.Ingress{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, clusterIngress); err != nil {
+	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
+	if err != nil {
 		return err, output
 	}
 
@@ -393,6 +397,17 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	var err error
+	r.config = mgr.GetConfig()
+
+	if r.configClient, err = configclient.NewForConfig(r.config); err != nil {
+		return err
+	}
+
+	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)

@@ -9,7 +9,8 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
-	github.com/openshift/api v0.0.0-20211028023115-7224b732cc14
+	github.com/openshift/api v0.0.0-20211028023115-7224b732cc14 // indirect
+	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 	github.com/operator-framework/api v0.12.0
 	helm.sh/helm/v3 v3.8.0
 	k8s.io/api v0.23.3
