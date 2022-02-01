@@ -3,4 +3,9 @@ kind: Pattern
 metadata:
   name: pattern-sample
 spec:
-  # TODO(user): Add fields here
+  siteName: hub
+  gitSpec:
+    account: beekhof
+    targetRepo: "https://github.com/hybrid-cloud-patterns/multicloud-gitops"
+
+  
