@@ -120,7 +120,11 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 	helmClient := helm.NewClient(helm.Host(helmhost))
 
 	// list/print releases
-	resp, _ := helmClient.ListReleases()
+	resp, err := helmClient.ListReleases()
+	if err != nil {
+		log.Printf("Error listing releases: %s", err.Error())
+		return nil
+	}
 	for _, release := range resp.Releases {
 		if pattern.Name == release.GetName() && pattern.Namespace == release.GetNamespace() {
 			nv, err := chartutil.ReadValues([]byte(release.Chart.Values.Raw))
