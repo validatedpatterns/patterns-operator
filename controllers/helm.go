@@ -162,7 +162,7 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 	c := HelmChart{
 		Name:      pattern.Name,
 		Namespace: pattern.Namespace,
-		Path:      pattern.Status.Path,
+		Path:      fmt.Sprintf("%s/common/install", pattern.Status.Path),
 	}
 
 	err, actionConfig := getConfiguration()
