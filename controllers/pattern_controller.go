@@ -151,7 +151,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 	}
 
-	if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetBranch, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
+	if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
 		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
 	}
 
@@ -333,8 +333,6 @@ func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface
 
 	if len(p.Spec.GitConfig.TargetRevision) > 0 {
 		gitMap["revision"] = p.Spec.GitConfig.TargetRevision
-	} else if len(p.Spec.GitConfig.TargetBranch) > 0 {
-		gitMap["revision"] = p.Spec.GitConfig.TargetBranch
 	}
 
 	if len(p.Spec.GitConfig.ValuesDirectoryURL) > 0 {

@@ -18,11 +18,13 @@ package controllers
 
 import (
 	//	"log"
+	"fmt"
 	"os"
 
 	"github.com/go-git/go-git/v5"
 	. "github.com/go-git/go-git/v5/_examples"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
@@ -39,14 +41,72 @@ func checkout(url, directory, token, branch, commit string) error {
 		return nil
 	}
 
-	if err := checkoutRevision(directory, token, branch, commit); err != nil {
+	if err := checkoutRevision(directory, token, commit); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func checkoutRevision(directory, token, branch, commit string) error {
+func getHashFromReference(repo *git.Repository, name plumbing.ReferenceName) (plumbing.Hash, error) {
+	b, err := repo.Reference(name, true)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	if !b.Name().IsTag() {
+		return b.Hash(), nil
+	}
+
+	o, err := repo.Object(plumbing.AnyObject, b.Hash())
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	switch o := o.(type) {
+	case *object.Tag:
+		if o.TargetType != plumbing.CommitObject {
+			return plumbing.ZeroHash, fmt.Errorf("unsupported tag object target %q", o.TargetType)
+		}
+
+		return o.Target, nil
+	case *object.Commit:
+		return o.Hash, nil
+	}
+
+	return plumbing.ZeroHash, fmt.Errorf("unsupported tag target %q", o.Type())
+}
+
+func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, error) {
+	if len(name) == 0 {
+		return getHashFromReference(repo, plumbing.NewBranchReferenceName("main"))
+	}
+
+	// Try as commit hash
+	h := plumbing.NewHash(name)
+	_, err := repo.Object(plumbing.AnyObject, h)
+	if err == nil {
+		return h, err
+	}
+
+	// Try various reference types...
+
+	if h, err := getHashFromReference(repo, plumbing.NewBranchReferenceName(name)); err == nil {
+		return h, err
+	}
+
+	if h, err := getHashFromReference(repo, plumbing.NewTagReferenceName(name)); err == nil {
+		return h, err
+	}
+
+	if h, err := getHashFromReference(repo, plumbing.NewRemoteHEADReferenceName(name)); err == nil {
+		return h, err
+	}
+
+	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
+}
+
+func checkoutRevision(directory, token, commit string) error {
 
 	Info("Accessing %s", directory)
 	repo, err := git.PlainOpen(directory)
@@ -81,19 +141,17 @@ func checkoutRevision(directory, token, branch, commit string) error {
 		return err
 	}
 
+	h, err := getCommitFromTarget(repo, commit)
 	coptions := git.CheckoutOptions{
 		Force: true,
+		Hash:  h,
 	}
-	if len(commit) > 0 {
-		Info("git checkout %s (hash)", commit)
-		coptions.Hash = plumbing.NewHash(commit)
-	} else if len(branch) > 0 {
-		Info("git checkout %s (branch)", branch)
-		coptions.Branch = plumbing.NewBranchReferenceName(branch)
-	} else {
-		Info("git checkout main (default)")
-		coptions.Branch = plumbing.NewBranchReferenceName("main")
+
+	if err != nil {
+		return err
 	}
+
+	Info("git checkout %s (%s)", h, commit)
 
 	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		Info("Error during checkout")

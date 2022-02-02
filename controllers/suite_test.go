@@ -91,7 +91,13 @@ var _ = BeforeSuite(func() {
 	logf.Log.Info("created reference", "branch", b, "input", input)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = checkoutRevision(directory, "", branch, "")
+	err = checkoutRevision(directory, "", branch)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = checkoutRevision(directory, "", "d1578208f326431805d56a96491f3312f1fa4658")
+	Expect(err).NotTo(HaveOccurred())
+
+	err = checkoutRevision(directory, "", "d157820")
 	Expect(err).NotTo(HaveOccurred())
 
 }, 60)
