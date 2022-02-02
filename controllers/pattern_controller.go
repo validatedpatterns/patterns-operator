@@ -215,7 +215,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if needSync {
-		err := r.deployPattern(qualifiedInstance, false, false)
+		err := r.deployPattern(qualifiedInstance, false, true)
 		return r.actionPerformed(qualifiedInstance, "updating the pattern", err)
 	}
 
@@ -412,8 +412,10 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 
 	var version = 0
 	if isUpdate {
+		r.logger.Info("updating pattern")
 		err, version = updateChart(chart)
 	} else {
+		r.logger.Info("installing pattern")
 		err, version = installChart(chart)
 	}
 	if err != nil {
