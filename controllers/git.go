@@ -89,11 +89,12 @@ func checkoutRevision(directory, token, branch, commit string) error {
 		coptions.Hash = plumbing.NewHash(commit)
 	} else if len(branch) > 0 {
 		Info("git checkout %s (branch)", branch)
-		coptions.Branch = plumbing.ReferenceName(branch)
+		coptions.Branch = plumbing.NewBranchReferenceName(branch)
 	} else {
 		Info("git checkout main (default)")
-		coptions.Branch = plumbing.ReferenceName("main")
+		coptions.Branch = plumbing.NewBranchReferenceName("main")
 	}
+
 	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		Info("Error during checkout")
 		return err
