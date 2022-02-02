@@ -118,11 +118,15 @@ func updateChart(c HelmChart) (error, int) {
 
 func chartForPattern(pattern api.Pattern) *HelmChart {
 	helmClient := helm.NewClient(helm.Host(helmhost))
+	if err := helmClient.PingTiller(); err != nil {
+		log.Printf("Error connecting to tiller: %s (%s)", err.Error(), helmClient.Driver.Name())
+		return nil
+	}
 
 	// list/print releases
 	resp, err := helmClient.ListReleases()
 	if err != nil {
-		log.Printf("Error listing releases: %s", err.Error())
+		log.Printf("Error listing releases: %s (%s)", err.Error(), helmClient.Driver.Name())
 		return nil
 	}
 	for _, release := range resp.Releases {
