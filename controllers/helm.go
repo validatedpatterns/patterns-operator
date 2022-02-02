@@ -45,7 +45,7 @@ type HelmChart struct {
 	Parameters chartutil.Values
 }
 
-func getChartObj(c HelmChart) (error, *action.Configuration, *chart.Chart) {
+func getConfiguration() (error, *action.Configuration) {
 	settings := cli.New()
 
 	actionConfig := new(action.Configuration)
@@ -55,29 +55,41 @@ func getChartObj(c HelmChart) (error, *action.Configuration, *chart.Chart) {
 	if len(driver) == 0 {
 		driver = "secrets"
 	}
-	if err := actionConfig.Init(settings.RESTClientGetter(), c.Namespace, driver, log.Printf); err != nil {
-		log.Printf("%+v", err)
-		return err, nil, nil
-	}
 
-	if err := actionConfig.KubeClient.IsReachable(); err != nil {
-		log.Printf("not reachable: %+v", err)
-		return err, nil, nil
-	}
-	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, os.Getenv("HELM_DRIVER"), func(format string, v ...interface{}) {
+	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, driver, func(format string, v ...interface{}) {
 	//		_ = fmt.Sprintf(format, v)
 	//	}); err != nil {
 	//		panic(err)
 	//	}
 
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), driver, log.Printf); err != nil {
+		log.Printf("Bad config: %+v", err)
+		return err, nil
+	}
+
+	if err := actionConfig.KubeClient.IsReachable(); err != nil {
+		log.Printf("not reachable: %+v", err)
+		return err, nil
+	}
+
+	return nil, actionConfig
+}
+
+func getChartObj(c HelmChart) (error, *chart.Chart) {
+
 	// load chart from the path
 	chartobj, err := loader.Load(c.Path)
-	return err, actionConfig, chartobj
+	return err, chartobj
 }
 
 func installChart(c HelmChart) (error, int) {
 
-	err, actionConfig, chartobj := getChartObj(c)
+	err, actionConfig := getConfiguration()
+	if err != nil {
+		return err, -1
+	}
+
+	err, chartobj := getChartObj(c)
 	if err != nil {
 		return err, -1
 	}
@@ -103,7 +115,12 @@ func installChart(c HelmChart) (error, int) {
 
 func updateChart(c HelmChart) (error, int) {
 
-	err, actionConfig, chartobj := getChartObj(c)
+	err, actionConfig := getConfiguration()
+	if err != nil {
+		return err, -1
+	}
+
+	err, chartobj := getChartObj(c)
 	if err != nil {
 		return err, -1
 	}
@@ -148,8 +165,14 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 		Path:      pattern.Status.Path,
 	}
 
-	err, actionConfig, chartobj := getChartObj(c)
+	err, actionConfig := getConfiguration()
 	if err != nil {
+		return nil
+	}
+
+	err, chartobj := getChartObj(c)
+	if err != nil {
+		log.Printf("Bad chart: %s\n", err.Error())
 		return nil
 	}
 
@@ -159,6 +182,7 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 		c.Parameters = rel.Chart.Values
 		return &c
 	}
+	log.Printf("Chart not installed\n")
 	return nil
 }
 
@@ -190,27 +214,21 @@ func installedCharts() []HelmChart {
 	// }
 
 	var charts []HelmChart
-	// omit getting kubeConfig, see: https://github.com/kubernetes/client-go/tree/master/examples
+	err, cfg := getConfiguration()
+	deployed, err := cfg.Releases.ListDeployed()
+	if err != nil {
+		log.Printf("Could not list deployed charts: %s\n", err.Error())
+		return charts
+	}
 
-	// get kubernetes client
-	// client, _ := kubernetes.NewForConfig(kubeConfig)
-
-	// port forward tiller
-	// tillerTunnel, _ := portforwarder.New("kube-system", client, config)
-
-	// new helm client
-	//	helmClient := helm.NewClient(helm.Host(helmhost))
-	//
-	//	// list/print releases
-	//	resp, _ := helmClient.ListReleases()
-	//	for _, release := range resp.Releases {
-	//		log.Println(release.GetName())
-	//		charts = append(charts, HelmChart{
-	//			Name:      release.GetName(),
-	//			Namespace: release.GetNamespace(),
-	//			Version:   release.GetVersion(),
-	//		})
-	//	}
+	for _, release := range deployed {
+		log.Println(release.Name)
+		charts = append(charts, HelmChart{
+			Name:      release.Name,
+			Namespace: release.Namespace,
+			Version:   release.Version,
+		})
+	}
 	return charts
 }
 
