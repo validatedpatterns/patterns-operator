@@ -17,18 +17,18 @@ limitations under the License.
 package controllers
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"os"
 
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-
-	"helm.sh/helm/v3/pkg/cli"
-	//	"helm.sh/helm/v3/pkg/release"
-
 	"helm.sh/helm/v3/pkg/chart"
-	"k8s.io/helm/pkg/chartutil"
-	"k8s.io/helm/pkg/helm"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/storage/driver"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
@@ -40,7 +40,7 @@ var (
 type HelmChart struct {
 	Name       string
 	Namespace  string
-	Version    int32
+	Version    int
 	Path       string
 	Parameters chartutil.Values
 }
@@ -51,12 +51,19 @@ func getChartObj(c HelmChart) (error, *action.Configuration, *chart.Chart) {
 	actionConfig := new(action.Configuration)
 	// You can pass an empty string instead of settings.Namespace() to list
 	// all namespaces
-	if err := actionConfig.Init(settings.RESTClientGetter(), c.Namespace,
-		os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
+	driver := os.Getenv("HELM_DRIVER")
+	if len(driver) == 0 {
+		driver = "secrets"
+	}
+	if err := actionConfig.Init(settings.RESTClientGetter(), c.Namespace, driver, log.Printf); err != nil {
 		log.Printf("%+v", err)
-		os.Exit(1)
+		return err, nil, nil
 	}
 
+	if err := actionConfig.KubeClient.IsReachable(); err != nil {
+		log.Printf("not reachable: %+v", err)
+		return err, nil, nil
+	}
 	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, os.Getenv("HELM_DRIVER"), func(format string, v ...interface{}) {
 	//		_ = fmt.Sprintf(format, v)
 	//	}); err != nil {
@@ -69,6 +76,7 @@ func getChartObj(c HelmChart) (error, *action.Configuration, *chart.Chart) {
 }
 
 func installChart(c HelmChart) (error, int) {
+
 	err, actionConfig, chartobj := getChartObj(c)
 	if err != nil {
 		return err, -1
@@ -102,53 +110,54 @@ func updateChart(c HelmChart) (error, int) {
 
 	client := action.NewUpgrade(actionConfig)
 	client.Namespace = c.Namespace
-	// client.DryRun = true - very handy!
 
-	// install the chart here
-	rel, err := client.Run(c.Name, chartobj, c.Parameters)
-	if err != nil {
-		return err, -1
-	}
-
-	log.Printf("Updated Chart %s from path: %s in namespace: %s\n", rel.Name, c.Path, rel.Namespace)
-	// this will confirm the values set during installation
-	log.Println(rel.Config)
-	return nil, rel.Version
+	// (*release.Release, error)
+	//	ctx := context.Background()
+	//	_, err := client.RunWithContext(ctx, c.Name, chartobj, c.Parameters)
+	_, err = client.Run(c.Name, chartobj, c.Parameters)
+	return err, -1
 }
 
+//func getConfiguration() (err, *action.Configuration) {
+//
+//return action.Init(getter genericclioptions.RESTClientGetter, namespace, "secrets", log DebugLog) error {
+//
+//     registryClient, err := registry.NewClient()
+//	if err != nil {
+//		return err, nil
+//	}
+//
+//	return &action.Configuration{
+//		Releases:       storage.Init(driver.NewMemory()),
+//		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: ioutil.Discard}},
+//		Capabilities:   chartutil.DefaultCapabilities,
+//		RegistryClient: registryClient,
+//		Log: func(format string, v ...interface{}) {
+////	t.Helper()
+////			if *verbose {
+//				t.Logf(format, v...)
+////			}
+//		},
+//	}
+//}
+
 func chartForPattern(pattern api.Pattern) *HelmChart {
-	helmClient := helm.NewClient(helm.Host(helmhost))
-	if err := helmClient.PingTiller(); err != nil {
-		log.Printf("Error connecting to tiller: %s (%s)", err.Error(), helmClient.Driver.Name())
-		return nil
+	c := HelmChart{
+		Name:      pattern.Name,
+		Namespace: pattern.Namespace,
+		Path:      pattern.Status.Path,
 	}
 
-	// list/print releases
-	resp, err := helmClient.ListReleases()
+	err, actionConfig, chartobj := getChartObj(c)
 	if err != nil {
-		log.Printf("Error listing releases: %s (%s)", err.Error(), helmClient.Driver.Name())
 		return nil
 	}
-	for _, release := range resp.Releases {
-		if pattern.Name == release.GetName() && pattern.Namespace == release.GetNamespace() {
-			nv, err := chartutil.ReadValues([]byte(release.Chart.Values.Raw))
-			log.Printf("Error: Reading chart '%s' default values (%s): %s", release.Chart.Metadata.Name, release.Chart.Values.Raw, err)
 
-			return &HelmChart{
-				Name:       release.GetName(),
-				Namespace:  release.GetNamespace(),
-				Version:    release.GetVersion(),
-				Path:       pattern.Status.Path,
-				Parameters: nv.AsMap(),
-
-				// type Config struct {
-				//        Raw                  string            `protobuf:"bytes,1,opt,name=raw,proto3" json:"raw,omitempty"`
-				//        Values               map[string]*Value `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-				//...
-				// Raw == yaml.Marshal(chartutil.Values)
-
-			}
-		}
+	rel, err := lastRelease(*actionConfig, pattern.Name, chartobj)
+	if err == nil && rel != nil {
+		c.Version = rel.Version
+		c.Parameters = rel.Chart.Values
+		return &c
 	}
 	return nil
 }
@@ -190,17 +199,53 @@ func installedCharts() []HelmChart {
 	// tillerTunnel, _ := portforwarder.New("kube-system", client, config)
 
 	// new helm client
-	helmClient := helm.NewClient(helm.Host(helmhost))
-
-	// list/print releases
-	resp, _ := helmClient.ListReleases()
-	for _, release := range resp.Releases {
-		log.Println(release.GetName())
-		charts = append(charts, HelmChart{
-			Name:      release.GetName(),
-			Namespace: release.GetNamespace(),
-			Version:   release.GetVersion(),
-		})
-	}
+	//	helmClient := helm.NewClient(helm.Host(helmhost))
+	//
+	//	// list/print releases
+	//	resp, _ := helmClient.ListReleases()
+	//	for _, release := range resp.Releases {
+	//		log.Println(release.GetName())
+	//		charts = append(charts, HelmChart{
+	//			Name:      release.GetName(),
+	//			Namespace: release.GetNamespace(),
+	//			Version:   release.GetVersion(),
+	//		})
+	//	}
 	return charts
+}
+
+func lastRelease(cfg action.Configuration, name string, chart *chart.Chart) (*release.Release, error) {
+	if chart == nil {
+		return nil, fmt.Errorf("errMissingChart")
+	}
+
+	// finds the last non-deleted release with the given name
+	lastRelease, err := cfg.Releases.Last(name)
+	if err != nil {
+		// to keep existing behavior of returning the "%q has no deployed releases" error when an existing release does not exist
+		return nil, nil
+	}
+
+	// Concurrent `helm upgrade`s will either fail here with `errPending` or when creating the release with "already exists". This should act as a pessimistic lock.
+	if lastRelease.Info.Status.IsPending() {
+		return nil, fmt.Errorf("errPending")
+	}
+
+	var currentRelease *release.Release
+	if lastRelease.Info.Status == release.StatusDeployed {
+		// no need to retrieve the last deployed release from storage as the last release is deployed
+		currentRelease = lastRelease
+	} else {
+		// finds the deployed release with the given name
+		currentRelease, err = cfg.Releases.Deployed(name)
+		if err != nil {
+			if errors.Is(err, driver.ErrNoDeployedReleases) &&
+				(lastRelease.Info.Status == release.StatusFailed || lastRelease.Info.Status == release.StatusSuperseded) {
+				currentRelease = lastRelease
+			} else {
+				return nil, err
+			}
+		}
+	}
+	return currentRelease, nil
 }

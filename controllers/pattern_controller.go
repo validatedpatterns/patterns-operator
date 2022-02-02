@@ -66,6 +66,11 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns/finalizers,verbs=update
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=namespaces;secrets,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
+//
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -128,7 +133,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Update/create the argo application
 
-	chart := chartForPattern(*qualifiedInstance)
 	if len(qualifiedInstance.Status.Path) == 0 {
 		err := r.prepareForClone(qualifiedInstance)
 		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
@@ -159,6 +163,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
+	chart := chartForPattern(*qualifiedInstance)
 	if chart == nil {
 		err := r.deployPattern(qualifiedInstance, needSubscription, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
