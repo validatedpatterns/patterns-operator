@@ -277,11 +277,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	//    domain: blueprints.rhecoeng.com
 	//    clustername: beekhof-gitops
 
-	if len(output.Spec.GitConfig.Hostname) == 0 {
-		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
-		output.Spec.GitConfig.Hostname = ss[1]
-	}
-
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
 	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 && output.Spec.GitConfig.Hostname == "github.com" {
 		// https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
@@ -295,7 +290,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	if len(output.Spec.GitConfig.Hostname) == 0 {
 		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
-		output.Spec.GitConfig.Hostname = ss[1]
+		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
 	if len(output.Spec.GitOpsConfig.SyncPolicy) == 0 {
@@ -308,7 +303,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
 		output.Spec.GitOpsConfig.OperatorChannel = "stable"
-		r.logger.Info("applied default", "OperatorChannel", output.Spec.GitOpsConfig.OperatorChannel)
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
