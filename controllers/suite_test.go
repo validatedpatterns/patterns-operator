@@ -17,6 +17,8 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -30,6 +32,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -70,6 +74,25 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	branch := "main"
+	directory := "/tmp/git-test"
+	if _, err = os.Stat(fmt.Sprintf("%s/.git", directory)); os.IsNotExist(err) {
+		err = cloneRepo("https://github.com/hybrid-cloud-patterns/multicloud-gitops", directory, "")
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	logf.Log.Info("Accessing", "directory", directory)
+	repo, err := git.PlainOpen(directory)
+	Expect(err).NotTo(HaveOccurred())
+
+	input := plumbing.NewBranchReferenceName(branch)
+	b, err := repo.Storer.Reference(input)
+	logf.Log.Info("created reference", "branch", b, "input", input)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = checkoutRevision(directory, "", branch, "")
+	Expect(err).NotTo(HaveOccurred())
 
 }, 60)
 
