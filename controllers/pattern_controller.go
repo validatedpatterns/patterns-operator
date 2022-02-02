@@ -308,7 +308,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
 		output.Spec.GitOpsConfig.OperatorChannel = "stable"
-		r.logger.Info(fmt.Sprintf("applied default", "OperatorChannel", output.Spec.GitOpsConfig.OperatorChannel))
+		r.logger.Info("applied default", "OperatorChannel", output.Spec.GitOpsConfig.OperatorChannel)
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
@@ -317,8 +317,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if len(output.Spec.GitOpsConfig.OperatorCSV) == 0 {
 		output.Spec.GitOpsConfig.OperatorCSV = "v1.4.0"
 	}
-	if len(output.Spec.SiteName) == 0 {
-		output.Spec.SiteName = "default"
+	if len(output.Spec.ClusterGroupName) == 0 {
+		output.Spec.ClusterGroupName = "default"
 	}
 
 	return nil, output
@@ -377,7 +377,7 @@ func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface
 				"source":  p.Spec.GitOpsConfig.OperatorSource,
 				"csv":     p.Spec.GitOpsConfig.OperatorCSV,
 			},
-			"siteName": p.Spec.SiteName,
+			"clusterGroupName": p.Spec.ClusterGroupName,
 		},
 
 		"global": map[string]interface{}{

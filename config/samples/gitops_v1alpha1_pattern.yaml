@@ -3,7 +3,7 @@ kind: Pattern
 metadata:
   name: pattern-sample
 spec:
-  siteName: hub
+  clusterGroupName: hub
   gitSpec:
     account: beekhof
     targetRepo: "https://github.com/hybrid-cloud-patterns/multicloud-gitops"

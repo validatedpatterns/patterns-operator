@@ -42,7 +42,7 @@ type PatternSpec struct {
 	// SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	SiteName string `json:"siteName"`
+	ClusterGroupName string `json:"clusterGroupName"`
 
 	GitConfig    GitConfig    `json:"gitSpec"`
 	GitOpsConfig GitOpsConfig `json:"gitOpsSpec,omitempty"`
