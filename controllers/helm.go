@@ -22,6 +22,8 @@ import (
 	"log"
 	"os"
 
+	"k8s.io/client-go/discovery"
+
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -184,6 +186,61 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 	}
 	log.Printf("Chart not installed\n")
 	return nil
+}
+
+func coalesceChartValues(pattern api.Pattern, c HelmChart) (error, map[string]interface{}) {
+	calculated := inputsForPattern(pattern, false)
+
+	err, chartobj := getChartObj(c)
+	if err != nil {
+		return err, nil
+	}
+
+	log.Printf("Calculated inputs: %+v\n", calculated)
+
+	vals, err := chartutil.CoalesceValues(chartobj, calculated)
+	return err, vals
+}
+
+// capabilities builds a Capabilities from discovery information.
+func getCapabilities(cfg *action.Configuration) (*chartutil.Capabilities, error) {
+	if cfg.Capabilities != nil {
+		return cfg.Capabilities, nil
+	}
+	dc, err := cfg.RESTClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil, fmt.Errorf("could not get Kubernetes discovery client: %s", err.Error())
+	}
+	// force a discovery cache invalidation to always fetch the latest server version/capabilities.
+	dc.Invalidate()
+	kubeVersion, err := dc.ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get server version from Kubernetes: %s", err.Error())
+	}
+	// Issue #6361:
+	// Client-Go emits an error when an API service is registered but unimplemented.
+	// We trap that error here and print a warning. But since the discovery client continues
+	// building the API object, it is correctly populated with all valid APIs.
+	// See https://github.com/kubernetes/kubernetes/issues/72051#issuecomment-521157642
+	apiVersions, err := action.GetVersionSet(dc)
+	if err != nil {
+		if discovery.IsGroupDiscoveryFailedError(err) {
+			cfg.Log("WARNING: The Kubernetes server has an orphaned API service. Server reports: %s", err)
+			cfg.Log("WARNING: To fix this, kubectl delete apiservice <service-name>")
+		} else {
+			return nil, fmt.Errorf("could not get get apiVersions from Kubernetes: %s", err.Error())
+		}
+	}
+
+	cfg.Capabilities = &chartutil.Capabilities{
+		APIVersions: apiVersions,
+		KubeVersion: chartutil.KubeVersion{
+			Version: kubeVersion.GitVersion,
+			Major:   kubeVersion.Major,
+			Minor:   kubeVersion.Minor,
+		},
+	}
+	return cfg.Capabilities, nil
 }
 
 // https://stackoverflow.com/questions/45692719/samples-on-kubernetes-helm-golang-client

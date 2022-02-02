@@ -181,18 +181,36 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		needSync = true
 
 	} else {
-
+		var err error
+		var deployedMarshalled []byte
+		var calculatedMarshalled []byte
 		// Force a consistent value for bootstrap, which doesn't matter
 		m := chart.Parameters["main"].(map[string]interface{})
 		o := m["options"].(map[string]interface{})
 		o["bootstrap"] = false
 
-		actual, _ := yaml.Marshal(chart.Parameters)
-		calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
-
-		if string(calculated) != string(actual) {
-			r.logger.Info(fmt.Sprintf("Parameters changed, calculated: %s, active: %s", string(calculated), string(actual)))
+		if deployedMarshalled, err = yaml.Marshal(chart.Parameters); err != nil {
 			needSync = true
+			r.logger.Info("Error marshalling deployed values", "input", chart.Parameters, "error", err.Error())
+
+		}
+		//calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
+
+		err, calculated := coalesceChartValues(*qualifiedInstance, *chart)
+		if err != nil {
+			needSync = true
+			r.logger.Info("Error coalescing calculated values", "error", err.Error())
+
+		} else if calculatedMarshalled, err = yaml.Marshal(calculated); err != nil {
+			needSync = true
+			r.logger.Info("Error marshalling calculated values", "input", calculated, "error", err.Error())
+		}
+
+		if string(calculatedMarshalled) != string(deployedMarshalled) {
+			r.logger.Info(fmt.Sprintf("Parameters changed... calculated:\n%s\nactual:\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
+			needSync = true
+		} else {
+			r.logger.Info(fmt.Sprintf("Parameters unchanged... current:\n%s\n", string(deployedMarshalled)))
 		}
 	}
 
