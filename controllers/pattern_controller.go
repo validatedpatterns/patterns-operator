@@ -207,10 +207,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		if string(calculatedMarshalled) != string(deployedMarshalled) {
-			r.logger.Info(fmt.Sprintf("Parameters changed... calculated:\n%s\nactual:\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
+			r.logger.Info(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
 			needSync = true
 		} else {
-			r.logger.Info(fmt.Sprintf("Parameters unchanged... current:\n%s\n", string(deployedMarshalled)))
+			r.logger.Info(fmt.Sprintf("Parameters unchanged. current...\n%s\n", string(deployedMarshalled)))
 		}
 	}
 
@@ -308,6 +308,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
 		output.Spec.GitOpsConfig.OperatorChannel = "stable"
+		r.logger.Info(fmt.Sprintf("applied default", "OperatorChannel", output.Spec.GitOpsConfig.OperatorChannel))
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
@@ -320,7 +321,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.SiteName = "default"
 	}
 
-	return nil, input
+	return nil, output
 }
 
 func (r *PatternReconciler) prepareForClone(p *api.Pattern) error {
