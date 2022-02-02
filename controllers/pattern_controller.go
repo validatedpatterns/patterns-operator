@@ -376,7 +376,7 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 		Name:       p.Name,
 		Namespace:  p.ObjectMeta.Namespace,
 		Version:    0,
-		Path:       p.Status.Path,
+		Path:       fmt.Sprintf("%s/common/install", p.Status.Path),
 		Parameters: inputsForPattern(*p, needSubscription),
 	}
 
