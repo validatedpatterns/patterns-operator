@@ -269,14 +269,14 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// "apps.mycluster.blueprints.rhecoeng.com"
 	output.Status.ClusterDomain = clusterIngress.Spec.Domain
 
+	if len(output.Spec.GitConfig.TargetRevision) == 0 {
+		output.Spec.GitConfig.TargetRevision = "main"
+	}
+
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
 	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 && output.Spec.GitConfig.Hostname == "github.com" {
 		// https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
-		var hash = "HEAD"
-		if len(output.Spec.GitConfig.TargetRevision) > 0 {
-			hash = output.Spec.GitConfig.TargetRevision
-		}
-		ss := fmt.Sprintf("%s/raw/%s/", output.Spec.GitConfig.TargetRepo, hash)
+		ss := fmt.Sprintf("%s/raw/%s/", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
 		output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
 	}
 
