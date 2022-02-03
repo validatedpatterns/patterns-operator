@@ -26,11 +26,12 @@ import (
 	"path/filepath"
 
 	"github.com/ghodss/yaml"
+	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,7 +97,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	instance := &api.Pattern{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if kerrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
@@ -199,7 +200,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err, calculated := coalesceChartValues(*qualifiedInstance, *chart)
 		if err != nil {
 			needSync = true
-			r.logger.Info("Error coalescing calculated values", "error", err.Error())
+			fmt.Printf("Error coalescing calculated values: %s", err.Error())
 
 		} else if calculatedMarshalled, err = yaml.Marshal(calculated); err != nil {
 			needSync = true
@@ -207,10 +208,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		if string(calculatedMarshalled) != string(deployedMarshalled) {
-			r.logger.Info(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
+			fmt.Printf(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
 			needSync = true
 		} else {
-			r.logger.Info(fmt.Sprintf("Parameters unchanged. current...\n%s\n", string(deployedMarshalled)))
+			fmt.Printf("Parameters unchanged. current...\n%s\n", string(deployedMarshalled))
 		}
 	}
 
@@ -233,7 +234,7 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	//ss := strings.Compare(input.Spec.GitConfig.TargetRepo, "git")
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
 	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "git@"); index == 0 {
-		return fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo)
+		return errors.New(fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo))
 	}
 
 	return nil
@@ -250,12 +251,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// Cluster ID:
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
 	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
-	clusterVersion, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
-	if err != nil {
+	if cv, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{}); err != nil {
 		return err, output
+	} else {
+		output.Status.ClusterID = string(cv.Spec.ClusterID)
 	}
-
-	r.logger.Info(fmt.Sprintf("clusterID: %s", clusterVersion.Spec.ClusterID))
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
@@ -331,7 +331,7 @@ func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (
 		// See also https://github.com/kubernetes/client-go/issues/198
 		return nil, string(val)
 	}
-	return fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace), ""
+	return errors.New(fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace)), ""
 }
 
 func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface{} {
@@ -398,17 +398,17 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 
 	var version = 0
 	if isUpdate {
-		r.logger.Info("updating pattern")
+		fmt.Printf("updating pattern")
 		err, version = updateChart(chart)
 	} else {
-		r.logger.Info("installing pattern")
+		fmt.Printf("installing pattern")
 		err, version = installChart(chart)
 	}
 	if err != nil {
 		return err
 	}
 
-	r.logger.Info(fmt.Sprintf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version))
+	fmt.Printf(fmt.Sprintf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version))
 	p.Status.Version = version
 	p.Status.Revision = hash
 	return nil
@@ -436,10 +436,11 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	// err is logged by the reconcileHandler
 	if err != nil {
 		p.Status.LastError = err.Error()
-		r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
+		fmt.Printf("\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
+		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
 	} else {
 		p.Status.LastError = ""
-		r.logger.Info(reason)
+		fmt.Printf("\x1b[34;1mReconcile step %q complete\x1b[0m\n", reason)
 	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
@@ -449,7 +450,7 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	if duration != nil {
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
-	//	r.logger.Info("Reconciling with exponential duration")
+	//	fmt.Printf("Reconciling with exponential duration")
 	return reconcile.Result{}, err
 }
 
@@ -472,7 +473,7 @@ func (r *PatternReconciler) handleFinalizer(instance *api.Pattern) (error, bool)
 		}
 
 	} else {
-		r.logger.Info("Deletion timestamp not zero")
+		fmt.Printf("Deletion timestamp not zero")
 
 		// The object is being deleted
 		if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {

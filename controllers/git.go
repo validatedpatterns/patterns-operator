@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"github.com/go-git/go-git/v5"
-	. "github.com/go-git/go-git/v5/_examples"
+	//	. "github.com/go-git/go-git/v5/_examples"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -108,7 +108,7 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 
 func checkoutRevision(directory, token, commit string) error {
 
-	Info("Accessing %s", directory)
+	fmt.Printf("Accessing %s", directory)
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return err
@@ -131,13 +131,13 @@ func checkoutRevision(directory, token, commit string) error {
 	}
 
 	if err := repo.Fetch(foptions); err != nil && err != git.NoErrAlreadyUpToDate {
-		Info("Error fetching")
+		fmt.Printf("Error fetching")
 		return err
 	}
 
 	w, err := repo.Worktree()
 	if err != nil {
-		Info("Error obtaining worktree")
+		fmt.Printf("Error obtaining worktree")
 		return err
 	}
 
@@ -151,30 +151,30 @@ func checkoutRevision(directory, token, commit string) error {
 		return err
 	}
 
-	Info("git checkout %s (%s)", h, commit)
+	fmt.Printf("git checkout %s (%s)", h, commit)
 
 	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
-		Info("Error during checkout")
+		fmt.Printf("Error during checkout")
 		return err
 	}
 
 	// ... retrieving the commit being pointed by HEAD, it shows that the
 	// repository is pointing to the giving commit in detached mode
-	Info("git show-ref --head HEAD")
+	fmt.Printf("git show-ref --head HEAD")
 	ref, err := repo.Head()
 	if err != nil {
-		Info("Error obtaining HEAD")
+		fmt.Printf("Error obtaining HEAD")
 		return err
 	}
 
-	Info("%s", ref.Hash())
+	fmt.Printf("%s", ref.Hash())
 	return err
 
 }
 
 func cloneRepo(url string, directory string, token string) error {
 
-	Info("git clone %s into %s", url, directory)
+	fmt.Printf("git clone %s into %s", url, directory)
 
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
@@ -198,12 +198,12 @@ func cloneRepo(url string, directory string, token string) error {
 	}
 
 	// ... retrieving the commit being pointed by HEAD
-	Info("git show-ref --head HEAD")
+	fmt.Printf("git show-ref --head HEAD")
 	ref, err := repo.Head()
 	if err != nil {
 		return err
 	}
-	Info("%s", ref.Hash())
+	fmt.Printf("%s", ref.Hash())
 	return nil
 }
 

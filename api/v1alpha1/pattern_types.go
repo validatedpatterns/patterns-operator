@@ -92,12 +92,15 @@ type GitOpsConfig struct {
 
 // PatternStatus defines the observed state of Pattern
 type PatternStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	LastError string `json:"lastError,omitempty"`
 	Path      string `json:"path,omitempty"`
 	Revision  string `json:"revision,omitempty"`
 	Version   int    `json:"version,omitempty"`
+
+	ClusterDomain string `json:"clusterDomain,omitempty"`
+	ClusterID     string `json:"clusterVersion,omitempty"`
 }
 
 //+kubebuilder:object:root=true
