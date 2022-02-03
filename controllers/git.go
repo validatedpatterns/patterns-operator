@@ -163,7 +163,7 @@ func checkoutRevision(directory, token, commit string) error {
 	fmt.Println("git show-ref --head HEAD")
 	ref, err := repo.Head()
 	if err != nil {
-		fmt.Print;n("Error obtaining HEAD")
+		fmt.Println("Error obtaining HEAD")
 		return err
 	}
 

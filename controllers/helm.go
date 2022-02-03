@@ -303,7 +303,10 @@ func lastRelease(cfg action.Configuration, name string, chart *chart.Chart) (*re
 
 	// Concurrent `helm upgrade`s will either fail here with `errPending` or when creating the release with "already exists". This should act as a pessimistic lock.
 	if lastRelease.Info.Status.IsPending() {
-		return nil, fmt.Errorf("errPending")
+		fmt.Printf("Chart is in a pending state - this is bad")
+		//return nil, fmt.Errorf("errPending")
+		return lastRelease, nil
+
 	}
 
 	var currentRelease *release.Release
