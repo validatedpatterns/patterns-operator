@@ -433,11 +433,11 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	// err is logged by the reconcileHandler
 	if err != nil {
 		p.Status.LastError = err.Error()
-		fmt.Printf("\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
+		fmt.Printf("\n\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
 		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
 	} else {
 		p.Status.LastError = ""
-		fmt.Printf("\x1b[34;1mReconcile step %q complete\x1b[0m\n", reason)
+		fmt.Printf("\n\x1b[34;1mReconcile step %q complete\x1b[0m\n", reason)
 	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)

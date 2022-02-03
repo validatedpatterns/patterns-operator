@@ -108,7 +108,7 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 
 func checkoutRevision(directory, token, commit string) error {
 
-	fmt.Printf("Accessing %s", directory)
+	fmt.Printf("Accessing %s\n", directory)
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return err
@@ -131,13 +131,13 @@ func checkoutRevision(directory, token, commit string) error {
 	}
 
 	if err := repo.Fetch(foptions); err != nil && err != git.NoErrAlreadyUpToDate {
-		fmt.Printf("Error fetching")
+		fmt.Println("Error fetching")
 		return err
 	}
 
 	w, err := repo.Worktree()
 	if err != nil {
-		fmt.Printf("Error obtaining worktree")
+		fmt.Println("Error obtaining worktree")
 		return err
 	}
 
@@ -151,7 +151,7 @@ func checkoutRevision(directory, token, commit string) error {
 		return err
 	}
 
-	fmt.Printf("git checkout %s (%s)", h, commit)
+	fmt.Printf("git checkout %s (%s)\n", h, commit)
 
 	if err := w.Checkout(&coptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		fmt.Printf("Error during checkout")
@@ -160,21 +160,21 @@ func checkoutRevision(directory, token, commit string) error {
 
 	// ... retrieving the commit being pointed by HEAD, it shows that the
 	// repository is pointing to the giving commit in detached mode
-	fmt.Printf("git show-ref --head HEAD")
+	fmt.Println("git show-ref --head HEAD")
 	ref, err := repo.Head()
 	if err != nil {
-		fmt.Printf("Error obtaining HEAD")
+		fmt.Print;n("Error obtaining HEAD")
 		return err
 	}
 
-	fmt.Printf("%s", ref.Hash())
+	fmt.Printf("%s\n", ref.Hash())
 	return err
 
 }
 
 func cloneRepo(url string, directory string, token string) error {
 
-	fmt.Printf("git clone %s into %s", url, directory)
+	fmt.Printf("git clone %s into %s\n", url, directory)
 
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
@@ -198,12 +198,12 @@ func cloneRepo(url string, directory string, token string) error {
 	}
 
 	// ... retrieving the commit being pointed by HEAD
-	fmt.Printf("git show-ref --head HEAD")
+	fmt.Println("git show-ref --head HEAD")
 	ref, err := repo.Head()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s", ref.Hash())
+	fmt.Printf("%s\n", ref.Hash())
 	return nil
 }
 
