@@ -206,8 +206,6 @@ func coalesceChartValues(pattern api.Pattern, c HelmChart) (error, map[string]in
 		return err, nil
 	}
 
-	log.Printf("Calculated inputs: %+v\n", calculated)
-
 	vals, err := chartutil.CoalesceValues(chartobj, calculated)
 	return err, vals
 }
@@ -267,13 +265,13 @@ func lastRelease(cfg action.Configuration, name string, chart *chart.Chart) (*re
 	lastRelease, err := cfg.Releases.Last(name)
 	if err != nil {
 		// to keep existing behavior of returning the "%q has no deployed releases" error when an existing release does not exist
-		fmt.Printf("Error obtaining chart: %s\n", err.Error())
+		log.Printf("Error obtaining chart: %s\n", err.Error())
 		return nil, nil
 	}
 
 	// Concurrent `helm upgrade`s will either fail here with `errPending` or when creating the release with "already exists". This should act as a pessimistic lock.
 	if lastRelease.Info.Status.IsPending() {
-		fmt.Println("Chart is in a pending state - this is bad")
+		log.Println("Chart is in a pending state - this is bad")
 		//return nil, fmt.Errorf("errPending")
 		return lastRelease, nil
 

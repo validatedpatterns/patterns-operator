@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
@@ -84,7 +85,7 @@ type PatternReconciler struct {
 func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Reconcile() should perform at most one action in any invocation
 	// in order to simplify testing.
-	r.logger = log.FromContext(ctx)
+	r.logger = klog.FromContext(ctx)
 	r.logger.Info("Reconciling Pattern")
 
 	// Logger includes name and namespace
@@ -202,7 +203,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err, calculated := coalesceChartValues(*qualifiedInstance, *chart)
 		if err != nil {
 			needSync = true
-			fmt.Printf("Error coalescing calculated values: %s", err.Error())
+			log.Printf("Error coalescing calculated values: %s", err.Error())
 
 		} else if calculatedMarshalled, err = yaml.Marshal(calculated); err != nil {
 			needSync = true
@@ -210,10 +211,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		if string(calculatedMarshalled) != string(deployedMarshalled) {
-			fmt.Printf(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
+			log.Printf(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
 			needSync = true
 		} else {
-			fmt.Printf("Parameters unchanged. current...\n%s\n", string(deployedMarshalled))
+			log.Printf("Parameters unchanged. current...\n%s\n", string(deployedMarshalled))
 		}
 	}
 
@@ -228,6 +229,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// Report statistics
 
+	log.Println("Reconcile complete")
 	return ctrl.Result{}, nil
 }
 
@@ -398,17 +400,17 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 
 	var version = 0
 	if isUpdate {
-		fmt.Printf("updating pattern")
+		log.Printf("updating pattern")
 		err, version = updateChart(chart)
 	} else {
-		fmt.Printf("installing pattern")
+		log.Printf("installing pattern")
 		err, version = installChart(chart)
 	}
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf(fmt.Sprintf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version))
+	log.Printf(fmt.Sprintf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version))
 	p.Status.Version = version
 	p.Status.Revision = hash
 	return nil
@@ -436,11 +438,11 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	// err is logged by the reconcileHandler
 	if err != nil {
 		p.Status.LastError = err.Error()
-		fmt.Printf("\n\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
+		log.Printf("\n\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
 		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
 	} else {
 		p.Status.LastError = ""
-		fmt.Printf("\n\x1b[34;1mReconcile step %q complete\x1b[0m\n", reason)
+		log.Printf("\n\x1b[34;1mReconcile step %q complete\x1b[0m\n", reason)
 	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
@@ -450,7 +452,7 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	if duration != nil {
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
-	//	fmt.Printf("Reconciling with exponential duration")
+	//	log.Printf("Reconciling with exponential duration")
 	return reconcile.Result{}, err
 }
 
@@ -473,7 +475,7 @@ func (r *PatternReconciler) handleFinalizer(instance *api.Pattern) (error, bool)
 		}
 
 	} else {
-		fmt.Printf("Deletion timestamp not zero")
+		log.Printf("Deletion timestamp not zero")
 
 		// The object is being deleted
 		if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
