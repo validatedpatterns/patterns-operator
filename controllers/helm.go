@@ -146,8 +146,8 @@ func updateChart(c HelmChart) (error, int) {
 	// (*release.Release, error)
 	//	ctx := context.Background()
 	//	_, err := client.RunWithContext(ctx, c.Name, chartobj, c.Parameters)
-	_, err = client.Run(c.Name, chartobj, c.Parameters)
-	return err, -1
+	rel, err := client.Run(c.Name, chartobj, c.Parameters)
+	return err, rel.Version
 }
 
 //func getConfiguration() (err, *action.Configuration) {
