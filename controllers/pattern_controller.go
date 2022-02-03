@@ -28,7 +28,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -309,9 +308,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 }
 
 func (r *PatternReconciler) prepareForClone(p *api.Pattern) error {
-	unique := uuid.New().URN()
-	p.Status.Path = filepath.Join(os.TempDir(), p.Namespace, p.Name, unique)
-
+	p.Status.Path = filepath.Join(os.TempDir(), p.Namespace, p.Name)
 	return os.MkdirAll(p.Status.Path, os.ModePerm)
 }
 
