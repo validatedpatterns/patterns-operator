@@ -479,6 +479,11 @@ func (r *PatternReconciler) handleFinalizer(instance *api.Pattern) (error, bool)
 		if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
 			// Do any required cleanup here
 
+			if err := uninstallChart(instance.Name); err != nil {
+				// Best effort only...
+				r.logger.Info("Could not uninstall pattern", "error", err)
+			}
+
 			// Remove our finalizer from the list and update it.
 			instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
 			err := r.Client.Update(context.Background(), instance)

@@ -82,6 +82,28 @@ func getChartObj(c HelmChart) (error, *chart.Chart) {
 	return err, chartobj
 }
 
+func uninstallChart(name string) error {
+	err, actionConfig := getConfiguration()
+	if err != nil {
+		return err
+	}
+
+	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+	// vendor/helm.sh/helm/v3/pkg/release/release.go
+	client := action.NewUninstall(actionConfig)
+
+	// install the chart here
+	res, err := client.Run(name)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Removed Chart %s: %s\n", name, res.Info)
+	// this will confirm the values set during installation
+
+	return nil
+}
+
 func installChart(c HelmChart) (error, int) {
 
 	err, actionConfig := getConfiguration()
