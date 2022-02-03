@@ -33,10 +33,6 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
-var (
-	helmhost = "tiller-deploy.kube-system.svc:44134"
-)
-
 type HelmChart struct {
 	Name       string
 	Namespace  string
@@ -53,7 +49,7 @@ func getConfiguration() (error, *action.Configuration) {
 	// all namespaces
 	driver := os.Getenv("HELM_DRIVER")
 	if len(driver) == 0 {
-		driver = "secrets"
+		driver = "configmap"
 	}
 
 	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, driver, func(format string, v ...interface{}) {
@@ -62,7 +58,9 @@ func getConfiguration() (error, *action.Configuration) {
 	//		panic(err)
 	//	}
 
-	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), driver, log.Printf); err != nil {
+	// settings.Namespace() == where we are running
+	// helm client uses 'default'
+	if err := actionConfig.Init(settings.RESTClientGetter(), "default", driver, log.Printf); err != nil {
 		log.Printf("Bad config: %+v", err)
 		return err, nil
 	}
