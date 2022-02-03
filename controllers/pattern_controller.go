@@ -109,8 +109,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	if err, done := r.handleFinalizer(instance); done || err != nil {
-		return r.actionPerformed(instance, "updated finalizer", err)
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Add finalizer when object is created
+		if !ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+			err := r.Client.Update(context.TODO(), instance)
+			return r.actionPerformed(instance, "updated finalizer", err)
+		}
+
+	} else if err := r.finalizeObject(instance); err != nil {
+		return reconcile.Result{}, err
+
+	} else {
+		return reconcile.Result{}, nil
 	}
 
 	// Fill in defaults - Make changes in the copy?
@@ -464,36 +475,28 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
 }
 
-func (r *PatternReconciler) handleFinalizer(instance *api.Pattern) (error, bool) {
+func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 	// Add finalizer when object is created
-	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) {
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
-			err := r.Client.Update(context.TODO(), instance)
-			return err, true
+	log.Printf("Finalizing pattern object")
+
+	// The object is being deleted
+	if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
+		// Do any required cleanup here
+		log.Printf("Uninstalling")
+
+		if err := uninstallChart(instance.Name); err != nil {
+			// Best effort only...
+			r.logger.Info("Could not uninstall pattern", "error", err)
 		}
 
-	} else {
-		log.Printf("Deletion timestamp not zero")
-
-		// The object is being deleted
-		if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
-			// Do any required cleanup here
-
-			if err := uninstallChart(instance.Name); err != nil {
-				// Best effort only...
-				r.logger.Info("Could not uninstall pattern", "error", err)
-			}
-
-			// Remove our finalizer from the list and update it.
-			instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
-			err := r.Client.Update(context.Background(), instance)
-			return err, true
-		}
+		// Remove our finalizer from the list and update it.
+		instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+		err := r.Client.Update(context.Background(), instance)
+		return err
 	}
 
-	return nil, false
+	return nil
 }
 
 // ContainsString checks if the string array contains the given string.
