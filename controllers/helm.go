@@ -49,6 +49,9 @@ func getConfiguration() (error, *action.Configuration) {
 	// all namespaces
 	driver := os.Getenv("HELM_DRIVER")
 	if len(driver) == 0 {
+		// configmaps, secrets, memory, or sql
+		// sql requires HELM_DRIVER_SQL_CONNECTION_STRING
+		// See helm.sh/helm/v3/pkg/action/action.go
 		driver = "configmap"
 	}
 
@@ -187,12 +190,15 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 	}
 
 	rel, err := lastRelease(*actionConfig, pattern.Name, chartobj)
-	if err == nil && rel != nil {
+	if err == nil && rel != nil && rel.Chart != nil {
 		c.Version = rel.Version
 		c.Parameters = rel.Chart.Values
 		return &c
+	} else if err != nil {
+		log.Printf("Chart not installed: %s\n", err.Error())
+	} else {
+		log.Printf("Chart not installed\n")
 	}
-	log.Printf("Chart not installed: %s\n", err.Error())
 	return nil
 }
 
