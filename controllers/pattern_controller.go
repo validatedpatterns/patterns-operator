@@ -264,18 +264,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		return err, output
 	}
 
-	//appDomain := "apps.mycluster.blueprints.rhecoeng.com"
-	appDomain := clusterIngress.Spec.Domain
-	domainElements := strings.Split(appDomain, ".")
-
-	clustername := domainElements[1]
-	domainname := strings.Join(domainElements[2:], ".")
-	r.logger.Info(fmt.Sprintf("cluster: %s @ %s", clustername, domainname))
-
-	//global:
-	//  datacenter:
-	//    domain: blueprints.rhecoeng.com
-	//    clustername: beekhof-gitops
+	// "apps.mycluster.blueprints.rhecoeng.com"
+	output.Status.ClusterDomain = clusterIngress.Spec.Domain
 
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
 	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 && output.Spec.GitConfig.Hostname == "github.com" {
@@ -375,6 +365,8 @@ func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface
 		},
 
 		"global": map[string]interface{}{
+			"hubClusterDomain":   p.Status.ClusterDomain,
+			"localClusterDomain": p.Status.ClusterDomain,
 			"imageregistry": map[string]interface{}{
 				"type": "quay",
 			},

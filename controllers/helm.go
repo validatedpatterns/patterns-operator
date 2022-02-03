@@ -184,7 +184,7 @@ func chartForPattern(pattern api.Pattern) *HelmChart {
 		c.Parameters = rel.Chart.Values
 		return &c
 	}
-	log.Printf("Chart not installed\n")
+	log.Printf("Chart not installed: %s\n", err.Error())
 	return nil
 }
 
