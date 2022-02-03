@@ -185,14 +185,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		var deployedMarshalled []byte
 		var calculatedMarshalled []byte
 		// Force a consistent value for bootstrap, which doesn't matter
-		m := chart.Parameters["main"].(map[string]interface{})
-		o := m["options"].(map[string]interface{})
-		o["bootstrap"] = false
-
-		if deployedMarshalled, err = yaml.Marshal(chart.Parameters); err != nil {
+		if err, current := getChartValues(qualifiedInstance.Name); err == nil {
+			m := current["main"].(map[string]interface{})
+			o := m["options"].(map[string]interface{})
+			o["bootstrap"] = false
+			if deployedMarshalled, err = yaml.Marshal(current); err != nil {
+				needSync = true
+				r.logger.Info("Error marshalling deployed values", "input", current, "error", err.Error())
+			}
+		} else {
 			needSync = true
-			r.logger.Info("Error marshalling deployed values", "input", chart.Parameters, "error", err.Error())
-
+			r.logger.Info("Error obtaining deployed values", "input", current, "error", err.Error())
 		}
 		//calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
 
