@@ -45,15 +45,13 @@ func getConfiguration() (error, *action.Configuration) {
 	settings := cli.New()
 
 	actionConfig := new(action.Configuration)
-	// You can pass an empty string instead of settings.Namespace() to list
-	// all namespaces
+
+	// configmaps, secrets, memory, or sql
+	// The default is secrets
+	//
+	// sql requires HELM_DRIVER_SQL_CONNECTION_STRING
+	// See helm.sh/helm/v3/pkg/action/action.go
 	driver := os.Getenv("HELM_DRIVER")
-	if len(driver) == 0 {
-		// configmaps, secrets, memory, or sql
-		// sql requires HELM_DRIVER_SQL_CONNECTION_STRING
-		// See helm.sh/helm/v3/pkg/action/action.go
-		driver = "configmap"
-	}
 
 	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, driver, func(format string, v ...interface{}) {
 	//		_ = fmt.Sprintf(format, v)
@@ -63,6 +61,8 @@ func getConfiguration() (error, *action.Configuration) {
 
 	// settings.Namespace() == where we are running
 	// helm client uses 'default'
+	// You can pass an empty string instead of settings.Namespace() to list
+	// all namespaces
 	if err := actionConfig.Init(settings.RESTClientGetter(), "default", driver, log.Printf); err != nil {
 		log.Printf("Bad config: %+v", err)
 		return err, nil
