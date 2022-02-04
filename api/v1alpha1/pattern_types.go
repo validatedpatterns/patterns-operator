@@ -47,9 +47,10 @@ type PatternSpec struct {
 	GitConfig    GitConfig     `json:"gitSpec"`
 	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
 
-	AnonymousUsage  bool   `json:"anonymousUsage,omitempty"`
-	Validation      bool   `json:"validation,omitempty"`
-	ValidationImage string `json:"validationImage,omitempty"`
+	ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
+	AnonymousUsage   bool   `json:"anonymousUsage,omitempty"`
+	Validation       bool   `json:"validation,omitempty"`
+	ValidationImage  string `json:"validationImage,omitempty"`
 
 	// .Name is dot separated per the helm --set syntax, such as:
 	//   global.something.field
