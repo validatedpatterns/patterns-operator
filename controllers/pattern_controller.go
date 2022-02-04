@@ -240,7 +240,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Report statistics
 
 	log.Println("Reconcile complete")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
