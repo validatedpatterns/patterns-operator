@@ -240,7 +240,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Report statistics
 
 	minutes := time.Duration(qualifiedInstance.Spec.ReconcileMinutes)
-	log.Printf("\n\x1b[32;1mReconcile complete - waiting %d minutes\x1b[0m\n", minutes)
+	log.Printf("\n\x1b[32;1m\tReconcile complete - waiting %d minutes\x1b[0m\n", minutes)
 
 	return ctrl.Result{RequeueAfter: time.Minute * minutes}, nil
 }
@@ -440,11 +440,11 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	p.Status.LastStep = reason
 	if err != nil {
 		p.Status.LastError = err.Error()
-		log.Printf("\n\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
+		log.Printf("\n\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
 		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
 	} else {
 		p.Status.LastError = ""
-		log.Printf("\n\x1b[34;1mReconcile step %q complete\x1b[0m\n", reason)
+		log.Printf("\n\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
 	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
