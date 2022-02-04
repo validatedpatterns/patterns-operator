@@ -224,7 +224,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Printf(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
 			needSync = true
 		} else {
-			log.Printf("Parameters unchanged. current...\n%s\n", string(deployedMarshalled))
+			log.Printf("Parameters unchanged\n")
 		}
 	}
 
@@ -373,7 +373,13 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubsc
 		return err
 	}
 
-	log.Printf(fmt.Sprintf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version))
+	log.Printf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version)
+
+	if err, deployed := getChartValues(p.Name); err == nil {
+		if deployedMarshalled, err := yaml.Marshal(deployed); err == nil {
+			log.Printf("Deployed values:\n%s\n", string(deployedMarshalled))
+		}
+	}
 	p.Status.Version = version
 	p.Status.Revision = hash
 	return nil
