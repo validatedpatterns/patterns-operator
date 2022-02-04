@@ -44,8 +44,8 @@ type PatternSpec struct {
 
 	ClusterGroupName string `json:"clusterGroupName"`
 
-	GitConfig    GitConfig    `json:"gitSpec"`
-	GitOpsConfig GitOpsConfig `json:"gitOpsSpec,omitempty"`
+	GitConfig    GitConfig     `json:"gitSpec"`
+	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
 
 	AnonymousUsage  bool   `json:"anonymousUsage,omitempty"`
 	Validation      bool   `json:"validation,omitempty"`

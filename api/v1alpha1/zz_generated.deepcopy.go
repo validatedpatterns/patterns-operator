@@ -133,7 +133,11 @@ func (in *PatternParameter) DeepCopy() *PatternParameter {
 func (in *PatternSpec) DeepCopyInto(out *PatternSpec) {
 	*out = *in
 	out.GitConfig = in.GitConfig
-	out.GitOpsConfig = in.GitOpsConfig
+	if in.GitOpsConfig != nil {
+		in, out := &in.GitOpsConfig, &out.GitOpsConfig
+		*out = new(GitOpsConfig)
+		**out = **in
+	}
 	if in.Parameters != nil {
 		in, out := &in.Parameters, &out.Parameters
 		*out = make([]PatternParameter, len(*in))
