@@ -192,6 +192,10 @@ func cloneRepo(url string, directory string, token string) error {
 		}
 	}
 
+	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+		return err
+	}
+
 	repo, err := git.PlainClone(directory, false, options)
 	if err != nil {
 		return err
@@ -199,11 +203,11 @@ func cloneRepo(url string, directory string, token string) error {
 
 	// ... retrieving the commit being pointed by HEAD
 	fmt.Println("git show-ref --head HEAD")
-	ref, err := repo.Head()
-	if err != nil {
+	if ref, err := repo.Head(); err != nil {
 		return err
+	} else {
+		fmt.Printf("%s\n", ref.Hash())
 	}
-	fmt.Printf("%s\n", ref.Hash())
 	return nil
 }
 

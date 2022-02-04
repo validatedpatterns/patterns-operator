@@ -130,29 +130,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 
-	// Set needGitops based on existance of the argo subscription
-	var needSubscription = true
-	var clusterSubscriptions olmapi.SubscriptionList
-	//	if tokenSecret, err = r.Client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
-
-	if err := r.Client.List(context.TODO(), &clusterSubscriptions, &client.ListOptions{}); err == nil {
-		for _, sub := range clusterSubscriptions.Items {
-			if sub.Spec.Package == "openshift-gitops-operator" && sub.Namespace == "openshift-operators" {
-				needSubscription = false
-			}
-		}
-	}
-
 	// Update/create the argo application
-
-	if len(qualifiedInstance.Status.Path) == 0 {
-		err := r.prepareForClone(qualifiedInstance)
-		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
-
-	} else if _, err := os.Stat(qualifiedInstance.Status.Path); os.IsNotExist(err) {
-		err := r.prepareForClone(qualifiedInstance)
-		return r.actionPerformed(qualifiedInstance, "preparing the way", err)
-	}
 
 	var token = ""
 	if len(qualifiedInstance.Spec.GitConfig.TokenSecret) > 0 {
@@ -178,6 +156,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if isPatternDeployed(qualifiedInstance.Name) == false {
 		// Helm doesn't always realize right away...
 		// Can result in unnecessary second deployment
+
+		needSubscription := r.doSubscriptionCheck()
 		err := r.deployPattern(qualifiedInstance, "deploying the pattern", needSubscription, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
@@ -245,6 +225,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log.Printf("\n\x1b[32;1m\tReconcile complete - waiting %d minutes\x1b[0m\n", minutes)
 
 	return ctrl.Result{RequeueAfter: time.Minute * minutes}, nil
+}
+
+func (r *PatternReconciler) doSubscriptionCheck() bool {
+	var clusterSubscriptions olmapi.SubscriptionList
+	//	if tokenSecret, err = r.Client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
+
+	if err := r.Client.List(context.TODO(), &clusterSubscriptions, &client.ListOptions{}); err == nil {
+		for _, sub := range clusterSubscriptions.Items {
+			if sub.Spec.Package == "openshift-gitops-operator" && sub.Namespace == "openshift-operators" {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
@@ -329,12 +324,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.ClusterGroupName = "default"
 	}
 
-	return nil, output
-}
+	if len(output.Status.Path) == 0 {
+		output.Status.Path = filepath.Join(os.TempDir(), output.Namespace, output.Name)
+	}
 
-func (r *PatternReconciler) prepareForClone(p *api.Pattern) error {
-	p.Status.Path = filepath.Join(os.TempDir(), p.Namespace, p.Name)
-	return os.MkdirAll(p.Status.Path, os.ModePerm)
+	return nil, output
 }
 
 func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (error, string) {
