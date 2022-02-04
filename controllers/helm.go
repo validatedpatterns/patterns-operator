@@ -90,6 +90,14 @@ func inputsForPattern(p api.Pattern) map[string]interface{} {
 				"account": p.Spec.GitConfig.Account,
 			},
 		},
+
+		// Future: Allow common/install to accept a set of parameter overrides
+		// to include in the site application and pass to
+		// child-applications
+		"patternOverrides": {
+		     "dot.separated.key.names": "override values",
+		     "some.thing.else": "true",
+		},
 	}
 	return inputs
 }
@@ -180,6 +188,7 @@ func overwriteWithChart(pattern api.Pattern) (error, int) {
 	fmt.Fprintln(&manifests, strings.TrimSpace(rel.Manifest))
 
 	for i, m := range rel.Hooks {
+		// Haven't seen this called...
 		fmt.Printf("Rendering hook %d\n", i)
 		fmt.Fprintf(&manifests, "---\n# Source: %s\n%s\n", m.Path, m.Manifest)
 
@@ -194,8 +203,50 @@ func overwriteWithChart(pattern api.Pattern) (error, int) {
 	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, pattern.Status.Path, rel.Namespace)
 	fmt.Printf("%s", manifests.String())
 
-	// this will confirm the values set during installation
-	log.Println(rel.Config)
+	// manifests.String() =>
+	//
+	// WARNING: This chart or one of its subcharts contains CRDs. Rendering may fail or contain inaccuracies.
+	// ---
+	// # Source: pattern-install/templates/argocd/namespace.yaml
+	// # Pre-create so we can create our argo app for keeping subscriptions in sync
+	// # Do it here so that we don't try to sync it in the future
+	// ---
+	// # Source: pattern-install/templates/argocd/application.yaml
+	// apiVersion: argoproj.io/v1alpha1
+	// kind: Application
+	// metadata:
+	//   name: pattern-sample-hub
+	//   namespace: openshift-gitops
+	// spec:
+	//   destination:
+	//     name: in-cluster
+	//     namespace: pattern-sample-hub
+	//   project: default
+	//   source:
+	//     repoURL: https://github.com/hybrid-cloud-patterns/multicloud-gitops
+	//     targetRevision: main
+	//     path: common/clustergroup
+	//     helm:
+	//       valueFiles:
+	//       - "https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main/values-global.yaml"
+	//       - "https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main/values-hub.yaml"
+	//       # Track the progress of https://github.com/argoproj/argo-cd/pull/6280
+	//       parameters:
+	//         - name: global.repoURL
+	//           value: $ARGOCD_APP_SOURCE_REPO_URL
+	//         - name: global.targetRevision
+	//           value: $ARGOCD_APP_SOURCE_TARGET_REVISION
+	//         - name: global.namespace
+	//           value: $ARGOCD_APP_NAMESPACE
+	//         - name: global.valuesDirectoryURL
+	//           value: https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main
+	//         - name: global.pattern
+	//           value: pattern-sample
+	//         - name: global.hubClusterDomain
+	//           value: apps.beekhof-1.blueprints.rhecoeng.com
+	//   syncPolicy:
+	//     automated: {}
+
 	return nil, rel.Version
 }
 

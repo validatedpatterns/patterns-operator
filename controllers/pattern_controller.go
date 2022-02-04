@@ -176,6 +176,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if isPatternDeployed(qualifiedInstance.Name) == false {
+		// Helm doesn't always realize right away...
+		// Can result in unnecessary second deployment
 		err := r.deployPattern(qualifiedInstance, "deploying the pattern", needSubscription, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
