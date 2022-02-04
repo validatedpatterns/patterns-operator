@@ -427,6 +427,30 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 	return nil
 }
 
+func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
+
+	// Add finalizer when object is created
+	log.Printf("Finalizing pattern object")
+
+	// The object is being deleted
+	if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
+		// Do any required cleanup here
+		log.Printf("Uninstalling")
+
+		if err := uninstallChart(instance.Name); err != nil {
+			// Best effort only...
+			r.logger.Info("Could not uninstall pattern", "error", err)
+		}
+
+		// Remove our finalizer from the list and update it.
+		instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+		err := r.Client.Update(context.Background(), instance)
+		return err
+	}
+
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
@@ -473,49 +497,4 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
-}
-
-func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
-
-	// Add finalizer when object is created
-	log.Printf("Finalizing pattern object")
-
-	// The object is being deleted
-	if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
-		// Do any required cleanup here
-		log.Printf("Uninstalling")
-
-		if err := uninstallChart(instance.Name); err != nil {
-			// Best effort only...
-			r.logger.Info("Could not uninstall pattern", "error", err)
-		}
-
-		// Remove our finalizer from the list and update it.
-		instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
-		err := r.Client.Update(context.Background(), instance)
-		return err
-	}
-
-	return nil
-}
-
-// ContainsString checks if the string array contains the given string.
-func ContainsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-// RemoveString removes the given string from the string array if exists.
-func RemoveString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return result
 }
