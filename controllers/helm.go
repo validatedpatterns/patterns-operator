@@ -24,6 +24,8 @@ import (
 	"os"
 	"strings"
 
+	"path/filepath"
+
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -94,9 +96,9 @@ func inputsForPattern(p api.Pattern) map[string]interface{} {
 		// Future: Allow common/install to accept a set of parameter overrides
 		// to include in the site application and pass to
 		// child-applications
-		"patternOverrides": {
-		     "dot.separated.key.names": "override values",
-		     "some.thing.else": "true",
+		"patternOverrides": map[string]interface{}{
+			"dot.separated.key.names": "override values",
+			"some.thing.else":         "true",
 		},
 	}
 	return inputs
@@ -203,51 +205,22 @@ func overwriteWithChart(pattern api.Pattern) (error, int) {
 	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, pattern.Status.Path, rel.Namespace)
 	fmt.Printf("%s", manifests.String())
 
-	// manifests.String() =>
-	//
-	// WARNING: This chart or one of its subcharts contains CRDs. Rendering may fail or contain inaccuracies.
-	// ---
-	// # Source: pattern-install/templates/argocd/namespace.yaml
-	// # Pre-create so we can create our argo app for keeping subscriptions in sync
-	// # Do it here so that we don't try to sync it in the future
-	// ---
-	// # Source: pattern-install/templates/argocd/application.yaml
-	// apiVersion: argoproj.io/v1alpha1
-	// kind: Application
-	// metadata:
-	//   name: pattern-sample-hub
-	//   namespace: openshift-gitops
-	// spec:
-	//   destination:
-	//     name: in-cluster
-	//     namespace: pattern-sample-hub
-	//   project: default
-	//   source:
-	//     repoURL: https://github.com/hybrid-cloud-patterns/multicloud-gitops
-	//     targetRevision: main
-	//     path: common/clustergroup
-	//     helm:
-	//       valueFiles:
-	//       - "https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main/values-global.yaml"
-	//       - "https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main/values-hub.yaml"
-	//       # Track the progress of https://github.com/argoproj/argo-cd/pull/6280
-	//       parameters:
-	//         - name: global.repoURL
-	//           value: $ARGOCD_APP_SOURCE_REPO_URL
-	//         - name: global.targetRevision
-	//           value: $ARGOCD_APP_SOURCE_TARGET_REVISION
-	//         - name: global.namespace
-	//           value: $ARGOCD_APP_NAMESPACE
-	//         - name: global.valuesDirectoryURL
-	//           value: https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main
-	//         - name: global.pattern
-	//           value: pattern-sample
-	//         - name: global.hubClusterDomain
-	//           value: apps.beekhof-1.blueprints.rhecoeng.com
-	//   syncPolicy:
-	//     automated: {}
+	filename := filepath.Join(os.TempDir(), pattern.Namespace, fmt.Sprintf("%s.yaml", pattern.Name))
+	if yamlFile, err := os.Create(filename); err != nil {
+		log.Printf("Could not create file: %s\n", err.Error())
+		return err, -1
+	} else {
+		defer yamlFile.Close()
+		if _, err = yamlFile.WriteString(manifests.String()); err != nil {
+			log.Printf("Could not write file: %s\n", err.Error())
+			return err, -1
+		}
+	}
 
-	return nil, rel.Version
+	if err := applyYamlFile(filename); err != nil {
+		return err, -1
+	}
+	return nil, 0
 }
 
 func uninstallChart(name string) error {
