@@ -175,8 +175,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
-	chart := chartForPattern(*qualifiedInstance)
-	if chart == nil {
+	if isPatternDeployed(qualifiedInstance.Name) == false {
 		err := r.deployPattern(qualifiedInstance, "deploying the pattern", needSubscription, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
@@ -211,7 +210,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		//calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
 
-		err, calculated := coalesceChartValues(*qualifiedInstance, *chart)
+		err, calculated := coalesceChartValues(*qualifiedInstance)
 		if err != nil {
 			needSync = true
 			log.Printf("Error coalescing calculated values: %s", err.Error())
@@ -347,61 +346,7 @@ func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (
 	return errors.New(fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace)), ""
 }
 
-func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface{} {
-	gitMap := map[string]interface{}{
-		"repoURL": p.Spec.GitConfig.TargetRepo,
-	}
-
-	if len(p.Spec.GitConfig.TargetRevision) > 0 {
-		gitMap["revision"] = p.Spec.GitConfig.TargetRevision
-	}
-
-	if len(p.Spec.GitConfig.ValuesDirectoryURL) > 0 {
-		gitMap["valuesDirectoryURL"] = p.Spec.GitConfig.ValuesDirectoryURL
-	}
-
-	inputs := map[string]interface{}{
-		"main": map[string]interface{}{
-			"git": gitMap,
-			"options": map[string]interface{}{
-				"syncPolicy":          p.Spec.GitOpsConfig.SyncPolicy,
-				"installPlanApproval": p.Spec.GitOpsConfig.InstallPlanApproval,
-				"useCSV":              p.Spec.GitOpsConfig.UseCSV,
-				"bootstrap":           needSubscription,
-			},
-			"gitops": map[string]interface{}{
-				"channel": p.Spec.GitOpsConfig.OperatorChannel,
-				"source":  p.Spec.GitOpsConfig.OperatorSource,
-				"csv":     p.Spec.GitOpsConfig.OperatorCSV,
-			},
-			"clusterGroupName": p.Spec.ClusterGroupName,
-		},
-
-		"global": map[string]interface{}{
-			"hubClusterDomain":   p.Status.ClusterDomain,
-			"localClusterDomain": p.Status.ClusterDomain,
-			"imageregistry": map[string]interface{}{
-				"type": "quay",
-			},
-			"git": map[string]interface{}{
-				"hostname": p.Spec.GitConfig.Hostname,
-				// Account is the user or organization under which the pattern repo lives
-				"account": p.Spec.GitConfig.Account,
-			},
-		},
-	}
-	return inputs
-}
-
 func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubscription bool, isUpdate bool) error {
-
-	chart := HelmChart{
-		Name:       p.Name,
-		Namespace:  p.ObjectMeta.Namespace,
-		Version:    0,
-		Path:       fmt.Sprintf("%s/common/install", p.Status.Path),
-		Parameters: inputsForPattern(*p, needSubscription),
-	}
 
 	var err error
 	err, hash := repoHash(p.Status.Path)
@@ -410,15 +355,21 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubsc
 	}
 
 	var version = 0
-	if isUpdate {
+	if p.Status.LastStep == step {
+		log.Printf("Escalating %s", step)
+		err, version = overwriteWithChart(*p)
+
+	} else if isUpdate {
 		log.Printf("updating pattern")
-		err, version = updateChart(chart)
+		err, version = updateChart(*p)
 	} else {
 		log.Printf("installing pattern")
-		err, version = installChart(chart)
-	}
-	if err != nil && p.Status.LastStep == step {
-		_, version = overwriteWithChart(chart)
+		err, version = installChart(*p)
+
+		if err != nil {
+			log.Printf("installing pattern")
+			_, _ = overwriteWithChart(*p)
+		}
 	}
 	if err != nil {
 		return err

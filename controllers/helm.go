@@ -35,14 +35,6 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
-type HelmChart struct {
-	Name       string
-	Namespace  string
-	Version    int
-	Path       string
-	Parameters chartutil.Values
-}
-
 func getChartValues(name string) (error, map[string]interface{}) {
 
 	if err, actionConfig := getConfiguration(); err != nil {
@@ -56,14 +48,60 @@ func getChartValues(name string) (error, map[string]interface{}) {
 	}
 }
 
-func installChart(c HelmChart) (error, int) {
+func inputsForPattern(p api.Pattern) map[string]interface{} {
+	gitMap := map[string]interface{}{
+		"repoURL": p.Spec.GitConfig.TargetRepo,
+	}
+
+	if len(p.Spec.GitConfig.TargetRevision) > 0 {
+		gitMap["revision"] = p.Spec.GitConfig.TargetRevision
+	}
+
+	if len(p.Spec.GitConfig.ValuesDirectoryURL) > 0 {
+		gitMap["valuesDirectoryURL"] = p.Spec.GitConfig.ValuesDirectoryURL
+	}
+
+	inputs := map[string]interface{}{
+		"main": map[string]interface{}{
+			"git": gitMap,
+			"options": map[string]interface{}{
+				"syncPolicy":          p.Spec.GitOpsConfig.SyncPolicy,
+				"installPlanApproval": p.Spec.GitOpsConfig.InstallPlanApproval,
+				"useCSV":              p.Spec.GitOpsConfig.UseCSV,
+				"bootstrap":           p.Status.NeedSubscription,
+			},
+			"gitops": map[string]interface{}{
+				"channel": p.Spec.GitOpsConfig.OperatorChannel,
+				"source":  p.Spec.GitOpsConfig.OperatorSource,
+				"csv":     p.Spec.GitOpsConfig.OperatorCSV,
+			},
+			"clusterGroupName": p.Spec.ClusterGroupName,
+		},
+
+		"global": map[string]interface{}{
+			"hubClusterDomain":   p.Status.ClusterDomain,
+			"localClusterDomain": p.Status.ClusterDomain,
+			"imageregistry": map[string]interface{}{
+				"type": "quay",
+			},
+			"git": map[string]interface{}{
+				"hostname": p.Spec.GitConfig.Hostname,
+				// Account is the user or organization under which the pattern repo lives
+				"account": p.Spec.GitConfig.Account,
+			},
+		},
+	}
+	return inputs
+}
+
+func installChart(pattern api.Pattern) (error, int) {
 
 	err, actionConfig := getConfiguration()
 	if err != nil {
 		return err, -1
 	}
 
-	err, chartobj := getChartObj(c)
+	err, chartobj := getChartObj(pattern.Status.Path)
 	if err != nil {
 		return err, -1
 	}
@@ -71,52 +109,55 @@ func installChart(c HelmChart) (error, int) {
 	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
 	// vendor/helm.sh/helm/v3/pkg/release/release.go
 	client := action.NewInstall(actionConfig)
-	client.Namespace = c.Namespace
-	client.ReleaseName = c.Name
+	client.Namespace = pattern.Namespace
+	client.ReleaseName = pattern.Name
 	// client.DryRun = true - very handy!
 
 	// install the chart here
-	rel, err := client.Run(chartobj, c.Parameters)
+	values := inputsForPattern(pattern)
+	rel, err := client.Run(chartobj, values)
 	if err != nil {
 		return err, -1
 	}
 
-	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, c.Path, rel.Namespace)
+	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, pattern.Status.Path, rel.Namespace)
 	// this will confirm the values set during installation
 	log.Println(rel.Config)
 	return nil, rel.Version
 }
 
-func updateChart(c HelmChart) (error, int) {
+func updateChart(pattern api.Pattern) (error, int) {
 
 	err, actionConfig := getConfiguration()
 	if err != nil {
 		return err, -1
 	}
 
-	err, chartobj := getChartObj(c)
+	err, chartobj := getChartObj(pattern.Status.Path)
 	if err != nil {
 		return err, -1
 	}
 
 	client := action.NewUpgrade(actionConfig)
-	client.Namespace = c.Namespace
+	client.Namespace = pattern.Namespace
 
 	// (*release.Release, error)
 	//	ctx := context.Background()
-	//	_, err := client.RunWithContext(ctx, c.Name, chartobj, c.Parameters)
-	rel, err := client.Run(c.Name, chartobj, c.Parameters)
+	//	_, err := client.RunWithContext(ctx, pattern.Name, chartobj, values)
+	values := inputsForPattern(pattern)
+	rel, err := client.Run(pattern.Name, chartobj, values)
+
 	return err, rel.Version
 }
 
-func overwriteWithChart(c HelmChart) (error, int) {
+func overwriteWithChart(pattern api.Pattern) (error, int) {
 
 	err, actionConfig := getConfiguration()
 	if err != nil {
 		return err, -1
 	}
 
-	err, chartobj := getChartObj(c)
+	err, chartobj := getChartObj(pattern.Status.Path)
 	if err != nil {
 		return err, -1
 	}
@@ -124,12 +165,13 @@ func overwriteWithChart(c HelmChart) (error, int) {
 	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
 	// vendor/helm.sh/helm/v3/pkg/release/release.go
 	client := action.NewInstall(actionConfig)
-	client.Namespace = c.Namespace
-	client.ReleaseName = c.Name
+	client.Namespace = pattern.Namespace
+	client.ReleaseName = pattern.Name
 	client.DryRun = true
 
 	// install the chart here
-	rel, err := client.Run(chartobj, c.Parameters)
+	values := inputsForPattern(pattern)
+	rel, err := client.Run(chartobj, values)
 	if err != nil {
 		return err, -1
 	}
@@ -149,7 +191,7 @@ func overwriteWithChart(c HelmChart) (error, int) {
 		//fileWritten[m.Path] = true
 	}
 
-	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, c.Path, rel.Namespace)
+	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, pattern.Status.Path, rel.Namespace)
 	fmt.Printf("%s", manifests.String())
 
 	// this will confirm the values set during installation
@@ -179,93 +221,29 @@ func uninstallChart(name string) error {
 	return nil
 }
 
-func chartForPattern(pattern api.Pattern) *HelmChart {
-	c := HelmChart{
-		Name:      pattern.Name,
-		Namespace: pattern.Namespace,
-		Path:      fmt.Sprintf("%s/common/install", pattern.Status.Path),
-	}
+func isPatternDeployed(name string) bool {
 
 	err, actionConfig := getConfiguration()
 	if err != nil {
-		return nil
+		return false
+	}
+	if _, err := actionConfig.Releases.Deployed(name); err != nil {
+		return false
 	}
 
-	err, chartobj := getChartObj(c)
-	if err != nil {
-		log.Printf("Bad chart: %s\n", err.Error())
-		return nil
-	}
-
-	rel, err := lastRelease(*actionConfig, pattern.Name, chartobj)
-	if err == nil && rel != nil && rel.Chart != nil {
-		c.Version = rel.Version
-		c.Parameters = rel.Chart.Values
-		return &c
-	} else if err != nil {
-		log.Printf("Chart not installed: %s\n", err.Error())
-	} else {
-		log.Printf("Chart not installed\n")
-	}
-	return nil
+	return true
 }
 
-func coalesceChartValues(pattern api.Pattern, c HelmChart) (error, map[string]interface{}) {
-	calculated := inputsForPattern(pattern, false)
+func coalesceChartValues(pattern api.Pattern) (error, map[string]interface{}) {
+	calculated := inputsForPattern(pattern)
 
-	err, chartobj := getChartObj(c)
+	err, chartobj := getChartObj(pattern.Status.Path)
 	if err != nil {
 		return err, nil
 	}
 
 	vals, err := chartutil.CoalesceValues(chartobj, calculated)
 	return err, vals
-}
-
-// https://stackoverflow.com/questions/45692719/samples-on-kubernetes-helm-golang-client
-func installedCharts() []HelmChart {
-	// ./vendor/k8s.io/helm/pkg/proto/hapi/release/release.pb.go
-
-	// type Release struct {
-	//         // Name is the name of the release
-	//         Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	//         // Info provides information about a release
-	//         Info *Info `protobuf:"bytes,2,opt,name=info,proto3" json:"info,omitempty"`
-	//         // Chart is the chart that was released.
-	//         Chart *chart.Chart `protobuf:"bytes,3,opt,name=chart,proto3" json:"chart,omitempty"`
-	//         // Config is the set of extra Values added to the chart.
-	//         // These values override the default values inside of the chart.
-	//         Config *chart.Config `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
-	//         // Manifest is the string representation of the rendered template.
-	//         Manifest string `protobuf:"bytes,5,opt,name=manifest,proto3" json:"manifest,omitempty"`
-	//         // Hooks are all of the hooks declared for this release.
-	//         Hooks []*Hook `protobuf:"bytes,6,rep,name=hooks,proto3" json:"hooks,omitempty"`
-	//         // Version is an int32 which represents the version of the release.
-	//         Version int32 `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`
-	//         // Namespace is the kubernetes namespace of the release.
-	//         Namespace            string   `protobuf:"bytes,8,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	//         XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	//         XXX_unrecognized     []byte   `json:"-"`
-	//         XXX_sizecache        int32    `json:"-"`
-	// }
-
-	var charts []HelmChart
-	err, cfg := getConfiguration()
-	deployed, err := cfg.Releases.ListDeployed()
-	if err != nil {
-		log.Printf("Could not list deployed charts: %s\n", err.Error())
-		return charts
-	}
-
-	for _, release := range deployed {
-		log.Println(release.Name)
-		charts = append(charts, HelmChart{
-			Name:      release.Name,
-			Namespace: release.Namespace,
-			Version:   release.Version,
-		})
-	}
-	return charts
 }
 
 func lastRelease(cfg action.Configuration, name string, chart *chart.Chart) (*release.Release, error) {
@@ -308,10 +286,10 @@ func lastRelease(cfg action.Configuration, name string, chart *chart.Chart) (*re
 	return currentRelease, nil
 }
 
-func getChartObj(c HelmChart) (error, *chart.Chart) {
+func getChartObj(path string) (error, *chart.Chart) {
 
 	// load chart from the path
-	chartobj, err := loader.Load(c.Path)
+	chartobj, err := loader.Load(fmt.Sprintf("%s/common/install", path))
 	return err, chartobj
 }
 

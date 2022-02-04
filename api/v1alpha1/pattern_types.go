@@ -101,9 +101,11 @@ type PatternStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 	LastStep  string `json:"lastStep,omitempty"`
 	LastError string `json:"lastError,omitempty"`
-	Path      string `json:"path,omitempty"`
-	Revision  string `json:"revision,omitempty"`
-	Version   int    `json:"version,omitempty"`
+
+	Path             string `json:"path,omitempty"`
+	Revision         string `json:"revision,omitempty"`
+	Version          int    `json:"version,omitempty"`
+	NeedSubscription bool   `json:"needSubscription,omitempty"`
 
 	ClusterDomain string `json:"clusterDomain,omitempty"`
 	ClusterID     string `json:"clusterID,omitempty"`
