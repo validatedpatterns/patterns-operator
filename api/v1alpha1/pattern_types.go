@@ -51,13 +51,18 @@ type PatternSpec struct {
 	Validation      bool   `json:"validation,omitempty"`
 	ValidationImage string `json:"validationImage,omitempty"`
 
-	Parameters      []PatternParameter `json:"parameters,omitempty"`
-	RequiredSecrets []string           `json:"requiredSecrets,omitempty"`
+	// .Name is dot separated per the helm --set syntax, such as:
+	//   global.something.field
+	Parameters []PatternParameter `json:"parameters,omitempty"`
+
+	// It would be great to use this, but controller-gen barfs on it
+	// Values      map[string]interface{} `json:"values,omitempty" yaml:"valuesLocal,omitempty"`
+	RequiredSecrets []string `json:"requiredSecrets,omitempty"`
 }
 
 type GitConfig struct {
 	Hostname             string `json:"hostname,omitempty"`
-	Account              string `json:"account"`
+	Account              string `json:"account,omitempty"`
 	TokenSecret          string `json:"tokenSecret,omitempty"`
 	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 	TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
@@ -94,13 +99,14 @@ type GitOpsConfig struct {
 type PatternStatus struct {
 	// define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	LastStep  string `json:"lastStep,omitempty"`
 	LastError string `json:"lastError,omitempty"`
 	Path      string `json:"path,omitempty"`
 	Revision  string `json:"revision,omitempty"`
 	Version   int    `json:"version,omitempty"`
 
 	ClusterDomain string `json:"clusterDomain,omitempty"`
-	ClusterID     string `json:"clusterVersion,omitempty"`
+	ClusterID     string `json:"clusterID,omitempty"`
 }
 
 //+kubebuilder:object:root=true

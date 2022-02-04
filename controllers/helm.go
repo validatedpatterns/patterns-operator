@@ -17,10 +17,12 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -41,68 +43,17 @@ type HelmChart struct {
 	Parameters chartutil.Values
 }
 
-func getConfiguration() (error, *action.Configuration) {
-	settings := cli.New()
+func getChartValues(name string) (error, map[string]interface{}) {
 
-	actionConfig := new(action.Configuration)
-
-	// configmaps, secrets, memory, or sql
-	// The default is secrets
-	//
-	// sql requires HELM_DRIVER_SQL_CONNECTION_STRING
-	// See helm.sh/helm/v3/pkg/action/action.go
-	driver := os.Getenv("HELM_DRIVER")
-
-	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, driver, func(format string, v ...interface{}) {
-	//		_ = fmt.Sprintf(format, v)
-	//	}); err != nil {
-	//		panic(err)
-	//	}
-
-	// settings.Namespace() == where we are running
-	// helm client uses 'default'
-	// You can pass an empty string instead of settings.Namespace() to list
-	// all namespaces
-	if err := actionConfig.Init(settings.RESTClientGetter(), "default", driver, log.Printf); err != nil {
-		log.Printf("Bad config: %+v", err)
+	if err, actionConfig := getConfiguration(); err != nil {
 		return err, nil
+	} else {
+
+		client := action.NewGetValues(actionConfig)
+
+		vals, err := client.Run(name)
+		return err, vals
 	}
-
-	if err := actionConfig.KubeClient.IsReachable(); err != nil {
-		log.Printf("not reachable: %+v", err)
-		return err, nil
-	}
-
-	return nil, actionConfig
-}
-
-func getChartObj(c HelmChart) (error, *chart.Chart) {
-
-	// load chart from the path
-	chartobj, err := loader.Load(c.Path)
-	return err, chartobj
-}
-
-func uninstallChart(name string) error {
-	err, actionConfig := getConfiguration()
-	if err != nil {
-		return err
-	}
-
-	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-	// vendor/helm.sh/helm/v3/pkg/release/release.go
-	client := action.NewUninstall(actionConfig)
-
-	// install the chart here
-	res, err := client.Run(name)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("Removed Chart %s: %s\n", name, res.Info)
-	// this will confirm the values set during installation
-
-	return nil
 }
 
 func installChart(c HelmChart) (error, int) {
@@ -136,19 +87,6 @@ func installChart(c HelmChart) (error, int) {
 	return nil, rel.Version
 }
 
-func getChartValues(name string) (error, map[string]interface{}) {
-
-	if err, actionConfig := getConfiguration(); err != nil {
-		return err, nil
-	} else {
-
-		client := action.NewGetValues(actionConfig)
-
-		vals, err := client.Run(name)
-		return err, vals
-	}
-}
-
 func updateChart(c HelmChart) (error, int) {
 
 	err, actionConfig := getConfiguration()
@@ -169,6 +107,76 @@ func updateChart(c HelmChart) (error, int) {
 	//	_, err := client.RunWithContext(ctx, c.Name, chartobj, c.Parameters)
 	rel, err := client.Run(c.Name, chartobj, c.Parameters)
 	return err, rel.Version
+}
+
+func overwriteWithChart(c HelmChart) (error, int) {
+
+	err, actionConfig := getConfiguration()
+	if err != nil {
+		return err, -1
+	}
+
+	err, chartobj := getChartObj(c)
+	if err != nil {
+		return err, -1
+	}
+
+	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+	// vendor/helm.sh/helm/v3/pkg/release/release.go
+	client := action.NewInstall(actionConfig)
+	client.Namespace = c.Namespace
+	client.ReleaseName = c.Name
+	client.DryRun = true
+
+	// install the chart here
+	rel, err := client.Run(chartobj, c.Parameters)
+	if err != nil {
+		return err, -1
+	}
+
+	var manifests bytes.Buffer
+	fmt.Fprintln(&manifests, strings.TrimSpace(rel.Manifest))
+
+	for i, m := range rel.Hooks {
+		fmt.Printf("Rendering hook %d\n", i)
+		fmt.Fprintf(&manifests, "---\n# Source: %s\n%s\n", m.Path, m.Manifest)
+
+		//OutputDir := "/tmp/..."
+		//err = writeToFile(OutputDir, m.Path, m.Manifest, fileWritten[m.Path])
+		//if err != nil {
+		//	return err
+		//}
+		//fileWritten[m.Path] = true
+	}
+
+	log.Printf("Installed Chart %s from path: %s in namespace: %s\n", rel.Name, c.Path, rel.Namespace)
+	fmt.Printf("%s", manifests.String())
+
+	// this will confirm the values set during installation
+	log.Println(rel.Config)
+	return nil, rel.Version
+}
+
+func uninstallChart(name string) error {
+	err, actionConfig := getConfiguration()
+	if err != nil {
+		return err
+	}
+
+	// func (i *Install) Run(chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+	// vendor/helm.sh/helm/v3/pkg/release/release.go
+	client := action.NewUninstall(actionConfig)
+
+	// install the chart here
+	res, err := client.Run(name)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Removed Chart %s: %s\n", name, res.Info)
+	// this will confirm the values set during installation
+
+	return nil
 }
 
 func chartForPattern(pattern api.Pattern) *HelmChart {
@@ -298,4 +306,46 @@ func lastRelease(cfg action.Configuration, name string, chart *chart.Chart) (*re
 		}
 	}
 	return currentRelease, nil
+}
+
+func getChartObj(c HelmChart) (error, *chart.Chart) {
+
+	// load chart from the path
+	chartobj, err := loader.Load(c.Path)
+	return err, chartobj
+}
+
+func getConfiguration() (error, *action.Configuration) {
+	settings := cli.New()
+
+	actionConfig := new(action.Configuration)
+
+	// configmaps, secrets, memory, or sql
+	// The default is secrets
+	//
+	// sql requires HELM_DRIVER_SQL_CONNECTION_STRING
+	// See helm.sh/helm/v3/pkg/action/action.go
+	driver := os.Getenv("HELM_DRIVER")
+
+	//	if err := actionConfig.Init(kube.GetConfig(kubeconfigPath, "", releaseNamespace), releaseNamespace, driver, func(format string, v ...interface{}) {
+	//		_ = fmt.Sprintf(format, v)
+	//	}); err != nil {
+	//		panic(err)
+	//	}
+
+	// settings.Namespace() == where we are running
+	// helm client uses 'default'
+	// You can pass an empty string instead of settings.Namespace() to list
+	// all namespaces
+	if err := actionConfig.Init(settings.RESTClientGetter(), "default", driver, log.Printf); err != nil {
+		log.Printf("Bad config: %+v", err)
+		return err, nil
+	}
+
+	if err := actionConfig.KubeClient.IsReachable(); err != nil {
+		log.Printf("not reachable: %+v", err)
+		return err, nil
+	}
+
+	return nil, actionConfig
 }

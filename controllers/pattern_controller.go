@@ -177,7 +177,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	chart := chartForPattern(*qualifiedInstance)
 	if chart == nil {
-		err := r.deployPattern(qualifiedInstance, needSubscription, false)
+		err := r.deployPattern(qualifiedInstance, "deploying the pattern", needSubscription, false)
 		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
 	}
 
@@ -230,7 +230,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if needSync {
-		err := r.deployPattern(qualifiedInstance, false, true)
+		err := r.deployPattern(qualifiedInstance, "updating the pattern", false, true)
 		return r.actionPerformed(qualifiedInstance, "updating the pattern", err)
 	}
 
@@ -393,7 +393,7 @@ func inputsForPattern(p api.Pattern, needSubscription bool) map[string]interface
 	return inputs
 }
 
-func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool, isUpdate bool) error {
+func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubscription bool, isUpdate bool) error {
 
 	chart := HelmChart{
 		Name:       p.Name,
@@ -416,6 +416,9 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, needSubscription bool,
 	} else {
 		log.Printf("installing pattern")
 		err, version = installChart(chart)
+	}
+	if err != nil && p.Status.LastStep == step {
+		_, version = overwriteWithChart(chart)
 	}
 	if err != nil {
 		return err
@@ -471,6 +474,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
 	// err is logged by the reconcileHandler
+	p.Status.LastStep = reason
 	if err != nil {
 		p.Status.LastError = err.Error()
 		log.Printf("\n\x1b[31;1mReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
