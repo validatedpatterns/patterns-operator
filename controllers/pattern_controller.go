@@ -354,6 +354,9 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubsc
 		return err
 	}
 
+	log.Printf("debug overwrite")
+	_, _ = overwriteWithChart(*p)
+
 	var version = 0
 	if p.Status.LastStep == step {
 		log.Printf("Escalating %s", step)
@@ -365,11 +368,6 @@ func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubsc
 	} else {
 		log.Printf("installing pattern")
 		err, version = installChart(*p)
-
-		if err != nil {
-			log.Printf("installing pattern")
-			_, _ = overwriteWithChart(*p)
-		}
 	}
 	if err != nil {
 		return err
