@@ -302,6 +302,9 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
+	if output.Spec.GitOpsConfig == nil {
+		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
+	}
 	if len(output.Spec.GitOpsConfig.SyncPolicy) == 0 {
 		output.Spec.GitOpsConfig.SyncPolicy = api.InstallAutomatic
 	}
