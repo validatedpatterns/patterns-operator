@@ -212,6 +212,15 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 	}
 }
 
-func removeApplication(config *rest.Config, p api.Pattern) error {
-	return fmt.Errorf("not implemented")
+func removeApplication(config *rest.Config, name string) error {
+	if client, err := argoclient.NewForConfig(config); err != nil {
+		return err
+	} else {
+		if err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
+			return err
+		} else {
+			//			log.Printf("Retrieved: %s\n", objectYaml(app))
+			return nil
+		}
+	}
 }

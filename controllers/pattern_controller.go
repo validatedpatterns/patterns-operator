@@ -300,10 +300,10 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		// Do any required cleanup here
 		log.Printf("Removing the application, anything instantiated by ArgoCD can now be cleaned up manually")
 
-		//		if err := removeApplication(p.Config, instance); err != nil {
-		//			// Best effort only...
-		//			r.logger.Info("Could not uninstall pattern", "error", err)
-		//		}
+		if err := removeApplication(r.config, applicationName(*instance)); err != nil {
+			// Best effort only...
+			r.logger.Info("Could not uninstall pattern", "error", err)
+		}
 
 		// Remove our finalizer from the list and update it.
 		instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
