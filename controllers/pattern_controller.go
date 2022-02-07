@@ -157,27 +157,27 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- ArgoCD Application
-	//	taregtApp := newApplication(qualifiedInstance)
-	//	controllerutil.SetOwnerReference(qualifiedInstance, app, r.Scheme)
-	//	err, app := getApplication(r.client, qualifiedInstance.Name)
-	//	if app == nil {
-	//		err, _ := createApplication(r.Client, taregtApp)
-	//		return r.actionPerformed(qualifiedInstance, "create application", err)
-	//
-	//	} else if ownedBySame(targetApp, app) {
-	//		// Check values
-	//		err, changed := updateApplication(r.Client, targetSub, sub)
-	//		if changed {
-	//			if err != nil {
-	//				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
-	//			}
-	//			return r.actionPerformed(qualifiedInstance, "updated application", err)
-	//		}
-	//
-	//	} else {
-	//		// Someone manually removed the owner ref
-	//		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
-	//	}
+	targetApp := newApplication(*qualifiedInstance)
+	controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
+	app, err := getApplication(r.config, qualifiedInstance.Name)
+	if app == nil {
+		err := createApplication(r.config, targetApp)
+		return r.actionPerformed(qualifiedInstance, "create application", err)
+
+	} else if ownedBySame(targetApp, app) {
+		// Check values
+		err, changed := updateApplication(r.config, targetApp, app)
+		if changed {
+			if err != nil {
+				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
+			}
+			return r.actionPerformed(qualifiedInstance, "updated application", err)
+		}
+
+	} else {
+		// Someone manually removed the owner ref
+		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
+	}
 
 	// Perform validation of the site values file(s)
 	if err := r.postValidation(qualifiedInstance); err != nil {
