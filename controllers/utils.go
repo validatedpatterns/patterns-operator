@@ -18,10 +18,23 @@ package controllers
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
+
+var (
+	logKeys = map[string]bool{}
+)
+
+func logOnce(message string) {
+	if _, ok := logKeys[message]; ok {
+		return
+	}
+	logKeys[message] = true
+	log.Println(message)
+}
 
 // ContainsString checks if the string array contains the given string.
 func ContainsString(slice []string, s string) bool {

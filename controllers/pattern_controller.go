@@ -26,26 +26,23 @@ import (
 
 	"path/filepath"
 
-	"github.com/ghodss/yaml"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
-	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 
-	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
@@ -59,7 +56,6 @@ type PatternReconciler struct {
 
 	config       *rest.Config
 	configClient configclient.Interface
-	fullClient   kubernetes.Interface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -109,6 +105,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
+	// Remove the ArgoCD application on deletion
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
 		if !ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) {
@@ -124,96 +121,63 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, nil
 	}
 
-	// Fill in defaults - Make changes in the copy?
+	// -- Fill in defaults (changes made to a copy and not persisted)
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
-	}
-
-	// Update/create the argo application
-
-	var token = ""
-	if len(qualifiedInstance.Spec.GitConfig.TokenSecret) > 0 {
-		if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
-			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
-		}
-	}
-
-	gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		err := cloneRepo(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token)
-		return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
-	}
-
-	if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
-		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
 	}
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
-	if isPatternDeployed(qualifiedInstance.Name) == false {
-		// Helm doesn't always realize right away...
-		// Can result in unnecessary second deployment
+	// -- GitOps Subscription
+	targetSub := newSubscription(*qualifiedInstance)
+	controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-		needSubscription := r.doSubscriptionCheck()
-		err := r.deployPattern(qualifiedInstance, "deploying the pattern", needSubscription, false)
-		return r.actionPerformed(qualifiedInstance, "deploying the pattern", err)
-	}
+	err, sub := getSubscription(r.config, targetSub.Name, targetSub.Namespace)
+	if sub == nil {
+		err := createSubscription(r.config, targetSub)
+		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
 
-	// Reconcile any changes
-	var needSync = false
-
-	err, hash := repoHash(qualifiedInstance.Status.Path)
-	if err != nil {
-		return r.actionPerformed(qualifiedInstance, "obtain git hash", err)
-	}
-
-	if needSync == false && qualifiedInstance.Status.Revision != hash {
-		needSync = true
+	} else if ownedBySame(targetSub, sub) {
+		// Check version/channel etc
+		err, changed := updateSubscription(r.config, targetSub, sub)
+		if changed {
+			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
+		}
 
 	} else {
-		var err error
-		var deployedMarshalled []byte
-		var calculatedMarshalled []byte
-		// Force a consistent value for bootstrap, which doesn't matter
-		if err, current := getChartValues(qualifiedInstance.Name); err == nil {
-			m := current["main"].(map[string]interface{})
-			o := m["options"].(map[string]interface{})
-			o["bootstrap"] = false
-			if deployedMarshalled, err = yaml.Marshal(current); err != nil {
-				needSync = true
-				r.logger.Info("Error marshalling deployed values", "input", current, "error", err.Error())
-			}
-		} else {
-			needSync = true
-			r.logger.Info("Error obtaining deployed values", "input", current, "error", err.Error())
-		}
-		//calculated, _ := yaml.Marshal(inputsForPattern(*qualifiedInstance, false))
-
-		err, calculated := coalesceChartValues(*qualifiedInstance)
-		if err != nil {
-			needSync = true
-			log.Printf("Error coalescing calculated values: %s", err.Error())
-
-		} else if calculatedMarshalled, err = yaml.Marshal(calculated); err != nil {
-			needSync = true
-			r.logger.Info("Error marshalling calculated values", "input", calculated, "error", err.Error())
-		}
-
-		if string(calculatedMarshalled) != string(deployedMarshalled) {
-			log.Printf(fmt.Sprintf("Parameters changed. calculated...\n%s\nactual...\n%s\n", string(calculatedMarshalled), string(deployedMarshalled)))
-			needSync = true
-		} else {
-			log.Printf("Parameters unchanged\n")
-		}
+		logOnce("The gitops subscription is not owned by us, leaving untouched")
 	}
 
-	if needSync {
-		err := r.deployPattern(qualifiedInstance, "updating the pattern", false, true)
-		return r.actionPerformed(qualifiedInstance, "updating the pattern", err)
+	// -- GitOps Namespace (created by the gitops operator)
+	if haveNamespace(r.config, applicationNamespace) == false {
+		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
+
+	// -- ArgoCD Application
+	//	taregtApp := newApplication(qualifiedInstance)
+	//	controllerutil.SetOwnerReference(qualifiedInstance, app, r.Scheme)
+	//	err, app := getApplication(r.client, qualifiedInstance.Name)
+	//	if app == nil {
+	//		err, _ := createApplication(r.Client, taregtApp)
+	//		return r.actionPerformed(qualifiedInstance, "create application", err)
+	//
+	//	} else if ownedBySame(targetApp, app) {
+	//		// Check values
+	//		err, changed := updateApplication(r.Client, targetSub, sub)
+	//		if changed {
+	//			if err != nil {
+	//				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
+	//			}
+	//			return r.actionPerformed(qualifiedInstance, "updated application", err)
+	//		}
+	//
+	//	} else {
+	//		// Someone manually removed the owner ref
+	//		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
+	//	}
 
 	// Perform validation of the site values file(s)
 	if err := r.postValidation(qualifiedInstance); err != nil {
@@ -227,21 +191,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{RequeueAfter: time.Minute * minutes}, nil
 }
 
-func (r *PatternReconciler) doSubscriptionCheck() bool {
-	var clusterSubscriptions olmapi.SubscriptionList
-	//	if tokenSecret, err = r.Client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
-
-	if err := r.Client.List(context.TODO(), &clusterSubscriptions, &client.ListOptions{}); err == nil {
-		for _, sub := range clusterSubscriptions.Items {
-			if sub.Spec.Package == "openshift-gitops-operator" && sub.Namespace == "openshift-operators" {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 
 	//ss := strings.Compare(input.Spec.GitConfig.TargetRepo, "git")
@@ -249,6 +198,8 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "git@"); index == 0 {
 		return errors.New(fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo))
 	}
+
+	// Check the url is reachable
 
 	return nil
 }
@@ -331,64 +282,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	return nil, output
 }
 
-func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (error, string) {
-	if len(key) == 0 {
-		return nil, ""
-	}
-	tokenSecret := &corev1.Secret{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
-	if err != nil {
-		//	if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
-		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", secret, namespace))
-		return err, ""
-	}
-
-	if val, ok := tokenSecret.Data[key]; ok {
-		// See also https://github.com/kubernetes/client-go/issues/198
-		return nil, string(val)
-	}
-	return errors.New(fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace)), ""
-}
-
-func (r *PatternReconciler) deployPattern(p *api.Pattern, step string, needSubscription bool, isUpdate bool) error {
-
-	var err error
-	err, hash := repoHash(p.Status.Path)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("debug overwrite")
-	_, _ = overwriteWithChart(*p)
-
-	var version = 0
-	if p.Status.LastStep == step {
-		log.Printf("Escalating %s", step)
-		err, version = overwriteWithChart(*p)
-
-	} else if isUpdate {
-		log.Printf("updating pattern")
-		err, version = updateChart(*p)
-	} else {
-		log.Printf("installing pattern")
-		err, version = installChart(*p)
-	}
-	if err != nil {
-		return err
-	}
-
-	log.Printf("Deployed %s/%s: %d.", p.Name, p.ObjectMeta.Namespace, version)
-
-	if err, deployed := getChartValues(p.Name); err == nil {
-		if deployedMarshalled, err := yaml.Marshal(deployed); err == nil {
-			log.Printf("Deployed values:\n%s\n", string(deployedMarshalled))
-		}
-	}
-	p.Status.Version = version
-	p.Status.Revision = hash
-	return nil
-}
-
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 	// Add finalizer when object is created
@@ -397,12 +290,12 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	// The object is being deleted
 	if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
 		// Do any required cleanup here
-		log.Printf("Uninstalling")
+		log.Printf("Removing the application, anything instantiated by ArgoCD can now be cleaned up manually")
 
-		if err := uninstallChart(instance.Name); err != nil {
-			// Best effort only...
-			r.logger.Info("Could not uninstall pattern", "error", err)
-		}
+		//		if err := removeApplication(p.Config, instance); err != nil {
+		//			// Best effort only...
+		//			r.logger.Info("Could not uninstall pattern", "error", err)
+		//		}
 
 		// Remove our finalizer from the list and update it.
 		instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
@@ -422,9 +315,9 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
-		return err
-	}
+	//	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
+	//		return err
+	//	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
