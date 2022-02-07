@@ -35,6 +35,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
 
+	"github.com/ghodss/yaml"
+
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
@@ -200,6 +202,15 @@ func ownedBy(object metav1.Object, ref metav1.OwnerReference) bool {
 	}
 
 	return false
+}
+
+func objectYaml(object metav1.Object) string {
+
+	if yamlString, err := yaml.Marshal(object); err != nil {
+		return fmt.Sprintf("Error marshalling object: %s\n", err.Error())
+	} else {
+		return string(yamlString)
+	}
 }
 
 // Returns true if a and b point to the same object.

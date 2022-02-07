@@ -133,20 +133,29 @@ func newApplication(p api.Pattern) *argoapi.Application {
 		}
 	}
 
-	return &argoapi.Application{
+	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "openshift-gitops-operator",
 			Namespace: applicationNamespace,
 		},
 		Spec: spec,
 	}
+
+	log.Printf("Generated: %s\n", objectYaml(&app))
+	return &app
+
 }
 
-func getApplication(config *rest.Config, name string) (*argoapi.Application, error) {
+func getApplication(config *rest.Config, name string) (error, *argoapi.Application) {
 	if client, err := argoclient.NewForConfig(config); err != nil {
-		return nil, err
+		return err, nil
 	} else {
-		return client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{})
+		if app, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+			return err, nil
+		} else {
+			log.Printf("Retrieved: %s\n", objectYaml(app))
+			return nil, app
+		}
 	}
 }
 
@@ -171,7 +180,7 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 	}
 
 	if target.Spec.Source.RepoURL != current.Spec.Source.RepoURL {
-		log.Println("RepoPath changed")
+		log.Printf("RepoURL changed %s -> %s\n", current.Spec.Source.RepoURL, target.Spec.Source.RepoURL)
 		changed = true
 	} else if target.Spec.Source.TargetRevision != current.Spec.Source.TargetRevision {
 		log.Println("CatalogSource changed")
@@ -186,9 +195,13 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 	if client, err := argoclient.NewForConfig(config); err != nil {
 		return err, changed
 	} else {
+		log.Printf("Updating: %s\n", objectYaml(current))
+
 		spec := current.Spec.DeepCopy()
 		target.Spec.DeepCopyInto(spec)
 		current.Spec = *spec
+
+		log.Printf("Sending update: %s\n", objectYaml(current))
 
 		_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return err, changed

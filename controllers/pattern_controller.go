@@ -151,16 +151,24 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		logOnce("The gitops subscription is not owned by us, leaving untouched")
 	}
 
+	logOnce("subscription found")
+
 	// -- GitOps Namespace (created by the gitops operator)
 	if haveNamespace(r.config, applicationNamespace) == false {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 
+	logOnce("namespace found")
+
 	// -- ArgoCD Application
 	targetApp := newApplication(*qualifiedInstance)
 	controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
-	app, err := getApplication(r.config, qualifiedInstance.Name)
+
+	log.Printf("Targeting: %s\n", objectYaml(targetApp))
+
+	err, app := getApplication(r.config, qualifiedInstance.Name)
 	if app == nil {
+		log.Printf("App not found: %s\n", err.Error())
 		err := createApplication(r.config, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 
