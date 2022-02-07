@@ -164,6 +164,12 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 	//	var client argoclient.Interface
 	changed := false
 
+	if current == nil {
+		return fmt.Errorf("current application was nil"), false
+	} else if target == nil {
+		return fmt.Errorf("target application was nil"), false
+	}
+
 	if target.Spec.Source.RepoURL != current.Spec.Source.RepoURL {
 		log.Println("RepoPath changed")
 		changed = true

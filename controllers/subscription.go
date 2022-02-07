@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,6 +99,11 @@ func createSubscription(config *rest.Config, sub *operatorv1alpha1.Subscription)
 
 func updateSubscription(config *rest.Config, target, current *operatorv1alpha1.Subscription) (error, bool) {
 	changed := false
+	if current == nil || current.Spec != nil {
+		return fmt.Errorf("current subscription was nil"), false
+	} else if target == nil || target.Spec != nil {
+		return fmt.Errorf("target subscription was nil"), false
+	}
 
 	if target.Spec.CatalogSourceNamespace != current.Spec.CatalogSourceNamespace {
 		log.Println("CatalogSourceNamespace changed")
