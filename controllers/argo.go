@@ -30,6 +30,86 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
+func compareSource(goal, actual argoapi.ApplicationSource) bool {
+	if goal.RepoURL != actual.RepoURL {
+		log.Printf("RepoURL changed %s -> %s\n", actual.RepoURL, goal.RepoURL)
+		return false
+	}
+
+	if goal.TargetRevision != actual.TargetRevision {
+		log.Printf("TargetRevision changed %s -> %s\n", actual.TargetRevision, goal.TargetRevision)
+		return false
+	}
+
+	if goal.Path != actual.Path {
+		log.Printf("Path changed %s -> %s\n", actual.Path, goal.Path)
+		return false
+	}
+
+	return compareHelmSource(*goal.Helm, *actual.Helm)
+
+}
+func compareHelmSource(goal, actual argoapi.ApplicationSourceHelm) bool {
+	if compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) == false {
+		return false
+	}
+	if compareHelmParameters(goal.Parameters, actual.Parameters) == false {
+		return false
+	}
+	return true
+}
+
+func compareHelmParameter(goal argoapi.HelmParameter, actual []argoapi.HelmParameter) bool {
+	for _, param := range actual {
+		if goal.Name == param.Name {
+			if goal.Value == param.Value {
+				return true
+			}
+			log.Printf("Parameter %q changed: %q -> %q", goal.Name, param.Value, goal.Value)
+			return false
+		}
+	}
+	log.Printf("Parameter %q not found", goal.Name)
+	return false
+
+}
+
+func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
+	if len(goal) != len(actual) {
+		return false
+	}
+
+	for _, gP := range goal {
+		if compareHelmParameter(gP, actual) == false {
+			return false
+		}
+
+	}
+	return true
+}
+
+func compareHelmValueFile(goal string, actual []string) bool {
+	for _, value := range actual {
+		if goal == value {
+			return true
+		}
+	}
+	log.Printf("Values file %q not found", goal)
+	return false
+
+}
+func compareHelmValueFiles(goal []string, actual []string) bool {
+	if len(goal) != len(actual) {
+		return false
+	}
+	for _, gV := range goal {
+		if compareHelmValueFile(gV, actual) == false {
+			return false
+		}
+	}
+	return true
+}
+
 //apiVersion: argoproj.io/v1alpha1
 //kind: Application
 //metadata:
@@ -183,17 +263,8 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 		return fmt.Errorf("target application was nil"), false
 	}
 
-	if target.Spec.Source.RepoURL != current.Spec.Source.RepoURL {
-		log.Printf("RepoURL changed %s -> %s\n", current.Spec.Source.RepoURL, target.Spec.Source.RepoURL)
-		changed = true
-	} else if target.Spec.Source.TargetRevision != current.Spec.Source.TargetRevision {
-		log.Println("CatalogSource changed")
-		changed = true
-		// TODO: Add more conditions...
-	}
-
-	if changed == false {
-		return nil, changed
+	if compareSource(target.Spec.Source, current.Spec.Source) {
+		return nil, false
 	}
 
 	if client, err := argoclient.NewForConfig(config); err != nil {
