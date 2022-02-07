@@ -64,11 +64,11 @@ func newApplication(p api.Pattern) *argoapi.Application {
 					},
 					{
 						Name:  "global.targetRevision",
-						Value: p.Spec.GitConfig.TargetRepo,
+						Value: p.Spec.GitConfig.TargetRevision,
 					},
 					{
 						Name:  "global.namespace",
-						Value: p.Spec.GitConfig.TargetRepo,
+						Value: p.Namespace,
 					},
 					{
 						Name:  "global.valuesDirectoryURL",
@@ -157,7 +157,7 @@ func getApplication(config *rest.Config, name string) (error, *argoapi.Applicati
 		if app, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
 			return err, nil
 		} else {
-			log.Printf("Retrieved: %s\n", objectYaml(app))
+			//			log.Printf("Retrieved: %s\n", objectYaml(app))
 			return nil, app
 		}
 	}

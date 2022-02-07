@@ -164,7 +164,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	targetApp := newApplication(*qualifiedInstance)
 	controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-	log.Printf("Targeting: %s\n", objectYaml(targetApp))
+	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
 
 	err, app := getApplication(r.config, applicationName(*qualifiedInstance))
 	if app == nil {
