@@ -102,7 +102,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 		},
 		Destination: argoapi.ApplicationDestination{
 			Name:      "in-cluster",
-			Namespace: fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName),
+			Namespace: p.Namespace,
 		},
 		// Project is a reference to the project this application belongs to.
 		// The empty string means that application belongs to the 'default' project.
@@ -135,7 +135,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 
 	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "openshift-gitops-operator",
+			Name:      applicationName(p),
 			Namespace: applicationNamespace,
 		},
 		Spec: spec,
@@ -144,6 +144,10 @@ func newApplication(p api.Pattern) *argoapi.Application {
 	log.Printf("Generated: %s\n", objectYaml(&app))
 	return &app
 
+}
+
+func applicationName(p api.Pattern) string {
+	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
 func getApplication(config *rest.Config, name string) (error, *argoapi.Application) {

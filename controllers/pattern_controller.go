@@ -166,7 +166,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Printf("Targeting: %s\n", objectYaml(targetApp))
 
-	err, app := getApplication(r.config, qualifiedInstance.Name)
+	err, app := getApplication(r.config, applicationName(*qualifiedInstance))
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
 		err := createApplication(r.config, targetApp)
