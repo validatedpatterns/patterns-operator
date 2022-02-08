@@ -23,6 +23,11 @@ import (
 	"strings"
 	"time"
 
+	"os"
+	"path/filepath"
+	"regexp"
+
+	"github.com/argoproj/argo-cd/v2/util/git"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
@@ -256,9 +261,14 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
 	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 && output.Spec.GitConfig.Hostname == "github.com" {
+
+		// Argo uses...
+		r := regexp.MustCompile("(/|:)")
+		output.Spec.GitConfig.ValuesDirectoryURL = filepath.Join(os.TempDir(), r.ReplaceAllString(git.NormalizeGitURL(output.Spec.GitConfig.TargetRepo), "_"))
+		logOnce(fmt.Sprintf("Calculate absolute path: %s\n", output.Spec.GitConfig.ValuesDirectoryURL))
 		// https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
-		ss := fmt.Sprintf("%s/raw/%s", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
-		output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
+		// ss := fmt.Sprintf("%s/raw/%s", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
+		// output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
 	}
 
 	if output.Spec.GitOpsConfig == nil {
