@@ -110,11 +110,65 @@ func compareHelmValueFiles(goal []string, actual []string) bool {
 	return true
 }
 
-//apiVersion: argoproj.io/v1alpha1
-//kind: Application
-//metadata:
-//  name: {{ .Release.Name }}-{{ .Values.main.clusterGroupName }}
-//  namespace: openshift-gitops
+func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParameter) bool {
+	for _, param := range actual {
+		if goal.Name == param.Name {
+			if goal.Value == param.Value {
+				return true
+			}
+			log.Printf("Parameter %q updated: %q -> %q", goal.Name, param.Value, goal.Value)
+			param.Value = goal.Value
+			return true
+		}
+	}
+	return false
+}
+
+func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
+
+	parameters := []argoapi.HelmParameter{
+		{
+			Name:  "global.pattern",
+			Value: p.Name,
+		},
+		{
+			Name:  "global.namespace",
+			Value: p.Namespace,
+		},
+		{
+			Name:  "global.repoURL",
+			Value: p.Spec.GitConfig.TargetRepo,
+			//						ForceString true,
+		},
+		{
+			Name:  "global.targetRevision",
+			Value: p.Spec.GitConfig.TargetRevision,
+		},
+		{
+			Name:  "global.valuesDirectoryURL",
+			Value: p.Spec.GitConfig.ValuesDirectoryURL,
+		},
+		{
+			Name:  "global.hubClusterDomain",
+			Value: p.Status.ClusterDomain,
+		},
+		{
+			Name:  "global.localClusterDomain",
+			Value: p.Status.ClusterDomain,
+		},
+	}
+
+	for _, extra := range p.Spec.Parameters {
+		if updateHelmParameter(extra, parameters) == false {
+			log.Printf("Parameter %q = %q added", extra.Name, extra.Value)
+			parameters = append(parameters, argoapi.HelmParameter{
+				Name:  extra.Name,
+				Value: extra.Value,
+			})
+		}
+	}
+	return parameters
+}
 
 func newApplication(p api.Pattern) *argoapi.Application {
 
@@ -136,33 +190,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 					fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Spec.ClusterGroupName),
 				},
 				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
-				Parameters: []argoapi.HelmParameter{
-					{
-						Name:  "global.repoURL",
-						Value: p.Spec.GitConfig.TargetRepo,
-						//						ForceString true,
-					},
-					{
-						Name:  "global.targetRevision",
-						Value: p.Spec.GitConfig.TargetRevision,
-					},
-					{
-						Name:  "global.namespace",
-						Value: p.Namespace,
-					},
-					{
-						Name:  "global.valuesDirectoryURL",
-						Value: p.Spec.GitConfig.ValuesDirectoryURL,
-					},
-					{
-						Name:  "global.pattern",
-						Value: p.Name,
-					},
-					{
-						Name:  "global.hubClusterDomain",
-						Value: p.Status.ClusterDomain,
-					},
-				},
+				Parameters: newApplicationParameters(p),
 				// ReleaseName is the Helm release name to use. If omitted it will use the application name
 				// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`
 				// Values specifies Helm values to be passed to helm template, typically defined as a block
