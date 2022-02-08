@@ -40,6 +40,26 @@ spec:
                 type: boolean
               clusterGroupName:
                 type: string
+              extraParameters:
+                description: '.Name is dot separated per the helm --set syntax, such
+                  as:   global.something.field'
+                items:
+                  properties:
+                    name:
+                      description: Foo is an example field of Pattern. Edit pattern_types.go
+                        to remove/update
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - name
+                  - value
+                  type: object
+                type: array
+              extraValueFiles:
+                items:
+                  type: string
+                type: array
               gitOpsSpec:
                 properties:
                   installPlanApproval:
@@ -57,8 +77,6 @@ spec:
                 type: object
               gitSpec:
                 properties:
-                  account:
-                    type: string
                   hostname:
                     type: string
                   originRepo:
@@ -67,33 +85,11 @@ spec:
                     type: string
                   targetRevision:
                     type: string
-                  tokenSecret:
-                    type: string
-                  tokenSecretKey:
-                    type: string
-                  tokenSecretNamespace:
-                    type: string
                   valuesDirectoryURL:
                     type: string
                 required:
                 - targetRepo
                 type: object
-              parameters:
-                description: '.Name is dot separated per the helm --set syntax, such
-                  as:   global.something.field'
-                items:
-                  properties:
-                    name:
-                      description: Foo is an example field of Pattern. Edit pattern_types.go
-                        to remove/update
-                      type: string
-                    value:
-                      type: string
-                  required:
-                  - name
-                  - value
-                  type: object
-                type: array
               reconcileMinutes:
                 type: integer
               requiredSecrets:
@@ -123,12 +119,6 @@ spec:
               lastStep:
                 description: 'define observed state of cluster Important: Run "make"
                   to regenerate code after modifying this file'
-                type: string
-              needSubscription:
-                type: boolean
-              path:
-                type: string
-              revision:
                 type: string
               version:
                 type: integer
