@@ -106,6 +106,7 @@ type PatternStatus struct {
 
 	Version int `json:"version,omitempty"`
 
+	ClusterName   string `json:"clusterName,omitempty"`
 	ClusterDomain string `json:"clusterDomain,omitempty"`
 	ClusterID     string `json:"clusterID,omitempty"`
 }

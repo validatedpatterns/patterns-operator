@@ -23,11 +23,11 @@ import (
 	"strings"
 	"time"
 
-	"os"
-	"path/filepath"
-	"regexp"
+	//	"os"
+	//	"path/filepath"
+	//	"regexp"
+	//	"github.com/argoproj/argo-cd/v2/util/git"
 
-	"github.com/argoproj/argo-cd/v2/util/git"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
@@ -248,6 +248,9 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	// "apps.mycluster.blueprints.rhecoeng.com"
+	ss := strings.Split(clusterIngress.Spec.Domain, ".")
+
+	output.Status.ClusterName = ss[1]
 	output.Status.ClusterDomain = clusterIngress.Spec.Domain
 
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
