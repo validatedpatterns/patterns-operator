@@ -246,16 +246,16 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.TargetRevision = "main"
 	}
 
+	if len(output.Spec.GitConfig.Hostname) == 0 {
+		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
+		output.Spec.GitConfig.Hostname = ss[2]
+	}
+
 	// Set output.Spec.GitConfig.ValuesDirectoryURL based on the TargetRepo
 	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 && output.Spec.GitConfig.Hostname == "github.com" {
 		// https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
 		ss := fmt.Sprintf("%s/raw/%s/", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
 		output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
-	}
-
-	if len(output.Spec.GitConfig.Hostname) == 0 {
-		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
-		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
 	if output.Spec.GitOpsConfig == nil {
