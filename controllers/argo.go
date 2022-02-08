@@ -221,7 +221,6 @@ func newApplication(p api.Pattern) *argoapi.Application {
 		Spec: spec,
 	}
 
-	log.Printf("Generated: %s\n", objectYaml(&app))
 	return &app
 
 }
@@ -248,7 +247,8 @@ func createApplication(config *rest.Config, app *argoapi.Application) error {
 	if client, err := argoclient.NewForConfig(config); err != nil {
 		return err
 	} else {
-		_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
+		saved, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
+		log.Printf("Created: %s\n", objectYaml(saved))
 		return err
 	}
 }
