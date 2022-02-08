@@ -255,8 +255,6 @@ func createApplication(config *rest.Config, app *argoapi.Application) error {
 
 func updateApplication(config *rest.Config, target, current *argoapi.Application) (error, bool) {
 	//	var client argoclient.Interface
-	changed := false
-
 	if current == nil {
 		return fmt.Errorf("current application was nil"), false
 	} else if target == nil {
@@ -268,18 +266,14 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 	}
 
 	if client, err := argoclient.NewForConfig(config); err != nil {
-		return err, changed
+		return err, true
 	} else {
-		log.Printf("Updating: %s\n", objectYaml(current))
-
 		spec := current.Spec.DeepCopy()
 		target.Spec.DeepCopyInto(spec)
 		current.Spec = *spec
 
-		log.Printf("Sending update: %s\n", objectYaml(current))
-
 		_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-		return err, changed
+		return err, true
 	}
 }
 
