@@ -82,7 +82,8 @@ func newApplicationValueFiles(p api.Pattern) []string {
 		// It would also be great to somehow support optional remote value files
 		fmt.Sprintf("%s/values-global.yaml", p.Spec.GitConfig.ValuesDirectoryURL),
 		fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Spec.ClusterGroupName),
-		fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Status.ClusterName),
+		// Enable this once we get argo 2.3 and support for IgnoreMissingValueFiles
+		//fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Status.ClusterName),
 	}
 
 	for _, extra := range p.Spec.ExtraValueFiles {
