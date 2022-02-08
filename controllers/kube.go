@@ -29,8 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/validation"
@@ -162,10 +161,8 @@ func applyOneObject(info *resource.Info) error {
 	return nil
 }
 
-func haveNamespace(config *rest.Config, name string) bool {
-	if client, err := clientset.NewForConfig(config); err != nil {
-		return false
-	} else if _, err := client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{}); err == nil {
+func haveNamespace(client kubernetes.Interface, name string) bool {
+	if _, err := client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{}); err == nil {
 		return true
 	}
 	return false

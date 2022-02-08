@@ -37,7 +37,10 @@ import (
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
+	"k8s.io/client-go/kubernetes"
 
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -53,6 +56,9 @@ type PatternReconciler struct {
 
 	config       *rest.Config
 	configClient configclient.Interface
+	argoClient   argoclient.Interface
+	olmClient    olmclient.Interface
+	fullClient   kubernetes.Interface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -132,15 +138,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	targetSub := newSubscription(*qualifiedInstance)
 	controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	err, sub := getSubscription(r.config, targetSub.Name, targetSub.Namespace)
+	err, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
 	if sub == nil {
-		err := createSubscription(r.config, targetSub)
+		err := createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
 
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		err, changed := updateSubscription(r.config, targetSub, sub)
+		err, changed := updateSubscription(r.olmClient, targetSub, sub)
 		if changed {
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
 		}
@@ -152,7 +158,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("subscription found")
 
 	// -- GitOps Namespace (created by the gitops operator)
-	if haveNamespace(r.config, applicationNamespace) == false {
+	if haveNamespace(r.fullClient, applicationNamespace) == false {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 
@@ -164,15 +170,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
 
-	err, app := getApplication(r.config, applicationName(*qualifiedInstance))
+	err, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
-		err := createApplication(r.config, targetApp)
+		err := createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		err, changed := updateApplication(r.config, targetApp, app)
+		err, changed := updateApplication(r.argoClient, targetApp, app)
 		if changed {
 			if err != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
@@ -294,7 +300,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		// Do any required cleanup here
 		log.Printf("Removing the application, anything instantiated by ArgoCD can now be cleaned up manually")
 
-		if err := removeApplication(r.config, applicationName(*instance)); err != nil {
+		if err := removeApplication(r.argoClient, applicationName(*instance)); err != nil {
 			// Best effort only...
 			r.logger.Info("Could not uninstall pattern", "error", err)
 		}
@@ -317,9 +323,17 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	//	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
-	//		return err
-	//	}
+	if r.argoClient, err = argoclient.NewForConfig(r.config); err != nil {
+		return err
+	}
+
+	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
+		return err
+	}
+
+	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
+		return err
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).

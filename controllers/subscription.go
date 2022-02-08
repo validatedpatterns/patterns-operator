@@ -23,8 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	clientset "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
-	"k8s.io/client-go/rest"
+	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -74,30 +73,18 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	}
 }
 
-func getSubscription(config *rest.Config, name, namespace string) (error, *operatorv1alpha1.Subscription) {
+func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
 
-	if client, err := clientset.NewForConfig(config); err != nil {
-		return err, nil
-	} else {
-		sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
-		return err, sub
-	}
+	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	return err, sub
 }
 
-func createSubscription(config *rest.Config, sub *operatorv1alpha1.Subscription) error {
-	//       var clusterSubscriptions olmapi.SubscriptionList
-	//       if tokenSecret, err = client.Core().Secrets(secret.Namespace).Get(secret.Name); err != nil {
-	//       if err := client.List(context.TODO(), &clusterSubscriptions, &client.ListOptions{}); err == nil {
-	// ./vendor/k8s.io/client-go/metadata/metadata.go:181:func (c *client) Get(ctx context.Context, name string, opts metav1.GetOptions, subresources ...string) (*metav1.PartialObjectMetadata, error) {
-	if client, err := clientset.NewForConfig(config); err != nil {
-		return err
-	} else {
-		_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
-		return err
-	}
+func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
+	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	return err
 }
 
-func updateSubscription(config *rest.Config, target, current *operatorv1alpha1.Subscription) (error, bool) {
+func updateSubscription(client olmclient.Interface, target, current *operatorv1alpha1.Subscription) (error, bool) {
 	changed := false
 	if current == nil || current.Spec != nil {
 		return fmt.Errorf("current subscription was nil"), false
@@ -132,12 +119,8 @@ func updateSubscription(config *rest.Config, target, current *operatorv1alpha1.S
 
 		target.Spec.DeepCopyInto(current.Spec)
 
-		if client, err := clientset.NewForConfig(config); err != nil {
-			return err, changed
-		} else {
-			_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-			return err, changed
-		}
+		_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		return err, changed
 	}
 
 	return nil, changed

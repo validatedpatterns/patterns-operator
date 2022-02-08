@@ -22,7 +22,6 @@ import (
 	"log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
@@ -271,31 +270,22 @@ func applicationName(p api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
-func getApplication(config *rest.Config, name string) (error, *argoapi.Application) {
-	if client, err := argoclient.NewForConfig(config); err != nil {
+func getApplication(client argoclient.Interface, name string) (error, *argoapi.Application) {
+	if app, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
 		return err, nil
 	} else {
-		if app, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
-			return err, nil
-		} else {
-			//			log.Printf("Retrieved: %s\n", objectYaml(app))
-			return nil, app
-		}
+		//			log.Printf("Retrieved: %s\n", objectYaml(app))
+		return nil, app
 	}
 }
 
-func createApplication(config *rest.Config, app *argoapi.Application) error {
-	//	var client argoclient.Interface
-	if client, err := argoclient.NewForConfig(config); err != nil {
-		return err
-	} else {
-		saved, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
-		log.Printf("Created: %s\n", objectYaml(saved))
-		return err
-	}
+func createApplication(client argoclient.Interface, app *argoapi.Application) error {
+	saved, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
+	log.Printf("Created: %s\n", objectYaml(saved))
+	return err
 }
 
-func updateApplication(config *rest.Config, target, current *argoapi.Application) (error, bool) {
+func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (error, bool) {
 	//	var client argoclient.Interface
 	if current == nil {
 		return fmt.Errorf("current application was nil"), false
@@ -307,27 +297,19 @@ func updateApplication(config *rest.Config, target, current *argoapi.Application
 		return nil, false
 	}
 
-	if client, err := argoclient.NewForConfig(config); err != nil {
-		return err, true
-	} else {
-		spec := current.Spec.DeepCopy()
-		target.Spec.DeepCopyInto(spec)
-		current.Spec = *spec
+	spec := current.Spec.DeepCopy()
+	target.Spec.DeepCopyInto(spec)
+	current.Spec = *spec
 
-		_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-		return err, true
-	}
+	_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+	return err, true
 }
 
-func removeApplication(config *rest.Config, name string) error {
-	if client, err := argoclient.NewForConfig(config); err != nil {
+func removeApplication(client argoclient.Interface, name string) error {
+	if err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	} else {
-		if err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
-			return err
-		} else {
-			//			log.Printf("Retrieved: %s\n", objectYaml(app))
-			return nil
-		}
+		//			log.Printf("Retrieved: %s\n", objectYaml(app))
+		return nil
 	}
 }
