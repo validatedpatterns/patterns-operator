@@ -139,6 +139,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
+		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
 		err, changed := updateSubscription(r.config, targetSub, sub)
 		if changed {
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
