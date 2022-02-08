@@ -20,11 +20,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
-
-	"path/filepath"
 
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
@@ -281,10 +278,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
-	}
-
-	if len(output.Status.Path) == 0 {
-		output.Status.Path = filepath.Join(os.TempDir(), output.Namespace, output.Name)
 	}
 
 	return nil, output

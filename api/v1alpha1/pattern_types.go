@@ -63,11 +63,11 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
-	Hostname             string `json:"hostname,omitempty"`
-	Account              string `json:"account,omitempty"`
-	TokenSecret          string `json:"tokenSecret,omitempty"`
-	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
-	TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	//Account              string `json:"account,omitempty"`
+	//TokenSecret          string `json:"tokenSecret,omitempty"`
+	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
+	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
 	OriginRepo     string `json:"originRepo,omitempty"`
 	TargetRepo     string `json:"targetRepo"`
@@ -104,10 +104,7 @@ type PatternStatus struct {
 	LastStep  string `json:"lastStep,omitempty"`
 	LastError string `json:"lastError,omitempty"`
 
-	Path             string `json:"path,omitempty"`
-	Revision         string `json:"revision,omitempty"`
-	Version          int    `json:"version,omitempty"`
-	NeedSubscription bool   `json:"needSubscription,omitempty"`
+	Version int `json:"version,omitempty"`
 
 	ClusterDomain string `json:"clusterDomain,omitempty"`
 	ClusterID     string `json:"clusterID,omitempty"`
