@@ -54,7 +54,8 @@ type PatternSpec struct {
 
 	// .Name is dot separated per the helm --set syntax, such as:
 	//   global.something.field
-	Parameters []PatternParameter `json:"parameters,omitempty"`
+	ExtraParameters []PatternParameter `json:"extraParameters,omitempty"`
+	ExtraValueFiles []string           `json:"extraValueFiles,omitempty"`
 
 	// It would be great to use this, but controller-gen barfs on it
 	// Values      map[string]interface{} `json:"values,omitempty" yaml:"valuesLocal,omitempty"`

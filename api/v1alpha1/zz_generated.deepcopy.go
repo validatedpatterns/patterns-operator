@@ -138,9 +138,14 @@ func (in *PatternSpec) DeepCopyInto(out *PatternSpec) {
 		*out = new(GitOpsConfig)
 		**out = **in
 	}
-	if in.Parameters != nil {
-		in, out := &in.Parameters, &out.Parameters
+	if in.ExtraParameters != nil {
+		in, out := &in.ExtraParameters, &out.ExtraParameters
 		*out = make([]PatternParameter, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExtraValueFiles != nil {
+		in, out := &in.ExtraValueFiles, &out.ExtraValueFiles
+		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
 	if in.RequiredSecrets != nil {

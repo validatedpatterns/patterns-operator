@@ -158,7 +158,7 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 		},
 	}
 
-	for _, extra := range p.Spec.Parameters {
+	for _, extra := range p.Spec.ExtraParameters {
 		if updateHelmParameter(extra, parameters) == false {
 			log.Printf("Parameter %q = %q added", extra.Name, extra.Value)
 			parameters = append(parameters, argoapi.HelmParameter{
@@ -168,6 +168,22 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 		}
 	}
 	return parameters
+}
+
+func newApplicationValueFiles(p api.Pattern) []string {
+
+	files := []string{
+		// Track the progress of https://github.com/argoproj/argo-cd/pull/6280
+		// It would also be great to somehow support optional remote value files
+		fmt.Sprintf("%s/values-global.yaml", p.Spec.GitConfig.ValuesDirectoryURL),
+		fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Spec.ClusterGroupName),
+	}
+
+	for _, extra := range p.Spec.ExtraValueFiles {
+		log.Printf("Values file %q added", extra)
+		files = append(files, extra)
+	}
+	return files
 }
 
 func newApplication(p api.Pattern) *argoapi.Application {
@@ -184,13 +200,11 @@ func newApplication(p api.Pattern) *argoapi.Application {
 			Path:           "common/clustergroup",
 			TargetRevision: p.Spec.GitConfig.TargetRevision,
 			Helm: &argoapi.ApplicationSourceHelm{
-				ValueFiles: []string{
-					// Track the progress of https://github.com/argoproj/argo-cd/pull/6280
-					fmt.Sprintf("%s/values-global.yaml", p.Spec.GitConfig.ValuesDirectoryURL),
-					fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Spec.ClusterGroupName),
-				},
+				ValueFiles: newApplicationValueFiles(p),
+
 				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
 				Parameters: newApplicationParameters(p),
+
 				// ReleaseName is the Helm release name to use. If omitted it will use the application name
 				// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`
 				// Values specifies Helm values to be passed to helm template, typically defined as a block
