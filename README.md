@@ -16,9 +16,17 @@ This creates a new Deployment that points to the pre-built image on quay
 kubectl create -f config/samples/gitops_v1alpha1_pattern.yaml
 ```
 
-### Check the status section
+### Check the status
 ```
 kubectl get -f config/samples/gitops_v1alpha1_pattern.yaml -o yaml
+oc get applications -A -w
+```
+
+### Initialize the secrets vault
+
+```
+wget https://raw.githubusercontent.com/hybrid-cloud-patterns/common/main/scripts/vault-utils.sh
+bash ./vault-utils.sh vault_init ./pattern-vault.init
 ```
 
 ### Delete the pattern
