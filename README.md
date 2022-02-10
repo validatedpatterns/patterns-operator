@@ -39,5 +39,43 @@ Removing the top-level application ensures that Argo won't try to put back anyth
 ## Development
 Restart the container to pick up the latest image from quay
 ```
- oc delete pods -n patterns-operator-system --all; oc get pods -n patterns-operator-system -w 
+ oc delete pods -n patterns-operator-system --all; oc get pods -n patterns-operator-system -w
+```
+
+### Upgrade testing with OLM
+
+Assuming the previous version was `0.0.1`, and we're not deploying to the official Quay repository, start by creating the 3 images and pushing them to quay:
+
+```
+IMAGE_TAG_BASE=quay.io/$USER/patterns-operator VERSION=0.0.2 CHANNELS=fast make docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
+```
+
+Now create the CatalogSource so the cluster can see the new version
+
+```
+VERSION=0.0.2 make catalog-install
+```
+
+
+### Releases
+
+First define the version and create the operator image:
+
+```
+export VERSION=0.0.3
+make docker-build docker-push
+```
+
+Next, create the OperatorHub release:
+
+```
+CHANNELS=fast make bundle
+
+git clone git@github.com:$USER/community-operators-prod.git
+rsync -a bundle/ community-operators-prod/operators/patterns-operator/$VERSION/
+git add community-operators-prod/operators/patterns-operator/$VERSION/
+git commit -s -m "New v$VERSION validated patterns operator release"
+git push
+
+echo "Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod"
 ```

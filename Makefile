@@ -4,6 +4,7 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
+OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -30,14 +31,14 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # hybrid-cloud-patterns.io/patterns-operator-bundle:$VERSION and hybrid-cloud-patterns.io/patterns-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/hybridcloudpatterns/patterns-operator
+IMAGE_TAG_BASE ?= quay.io/hybridcloudpatterns/$(OPERATOR_NAME)-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/hybridcloudpatterns/patterns-operator:latest
+IMG ?= quay.io/hybridcloudpatterns/$(OPERATOR_NAME)-operator:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
@@ -171,6 +172,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(MAKE) bundle-fixes bundle-date
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build
@@ -180,6 +182,24 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+
+.PHONY: csv-date
+csv-date: ## Set createdAt date in the CSV.
+	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;"  ./config/manifests/bases/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+
+# Some fixes in the bundle
+.PHONY: bundle-fixes
+bundle-fixes: ## update container image
+	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+
+.PHONY: bundle-date
+bundle-date: ## Set createdAt date in the bundle's CSV. Do not commit changes!
+	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+
+.PHONY: bundle-date-reset
+bundle-date-reset: ## Reset createdAt date to empty value
+	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -221,3 +241,14 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+.PHONY: catalog-install
+catalog-install: config/samples/pattern-catalog-$(VERSION).yaml
+	-oc delete -f config/samples/pattern-catalog-$(VERSION).yaml
+	oc create -f config/samples/pattern-catalog-$(VERSION).yaml
+
+config/samples/pattern-catalog-$(VERSION).yaml:
+	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
+	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
+
+
