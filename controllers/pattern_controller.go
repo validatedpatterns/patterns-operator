@@ -210,6 +210,18 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 		return errors.New(fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo))
 	}
 
+	haveHttp := false
+	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "https://"); index == 0 {
+		haveHttp = true
+	}
+	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "http://"); index == 0 {
+		haveHttp = true
+	}
+
+	if haveHttp == false {
+		return errors.New(fmt.Errorf("TargetRepo must be either http/https: %s", input.Spec.GitConfig.TargetRepo))
+	}
+
 	// Check the url is reachable
 	return nil
 }
