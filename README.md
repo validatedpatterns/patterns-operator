@@ -44,16 +44,17 @@ Restart the container to pick up the latest image from quay
 
 ### Upgrade testing with OLM
 
-Assuming the previous version was `0.0.1`, and we're not deploying to the official Quay repository, start by creating the 3 images and pushing them to quay:
+Assuming the previous version was `0.0.1`, and we're not deploying to the official Quay repository, start by defining the version, creating the 3 images, and pushing them to quay:
 
 ```
-IMAGE_TAG_BASE=quay.io/$USER/patterns-operator VERSION=0.0.2 CHANNELS=fast make docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
+export VERSION=0.0.2
+IMAGE_TAG_BASE=quay.io/$USER/patterns-operator CHANNELS=fast make docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
 ```
 
 Now create the CatalogSource so the cluster can see the new version
 
 ```
-VERSION=0.0.2 make catalog-install
+make catalog-install
 ```
 
 
