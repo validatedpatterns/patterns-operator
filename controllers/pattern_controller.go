@@ -23,11 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/argoproj/argo-cd/v2/util/git"
-	"os"
-	"path/filepath"
-	"regexp"
-
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
@@ -216,7 +211,6 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	}
 
 	// Check the url is reachable
-
 	return nil
 }
 
@@ -266,15 +260,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		//     This is just fine (once we're on 2.3)...
 		//     https://github.com/argoproj/argo-cd/blob/bb77664b6f0299bb332843bcd2524820c7ba1558/reposerver/repository/repository.go#L674
 		//
-		//     Until then, replicate what Argo uses...
-		r := regexp.MustCompile("(/|:)")
-		output.Spec.GitConfig.ValuesDirectoryURL = filepath.Join(os.TempDir(), r.ReplaceAllString(git.NormalizeGitURL(output.Spec.GitConfig.TargetRepo), "_"))
-		logOnce(fmt.Sprintf("Calculated absolute path: %s\n", output.Spec.GitConfig.ValuesDirectoryURL))
-
-		//     Or we can try to calculate a URL based on TargetRepo...
+		//     Until then, calculate a URL based on TargetRepo...
 		//     https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
-		//     ss := fmt.Sprintf("%s/raw/%s", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
-		//     output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
+		ss := fmt.Sprintf("%s/raw/%s", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
+		output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
 	}
 
 	if output.Spec.GitOpsConfig == nil {
