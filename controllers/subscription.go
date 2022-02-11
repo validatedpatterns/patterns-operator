@@ -60,7 +60,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 		spec.StartingCSV = p.Spec.GitOpsConfig.OperatorCSV
 	}
 
-	if p.Spec.GitOpsConfig.InstallPlanApproval == "Manual" {
+	if p.Spec.GitOpsConfig.ManualApproval {
 		spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
 	}
 

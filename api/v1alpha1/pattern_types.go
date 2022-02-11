@@ -74,10 +74,15 @@ type GitConfig struct {
 	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
-	OriginRepo     string `json:"originRepo,omitempty"`
-	TargetRepo     string `json:"targetRepo"`
+	// Unused
+	OriginRepo string `json:"originRepo,omitempty"`
+	// Git repo containing the pattern to deploy. Must use https/http
+	TargetRepo string `json:"targetRepo"`
+
+	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: main
 	TargetRevision string `json:"targetRevision,omitempty"`
 
+	// Optional. Alternate URL to obtain Helm values files from instead of this pattern.
 	ValuesDirectoryURL string `json:"valuesDirectoryURL,omitempty"`
 }
 
@@ -89,13 +94,20 @@ const (
 )
 
 type GitOpsConfig struct {
+	// Channel to deploy openshift-gitops from. Default: stable
 	OperatorChannel string `json:"operatorChannel,omitempty"`
-	OperatorSource  string `json:"operatorSource,omitempty"`
-	OperatorCSV     string `json:"operatorCSV,omitempty"`
+	// Source to deploy openshift-gitops from. Default: redhat-operators
+	OperatorSource string `json:"operatorSource,omitempty"`
 
-	SyncPolicy          ApplyChangeType `json:"syncPolicy,omitempty"`
-	InstallPlanApproval ApplyChangeType `json:"installPlanApproval,omitempty"`
-	UseCSV              bool            `json:"useCSV,omitempty"`
+	// Require manual intervention before Argo will sync new content. Default: False
+	ManualSync bool `json:"manualSync,omitempty"`
+	// Require manual confirmation before installing and upgrading operators. Default: False
+	ManualApproval bool `json:"manualApproval,omitempty"`
+
+	// Specific version of openshift-gitops to deploy.  Requires UseCSV=True
+	OperatorCSV string `json:"operatorCSV,omitempty"`
+	// Dangerous. Force a specific version to be installed. Default: False
+	UseCSV bool `json:"useCSV,omitempty"`
 }
 
 //global:

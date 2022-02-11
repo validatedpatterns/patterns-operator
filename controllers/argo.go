@@ -150,7 +150,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 
 	}
 
-	if p.Spec.GitOpsConfig.SyncPolicy == "Automatic" {
+	if p.Spec.GitOpsConfig.ManualSync == false {
 		// SyncPolicy controls when and how a sync will be performed
 		spec.SyncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision

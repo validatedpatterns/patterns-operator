@@ -277,13 +277,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if output.Spec.GitOpsConfig == nil {
 		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
 	}
-	if len(output.Spec.GitOpsConfig.SyncPolicy) == 0 {
-		output.Spec.GitOpsConfig.SyncPolicy = api.InstallAutomatic
-	}
-
-	if len(output.Spec.GitOpsConfig.InstallPlanApproval) == 0 {
-		output.Spec.GitOpsConfig.InstallPlanApproval = api.InstallAutomatic
-	}
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
 		output.Spec.GitOpsConfig.OperatorChannel = "stable"
