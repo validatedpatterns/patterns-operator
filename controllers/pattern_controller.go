@@ -196,10 +196,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// Report statistics
 
-	minutes := time.Duration(qualifiedInstance.Spec.ReconcileMinutes)
-	log.Printf("\n\x1b[32;1m\tReconcile complete - waiting %d minutes\x1b[0m\n", minutes)
+	log.Printf("\n\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	return ctrl.Result{RequeueAfter: time.Minute * minutes}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
@@ -233,9 +232,6 @@ func (r *PatternReconciler) postValidation(input *api.Pattern) error {
 func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
 
 	output := input.DeepCopy()
-	if output.Spec.ReconcileMinutes == 0 {
-		output.Spec.ReconcileMinutes = 10
-	}
 
 	// Cluster ID:
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'

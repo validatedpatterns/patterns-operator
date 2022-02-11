@@ -37,6 +37,14 @@ type PatternParameter struct {
 	Value string `json:"value"`
 }
 
+// Future fields...
+//   SendAnonymousUsage   bool   `json:"anonymousUsage,omitempty"`
+//   Validation       bool   `json:"validation,omitempty"`
+//   ValidationImage  string `json:"validationImage,omitempty"`
+//   RequiredSecrets []string `json:"requiredSecrets,omitempty"`
+// It would be great to use this, instead of ExtraParameters, but controller-gen barfs on it
+//   Values      map[string]interface{} `json:"values,omitempty" yaml:"valuesLocal,omitempty"`
+
 // PatternSpec defines the desired state of Pattern
 type PatternSpec struct {
 	// SPEC FIELDS - desired state of cluster
@@ -47,23 +55,20 @@ type PatternSpec struct {
 	GitConfig    GitConfig     `json:"gitSpec"`
 	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
 
-	ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
-	AnonymousUsage   bool   `json:"anonymousUsage,omitempty"`
-	Validation       bool   `json:"validation,omitempty"`
-	ValidationImage  string `json:"validationImage,omitempty"`
-
 	// .Name is dot separated per the helm --set syntax, such as:
 	//   global.something.field
 	ExtraParameters []PatternParameter `json:"extraParameters,omitempty"`
-	ExtraValueFiles []string           `json:"extraValueFiles,omitempty"`
 
-	// It would be great to use this, but controller-gen barfs on it
-	// Values      map[string]interface{} `json:"values,omitempty" yaml:"valuesLocal,omitempty"`
-	RequiredSecrets []string `json:"requiredSecrets,omitempty"`
+	// URLs to additional Helm parameter files
+	ExtraValueFiles []string `json:"extraValueFiles,omitempty"`
+
+	// Look for external changes every N minutes
+	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
 }
 
 type GitConfig struct {
 	Hostname string `json:"hostname,omitempty"`
+
 	//Account              string `json:"account,omitempty"`
 	//TokenSecret          string `json:"tokenSecret,omitempty"`
 	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
