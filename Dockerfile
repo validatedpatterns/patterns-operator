@@ -17,11 +17,12 @@ COPY go.sum go.sum
 # Copy the go source
 COPY main.go main.go
 COPY api/ api/
+COPY version/ version/
 COPY controllers/ controllers/
 COPY vendor/ vendor/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -a -o manager main.go
+RUN hack/build.sh
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details

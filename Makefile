@@ -101,11 +101,12 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
-	go build $(GOFLAGS) -o bin/manager main.go
+	hack/build.sh
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	hack/build.sh run
+#	go run ./main.go
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
