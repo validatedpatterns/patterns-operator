@@ -21,6 +21,7 @@ COPY version/ version/
 COPY controllers/ controllers/
 COPY vendor/ vendor/
 COPY hack/ hack/
+COPY .git/ .git/
 
 # Build
 RUN hack/build.sh
