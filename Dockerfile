@@ -20,6 +20,7 @@ COPY api/ api/
 COPY version/ version/
 COPY controllers/ controllers/
 COPY vendor/ vendor/
+COPY hack/ hack/
 
 # Build
 RUN hack/build.sh
