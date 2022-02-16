@@ -18,6 +18,20 @@ spec:
       displayName: Pattern
       kind: Pattern
       name: patterns.gitops.hybrid-cloud-patterns.io
+      resources:
+      - kind: Pattern
+        name: patterns
+        version: v1alpha1
+      statusDescriptors:
+      - description: Last error encountered by the pattern
+        displayName: Last Error
+        path: lastError
+      - description: Last action related to the pattern
+        displayName: Last Step
+        path: lastStep
+      - description: Number of updates to the pattern
+        displayName: Version
+        path: version
       version: v1alpha1
   description: Deploys and manages architecture patterns from https://hybrid-cloud-patterns.io
   displayName: Validated Patterns Operator

@@ -13,6 +13,8 @@ spec:
     kind: Pattern
     listKind: PatternList
     plural: patterns
+    shortNames:
+    - pat
     singular: pattern
   scope: Namespaced
   versions:
@@ -122,12 +124,16 @@ spec:
               clusterName:
                 type: string
               lastError:
+                description: Last error encountered by the pattern
                 type: string
               lastStep:
-                description: 'define observed state of cluster Important: Run "make"
-                  to regenerate code after modifying this file'
+                description: Last action related to the pattern
+                nullable: true
                 type: string
+                x-kubernetes-embedded-resource: true
+                x-kubernetes-preserve-unknown-fields: true
               version:
+                description: Number of updates to the pattern
                 type: integer
             type: object
         type: object

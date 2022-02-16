@@ -30,7 +30,7 @@ const (
 
 type PatternParameter struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Important: Run "make generate" to regenerate code after modifying this file
 
 	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
 	Name  string `json:"name"`
@@ -48,7 +48,7 @@ type PatternParameter struct {
 // PatternSpec defines the desired state of Pattern
 type PatternSpec struct {
 	// SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Important: Run "make generate" to regenerate code after modifying this file
 
 	ClusterGroupName string `json:"clusterGroupName"`
 
@@ -116,11 +116,22 @@ type GitOpsConfig struct {
 
 // PatternStatus defines the observed state of Pattern
 type PatternStatus struct {
-	// define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	LastStep  string `json:"lastStep,omitempty"`
+	// Observed state of the pattern
+	//
+	// +optional
+	// +kubebuilder:validation:EmbeddedResource
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +nullable
+
+	// Last action related to the pattern
+	//+operator-sdk:csv:customresourcedefinitions:type=status
+	LastStep string `json:"lastStep,omitempty"`
+	// Last error encountered by the pattern
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	LastError string `json:"lastError,omitempty"`
 
+	// Number of updates to the pattern
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	Version int `json:"version,omitempty"`
 
 	ClusterName   string `json:"clusterName,omitempty"`
@@ -130,6 +141,8 @@ type PatternStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName=patt
+//+operator-sdk:csv:customresourcedefinitions:resources={{"Pattern","v1alpha1","patterns"}}
 
 // Pattern is the Schema for the patterns API
 type Pattern struct {
