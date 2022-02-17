@@ -110,10 +110,6 @@ type GitOpsConfig struct {
 	UseCSV bool `json:"useCSV,omitempty"`
 }
 
-//global:
-//  imageregistry:
-//   type: quay
-
 // PatternStatus defines the observed state of Pattern
 type PatternStatus struct {
 	// Observed state of the pattern
@@ -124,7 +120,7 @@ type PatternStatus struct {
 	// +nullable
 
 	// Last action related to the pattern
-	//+operator-sdk:csv:customresourcedefinitions:type=status
+	// +operator-sdk:csv:customresourcedefinitions:type=status
 	LastStep string `json:"lastStep,omitempty"`
 	// Last error encountered by the pattern
 	//+operator-sdk:csv:customresourcedefinitions:type=status
@@ -139,9 +135,12 @@ type PatternStatus struct {
 	ClusterID     string `json:"clusterID,omitempty"`
 }
 
+// See: https://book.kubebuilder.io/reference/markers/crd.html
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:shortName=patt
+//+kubebuilder:printcolumn:name="Step",type=string,JSONPath=`.status.lastStep`,priority=1
+//+kubebuilder:printcolumn:name="Error",type=string,JSONPath=`.status.lastError`,priority=2
 //+operator-sdk:csv:customresourcedefinitions:resources={{"Pattern","v1alpha1","patterns"}}
 
 // Pattern is the Schema for the patterns API

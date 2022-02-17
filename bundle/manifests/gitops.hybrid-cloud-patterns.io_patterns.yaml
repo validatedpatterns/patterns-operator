@@ -12,11 +12,20 @@ spec:
     listKind: PatternList
     plural: patterns
     shortNames:
-    - pat
+    - patt
     singular: pattern
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.lastStep
+      name: Step
+      priority: 1
+      type: string
+    - jsonPath: .status.lastError
+      name: Error
+      priority: 2
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Pattern is the Schema for the patterns API
