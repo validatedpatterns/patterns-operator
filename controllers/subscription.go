@@ -76,7 +76,10 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
 
 	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
-	return err, sub
+	if err != nil {
+		return err, nil
+	}
+	return nil, sub
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
