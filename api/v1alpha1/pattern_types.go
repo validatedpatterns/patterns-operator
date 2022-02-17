@@ -113,15 +113,11 @@ type GitOpsConfig struct {
 // PatternStatus defines the observed state of Pattern
 type PatternStatus struct {
 	// Observed state of the pattern
-	//
-	// +optional
-	// +kubebuilder:validation:EmbeddedResource
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +nullable
 
 	// Last action related to the pattern
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	LastStep string `json:"lastStep,omitempty"`
+
 	// Last error encountered by the pattern
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	LastError string `json:"lastError,omitempty"`

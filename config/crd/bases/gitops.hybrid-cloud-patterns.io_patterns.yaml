@@ -137,10 +137,7 @@ spec:
                 type: string
               lastStep:
                 description: Last action related to the pattern
-                nullable: true
                 type: string
-                x-kubernetes-embedded-resource: true
-                x-kubernetes-preserve-unknown-fields: true
               version:
                 description: Number of updates to the pattern
                 type: integer
