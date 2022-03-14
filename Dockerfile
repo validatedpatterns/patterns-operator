@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS builder
 RUN microdnf install git golang -y && microdnf clean all
 RUN go version
 
