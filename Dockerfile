@@ -1,5 +1,5 @@
-FROM quay.io/centos/centos:stream9 AS builder
-RUN dnf install git golang -y && dnf clean all
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+RUN microdnf install git golang -y && microdnf clean all
 RUN go version
 
 
