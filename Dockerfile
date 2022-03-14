@@ -1,5 +1,5 @@
 FROM quay.io/centos/centos:stream9 AS builder
-RUN dnf install git golang -y
+RUN dnf install git golang -y && dnf clean all
 RUN go version
 
 
