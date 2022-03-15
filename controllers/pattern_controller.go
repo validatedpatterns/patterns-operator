@@ -110,8 +110,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Remove the ArgoCD application on deletion
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
-		if !ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) {
-			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
+			controllerutil.AddFinalizer(instance, api.PatternFinalizer)
 			err := r.Client.Update(context.TODO(), instance)
 			return r.actionPerformed(instance, "updated finalizer", err)
 		}
@@ -301,7 +301,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	log.Printf("Finalizing pattern object")
 
 	// The object is being deleted
-	if ContainsString(instance.ObjectMeta.Finalizers, api.PatternFinalizer) || ContainsString(instance.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents) {
+	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
 		// Do any required cleanup here
 		log.Printf("Removing the application, anything instantiated by ArgoCD can now be cleaned up manually")
 
@@ -311,7 +311,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 
 		// Remove our finalizer from the list and update it.
-		instance.ObjectMeta.Finalizers = RemoveString(instance.ObjectMeta.Finalizers, api.PatternFinalizer)
+		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
 		err := r.Client.Update(context.Background(), instance)
 		return err
 	}
@@ -369,8 +369,8 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 }
 
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
-	if err == nil {
-		delay := time.Second * 5
+	if err != nil {
+		delay := time.Minute * 1
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
