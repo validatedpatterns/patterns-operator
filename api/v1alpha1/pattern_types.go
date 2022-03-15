@@ -31,9 +31,12 @@ const (
 type PatternParameter struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make generate" to regenerate code after modifying this file
-
 	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
-	Name  string `json:"name"`
+
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	Name string `json:"name"`
+
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	Value string `json:"value"`
 }
 
@@ -50,16 +53,19 @@ type PatternSpec struct {
 	// SPEC FIELDS - desired state of cluster
 	// Important: Run "make generate" to regenerate code after modifying this file
 
-	ClusterGroupName string `json:"clusterGroupName"`
-
 	GitConfig    GitConfig     `json:"gitSpec"`
 	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
 
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	ClusterGroupName string `json:"clusterGroupName"`
+
 	// .Name is dot separated per the helm --set syntax, such as:
 	//   global.something.field
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	ExtraParameters []PatternParameter `json:"extraParameters,omitempty"`
 
 	// URLs to additional Helm parameter files
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	ExtraValueFiles []string `json:"extraValueFiles,omitempty"`
 
 	// Look for external changes every N minutes
@@ -67,6 +73,7 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
+	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
 	Hostname string `json:"hostname,omitempty"`
 
 	//Account              string `json:"account,omitempty"`
@@ -95,18 +102,24 @@ const (
 
 type GitOpsConfig struct {
 	// Channel to deploy openshift-gitops from. Default: stable
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OperatorChannel string `json:"operatorChannel,omitempty"`
 	// Source to deploy openshift-gitops from. Default: redhat-operators
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OperatorSource string `json:"operatorSource,omitempty"`
 
 	// Require manual intervention before Argo will sync new content. Default: False
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	ManualSync bool `json:"manualSync,omitempty"`
 	// Require manual confirmation before installing and upgrading operators. Default: False
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	ManualApproval bool `json:"manualApproval,omitempty"`
 
 	// Specific version of openshift-gitops to deploy.  Requires UseCSV=True
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OperatorCSV string `json:"operatorCSV,omitempty"`
 	// Dangerous. Force a specific version to be installed. Default: False
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	UseCSV bool `json:"useCSV,omitempty"`
 }
 
@@ -132,6 +145,7 @@ type PatternStatus struct {
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
+//      https://sdk.operatorframework.io/docs/building-operators/golang/references/markers/
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:shortName=patt

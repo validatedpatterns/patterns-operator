@@ -39,6 +39,40 @@ spec:
       - kind: Pattern
         name: patterns
         version: v1alpha1
+      specDescriptors:
+      - displayName: Cluster Group Name
+        path: clusterGroupName
+      - description: '.Name is dot separated per the helm --set syntax, such as:   global.something.field'
+        displayName: Extra Parameters
+        path: extraParameters
+      - displayName: Name
+        path: extraParameters[0].name
+      - displayName: Value
+        path: extraParameters[0].value
+      - description: URLs to additional Helm parameter files
+        displayName: Extra Value Files
+        path: extraValueFiles
+      - description: 'Require manual confirmation before installing and upgrading
+          operators. Default: False'
+        displayName: Manual Approval
+        path: gitOpsSpec.manualApproval
+      - description: 'Require manual intervention before Argo will sync new content.
+          Default: False'
+        displayName: Manual Sync
+        path: gitOpsSpec.manualSync
+      - description: Specific version of openshift-gitops to deploy.  Requires UseCSV=True
+        displayName: Operator CSV
+        path: gitOpsSpec.operatorCSV
+      - description: 'Channel to deploy openshift-gitops from. Default: stable'
+        displayName: Operator Channel
+        path: gitOpsSpec.operatorChannel
+      - description: 'Source to deploy openshift-gitops from. Default: redhat-operators'
+        displayName: Operator Source
+        path: gitOpsSpec.operatorSource
+      - description: 'Dangerous. Force a specific version to be installed. Default:
+          False'
+        displayName: Use CSV
+        path: gitOpsSpec.useCSV
       statusDescriptors:
       - description: Last error encountered by the pattern
         displayName: Last Error
