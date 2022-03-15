@@ -16,7 +16,6 @@ RUN go version
 # Build the manager binary
 
 WORKDIR /workspace
-COPY go.mod go.sum main.go /workspace
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
@@ -24,7 +23,10 @@ COPY go.mod go.sum main.go /workspace
 # Or, we could not do that
 
 # Copy the go source
+COPY go.mod go.mod
+COPY go.sum go.sum
 COPY vendor/ vendor/
+COPY main.go main.go
 COPY api/ api/
 COPY version/ version/
 COPY controllers/  controllers/ 
@@ -36,6 +38,9 @@ RUN hack/build.sh
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
+# FROM gcr.io/distroless/static:nonroot
+
+# UBI is larger (158Mb vs. 56Mb) but approved by RH
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 WORKDIR /
 COPY --from=builder /workspace/manager .
