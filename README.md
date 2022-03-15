@@ -45,6 +45,27 @@ Removing the top-level application ensures that Argo won't try to put back anyth
 ```
 
 ## Development
+
+### Test your changes
+```
+BRANCH=`whoami`
+git co -b $BRANCH
+vi somefile.go
+git commit
+git push --set-upstream origin $BRANCH
+# Wait for quay to build
+VERSION=$BRANCH make deploy
+```
+
+### Test your changes (alt)
+```
+vi somefile.go
+export IMAGE_TAG_BASE=quay.io/$USER/patterns-operator
+make docker-build docker-push bundle
+make deploy
+```
+
+
 Restart the container to pick up the latest image from quay
 ```
  oc delete pods -n patterns-operator-system --all; oc get pods -n patterns-operator-system -w
