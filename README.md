@@ -3,6 +3,8 @@ Here be dragons
 References:
 - https://sdk.operatorframework.io/docs/building-operators/golang/quickstart/
 
+Follow https://sdk.operatorframework.io/docs/installation/ to install the operator-sdk
+
 
 ## Deploy the operator
 ```
@@ -58,9 +60,12 @@ VERSION=$BRANCH make deploy
 ```
 
 ### Test your changes (alt)
+
+Replace $USER and the version of the operator:
 ```
 vi somefile.go
 export IMAGE_TAG_BASE=quay.io/$USER/patterns-operator
+export IMG=quay.io/$USER/patterns-operator:0.0.2
 make docker-build docker-push bundle
 make deploy
 ```
