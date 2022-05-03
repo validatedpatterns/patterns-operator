@@ -22,7 +22,7 @@ metadata:
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.2
     description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
-    operators.operatorframework.io/builder: operator-sdk-v1.15.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.19.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/hybrid-cloud-patterns/patterns-operator
   name: patterns-operator.v0.0.2
@@ -42,7 +42,7 @@ spec:
       specDescriptors:
       - displayName: Cluster Group Name
         path: clusterGroupName
-      - description: '.Name is dot separated per the helm --set syntax, such as:   global.something.field'
+      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
         displayName: Extra Parameters
         path: extraParameters
       - displayName: Name
@@ -74,6 +74,14 @@ spec:
         displayName: Use CSV
         path: gitOpsSpec.useCSV
       statusDescriptors:
+      - displayName: Cluster Domain
+        path: clusterDomain
+      - displayName: Cluster ID
+        path: clusterID
+      - displayName: Cluster Name
+        path: clusterName
+      - displayName: Cluster Platform
+        path: clusterPlatform
       - description: Last error encountered by the pattern
         displayName: Last Error
         path: lastError
@@ -176,7 +184,9 @@ spec:
           - create
         serviceAccountName: patterns-operator-controller-manager
       deployments:
-      - name: patterns-operator-controller-manager
+      - label:
+          control-plane: controller-manager
+        name: patterns-operator-controller-manager
         spec:
           replicas: 1
           selector:

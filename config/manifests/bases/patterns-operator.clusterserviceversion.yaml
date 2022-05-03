@@ -25,7 +25,7 @@ spec:
       specDescriptors:
       - displayName: Cluster Group Name
         path: clusterGroupName
-      - description: '.Name is dot separated per the helm --set syntax, such as:   global.something.field'
+      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
         displayName: Extra Parameters
         path: extraParameters
       - displayName: Name
@@ -57,6 +57,14 @@ spec:
         displayName: Use CSV
         path: gitOpsSpec.useCSV
       statusDescriptors:
+      - displayName: Cluster Domain
+        path: clusterDomain
+      - displayName: Cluster ID
+        path: clusterID
+      - displayName: Cluster Name
+        path: clusterName
+      - displayName: Cluster Platform
+        path: clusterPlatform
       - description: Last error encountered by the pattern
         displayName: Last Error
         path: lastError

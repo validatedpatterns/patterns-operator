@@ -96,6 +96,8 @@ spec:
               gitSpec:
                 properties:
                   hostname:
+                    description: Optional. FQDN of the git server if automatic parsing
+                      from TargetRepo is broken
                     type: string
                   originRepo:
                     description: Unused
@@ -127,6 +129,8 @@ spec:
               clusterID:
                 type: string
               clusterName:
+                type: string
+              clusterPlatform:
                 type: string
               lastError:
                 description: Last error encountered by the pattern
