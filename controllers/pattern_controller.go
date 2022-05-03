@@ -242,6 +242,28 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Status.ClusterID = string(cv.Spec.ClusterID)
 	}
 
+	// Cluster platform
+	// oc get Infrastructure.config.openshift.io/cluster  -o jsonpath='{.spec.platformSpec.type}'
+	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), "cluster", metav1.GetOptions{})
+	if err != nil {
+		return err, output
+	} else {
+		//   status:
+		//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
+		//    apiServerURL: https://api.beekhof49.blueprints.rhecoeng.com:6443
+		//    controlPlaneTopology: HighlyAvailable
+		//    etcdDiscoveryDomain: ""
+		//    infrastructureName: beekhof49-pqzfb
+		//    infrastructureTopology: HighlyAvailable
+		//    platform: AWS
+		//    platformStatus:
+		//      aws:
+		//        region: ap-southeast-2
+		//      type: AWS
+
+		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
+	}
+
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
 	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
