@@ -129,6 +129,13 @@ spec:
         - apiGroups:
           - config.openshift.io
           resources:
+          - infrastructures
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - config.openshift.io
+          resources:
           - ingresses
           verbs:
           - get
