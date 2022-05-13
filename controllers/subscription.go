@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
@@ -47,6 +49,10 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	//    source: redhat-operators
 	//    sourceNamespace: openshift-marketplace
 	//    startingCSV: openshift-gitops-operator.v1.4.1
+	//    config:
+	//      env:
+	//        - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
+	//          value: "*"
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          "redhat-operators",
@@ -54,6 +60,14 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 		Channel:                p.Spec.GitOpsConfig.OperatorChannel,
 		Package:                "openshift-gitops-operator",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
+		Config: &operatorv1alpha1.SubscriptionConfig{
+			Env: []corev1.EnvVar{
+				{
+					Name:  "ARGOCD_CLUSTER_CONFIG_NAMESPACES",
+					Value: "*",
+				},
+			},
+		},
 	}
 
 	if p.Spec.GitOpsConfig.UseCSV {
@@ -112,6 +126,9 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 		changed = true
 	} else if target.Spec.StartingCSV != current.Spec.StartingCSV {
 		log.Println("StartingCSV changed")
+		changed = true
+	} else if !reflect.DeepEqual(target.Spec.Config.Env, current.Spec.Config.Env) {
+		log.Println("Config Env changed")
 		changed = true
 	}
 
