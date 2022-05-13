@@ -40,8 +40,9 @@ The subscription and anything created by Argo will not be removed and canmust be
 Removing the top-level application ensures that Argo won't try to put back anything you delete.
 
 ## Watch the logs
+Note that when installing via UI the namespace will be `openshift-operators` and not `patterns-operator-system`
 ```
- oc logs -n patterns-operator-system `oc get -n patterns-operator-system pods | grep -v NAME | grep Running | head -n 1 | awk '{print $1}'` -c manager -f  
+oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
 ```
 
 ## Development
