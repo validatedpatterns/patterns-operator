@@ -202,22 +202,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
-
-	//ss := strings.Compare(input.Spec.GitConfig.TargetRepo, "git")
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
-	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "git@"); index == 0 {
+	switch {
+	case strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "git@"):
 		return errors.New(fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo))
-	}
-
-	haveHttp := false
-	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "https://"); index == 0 {
-		haveHttp = true
-	}
-	if index := strings.Index(input.Spec.GitConfig.TargetRepo, "http://"); index == 0 {
-		haveHttp = true
-	}
-
-	if haveHttp == false {
+	case strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "https://"),
+		strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "http://"):
+		break
+	default:
 		return errors.New(fmt.Errorf("TargetRepo must be either http/https: %s", input.Spec.GitConfig.TargetRepo))
 	}
 
