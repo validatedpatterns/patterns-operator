@@ -7,6 +7,7 @@ metadata:
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.1
     description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
+    operatorframework.io/suggested-namespace: patterns-operator-system
     repository: https://github.com/hybrid-cloud-patterns/patterns-operator
   name: patterns-operator.v0.0.0
   namespace: placeholder
