@@ -115,6 +115,21 @@ spec:
           - get
           - list
         - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - ""
+          resourceNames:
+          - vault-0
+          resources:
+          - pods/exec
+          verbs:
+          - create
+        - apiGroups:
           - argoproj.io
           resources:
           - applications
@@ -293,6 +308,13 @@ spec:
           verbs:
           - create
           - patch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+          - get
         serviceAccountName: patterns-operator-controller-manager
     strategy: deployment
   installModes:
