@@ -4,7 +4,7 @@ metadata:
   name: pattern-sample
 spec:
   clusterGroupName: hub
+  insecureManagedVault: false
   gitSpec:
     targetRepo: "https://github.com/hybrid-cloud-patterns/multicloud-gitops"
 
-  

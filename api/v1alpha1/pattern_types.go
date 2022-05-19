@@ -70,6 +70,10 @@ type PatternSpec struct {
 
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
+
+	// Unseal and Initialize the Vault automatically. Note: This is *insecure*
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	InsecureManagedVault bool `json:"insecureManagedVault,omitempty"`
 }
 
 type GitConfig struct {
