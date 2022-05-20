@@ -31,8 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/apply"
 
 	"github.com/ghodss/yaml"
-
-	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
 func applyOneObject(info *resource.Info) error {
@@ -79,15 +77,6 @@ func haveNamespace(client kubernetes.Interface, name string) bool {
 		return true
 	}
 	return false
-}
-
-func createOwnerRef(p *api.Pattern) metav1.OwnerReference {
-	return metav1.OwnerReference{
-		APIVersion: api.GroupVersion.String(),
-		Kind:       p.Kind, // String
-		UID:        p.GetUID(),
-		Name:       p.GetName(),
-	}
 }
 
 func ownedBySame(expected, object metav1.Object) bool {
