@@ -68,7 +68,7 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 	}
 
 	for _, extra := range p.Spec.ExtraParameters {
-		if updateHelmParameter(extra, parameters) == false {
+		if !updateHelmParameter(extra, parameters) {
 			log.Printf("Parameter %q = %q added", extra.Name, extra.Value)
 			parameters = append(parameters, argoapi.HelmParameter{
 				Name:  extra.Name,
@@ -159,7 +159,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 
 	}
 
-	if p.Spec.GitOpsConfig.ManualSync == false {
+	if !p.Spec.GitOpsConfig.ManualSync {
 		// SyncPolicy controls when and how a sync will be performed
 		spec.SyncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision
@@ -251,10 +251,10 @@ func compareSource(goal, actual argoapi.ApplicationSource) bool {
 
 }
 func compareHelmSource(goal, actual argoapi.ApplicationSourceHelm) bool {
-	if compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) == false {
+	if !compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) {
 		return false
 	}
-	if compareHelmParameters(goal.Parameters, actual.Parameters) == false {
+	if !compareHelmParameters(goal.Parameters, actual.Parameters) {
 		return false
 	}
 	return true
@@ -281,7 +281,7 @@ func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
 	}
 
 	for _, gP := range goal {
-		if compareHelmParameter(gP, actual) == false {
+		if !compareHelmParameter(gP, actual) {
 			return false
 		}
 
@@ -304,7 +304,7 @@ func compareHelmValueFiles(goal []string, actual []string) bool {
 		return false
 	}
 	for _, gV := range goal {
-		if compareHelmValueFile(gV, actual) == false {
+		if !compareHelmValueFile(gV, actual) {
 			return false
 		}
 	}

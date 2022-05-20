@@ -158,7 +158,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("subscription found")
 
 	// -- GitOps Namespace (created by the gitops operator)
-	if haveNamespace(r.fullClient, applicationNamespace) == false {
+	if !haveNamespace(r.fullClient, applicationNamespace) {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 

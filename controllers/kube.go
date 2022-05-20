@@ -38,7 +38,7 @@ func ownedBySame(expected, object metav1.Object) bool {
 	ownerReferences := expected.GetOwnerReferences()
 
 	for _, r := range ownerReferences {
-		if ownedBy(object, r) == false {
+		if !ownedBy(object, r) {
 			return false
 		}
 	}
