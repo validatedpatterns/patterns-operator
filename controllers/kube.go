@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,100 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/cmd/apply"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/validation"
 
 	"github.com/ghodss/yaml"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
-
-func applyYamlFile(filename string) error {
-
-	kubeConfigFlags := genericclioptions.NewConfigFlags(false)
-	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
-	//matchVersionKubeConfigFlags.AddFlags(flags)
-
-	//	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-	//	builder := resource.NewBuilder(f.clientGetter)
-	builder := resource.NewBuilder(matchVersionKubeConfigFlags)
-	r := builder.
-		Unstructured().
-		Schema(validation.NullSchema{}).
-		ContinueOnError().
-		NamespaceParam("default").DefaultNamespace().
-		Path(false, filename).
-		SelectAllParam(true).
-		Flatten().
-		Do()
-	if objects, err := r.Infos(); err != nil {
-		log.Printf("Could not extract objects: %s\n", err.Error())
-		return err
-	} else {
-		for _, info := range objects {
-			if err := applyOneObject(info); err != nil {
-				log.Printf("Could not apply objects: %s\n", err.Error())
-				return err
-			}
-		}
-	}
-
-	//manifestsJSON, err := yaml.YAMLToJSON(manifests)
-	//if err != nil {
-	//	log.Printf("Error parsing manifests: %s\n", err.Error())
-	//	return err, -1
-	//}
-
-	// manifests.String() =>
-	//
-	// WARNING: This chart or one of its subcharts contains CRDs. Rendering may fail or contain inaccuracies.
-	// ---
-	// # Source: pattern-install/templates/argocd/namespace.yaml
-	// # Pre-create so we can create our argo app for keeping subscriptions in sync
-	// # Do it here so that we don't try to sync it in the future
-	// ---
-	// # Source: pattern-install/templates/argocd/application.yaml
-	// apiVersion: argoproj.io/v1alpha1
-	// kind: Application
-	// metadata:
-	//   name: pattern-sample-hub
-	//   namespace: openshift-gitops
-	// spec:
-	//   destination:
-	//     name: in-cluster
-	//     namespace: pattern-sample-hub
-	//   project: default
-	//   source:
-	//     repoURL: https://github.com/hybrid-cloud-patterns/multicloud-gitops
-	//     targetRevision: main
-	//     path: common/clustergroup
-	//     helm:
-	//       valueFiles:
-	//       - "https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main/values-global.yaml"
-	//       - "https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main/values-hub.yaml"
-	//       # Track the progress of https://github.com/argoproj/argo-cd/pull/6280
-	//       parameters:
-	//         - name: global.repoURL
-	//           value: $ARGOCD_APP_SOURCE_REPO_URL
-	//         - name: global.targetRevision
-	//           value: $ARGOCD_APP_SOURCE_TARGET_REVISION
-	//         - name: global.namespace
-	//           value: $ARGOCD_APP_NAMESPACE
-	//         - name: global.valuesDirectoryURL
-	//           value: https://github.com/hybrid-cloud-patterns/multicloud-gitops/raw/main
-	//         - name: global.pattern
-	//           value: pattern-sample
-	//         - name: global.hubClusterDomain
-	//           value: apps.beekhof-1.blueprints.rhecoeng.com
-	//   syncPolicy:
-	//     automated: {}
-
-	return nil
-}
 
 func applyOneObject(info *resource.Info) error {
 	if len(info.Name) == 0 {
