@@ -6,7 +6,7 @@ require (
 	github.com/argoproj/argo-cd/v2 v2.3.0-rc5.0.20220206192056-4b04a3918029
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors v1.4.2
-	github.com/go-git/go-git/v5 v5.3.0
+	github.com/go-git/go-git/v5 v5.3.0 // indirect
 	github.com/go-logr/logr v1.2.2
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/onsi/ginkgo v1.16.5
@@ -15,6 +15,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 	github.com/operator-framework/api v0.12.0
 	github.com/operator-framework/operator-lifecycle-manager v0.20.0
+	k8s.io/api v0.23.1
 	k8s.io/apimachinery v0.23.1
 	k8s.io/cli-runtime v0.23.1
 	k8s.io/client-go v0.23.1
