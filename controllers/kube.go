@@ -20,57 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubectl/pkg/cmd/apply"
 
 	"github.com/ghodss/yaml"
 )
-
-func applyOneObject(info *resource.Info) error {
-	if len(info.Name) == 0 {
-		metadata, _ := meta.Accessor(info.Object)
-		generatedName := metadata.GetGenerateName()
-		if len(generatedName) > 0 {
-			return fmt.Errorf("from %s: cannot use generate name with apply", generatedName)
-		}
-	}
-
-	helper := resource.NewHelper(info.Client, info.Mapping).
-		DryRun(false).
-		WithFieldManager(apply.FieldManagerClientSideApply)
-
-	// Send the full object to be applied on the server side.
-	data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
-	if err != nil {
-		return err
-	}
-
-	forceConflicts := true
-	options := metav1.PatchOptions{
-		Force: &forceConflicts,
-	}
-
-	obj, err := helper.Patch(
-		info.Namespace,
-		info.Name,
-		types.ApplyPatchType,
-		data,
-		&options,
-	)
-	if err != nil {
-		return err
-	}
-
-	info.Refresh(obj, true)
-	return nil
-}
 
 func haveNamespace(client kubernetes.Interface, name string) bool {
 	if _, err := client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{}); err == nil {
