@@ -136,13 +136,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub := newSubscription(*qualifiedInstance)
-	controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
+	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	err, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
+	_, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
 	if sub == nil {
 		err := createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
@@ -150,7 +149,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if changed {
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
 		}
-
 	} else {
 		logOnce("The gitops subscription is not owned by us, leaving untouched")
 	}
@@ -166,7 +164,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- ArgoCD Application
 	targetApp := newApplication(*qualifiedInstance)
-	controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
+	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
 
