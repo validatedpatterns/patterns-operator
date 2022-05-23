@@ -195,6 +195,9 @@ func vaultStatus(config *rest.Config, client kubernetes.Interface) (*VaultStatus
 	if !havePod(client, vaultNamespace, vaultPod) {
 		return nil, fmt.Errorf("'%s/%s' pod not found yet", vaultNamespace, vaultPod)
 	}
+	if !haveContainer(client, vaultNamespace, vaultPod, vaultContainer) {
+		return nil, fmt.Errorf("'%s/%s %s' container not found yet", vaultNamespace, vaultPod, vaultContainer)
+	}
 	log.Printf("%s/%s exists. Getting vault status:", vaultNamespace, vaultPod)
 	stdout, stderr, err := execInPod(config, client, vaultNamespace, vaultPod, vaultContainer, []string{"vault", "status", "-format=json"})
 	var ret int = 0

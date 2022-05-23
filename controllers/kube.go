@@ -46,6 +46,19 @@ func havePod(client kubernetes.Interface, namespace, pod string) bool {
 	return false
 }
 
+func haveContainer(client kubernetes.Interface, namespace, pod, container string) bool {
+	pods, err := client.CoreV1().Pods(namespace).Get(context.Background(), pod, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	for i := range pods.Spec.Containers {
+		if pods.Spec.Containers[i].Name == container {
+			return true
+		}
+	}
+	return false
+}
+
 func execInPod(config *rest.Config, client kubernetes.Interface, namespace, pod, container string, cmd []string) (*bytes.Buffer, *bytes.Buffer, error) {
 	req := client.CoreV1().RESTClient().Post().Resource("pods").Name(pod).Namespace(namespace).SubResource("exec").Param("container", container)
 	req.VersionedParams(
