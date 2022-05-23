@@ -193,7 +193,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
 	}
 	// Unseal the vault
-	if qualifiedInstance.Spec.InsecureManagedVault {
+	if *qualifiedInstance.Spec.InsecureManagedVault {
 		log.Printf("Insecure Vault set to true")
 		if initialized, err := vaultInitialize(r.config, r.fullClient); err != nil || initialized {
 			return r.actionPerformed(qualifiedInstance, "Initialize vault", err)
@@ -284,6 +284,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	output.Status.ClusterName = ss[1]
 	output.Status.ClusterDomain = clusterIngress.Spec.Domain
+
+	if output.Spec.InsecureManagedVault == nil {
+		var managedVault bool = false
+		output.Spec.InsecureManagedVault = &managedVault
+	}
 
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "main"
