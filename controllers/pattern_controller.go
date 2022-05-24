@@ -194,7 +194,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// Unseal the vault
 	if *qualifiedInstance.Spec.InsecureManagedVault {
-		log.Printf("Insecure Vault set to true")
+		logOnce("Insecure Vault set to true")
 		if initialized, err := vaultInitialize(r.config, r.fullClient); err != nil || initialized {
 			return r.actionPerformed(qualifiedInstance, "Initialize vault", err)
 		}
