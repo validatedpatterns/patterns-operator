@@ -70,6 +70,10 @@ type PatternSpec struct {
 
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
+
+	// Unseal and Initialize the Vault automatically. Note: This is *insecure*
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	InsecureManagedVault *bool `json:"insecureManagedVault,omitempty"`
 }
 
 type GitConfig struct {
@@ -140,11 +144,11 @@ type PatternStatus struct {
 	Version int `json:"version,omitempty"`
 
 	//+operator-sdk:csv:customresourcedefinitions:type=status
-	ClusterName     string `json:"clusterName,omitempty"`
+	ClusterName string `json:"clusterName,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
-	ClusterDomain   string `json:"clusterDomain,omitempty"`
+	ClusterDomain string `json:"clusterDomain,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
-	ClusterID       string `json:"clusterID,omitempty"`
+	ClusterID string `json:"clusterID,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterPlatform string `json:"clusterPlatform,omitempty"`
 }

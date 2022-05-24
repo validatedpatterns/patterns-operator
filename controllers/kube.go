@@ -17,12 +17,17 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubectl/pkg/scheme"
 
 	"github.com/ghodss/yaml"
 )
@@ -32,6 +37,55 @@ func haveNamespace(client kubernetes.Interface, name string) bool {
 		return true
 	}
 	return false
+}
+
+func havePod(client kubernetes.Interface, namespace, pod string) bool {
+	if _, err := client.CoreV1().Pods(namespace).Get(context.Background(), pod, metav1.GetOptions{}); err == nil {
+		return true
+	}
+	return false
+}
+
+func haveContainer(client kubernetes.Interface, namespace, pod, container string) bool {
+	pods, err := client.CoreV1().Pods(namespace).Get(context.Background(), pod, metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	for i := range pods.Spec.Containers {
+		if pods.Spec.Containers[i].Name == container {
+			return true
+		}
+	}
+	return false
+}
+
+func execInPod(config *rest.Config, client kubernetes.Interface, namespace, pod, container string, cmd []string) (*bytes.Buffer, *bytes.Buffer, error) {
+	req := client.CoreV1().RESTClient().Post().Resource("pods").Name(pod).Namespace(namespace).SubResource("exec").Param("container", container)
+	req.VersionedParams(
+		&v1.PodExecOptions{
+			Command: cmd,
+			Stdin:   false,
+			Stdout:  true,
+			Stderr:  true,
+			TTY:     false,
+		},
+		scheme.ParameterCodec,
+	)
+
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var stdout, stderr bytes.Buffer
+	err = exec.Stream(remotecommand.StreamOptions{
+		Stdin:  nil,
+		Stdout: &stdout,
+		Stderr: &stderr,
+		Tty:    false,
+	})
+
+	return &stdout, &stderr, err
 }
 
 func ownedBySame(expected, object metav1.Object) bool {
