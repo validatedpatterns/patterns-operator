@@ -1,5 +1,5 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal AS builder
-RUN microdnf install git golang -y && microdnf clean all
+RUN microdnf install git-core golang -y && microdnf clean all
 #
 # Until ubi has golang 1.17
 #FROM golang:1.17-alpine as builder
