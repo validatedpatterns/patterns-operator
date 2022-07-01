@@ -68,10 +68,6 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
-//FIXME(bandini): it would be nice to restrict the following two RBACs to the vault namespace. kustomize currently fails on that
-//+kubebuilder:rbac:groups="",resources=pods,verbs=list;get
-//+kubebuilder:rbac:groups="",resources=pods/exec,resourceNames=vault-0,verbs=create
-//+kubebuilder:rbac:groups="",namespace=patterns-operator-system,resources=secrets,verbs=create;get
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
 //
@@ -192,19 +188,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Someone manually removed the owner ref
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
 	}
-	// Unseal the vault
-	if *qualifiedInstance.Spec.InsecureManagedVault {
-		logOnce("Insecure Vault set to true")
-		if initialized, err := vaultInitialize(r.config, r.fullClient); err != nil || initialized {
-			return r.actionPerformed(qualifiedInstance, "Initialize vault", err)
-		}
-		if unsealed, err := vaultUnseal(r.config, r.fullClient); err != nil || unsealed {
-			return r.actionPerformed(qualifiedInstance, "Unseal vault", err)
-		}
-		if loggedin, err := vaultLogin(r.config, r.fullClient); err != nil || loggedin {
-			return r.actionPerformed(qualifiedInstance, "Login vault", err)
-		}
-	}
 
 	// Perform validation of the site values file(s)
 	if err := r.postValidation(qualifiedInstance); err != nil {
@@ -284,11 +267,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	output.Status.ClusterName = ss[1]
 	output.Status.ClusterDomain = clusterIngress.Spec.Domain
-
-	if output.Spec.InsecureManagedVault == nil {
-		var managedVault bool = false
-		output.Spec.InsecureManagedVault = &managedVault
-	}
 
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "main"

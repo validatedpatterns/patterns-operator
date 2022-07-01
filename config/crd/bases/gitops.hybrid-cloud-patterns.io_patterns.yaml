@@ -119,10 +119,6 @@ spec:
                 required:
                 - targetRepo
                 type: object
-              insecureManagedVault:
-                description: 'Unseal and Initialize the Vault automatically. Note:
-                  This is *insecure*'
-                type: boolean
             required:
             - clusterGroupName
             - gitSpec

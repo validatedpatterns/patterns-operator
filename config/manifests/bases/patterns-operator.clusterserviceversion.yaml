@@ -57,10 +57,6 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
-      - description: 'Unseal and Initialize the Vault automatically. Note: This is
-          *insecure*'
-        displayName: Insecure Managed Vault
-        path: insecureManagedVault
       statusDescriptors:
       - displayName: Cluster Domain
         path: clusterDomain
