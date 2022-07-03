@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 
+	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -56,11 +57,12 @@ type PatternReconciler struct {
 
 	logger logr.Logger
 
-	config       *rest.Config
-	configClient configclient.Interface
-	argoClient   argoclient.Interface
-	olmClient    olmclient.Interface
-	fullClient   kubernetes.Interface
+	config        *rest.Config
+	configClient  configclient.Interface
+	argoClient    argoclient.Interface
+	olmClient     olmclient.Interface
+	fullClient    kubernetes.Interface
+	dynamicClient dynamic.Interface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -72,6 +74,8 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
+//+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -346,6 +350,10 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return fmt.Errorf("updated application %q for removal\n", app.Name)
 		}
 
+		if haveACMHub(r) {
+			return fmt.Errorf("waiting for removal of that acm hub")
+		}
+
 		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
 			return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
 		}
@@ -379,6 +387,10 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
+		return err
+	}
+
+	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
 		return err
 	}
 

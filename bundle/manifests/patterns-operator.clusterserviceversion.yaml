@@ -75,10 +75,6 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
-      - description: 'Unseal and Initialize the Vault automatically. Note: This is
-          *insecure*'
-        displayName: Insecure Managed Vault
-        path: insecureManagedVault
       statusDescriptors:
       - displayName: Cluster Domain
         path: clusterDomain
@@ -110,25 +106,17 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - ""
+          resources:
           - namespaces
           verbs:
           - get
           - list
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - get
-          - list
-        - apiGroups:
-          - ""
-          resourceNames:
-          - vault-0
-          resources:
-          - pods/exec
-          verbs:
-          - create
         - apiGroups:
           - argoproj.io
           resources:
@@ -187,6 +175,13 @@ spec:
           - get
           - patch
           - update
+        - apiGroups:
+          - operator.open-cluster-management.io
+          resources:
+          - multiclusterhubs
+          verbs:
+          - get
+          - list
         - apiGroups:
           - operators.coreos.com
           resources:
@@ -308,13 +303,6 @@ spec:
           verbs:
           - create
           - patch
-        - apiGroups:
-          - ""
-          resources:
-          - secrets
-          verbs:
-          - create
-          - get
         serviceAccountName: patterns-operator-controller-manager
     strategy: deployment
   installModes:

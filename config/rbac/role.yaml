@@ -9,6 +9,13 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
   - namespaces
   verbs:
   - get
@@ -71,6 +78,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - operator.open-cluster-management.io
+  resources:
+  - multiclusterhubs
+  verbs:
+  - get
+  - list
 - apiGroups:
   - operators.coreos.com
   resources:
