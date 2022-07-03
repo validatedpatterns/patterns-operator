@@ -42,6 +42,8 @@ import (
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 
+	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
+
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -118,9 +120,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 	} else if err := r.finalizeObject(instance); err != nil {
-		return reconcile.Result{}, err
+		return r.actionPerformed(instance, "finalize", err)
 
 	} else {
+		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
+		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
+		if updateErr := r.Client.Status().Update(context.TODO(), instance); updateErr != nil {
+			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
+			return reconcile.Result{}, updateErr
+		}
+
+		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
 		return reconcile.Result{}, nil
 	}
 
@@ -195,7 +205,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// Report statistics
 
-	log.Printf("\n\x1b[32;1m\tReconcile complete\x1b[0m\n")
+	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
 	return ctrl.Result{}, nil
 }
@@ -310,18 +320,42 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 	// The object is being deleted
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
-		// Do any required cleanup here
-		log.Printf("Removing the application, anything instantiated by ArgoCD can now be cleaned up manually")
 
-		if err := removeApplication(r.argoClient, applicationName(*instance)); err != nil {
-			// Best effort only...
-			r.logger.Info("Could not uninstall pattern", "error", err)
+		// Prepare the app for cascaded deletion
+		err, qualifiedInstance := r.applyDefaults(instance)
+		if err != nil {
+			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
+			return nil
 		}
 
-		// Remove our finalizer from the list and update it.
-		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
-		err := r.Client.Update(context.Background(), instance)
-		return err
+		targetApp := newApplication(*qualifiedInstance)
+		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
+
+		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+		if app == nil {
+			log.Printf("Application %q has already been removed\n", app.Name)
+			return nil
+		}
+
+		if !ownedBySame(targetApp, app) {
+			log.Printf("Application %q is not owned by us\n", app.Name)
+			return nil
+		}
+
+		if _, changed := updateApplication(r.argoClient, targetApp, app); changed {
+			return fmt.Errorf("updated application %q for removal\n", app.Name)
+		}
+
+		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+			return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
+		}
+
+		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
+		if err := removeApplication(r.argoClient, app.Name); err != nil {
+			return err
+		}
+
+		return fmt.Errorf("waiting for application %q to be removed\n", app.Name)
 	}
 
 	return nil
@@ -358,18 +392,21 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	p.Status.LastStep = reason
 	if err != nil {
 		p.Status.LastError = err.Error()
-		log.Printf("\n\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
+		log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
 		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
+
 	} else {
 		p.Status.LastError = ""
-		log.Printf("\n\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
+		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
 	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update Pattern status")
+		return reconcile.Result{}, updateErr
 	}
 	if duration != nil {
+		log.Printf("Requeueing\n")
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
 	//	log.Printf("Reconciling with exponential duration")
@@ -379,6 +416,9 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
 	if err != nil {
 		delay := time.Minute * 1
+		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
+	} else if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+		delay := time.Minute * 2
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
