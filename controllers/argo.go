@@ -22,6 +22,7 @@ import (
 	"log"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
@@ -75,6 +76,13 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 				Value: extra.Value,
 			})
 		}
+	}
+	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+		parameters = append(parameters, argoapi.HelmParameter{
+			Name:        "global.deletePattern",
+			Value:       "1",
+			ForceString: true,
+		})
 	}
 	return parameters
 }
@@ -159,7 +167,17 @@ func newApplication(p api.Pattern) *argoapi.Application {
 
 	}
 
-	if !p.Spec.GitOpsConfig.ManualSync {
+	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+		spec.SyncPolicy = &argoapi.SyncPolicy{
+			// Automated will keep an application synced to the target revision
+			Automated: &argoapi.SyncPolicyAutomated{
+				Prune: true,
+			},
+			// Options allow you to specify whole app sync-SyncOptions
+			SyncOptions: []string{"Prune=true"},
+		}
+
+	} else if !p.Spec.GitOpsConfig.ManualSync {
 		// SyncPolicy controls when and how a sync will be performed
 		spec.SyncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision
@@ -171,14 +189,18 @@ func newApplication(p api.Pattern) *argoapi.Application {
 		}
 	}
 
+	labels := make(map[string]string)
+	labels["pattern"] = applicationName(p)
 	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      applicationName(p),
 			Namespace: applicationNamespace,
+			Labels:    labels,
 		},
 		Spec: spec,
 	}
 
+	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
 	return &app
 
 }
@@ -223,12 +245,7 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 }
 
 func removeApplication(client argoclient.Interface, name string) error {
-	if err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
-		return err
-	} else {
-		//			log.Printf("Retrieved: %s\n", objectYaml(app))
-		return nil
-	}
+	return client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
 func compareSource(goal, actual argoapi.ApplicationSource) bool {

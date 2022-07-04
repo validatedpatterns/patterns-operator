@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 
+	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -41,6 +42,8 @@ import (
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
+
+	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -54,11 +57,12 @@ type PatternReconciler struct {
 
 	logger logr.Logger
 
-	config       *rest.Config
-	configClient configclient.Interface
-	argoClient   argoclient.Interface
-	olmClient    olmclient.Interface
-	fullClient   kubernetes.Interface
+	config        *rest.Config
+	configClient  configclient.Interface
+	argoClient    argoclient.Interface
+	olmClient     olmclient.Interface
+	fullClient    kubernetes.Interface
+	dynamicClient dynamic.Interface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -68,12 +72,10 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
-//FIXME(bandini): it would be nice to restrict the following two RBACs to the vault namespace. kustomize currently fails on that
-//+kubebuilder:rbac:groups="",resources=pods,verbs=list;get
-//+kubebuilder:rbac:groups="",resources=pods/exec,resourceNames=vault-0,verbs=create
-//+kubebuilder:rbac:groups="",namespace=patterns-operator-system,resources=secrets,verbs=create;get
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
+//+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -122,9 +124,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 	} else if err := r.finalizeObject(instance); err != nil {
-		return reconcile.Result{}, err
+		return r.actionPerformed(instance, "finalize", err)
 
 	} else {
+		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
+		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
+		if updateErr := r.Client.Status().Update(context.TODO(), instance); updateErr != nil {
+			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
+			return reconcile.Result{}, updateErr
+		}
+
+		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
 		return reconcile.Result{}, nil
 	}
 
@@ -192,19 +202,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Someone manually removed the owner ref
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
 	}
-	// Unseal the vault
-	if *qualifiedInstance.Spec.InsecureManagedVault {
-		logOnce("Insecure Vault set to true")
-		if initialized, err := vaultInitialize(r.config, r.fullClient); err != nil || initialized {
-			return r.actionPerformed(qualifiedInstance, "Initialize vault", err)
-		}
-		if unsealed, err := vaultUnseal(r.config, r.fullClient); err != nil || unsealed {
-			return r.actionPerformed(qualifiedInstance, "Unseal vault", err)
-		}
-		if loggedin, err := vaultLogin(r.config, r.fullClient); err != nil || loggedin {
-			return r.actionPerformed(qualifiedInstance, "Login vault", err)
-		}
-	}
 
 	// Perform validation of the site values file(s)
 	if err := r.postValidation(qualifiedInstance); err != nil {
@@ -212,7 +209,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// Report statistics
 
-	log.Printf("\n\x1b[32;1m\tReconcile complete\x1b[0m\n")
+	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
 	return ctrl.Result{}, nil
 }
@@ -285,11 +282,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	output.Status.ClusterName = ss[1]
 	output.Status.ClusterDomain = clusterIngress.Spec.Domain
 
-	if output.Spec.InsecureManagedVault == nil {
-		var managedVault bool = false
-		output.Spec.InsecureManagedVault = &managedVault
-	}
-
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "main"
 	}
@@ -299,15 +291,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 {
-		//     This is just fine (once we're on 2.3)...
-		//     https://github.com/argoproj/argo-cd/blob/bb77664b6f0299bb332843bcd2524820c7ba1558/reposerver/repository/repository.go#L674
-		//
-		//     Until then, calculate a URL based on TargetRepo...
-		//     https://github.com/hybrid-cloud-patterns/industrial-edge/raw/main/
-		ss := fmt.Sprintf("%s/raw/%s", output.Spec.GitConfig.TargetRepo, output.Spec.GitConfig.TargetRevision)
-		output.Spec.GitConfig.ValuesDirectoryURL = strings.ReplaceAll(ss, ".git", "")
-	}
+	// if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 {
+	//     This is just fine as of Argo 2.3
+	//     https://github.com/argoproj/argo-cd/blob/bb77664b6f0299bb332843bcd2524820c7ba1558/reposerver/repository/repository.go#L674
+	// }
 
 	if output.Spec.GitOpsConfig == nil {
 		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
@@ -337,18 +324,46 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 	// The object is being deleted
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
-		// Do any required cleanup here
-		log.Printf("Removing the application, anything instantiated by ArgoCD can now be cleaned up manually")
 
-		if err := removeApplication(r.argoClient, applicationName(*instance)); err != nil {
-			// Best effort only...
-			r.logger.Info("Could not uninstall pattern", "error", err)
+		// Prepare the app for cascaded deletion
+		err, qualifiedInstance := r.applyDefaults(instance)
+		if err != nil {
+			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
+			return nil
 		}
 
-		// Remove our finalizer from the list and update it.
-		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
-		err := r.Client.Update(context.Background(), instance)
-		return err
+		targetApp := newApplication(*qualifiedInstance)
+		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
+
+		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+		if app == nil {
+			log.Printf("Application %q has already been removed\n", app.Name)
+			return nil
+		}
+
+		if !ownedBySame(targetApp, app) {
+			log.Printf("Application %q is not owned by us\n", app.Name)
+			return nil
+		}
+
+		if _, changed := updateApplication(r.argoClient, targetApp, app); changed {
+			return fmt.Errorf("updated application %q for removal\n", app.Name)
+		}
+
+		if haveACMHub(r) {
+			return fmt.Errorf("waiting for removal of that acm hub")
+		}
+
+		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+			return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
+		}
+
+		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
+		if err := removeApplication(r.argoClient, app.Name); err != nil {
+			return err
+		}
+
+		return fmt.Errorf("waiting for application %q to be removed\n", app.Name)
 	}
 
 	return nil
@@ -375,6 +390,10 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
@@ -385,18 +404,21 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	p.Status.LastStep = reason
 	if err != nil {
 		p.Status.LastError = err.Error()
-		log.Printf("\n\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
+		log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
 		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
+
 	} else {
 		p.Status.LastError = ""
-		log.Printf("\n\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
+		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
 	}
 
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update Pattern status")
+		return reconcile.Result{}, updateErr
 	}
 	if duration != nil {
+		log.Printf("Requeueing\n")
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
 	//	log.Printf("Reconciling with exponential duration")
@@ -406,6 +428,9 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
 	if err != nil {
 		delay := time.Minute * 1
+		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
+	} else if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+		delay := time.Minute * 2
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
