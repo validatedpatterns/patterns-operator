@@ -14,8 +14,7 @@ metadata:
             "clusterGroupName": "hub",
             "gitSpec": {
               "targetRepo": "https://github.com/hybrid-cloud-patterns/multicloud-gitops"
-            },
-            "insecureManagedVault": false
+            }
           }
         }
       ]
