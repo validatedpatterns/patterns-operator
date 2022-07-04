@@ -97,7 +97,7 @@ First define the version and create the operator image:
 ```
 export VERSION=0.0.3
 git tag $VERSION
-git push --tags
+git push $VERSION
 ```
 
 Next, create the OperatorHub release:
@@ -106,13 +106,15 @@ Next, create the OperatorHub release:
 CHANNELS=fast make bundle
 
 git clone git@github.com:$USER/community-operators-prod.git
+git checkout -b "patterns-operator-v$VERSION"
 rsync -a bundle/ community-operators-prod/operators/patterns-operator/$VERSION/
 cd community-operators-prod
 git add operators/patterns-operator/$VERSION/
 git commit -s -m "New v$VERSION validated patterns operator release"
-git push
+git push <fork-remote> "patterns-operator-v$VERSION"
 cd operators/patterns-operator
-diff -ur `ls -1tr | head -n 2 | sort` 
+# Inspect the diff from the previously released version
+diff -urN $(ls -1tr | grep -v ci.yaml | head -n2 | sort)
 
 echo "Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod"
 ```
