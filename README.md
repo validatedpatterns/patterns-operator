@@ -106,9 +106,9 @@ Next, create the OperatorHub release:
 CHANNELS=fast make bundle
 
 git clone git@github.com:$USER/community-operators-prod.git
-git checkout -b "patterns-operator-v$VERSION"
 rsync -a bundle/ community-operators-prod/operators/patterns-operator/$VERSION/
 cd community-operators-prod
+git checkout -b "patterns-operator-v$VERSION"
 git add operators/patterns-operator/$VERSION/
 git commit -s -m "New v$VERSION validated patterns operator release"
 git push <fork-remote> "patterns-operator-v$VERSION"
