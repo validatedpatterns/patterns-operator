@@ -88,9 +88,6 @@ type GitConfig struct {
 
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: main
 	TargetRevision string `json:"targetRevision,omitempty"`
-
-	// Optional. Alternate URL to obtain Helm values files from instead of this pattern.
-	ValuesDirectoryURL string `json:"valuesDirectoryURL,omitempty"`
 }
 
 type ApplyChangeType string
