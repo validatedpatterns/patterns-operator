@@ -332,7 +332,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
 		if app == nil {
-			log.Printf("Application %q has already been removed\n", app.Name)
+			log.Printf("Application has already been removed\n")
 			return nil
 		}
 
