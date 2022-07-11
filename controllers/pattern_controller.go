@@ -291,11 +291,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	// if len(output.Spec.GitConfig.ValuesDirectoryURL) == 0 {
-	//     This is just fine as of Argo 2.3
-	//     https://github.com/argoproj/argo-cd/blob/bb77664b6f0299bb332843bcd2524820c7ba1558/reposerver/repository/repository.go#L674
-	// }
-
 	if output.Spec.GitOpsConfig == nil {
 		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
 	}

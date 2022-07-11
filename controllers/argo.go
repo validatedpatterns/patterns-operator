@@ -51,10 +51,6 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 			Value: p.Spec.GitConfig.TargetRevision,
 		},
 		{
-			Name:  "global.valuesDirectoryURL",
-			Value: p.Spec.GitConfig.ValuesDirectoryURL,
-		},
-		{
 			Name:  "global.hubClusterDomain",
 			Value: p.Status.ClusterDomain,
 		},
@@ -90,17 +86,10 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 func newApplicationValueFiles(p api.Pattern) []string {
 
 	files := []string{
-		// Track the progress of https://github.com/argoproj/argo-cd/pull/6280
-		// It would also be great to somehow support optional remote value files
-		fmt.Sprintf("%s/values-global.yaml", p.Spec.GitConfig.ValuesDirectoryURL),
-		fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Spec.ClusterGroupName),
-	}
-
-	if len(p.Spec.GitConfig.ValuesDirectoryURL) == 0 || p.Spec.GitConfig.ValuesDirectoryURL[0] == '/' || p.Spec.GitConfig.ValuesDirectoryURL[0] == '.' {
-		// Now we have argo 2.3 and support for IgnoreMissingValueFiles,
-		// we can add additional entires, but only if the targets are local
-		files = append(files, fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Status.ClusterPlatform))
-		files = append(files, fmt.Sprintf("%s/values-%s.yaml", p.Spec.GitConfig.ValuesDirectoryURL, p.Status.ClusterName))
+		"/values-global.yaml",
+		fmt.Sprintf("/values-%s.yaml", p.Spec.ClusterGroupName),
+		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterPlatform),
+		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterName),
 	}
 
 	for _, extra := range p.Spec.ExtraValueFiles {

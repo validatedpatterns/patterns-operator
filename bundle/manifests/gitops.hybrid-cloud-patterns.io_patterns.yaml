@@ -110,10 +110,6 @@ spec:
                     description: 'Branch, tag, or commit to deploy.  Does not support
                       short-sha''s. Default: main'
                     type: string
-                  valuesDirectoryURL:
-                    description: Optional. Alternate URL to obtain Helm values files
-                      from instead of this pattern.
-                    type: string
                 required:
                 - targetRepo
                 type: object
