@@ -6,4 +6,5 @@ spec:
   clusterGroupName: hub
   gitSpec:
     targetRepo: "https://github.com/hybrid-cloud-patterns/multicloud-gitops"
+    targetRevision: "main"
 
