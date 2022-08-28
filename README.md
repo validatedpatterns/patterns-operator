@@ -93,29 +93,43 @@ make catalog-install
 
 ### Releases
 
-First define the version and create the operator image:
+As a first step, make sure you have already cloned the community-operators-prod via `git clone git@github.com:$USER/community-operators-prod.git`
+and that it is up-to-date:
+```
+# First make sure community-operators-prod is uptodate
+cd ~/Devel/operators/community-operators-prod
+git fetch --all; git checkout main; git pull
+```
+
+Then switch to the `patterns-operator` git folder, define the version and create the operator image:
 
 ```
-export VERSION=0.0.3
+export VERSION=0.0.5
+CHANNELS=fast make bundle
+git commit -a -m "Upgrade version to ${VERSION}"
 git tag $VERSION
 git push $VERSION
+# Sync the bundle/ folder to the community-operators-prod git repo
+rsync -va bundle/ ../community-operators-prod/operators/patterns-operator/$VERSION
 ```
 
-Next, create the OperatorHub release:
+Next, create the OperatorHub release, by creating the community operator PR:
 
 ```
-CHANNELS=fast make bundle
-
-git clone git@github.com:$USER/community-operators-prod.git
-rsync -a bundle/ community-operators-prod/operators/patterns-operator/$VERSION/
-cd community-operators-prod
+cd ../community-operators-prod
 git checkout -b "patterns-operator-v$VERSION"
 git add operators/patterns-operator/$VERSION/
 git commit -s -m "New v$VERSION validated patterns operator release"
 git push <fork-remote> "patterns-operator-v$VERSION"
-cd operators/patterns-operator
+
 # Inspect the diff from the previously released version
-diff -urN $(ls -1tr | grep -v ci.yaml | head -n2 | sort)
+cd operators/patterns-operator
+diff -urN $(ls -1r | grep -v ci.yaml | head -n2 | sort)
 
 echo "Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod"
+# Create the PR and make sure you flag the questions under `Updated to existing Operators`
+# and section `Your submission should not`
+# Example PR https://github.com/redhat-openshift-ecosystem/community-operators-prod/pull/1569
+# The PR will get automatically merged once CI passes and the PR is pushed by one of the OWNERS of the patterns-operator
+# subfolder inside community-operators-prod
 ```
