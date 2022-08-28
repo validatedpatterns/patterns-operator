@@ -97,16 +97,22 @@ As a first step, make sure you have already cloned the community-operators-prod 
 and that it is up-to-date:
 ```
 # First make sure community-operators-prod is uptodate
-cd ~/Devel/operators/community-operators-prod
+cd community-operators-prod
 git fetch --all; git checkout main; git pull
 ```
 
 Then switch to the `patterns-operator` git folder, define the version and create the operator image:
 
 ```
+cd ../patterns-operator
 export VERSION=0.0.5
+git checkout -b "patterns-operator-v$VERSION"
 CHANNELS=fast make bundle
 git commit -a -m "Upgrade version to ${VERSION}"
+gh pr create
+# Merge the PR
+git checkout main
+git pull
 git tag $VERSION
 git push $VERSION
 # Sync the bundle/ folder to the community-operators-prod git repo
