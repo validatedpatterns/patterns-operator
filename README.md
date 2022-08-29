@@ -26,10 +26,22 @@ oc get applications -A -w
 
 ### Initialize the secrets vault
 
-```
-wget https://raw.githubusercontent.com/hybrid-cloud-patterns/common/main/scripts/vault-utils.sh
-bash ./vault-utils.sh vault_init ./pattern-vault.init
-```
+There are two ways to initialize and unseal the vault:
+1) By adding an ExtraParameter in the UI as follows:
+
+ - Name: `clusterGroup.insecureUnsealVaultInsideCluster`
+ - Value: `true`
+
+2) By cloning the pattern's repo locally and running `make vault-init`
+
+In order to load the secrets out of band into the vault you can copy
+the `values-secret.yaml.template` inside the pattern's git repo to `~/values-secret.yaml`,
+edit the secrets at your discretion and then run `make load-secrets`.
+Otherwise you can access the vault via its network route, login via the root
+token (contained in the `imperative` namespace in the `vaultkeys` secret or in
+the `common/pattern-vault.init` file, depending if you unsealed with
+`insecureUnsealVaultInsideCluster` or via `make vault-init`) and then add the secrets
+via the UI (this approach is a bit more work)
 
 ### Delete the pattern
 
