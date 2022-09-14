@@ -84,9 +84,11 @@ type GitConfig struct {
 	// Unused
 	OriginRepo string `json:"originRepo,omitempty"`
 	// Git repo containing the pattern to deploy. Must use https/http
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRepo string `json:"targetRepo"`
 
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: main
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRevision string `json:"targetRevision,omitempty"`
 }
 
