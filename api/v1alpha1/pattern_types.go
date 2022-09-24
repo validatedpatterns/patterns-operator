@@ -141,6 +141,8 @@ type PatternStatus struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterName string `json:"clusterName,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
+	AppClusterDomain string `json:"appClusterDomain,omitempty"`
+	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterDomain string `json:"clusterDomain,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterID string `json:"clusterID,omitempty"`

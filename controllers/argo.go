@@ -52,10 +52,14 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 		},
 		{
 			Name:  "global.hubClusterDomain",
-			Value: p.Status.ClusterDomain,
+			Value: p.Status.AppClusterDomain,
 		},
 		{
 			Name:  "global.localClusterDomain",
+			Value: p.Status.AppClusterDomain,
+		},
+		{
+			Name:  "global.clusterDomain",
 			Value: p.Status.ClusterDomain,
 		},
 		{
