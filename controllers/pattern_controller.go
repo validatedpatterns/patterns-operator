@@ -280,7 +280,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	ss := strings.Split(clusterIngress.Spec.Domain, ".")
 
 	output.Status.ClusterName = ss[1]
-	output.Status.ClusterDomain = clusterIngress.Spec.Domain
+	output.Status.AppClusterDomain = clusterIngress.Spec.Domain
+	output.Status.ClusterDomain = strings.Join(ss[1:], ".")
 
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "main"
