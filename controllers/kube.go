@@ -28,10 +28,10 @@ import (
 )
 
 func haveNamespace(client kubernetes.Interface, name string) bool {
-      if _, err := client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{}); err == nil {
-              return true
-      }
-      return false
+	if _, err := client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{}); err == nil {
+		return true
+	}
+	return false
 }
 
 func ownedBySame(expected, object metav1.Object) bool {
