@@ -92,6 +92,8 @@ spec:
         path: clusterName
       - displayName: Cluster Platform
         path: clusterPlatform
+      - displayName: Cluster Version
+        path: clusterVersion
       - description: Last error encountered by the pattern
         displayName: Last Error
         path: lastError
@@ -187,6 +189,13 @@ spec:
           - operator.open-cluster-management.io
           resources:
           - multiclusterhubs
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - operator.openshift.io
+          resources:
+          - openshiftcontrollermanagers
           verbs:
           - get
           - list

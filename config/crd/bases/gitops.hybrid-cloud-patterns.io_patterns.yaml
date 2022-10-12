@@ -132,6 +132,8 @@ spec:
                 type: string
               clusterPlatform:
                 type: string
+              clusterVersion:
+                type: string
               lastError:
                 description: Last error encountered by the pattern
                 type: string

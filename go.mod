@@ -3,10 +3,10 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 go 1.16
 
 require (
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/argoproj/argo-cd/v2 v2.3.0-rc5.0.20220206192056-4b04a3918029
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors v1.4.2
-	github.com/go-git/go-git/v5 v5.3.0 // indirect
 	github.com/go-logr/logr v1.2.2
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/onsi/ginkgo v1.16.5
@@ -17,9 +17,7 @@ require (
 	github.com/operator-framework/operator-lifecycle-manager v0.20.0
 	k8s.io/api v0.23.1
 	k8s.io/apimachinery v0.23.1
-	k8s.io/cli-runtime v0.23.1
 	k8s.io/client-go v0.23.1
-	k8s.io/kubectl v0.23.1
 	sigs.k8s.io/controller-runtime v0.11.0
 )
 

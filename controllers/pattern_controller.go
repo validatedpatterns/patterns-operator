@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
@@ -48,6 +49,7 @@ import (
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
 // PatternReconciler reconciles a Pattern object
@@ -57,12 +59,13 @@ type PatternReconciler struct {
 
 	logger logr.Logger
 
-	config        *rest.Config
-	configClient  configclient.Interface
-	argoClient    argoclient.Interface
-	olmClient     olmclient.Interface
-	fullClient    kubernetes.Interface
-	dynamicClient dynamic.Interface
+	config         *rest.Config
+	configClient   configclient.Interface
+	argoClient     argoclient.Interface
+	olmClient      olmclient.Interface
+	fullClient     kubernetes.Interface
+	dynamicClient  dynamic.Interface
+	operatorClient operatorclient.OperatorV1Interface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -76,6 +79,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
+//+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -269,6 +273,23 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
 	}
 
+	// Cluster Version
+	// oc get OpenShiftControllerManager/cluster -o jsonpath='{.status.version}'
+	clusterVersion, err := r.operatorClient.OpenShiftControllerManagers().Get(context.Background(), "cluster", metav1.GetOptions{})
+	if err != nil {
+		return err, output
+	} else {
+		// status:
+		//   ...
+		//   version: 4.10.32
+		v, version_err := semver.NewVersion(string(clusterVersion.Status.Version))
+		if version_err != nil {
+			return version_err, output
+		}
+
+		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
+	}
+
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
 	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
@@ -387,6 +408,10 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
+		return err
+	}
+
+	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
 

@@ -63,6 +63,10 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 			Value: p.Status.ClusterDomain,
 		},
 		{
+			Name:  "global.clusterVersion",
+			Value: p.Status.ClusterVersion,
+		},
+		{
 			Name:  "global.localClusterName",
 			Value: p.Status.ClusterName,
 		},
@@ -93,6 +97,7 @@ func newApplicationValueFiles(p api.Pattern) []string {
 		"/values-global.yaml",
 		fmt.Sprintf("/values-%s.yaml", p.Spec.ClusterGroupName),
 		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterPlatform),
+		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterVersion, p.Spec.ClusterGroupName),
 		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterName),
 	}
 

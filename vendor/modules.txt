@@ -19,6 +19,7 @@ github.com/Azure/go-autorest/tracing
 # github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 github.com/MakeNowJust/heredoc
 # github.com/Masterminds/semver/v3 v3.1.1
+## explicit
 github.com/Masterminds/semver/v3
 # github.com/Microsoft/go-winio v0.4.17
 github.com/Microsoft/go-winio
@@ -125,7 +126,6 @@ github.com/go-git/go-billy/v5/helper/polyfill
 github.com/go-git/go-billy/v5/osfs
 github.com/go-git/go-billy/v5/util
 # github.com/go-git/go-git/v5 v5.3.0
-## explicit
 github.com/go-git/go-git/v5
 github.com/go-git/go-git/v5/config
 github.com/go-git/go-git/v5/internal/revision
@@ -325,11 +325,15 @@ github.com/opencontainers/go-digest
 # github.com/openshift/api v0.0.0-20211028023115-7224b732cc14
 ## explicit
 github.com/openshift/api/config/v1
+github.com/openshift/api/operator/v1
+github.com/openshift/api/operator/v1alpha1
 # github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7
 ## explicit
 github.com/openshift/client-go/config/clientset/versioned
 github.com/openshift/client-go/config/clientset/versioned/scheme
 github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
+github.com/openshift/client-go/operator/clientset/versioned/scheme
+github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1
 # github.com/operator-framework/api v0.12.0
 ## explicit
 github.com/operator-framework/api/pkg/lib/version
@@ -671,7 +675,6 @@ k8s.io/apimachinery/third_party/forked/golang/reflect
 k8s.io/apiserver/pkg/features
 k8s.io/apiserver/pkg/util/feature
 # k8s.io/cli-runtime v0.23.1 => k8s.io/cli-runtime v0.23.0
-## explicit
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
@@ -845,7 +848,6 @@ k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/proto/validation
 k8s.io/kube-openapi/pkg/validation/spec
 # k8s.io/kubectl v0.23.1 => k8s.io/kubectl v0.23.0
-## explicit
 k8s.io/kubectl/pkg/cmd/apiresources
 k8s.io/kubectl/pkg/cmd/apply
 k8s.io/kubectl/pkg/cmd/auth

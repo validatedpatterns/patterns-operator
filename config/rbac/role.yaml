@@ -86,6 +86,13 @@ rules:
   - get
   - list
 - apiGroups:
+  - operator.openshift.io
+  resources:
+  - openshiftcontrollermanagers
+  verbs:
+  - get
+  - list
+- apiGroups:
   - operators.coreos.com
   resources:
   - subscriptions
