@@ -267,6 +267,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		//      type: AWS
 
 		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
+		output.Status.ClusterApiServerURL = clusterInfra.Status.APIServerURL
 	}
 
 	// Derive cluster and domain names

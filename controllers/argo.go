@@ -66,6 +66,10 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 			Name:  "global.localClusterName",
 			Value: p.Status.ClusterName,
 		},
+		{
+			Name:  "global.clusterApiServerURL",
+			Value: p.Status.ClusterApiServerURL,
+		},
 	}
 
 	for _, extra := range p.Spec.ExtraParameters {
