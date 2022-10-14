@@ -56,7 +56,16 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
+      - description: Git repo containing the pattern to deploy. Must use https/http
+        displayName: Target Repo
+        path: gitSpec.targetRepo
+      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
+          Default: main'
+        displayName: Target Revision
+        path: gitSpec.targetRevision
       statusDescriptors:
+      - displayName: App Cluster Domain
+        path: appClusterDomain
       - displayName: Cluster Domain
         path: clusterDomain
       - displayName: Cluster ID
