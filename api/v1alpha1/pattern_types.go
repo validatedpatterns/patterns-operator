@@ -148,6 +148,8 @@ type PatternStatus struct {
 	ClusterID string `json:"clusterID,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterPlatform string `json:"clusterPlatform,omitempty"`
+	//+operator-sdk:csv:customresourcedefinitions:type=status
+	ClusterVersion string `json:"clusterVersion,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html

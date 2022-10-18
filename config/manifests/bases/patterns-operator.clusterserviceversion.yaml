@@ -74,6 +74,8 @@ spec:
         path: clusterName
       - displayName: Cluster Platform
         path: clusterPlatform
+      - displayName: Cluster Version
+        path: clusterVersion
       - description: Last error encountered by the pattern
         displayName: Last Error
         path: lastError
