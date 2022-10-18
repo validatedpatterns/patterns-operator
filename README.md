@@ -128,7 +128,7 @@ gh pr create
 git checkout main
 git pull
 git tag $VERSION
-git push $VERSION
+git push <upstream-remote> $VERSION
 # Sync the bundle/ folder to the community-operators-prod git repo
 rsync -va bundle/ ../community-operators-prod/operators/patterns-operator/$VERSION
 ```
@@ -146,7 +146,8 @@ git push <fork-remote> "patterns-operator-v$VERSION"
 cd operators/patterns-operator
 diff -urN $(ls -1r | grep -v ci.yaml | head -n2 | sort)
 
-echo "Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod"
+# Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod
+# Use the web interface so you can fill in the web template
 # Create the PR and make sure you flag the questions under `Updated to existing Operators`
 # and section `Your submission should not`
 # Example PR https://github.com/redhat-openshift-ecosystem/community-operators-prod/pull/1569
