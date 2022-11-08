@@ -67,6 +67,10 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 			Value: p.Status.ClusterVersion,
 		},
 		{
+			Name:  "global.clusterPlatform",
+			Value: p.Status.ClusterPlatform,
+		},
+		{
 			Name:  "global.localClusterName",
 			Value: p.Status.ClusterName,
 		},
