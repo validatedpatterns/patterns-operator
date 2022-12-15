@@ -66,6 +66,7 @@ type PatternReconciler struct {
 	fullClient     kubernetes.Interface
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
+	driftWatcher   DriftWatcher
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -95,6 +96,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Reconcile() should perform at most one action in any invocation
 	// in order to simplify testing.
 	r.logger = klog.FromContext(ctx)
+
 	r.logger.Info("Reconciling Pattern")
 
 	// Logger includes name and namespace
@@ -150,6 +152,22 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
+	}
+
+	// -- Git Drift monitoring
+	gitConfig := qualifiedInstance.Spec.GitConfig
+	// if both git repositories are defined in the pattern's git configuration
+	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+		// start monitoring drifts for this pattern
+		err := r.driftWatcher.add(qualifiedInstance.Name,
+			qualifiedInstance.Namespace,
+			gitConfig.OriginRepo,
+			gitConfig.TargetRepo,
+			gitConfig.TargetRevision,
+			gitConfig.PollInterval)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
+		}
 	}
 
 	// -- GitOps Subscription
@@ -331,7 +349,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.ClusterGroupName = "default"
 	}
 
-	if output.Spec.GitConfig.PollInterval == 0 {
+	// interval cannot be less than 30 seconds to avoid drowning the API server in requests
+	if output.Spec.GitConfig.PollInterval < 30 {
 		output.Spec.GitConfig.PollInterval = 30
 	}
 
@@ -367,6 +386,12 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
+		if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+			// Stop watching for drifts in the pattern's git repositories
+			if err := r.driftWatcher.remove(instance.Name, instance.Namespace); err != nil {
+				return err
+			}
+		}
 		if _, changed := updateApplication(r.argoClient, targetApp, app); changed {
 			return fmt.Errorf("updated application %q for removal\n", app.Name)
 		}
@@ -383,7 +408,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		if err := removeApplication(r.argoClient, app.Name); err != nil {
 			return err
 		}
-
 		return fmt.Errorf("waiting for application %q to be removed\n", app.Name)
 	}
 
@@ -418,7 +442,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
-
+	r.driftWatcher = NewDriftWatcher(r.Client, mgr.GetLogger(), NewGitClient())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
