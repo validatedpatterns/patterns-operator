@@ -185,7 +185,7 @@ func (d *driftWatcher) remove(name, namespace string) error {
 	return fmt.Errorf("unable to find git remote pair for pattern %s in namespace %s", name, namespace)
 }
 
-func (d *driftWatcher) calculateNextTimer() {
+func (d *driftWatcher) startNewTimer() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 	// if there is an ongoing timer...
@@ -219,12 +219,12 @@ func (d *driftWatcher) calculateNextTimer() {
 		} else {
 			conditionType := api.GitInSync
 			if hasDrifted {
-				d.logger.Info("git repositories have drifted for resource %s in namespace %s", pair.name, pair.namespace)
+				d.logger.Info(fmt.Sprintf("git repositories have drifted for resource %s in namespace %s", pair.name, pair.namespace))
 				conditionType = api.GitOutOfSync
 			}
 			err := updatePatternConditions(d.kcli, conditionType, pair.name, pair.namespace, time.Now())
 			if err != nil {
-				d.logger.Error(err, "failed to update pattern condition for %s in namespace %s", pair.name, pair.namespace)
+				d.logger.Error(err, fmt.Sprintf("failed to update pattern condition for %s in namespace %s", pair.name, pair.namespace))
 			}
 		}
 		pair.lastCheck = time.Now()
@@ -234,7 +234,7 @@ func (d *driftWatcher) calculateNextTimer() {
 		sort.Sort(d.repoPairs)
 		d.updateCh <- struct{}{}
 	})
-	d.logger.V(1).Info("Timer updated for ")
+	d.logger.V(1).Info(fmt.Sprintf("New timer started for %s in %s to end on %s", nextPair.name, nextPair.namespace, nextPair.nextCheck.String()))
 }
 
 // watch starts the process of monitoring the drifts. The call returns a channel to be used to manage
@@ -251,7 +251,7 @@ func (d *driftWatcher) watch() chan interface{} {
 				}
 				return
 			case <-d.updateCh:
-				go d.calculateNextTimer()
+				go d.startNewTimer()
 			}
 		}
 	}()
