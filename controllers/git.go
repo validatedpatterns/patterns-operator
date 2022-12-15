@@ -111,6 +111,7 @@ type driftWatcher struct {
 	mutex           *sync.Mutex
 	logger          logr.Logger
 	timer           *time.Timer
+	timerCancelled  bool
 	gitClient       GitClient
 }
 
@@ -150,6 +151,7 @@ func (d *driftWatcher) add(name, namespace, origin, target, targetRevision strin
 	}
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
+	d.stopTimer()
 	pair := repositoryPair{
 		name:           name,
 		namespace:      namespace,
@@ -175,6 +177,7 @@ func (d *driftWatcher) remove(name, namespace string) error {
 	defer d.mutex.Unlock()
 	for index := range d.repoPairs {
 		if name == d.repoPairs[index].name && namespace == d.repoPairs[index].namespace {
+			d.stopTimer()
 			d.repoPairs = append(d.repoPairs[:index], d.repoPairs[index+1:]...)
 			sort.Sort(d.repoPairs)
 			// Notify of updates
@@ -185,14 +188,21 @@ func (d *driftWatcher) remove(name, namespace string) error {
 	return fmt.Errorf("unable to find git remote pair for pattern %s in namespace %s", name, namespace)
 }
 
+func (d *driftWatcher) stopTimer() {
+	// if there is an ongoing timer...
+	if d.timer != nil {
+		// ...stop the timer. Any ongoing timer is no longer valid as there are going to be changes to the slice
+		if d.timer.Stop() {
+			// if the timer function is in progress, at this point is waiting to get the lock. Flag timerCancelled as true to notify the routine to exit as soon as it gets the lock and ensure
+			// that the function does not continue executing, as the order of the slice has changed since the function was triggered and got blocked waiting to get the lock
+			d.timerCancelled = true
+		}
+	}
+}
+
 func (d *driftWatcher) startNewTimer() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	// if there is an ongoing timer...
-	if d.timer != nil {
-		// ...stop the timer. Any ongoing timer is no longer valid as there have been changes to the pair slice
-		d.timer.Stop()
-	}
 	if len(d.repoPairs) == 0 {
 		return
 	}
@@ -208,6 +218,12 @@ func (d *driftWatcher) startNewTimer() {
 	d.timer = time.AfterFunc(nextInterval, func() {
 		d.mutex.Lock()
 		defer d.mutex.Unlock()
+		if d.timerCancelled {
+			// timer has been stopped while the routine was waiting for hold the lock. This means that there has been a change in the order of elements in the slice while it was waiting to obtain the lock
+			// reset the timer cancelled field.
+			d.timerCancelled = false
+			return
+		}
 		if len(d.repoPairs) == 0 {
 			d.updateCh <- struct{}{}
 			return

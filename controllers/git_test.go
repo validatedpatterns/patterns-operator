@@ -521,19 +521,53 @@ var _ = Describe("Drift watcher", func() {
 		const (
 			defaultNamespace = "default"
 		)
-		It("adds,removes and check for existing pairs in parallel load with random intervals", func() {
+		var (
+			mockGitClient      *MockClient
+			mockRemote         *MockRemoteClient
+			pattern1, pattern2 *api.Pattern
+			ctrl               *gomock.Controller
+		)
+		BeforeEach(func() {
+			pattern1 = &api.Pattern{
+				ObjectMeta: v1.ObjectMeta{Name: barName, Namespace: defaultNamespace},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
+			pattern2 = &api.Pattern{
+				ObjectMeta: v1.ObjectMeta{Name: fooName, Namespace: defaultNamespace},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
+			ctrl = gomock.NewController(GinkgoT())
+			mockGitClient = NewMockClient(ctrl)
+			mockRemote = NewMockRemoteClient(ctrl)
 
-			watch := newWatcher(nil)
+			// Add the 2 patterns in etcd
+			err := k8sClient.Create(context.TODO(), pattern1)
+			Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.Create(context.TODO(), pattern2)
+			Expect(err).NotTo(HaveOccurred())
+
+		})
+
+		AfterEach(func() {
+			err := k8sClient.Delete(context.TODO(), pattern1)
+			Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.Delete(context.TODO(), pattern2)
+			Expect(err).NotTo(HaveOccurred())
+		})
+		It("adds,removes and check for existing pairs in parallel load with random intervals", func() {
+			mockGitClient.EXPECT().NewRemoteClient(gomock.Any()).Return(mockRemote).AnyTimes()
+			mockRemote.EXPECT().List(gomock.Any()).Return(firstCommitReference, nil).AnyTimes()
+
+			watch := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
 			watch.watch()
 			// add references in parallel
 			wg := sync.WaitGroup{}
 			wg.Add(2)
 			go func() {
-				for i := 0; i < 100; i++ {
-					interval := rand.Intn(100) + 100
-					name := fmt.Sprintf("load-%d", rand.Intn(100))
+				for i := 0; i < 1000; i++ {
+					// set interval between 1-2 seconds to force the trigger of the timer function during the test
+					interval := rand.Intn(2) + 1
+					name := fmt.Sprintf("load-%d", rand.Intn(1000))
 					for watch.isWatching(name, defaultNamespace) {
-						name = fmt.Sprintf("load-%d", rand.Intn(100))
+						name = fmt.Sprintf("load-%d", rand.Intn(1000))
 					}
 					Expect(watch.add(name, defaultNamespace, originURL, targetURL, "", interval)).NotTo(HaveOccurred())
 				}
@@ -541,8 +575,8 @@ var _ = Describe("Drift watcher", func() {
 			}()
 			go func() {
 				var deleted int
-				for deleted < 100 {
-					name := fmt.Sprintf("load-%d", rand.Intn(100))
+				for deleted < 1000 {
+					name := fmt.Sprintf("load-%d", rand.Intn(1000))
 					if watch.isWatching(name, defaultNamespace) {
 						Expect(watch.remove(name, defaultNamespace)).NotTo(HaveOccurred())
 						deleted++
@@ -551,7 +585,6 @@ var _ = Describe("Drift watcher", func() {
 				wg.Done()
 			}()
 			wg.Wait()
-			Expect(watch.repoPairs).To(BeEmpty())
 		})
 	})
 })
