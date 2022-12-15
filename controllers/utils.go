@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -83,4 +84,30 @@ func ParametersToMap(parameters []api.PatternParameter) map[string]interface{} {
 	}
 
 	return output
+}
+
+// getPatternConditionByStatus returns a copy of the pattern condition defined by the status and the index in the slice if it exists, otherwise -1 and nil
+func getPatternConditionByStatus(conditions []api.PatternCondition, conditionStatus v1.ConditionStatus) (int, *api.PatternCondition) {
+	if conditions == nil {
+		return -1, nil
+	}
+	for i := range conditions {
+		if conditions[i].Status == conditionStatus {
+			return i, &conditions[i]
+		}
+	}
+	return -1, nil
+}
+
+// getPatternConditionByType returns a copy of the pattern condition defined by the type and the index in the slice if it exists, otherwise -1 and nil
+func getPatternConditionByType(conditions []api.PatternCondition, conditionType api.PatternConditionType) (int, *api.PatternCondition) {
+	if conditions == nil {
+		return -1, nil
+	}
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return i, &conditions[i]
+		}
+	}
+	return -1, nil
 }
