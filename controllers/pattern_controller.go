@@ -331,6 +331,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.ClusterGroupName = "default"
 	}
 
+	if output.Spec.GitConfig.PollInterval == 0 {
+		output.Spec.GitConfig.PollInterval = 30
+	}
+
 	return nil, output
 }
 

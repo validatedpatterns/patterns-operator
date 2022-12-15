@@ -56,6 +56,10 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
+      - description: 'Interval in seconds to poll for drifts between origin and target
+          repositories. Default: 30 seconds'
+        displayName: Poll Interval
+        path: gitSpec.pollInterval
       - description: Git repo containing the pattern to deploy. Must use https/http
         displayName: Target Repo
         path: gitSpec.targetRepo

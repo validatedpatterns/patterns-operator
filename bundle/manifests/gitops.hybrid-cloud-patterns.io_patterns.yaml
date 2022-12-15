@@ -102,6 +102,10 @@ spec:
                   originRepo:
                     description: Unused
                     type: string
+                  pollInterval:
+                    description: 'Interval in seconds to poll for drifts between origin
+                      and target repositories. Default: 30 seconds'
+                    type: integer
                   targetRepo:
                     description: Git repo containing the pattern to deploy. Must use
                       https/http
