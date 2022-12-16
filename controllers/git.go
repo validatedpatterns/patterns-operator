@@ -115,14 +115,15 @@ type driftWatcher struct {
 	gitClient       GitClient
 }
 
-func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) DriftWatcher {
-	return &driftWatcher{
+func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (DriftWatcher, chan interface{}) {
+	d := &driftWatcher{
 		kcli:      kubeClient,
 		logger:    logger,
 		repoPairs: repositoryPairs{},
 		endCh:     make(chan interface{}),
 		mutex:     &sync.Mutex{},
 		gitClient: gitClient}
+	return d, d.watch()
 }
 
 type DriftWatcher interface {
@@ -256,6 +257,9 @@ func (d *driftWatcher) startNewTimer() {
 // watch starts the process of monitoring the drifts. The call returns a channel to be used to manage
 // the closure of the monitoring routine cleanly.
 func (d *driftWatcher) watch() chan interface{} {
+	if d.updateCh != nil {
+		return d.endCh
+	}
 	// ready to start processing notifications
 	d.updateCh = make(chan interface{})
 	go func() {

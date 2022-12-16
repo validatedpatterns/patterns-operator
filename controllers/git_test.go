@@ -13,15 +13,14 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
-	"github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1core "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
 const (
@@ -192,7 +191,7 @@ var _ = Describe("Git client", func() {
 		BeforeEach(func() {
 			pattern = api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: foo, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
 				Spec:       api.PatternSpec{GitConfig: api.GitConfig{Hostname: foo, PollInterval: 30}},
 			}
 			e := k8sClient.Create(ctx, &pattern)
@@ -222,8 +221,8 @@ var _ = Describe("Git client", func() {
 			Expect(p.Status.Conditions[0]).To(BeComparableTo(api.PatternCondition{
 				Type:               api.GitInSync,
 				Status:             v1core.ConditionTrue,
-				LastUpdateTime:     metav1.Time{Time: timestamp},
-				LastTransitionTime: metav1.Time{Time: timestamp},
+				LastUpdateTime:     v1.Time{Time: timestamp},
+				LastTransitionTime: v1.Time{Time: timestamp},
 				Message:            "Git repositories are in sync",
 			}))
 		})
@@ -245,8 +244,8 @@ var _ = Describe("Git client", func() {
 			Expect(p.Status.Conditions[0]).To(BeComparableTo(api.PatternCondition{
 				Type:               api.GitInSync,
 				Status:             v1core.ConditionTrue,
-				LastUpdateTime:     metav1.Time{Time: secondTimeStamp},
-				LastTransitionTime: metav1.Time{Time: firstTimestamp},
+				LastUpdateTime:     v1.Time{Time: secondTimeStamp},
+				LastTransitionTime: v1.Time{Time: firstTimestamp},
 				Message:            "Git repositories are in sync",
 			}))
 		})
@@ -268,15 +267,15 @@ var _ = Describe("Git client", func() {
 			Expect(p.Status.Conditions[0]).To(BeComparableTo(api.PatternCondition{
 				Type:               api.GitInSync,
 				Status:             v1core.ConditionFalse,
-				LastUpdateTime:     metav1.Time{Time: secondTimeStamp},
-				LastTransitionTime: metav1.Time{Time: firstTimestamp},
+				LastUpdateTime:     v1.Time{Time: secondTimeStamp},
+				LastTransitionTime: v1.Time{Time: firstTimestamp},
 				Message:            "Git repositories are in sync",
 			}))
 			Expect(p.Status.Conditions[1]).To(BeComparableTo(api.PatternCondition{
 				Type:               api.GitOutOfSync,
 				Status:             v1core.ConditionTrue,
-				LastUpdateTime:     metav1.Time{Time: secondTimeStamp},
-				LastTransitionTime: metav1.Time{Time: secondTimeStamp},
+				LastUpdateTime:     v1.Time{Time: secondTimeStamp},
+				LastTransitionTime: v1.Time{Time: secondTimeStamp},
 				Message:            "Git repositories are out of sync",
 			}))
 		})
@@ -301,15 +300,15 @@ var _ = Describe("Git client", func() {
 			Expect(p.Status.Conditions[0]).To(BeComparableTo(api.PatternCondition{
 				Type:               api.GitInSync,
 				Status:             v1core.ConditionTrue,
-				LastUpdateTime:     metav1.Time{Time: thirdTimeStamp},
-				LastTransitionTime: metav1.Time{Time: thirdTimeStamp},
+				LastUpdateTime:     v1.Time{Time: thirdTimeStamp},
+				LastTransitionTime: v1.Time{Time: thirdTimeStamp},
 				Message:            "Git repositories are in sync",
 			}))
 			Expect(p.Status.Conditions[1]).To(BeComparableTo(api.PatternCondition{
 				Type:               api.GitOutOfSync,
 				Status:             v1core.ConditionFalse,
-				LastUpdateTime:     metav1.Time{Time: thirdTimeStamp},
-				LastTransitionTime: metav1.Time{Time: secondTimeStamp},
+				LastUpdateTime:     v1.Time{Time: thirdTimeStamp},
+				LastTransitionTime: v1.Time{Time: secondTimeStamp},
 				Message:            "Git repositories are out of sync",
 			}))
 		})
@@ -335,10 +334,10 @@ var _ = Describe("Drift watcher", func() {
 		BeforeEach(func() {
 			pattern1 = &api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: barName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
 			pattern2 = &api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: fooName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
 			ctrl = gomock.NewController(GinkgoT())
 
 			mockGitClient = NewMockClient(ctrl)
@@ -380,8 +379,7 @@ var _ = Describe("Drift watcher", func() {
 				}
 				return multipleCommitsWithDifferentHashReference, nil
 			}).AnyTimes()
-			watch := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
-			closeCh := watch.watch()
+			watch, closeCh := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
 
 			// Add the pair
 			timestamp := time.Now()
@@ -433,10 +431,10 @@ var _ = Describe("Drift watcher", func() {
 		BeforeEach(func() {
 			pattern1 = &api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: barName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
 			pattern2 = &api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: fooName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
 			ctrl = gomock.NewController(GinkgoT())
 			mockGitClient = NewMockClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
@@ -522,42 +520,22 @@ var _ = Describe("Drift watcher", func() {
 			defaultNamespace = "default"
 		)
 		var (
-			mockGitClient      *MockClient
-			mockRemote         *MockRemoteClient
-			pattern1, pattern2 *api.Pattern
-			ctrl               *gomock.Controller
+			mockGitClient *MockClient
+			mockRemote    *MockRemoteClient
+			ctrl          *gomock.Controller
 		)
 		BeforeEach(func() {
-			pattern1 = &api.Pattern{
-				ObjectMeta: v1.ObjectMeta{Name: barName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
-			pattern2 = &api.Pattern{
-				ObjectMeta: v1.ObjectMeta{Name: fooName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: v1alpha1.GroupVersion.String()}}
 			ctrl = gomock.NewController(GinkgoT())
 			mockGitClient = NewMockClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
 
-			// Add the 2 patterns in etcd
-			err := k8sClient.Create(context.TODO(), pattern1)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Create(context.TODO(), pattern2)
-			Expect(err).NotTo(HaveOccurred())
-
 		})
 
-		AfterEach(func() {
-			err := k8sClient.Delete(context.TODO(), pattern1)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Delete(context.TODO(), pattern2)
-			Expect(err).NotTo(HaveOccurred())
-		})
 		It("adds,removes and check for existing pairs in parallel load with random intervals", func() {
 			mockGitClient.EXPECT().NewRemoteClient(gomock.Any()).Return(mockRemote).AnyTimes()
 			mockRemote.EXPECT().List(gomock.Any()).Return(firstCommitReference, nil).AnyTimes()
 
-			watch := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
-			watch.watch()
+			watch, _ := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
 			// add references in parallel
 			wg := sync.WaitGroup{}
 			wg.Add(2)

@@ -442,7 +442,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
-	r.driftWatcher = NewDriftWatcher(r.Client, mgr.GetLogger(), NewGitClient())
+	r.driftWatcher, _ = NewDriftWatcher(r.Client, mgr.GetLogger(), NewGitClient())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
