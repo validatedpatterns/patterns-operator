@@ -36,7 +36,7 @@ const (
 	applicationNamespace  = "openshift-gitops"
 )
 
-func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
+func newSubscription(config *api.GitOpsConfig) *operatorv1alpha1.Subscription {
 	//  apiVersion: operators.coreos.com/v1alpha1
 	//  kind: Subscription
 	//  metadata:
@@ -57,7 +57,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          "redhat-operators",
 		CatalogSourceNamespace: "openshift-marketplace",
-		Channel:                p.Spec.GitOpsConfig.OperatorChannel,
+		Channel:                config.Spec.OperatorChannel,
 		Package:                "openshift-gitops-operator",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
@@ -70,11 +70,11 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 		},
 	}
 
-	if p.Spec.GitOpsConfig.UseCSV {
-		spec.StartingCSV = p.Spec.GitOpsConfig.OperatorCSV
+	if config.Spec.UseCSV {
+		spec.StartingCSV = config.Spec.OperatorCSV
 	}
 
-	if p.Spec.GitOpsConfig.ManualApproval {
+	if config.Spec.ManualApproval {
 		spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
 	}
 
@@ -89,7 +89,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 
 func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
 
-	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	sub, err := client.OperatorsV1alpha1().Subscriptions(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return err, nil
 	}
@@ -97,7 +97,7 @@ func getSubscription(client olmclient.Interface, name, namespace string) (error,
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	_, err := client.OperatorsV1alpha1().Subscriptions(sub.Namespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 

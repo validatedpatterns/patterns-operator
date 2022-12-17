@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/gitops.hybrid-cloud-patterns.io_patterns.yaml
+- bases/gitops.hybrid-cloud-patterns.io_gitopsconfigs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

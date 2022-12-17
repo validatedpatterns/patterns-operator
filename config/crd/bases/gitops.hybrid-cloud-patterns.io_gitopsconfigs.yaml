@@ -1,0 +1,94 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: gitopsconfigs.gitops.hybrid-cloud-patterns.io
+spec:
+  group: gitops.hybrid-cloud-patterns.io
+  names:
+    kind: GitOpsConfig
+    listKind: GitOpsConfigList
+    plural: gitopsconfigs
+    shortNames:
+    - goc
+    singular: gitopsconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.lastStep
+      name: Step
+      priority: 1
+      type: string
+    - jsonPath: .status.lastError
+      name: Error
+      priority: 2
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: 'See: https://book.kubebuilder.io/reference/markers/crd.html      https://sdk.operatorframework.io/docs/building-operators/golang/references/markers/'
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              manualApproval:
+                description: 'Require manual confirmation before installing and upgrading
+                  operators. Default: False'
+                type: boolean
+              manualSync:
+                description: 'Require manual intervention before Argo will sync new
+                  content. Default: False'
+                type: boolean
+              operatorCSV:
+                description: Specific version of openshift-gitops to deploy.  Requires
+                  UseCSV=True
+                type: string
+              operatorChannel:
+                description: 'Channel to deploy openshift-gitops from. Default: stable'
+                type: string
+              operatorSource:
+                description: 'Source to deploy openshift-gitops from. Default: redhat-operators'
+                type: string
+              useCSV:
+                description: 'Dangerous. Force a specific version to be installed.
+                  Default: False'
+                type: boolean
+            type: object
+          status:
+            properties:
+              lastError:
+                description: Last error encountered by the pattern
+                type: string
+              lastStep:
+                description: Last action related to the pattern
+                type: string
+              version:
+                description: Number of updates to the pattern
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

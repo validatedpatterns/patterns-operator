@@ -1,0 +1,7 @@
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: GitOpsConfig
+metadata:
+  name: gitopsconfig
+  namespace: openshift-operators
+spec:
+

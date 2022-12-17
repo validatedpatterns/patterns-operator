@@ -145,7 +145,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- Fill in defaults (changes made to a copy and not persisted)
-	err, qualifiedInstance := r.applyDefaults(instance)
+	err, qualifiedInstance := r.applyPatternDefaults(instance)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
@@ -181,22 +181,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub := newSubscription(*qualifiedInstance)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
-
-	_, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
-	if sub == nil {
-		err := createSubscription(r.olmClient, targetSub)
-		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if ownedBySame(targetSub, sub) {
-		// Check version/channel etc
-		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		err, changed := updateSubscription(r.olmClient, targetSub, sub)
-		if changed {
-			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
+	gocInstance := api.GitOpsConfig{}
+	err = r.Client.Get(context.TODO(), gitOpsConfigDefaultNamespacedName, &gocInstance)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			r.logger.Info("GitOpsConfig not found")
+			return reconcile.Result{}, nil
 		}
-	} else {
-		logOnce("The gitops subscription is not owned by us, leaving untouched")
+		// Error reading the object - requeue the request.
+		r.logger.Info("Error reading the request object, requeuing.")
+		return reconcile.Result{}, err
 	}
 
 	logOnce("subscription found")
@@ -209,7 +206,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// -- ArgoCD Application
-	targetApp := newApplication(*qualifiedInstance)
+	targetApp := newApplication(*qualifiedInstance, &gocInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
@@ -278,7 +275,7 @@ func (r *PatternReconciler) postValidation(input *api.Pattern) error {
 	return nil
 }
 
-func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
+func (r *PatternReconciler) applyPatternDefaults(input *api.Pattern) (error, *api.Pattern) {
 
 	output := input.DeepCopy()
 
@@ -344,10 +341,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	output.Status.AppClusterDomain = clusterIngress.Spec.Domain
 	output.Status.ClusterDomain = strings.Join(ss[1:], ".")
 
-	if output.Spec.GitOpsConfig == nil {
-		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
-	}
-
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "HEAD"
 	}
@@ -361,16 +354,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
-		output.Spec.GitOpsConfig.OperatorChannel = "stable"
-	}
-
-	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
-		output.Spec.GitOpsConfig.OperatorSource = "redhat-operators"
-	}
-	if len(output.Spec.GitOpsConfig.OperatorCSV) == 0 {
-		output.Spec.GitOpsConfig.OperatorCSV = "v1.4.0"
-	}
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
@@ -393,13 +376,12 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
 
 		// Prepare the app for cascaded deletion
-		err, qualifiedInstance := r.applyDefaults(instance)
+		err, qualifiedInstance := r.applyPatternDefaults(instance)
 		if err != nil {
 			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
 			return nil
 		}
-
-		targetApp := newApplication(*qualifiedInstance)
+		targetApp := newApplication(*qualifiedInstance, nil)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))

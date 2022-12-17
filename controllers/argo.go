@@ -112,7 +112,7 @@ func newApplicationValueFiles(p api.Pattern) []string {
 	return files
 }
 
-func newApplication(p api.Pattern) *argoapi.Application {
+func newApplication(p api.Pattern, c *api.GitOpsConfig) *argoapi.Application {
 
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
@@ -179,7 +179,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 			SyncOptions: []string{"Prune=true"},
 		}
 
-	} else if !p.Spec.GitOpsConfig.ManualSync {
+	} else if c != nil && !c.Spec.ManualSync {
 		// SyncPolicy controls when and how a sync will be performed
 		spec.SyncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision

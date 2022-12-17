@@ -55,6 +55,32 @@ rules:
 - apiGroups:
   - gitops.hybrid-cloud-patterns.io
   resources:
+  - gitopsconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - gitopsconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - gitopsconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
   - patterns
   verbs:
   - create

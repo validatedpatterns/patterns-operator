@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,8 +30,9 @@ import (
 )
 
 func haveNamespace(client client.Client, name string) bool {
-	ns := &v1.Namespace{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
+
+	if err := client.Get(context.Background(), types.NamespacedName{Name: name},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}); err == nil {
 		return true
 	}
 	return false
