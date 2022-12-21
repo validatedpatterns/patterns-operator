@@ -93,7 +93,7 @@ var _ = Describe("Git client", func() {
 			e := k8sClient.Delete(context.Background(), &pattern)
 			Expect(e).NotTo(HaveOccurred())
 		})
-		DescribeTable("when drifting", func(originRefs, targetRefs []*plumbing.Reference, targetRef string, expected bool, errOriginList, errTargetList, errFilter error) {
+		DescribeTable("when drifting", func(originRefs, targetRefs []*plumbing.Reference, originRef, targetRef string, expected bool, errOriginList, errTargetList, errOriginFilter, errTargetFilter error) {
 			pattern = api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: foo, Namespace: defaultNamespace},
 				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
@@ -102,6 +102,7 @@ var _ = Describe("Git client", func() {
 						Hostname:       foo,
 						PollInterval:   30,
 						OriginRepo:     originURL,
+						OriginRevision: originRef,
 						TargetRepo:     targetURL,
 						TargetRevision: targetRef}},
 			}
@@ -128,8 +129,10 @@ var _ = Describe("Git client", func() {
 					Expect(e).To(Equal(errOriginList))
 				case errTargetList != nil:
 					Expect(e).To(Equal(errTargetList))
-				case errFilter != nil:
-					Expect(e).To(Equal(errFilter))
+				case errOriginFilter != nil:
+					Expect(e).To(Equal(errOriginFilter))
+				case errTargetFilter != nil:
+					Expect(e).To(Equal(errTargetFilter))
 				}
 				return
 			}
@@ -137,20 +140,22 @@ var _ = Describe("Git client", func() {
 			Expect(e).NotTo(HaveOccurred())
 			Expect(hasDrifted).To(Equal(expected))
 		},
-			Entry("One commit with head main and same hash", firstCommitReference, firstCommitReference, "", false, nil, nil, nil),
-			Entry("One commit with head main and different hash", firstCommitReference, firstCommitAmendedReference, "", true, nil, nil, nil),
-			Entry("One commit with head main and head master and same hash", firstCommitReference, firstCommitReferenceWithMaster, "", false, nil, nil, nil),
-			Entry("Multiple commit with head main and branches with the same hash", multipleCommitsReference, multipleCommitsReference, "", false, nil, nil, nil),
-			Entry("Multiple commit with head main and branches with different hash", multipleCommitsReference, multipleCommitsWithDifferentHashReference, "", true, nil, nil, nil),
-			Entry("One commit with head main and target reference with the same hash", firstCommitReference, multipleCommitsReference, "test", false, nil, nil, nil),
+			Entry("One commit with head main and same hash", firstCommitReference, firstCommitReference, "", "", false, nil, nil, nil, nil),
+			Entry("One commit with head main and different hash", firstCommitReference, firstCommitAmendedReference, "", "", true, nil, nil, nil, nil),
+			Entry("One commit with head main and head master and same hash", firstCommitReference, firstCommitReferenceWithMaster, "", "", false, nil, nil, nil, nil),
+			Entry("Multiple commit with head main and branches with the same hash", multipleCommitsReference, multipleCommitsReference, "", "", false, nil, nil, nil, nil),
+			Entry("Multiple commit with head main and branches with different hash", multipleCommitsReference, multipleCommitsWithDifferentHashReference, "", "", true, nil, nil, nil, nil),
+			Entry("One commit with head main and target reference with the same hash", firstCommitReference, multipleCommitsReference, "", "test", false, nil, nil, nil, nil),
+			Entry("One commit with origin reference and target reference with the same hash", firstCommitReference, multipleCommitsReference, "test", "test", false, nil, nil, nil, nil),
 			// errors
-			Entry("Error while retrieving the origin references", emptyCommits, nil, "", false, fmt.Errorf("no references found for origin %s", originURL), nil, nil),
-			Entry("Error while retrieving the target references", firstCommitReference, nil, "", false, nil, fmt.Errorf("error while retrieving target references %s", targetURL), nil),
-			Entry("One commit with no HEAD reference in origin", noHeadReference, noHeadReference, "", false, nil, nil, fmt.Errorf("unable to find HEAD for origin %s", originURL)),
-			Entry("One commit with no HEAD reference in target", firstCommitReference, noHeadReference, "", false, nil, nil, fmt.Errorf("unable to find HEAD for target %s", targetURL)),
-			Entry("No commits found in origin", noCommits, noHeadReference, "", false, nil, nil, fmt.Errorf("unable to find HEAD for origin %s", originURL)),
-			Entry("No commits found in target", firstCommitReference, noCommits, "", false, nil, nil, fmt.Errorf("unable to find HEAD for target %s", targetURL)),
-			Entry("Reference not found in target", firstCommitAmendedReference, firstCommitReference, "reference/not/found", false, nil, nil, fmt.Errorf("unable to find refs/heads/reference/not/found for target %s", targetURL)),
+			Entry("Error while retrieving the origin references", emptyCommits, nil, "", "", false, fmt.Errorf("no references found for origin %s", originURL), nil, nil, nil),
+			Entry("Error while retrieving the target references", firstCommitReference, nil, "", "", false, nil, fmt.Errorf("error while retrieving target references %s", targetURL), nil, nil),
+			Entry("One commit with no HEAD reference in origin", noHeadReference, noHeadReference, "", "", false, nil, nil, fmt.Errorf("unable to find HEAD for origin %s", originURL), nil),
+			Entry("One commit with no HEAD reference in target", firstCommitReference, noHeadReference, "", "", false, nil, nil, nil, fmt.Errorf("unable to find HEAD for target %s", targetURL)),
+			Entry("No commits found in origin", noCommits, noHeadReference, "", "", false, nil, nil, fmt.Errorf("unable to find HEAD for origin %s", originURL), nil),
+			Entry("No commits found in target", firstCommitReference, noCommits, "", "", false, nil, nil, nil, fmt.Errorf("unable to find HEAD for target %s", targetURL)),
+			Entry("Reference not found in origin", firstCommitAmendedReference, firstCommitReference, "reference/not/found", "", false, nil, nil, fmt.Errorf("unable to find refs/heads/reference/not/found for origin %s", originURL), nil),
+			Entry("Reference not found in target", firstCommitAmendedReference, firstCommitReference, "", "reference/not/found", false, nil, nil, nil, fmt.Errorf("unable to find refs/heads/reference/not/found for target %s", targetURL)),
 		)
 	})
 	var _ = Context("git reference", func() {

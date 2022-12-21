@@ -60,13 +60,21 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 	if len(targetRefs) == 0 {
 		return false, fmt.Errorf("no references found for target %s", p.Spec.GitConfig.TargetRepo)
 	}
-	originHeadRef := getHeadBranch(originRefs)
-	if originHeadRef == nil {
-		return false, fmt.Errorf("unable to find %s for origin %s", plumbing.HEAD, p.Spec.GitConfig.OriginRepo)
+	var originRef *plumbing.Reference
+	originRefName := plumbing.HEAD
+	if p.Spec.GitConfig.OriginRevision != "" {
+		originRefName = plumbing.NewBranchReferenceName(p.Spec.GitConfig.OriginRevision)
+		originRef = getReferenceByName(originRefs, originRefName)
+	} else {
+		originRef = getHeadBranch(originRefs)
 	}
+	if originRef == nil {
+		return false, fmt.Errorf("unable to find %s for origin %s", originRefName, p.Spec.GitConfig.OriginRepo)
+	}
+
 	var targetRef *plumbing.Reference
 	targetRefName := plumbing.HEAD
-	if len(p.Spec.GitConfig.TargetRevision) > 0 {
+	if p.Spec.GitConfig.TargetRevision != "" {
 		targetRefName = plumbing.NewBranchReferenceName(p.Spec.GitConfig.TargetRevision)
 		targetRef = getReferenceByName(targetRefs, targetRefName)
 	} else {
@@ -75,7 +83,7 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 	if targetRef == nil {
 		return false, fmt.Errorf("unable to find %s for target %s", targetRefName, p.Spec.GitConfig.TargetRepo)
 	}
-	return originHeadRef.Hash() != targetRef.Hash(), nil
+	return originRef.Hash() != targetRef.Hash(), nil
 
 }
 

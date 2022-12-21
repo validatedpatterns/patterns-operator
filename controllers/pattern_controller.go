@@ -241,20 +241,32 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
+func validGitRepoURL(repoURL string) error {
+	switch {
+	case strings.HasPrefix(repoURL, "git@"):
+		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
+	case strings.HasPrefix(repoURL, "https://"),
+		strings.HasPrefix(repoURL, "http://"):
+		return nil
+	default:
+		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
+	}
+}
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
-	switch {
-	case strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "git@"):
-		return errors.New(fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo))
-	case strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "https://"),
-		strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "http://"):
-		break
-	default:
-		return errors.New(fmt.Errorf("TargetRepo must be either http/https: %s", input.Spec.GitConfig.TargetRepo))
+	gc := input.Spec.GitConfig
+	if gc.OriginRepo != "" {
+		if err := validGitRepoURL(gc.OriginRepo); err != nil {
+			return err
+		}
 	}
+	if gc.TargetRepo != "" {
+		return validGitRepoURL(gc.TargetRepo)
+	}
+	return fmt.Errorf("TargetRepo cannot be empty")
 
 	// Check the url is reachable
-	return nil
+
 }
 
 func (r *PatternReconciler) postValidation(input *api.Pattern) error {
@@ -327,17 +339,21 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	output.Status.AppClusterDomain = clusterIngress.Spec.Domain
 	output.Status.ClusterDomain = strings.Join(ss[1:], ".")
 
+	if output.Spec.GitOpsConfig == nil {
+		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
+	}
+
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
-		output.Spec.GitConfig.TargetRevision = "main"
+		output.Spec.GitConfig.TargetRevision = "HEAD"
+	}
+
+	if len(output.Spec.GitConfig.OriginRevision) == 0 {
+		output.Spec.GitConfig.OriginRevision = "HEAD"
 	}
 
 	if len(output.Spec.GitConfig.Hostname) == 0 {
 		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
 		output.Spec.GitConfig.Hostname = ss[2]
-	}
-
-	if output.Spec.GitOpsConfig == nil {
-		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {

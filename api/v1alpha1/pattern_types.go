@@ -82,10 +82,15 @@ type GitConfig struct {
 	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
-	// Unused
+	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OriginRepo string `json:"originRepo,omitempty"`
 
-	// Interval in seconds to poll for drifts between origin and target repositories. Default: 30 seconds
+	// Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	OriginRevision string `json:"originRevision,omitempty"`
+
+	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	PollInterval int `json:"pollInterval,omitempty"`
 
@@ -93,7 +98,7 @@ type GitConfig struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRepo string `json:"targetRepo"`
 
-	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: main
+	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRevision string `json:"targetRevision,omitempty"`
 }

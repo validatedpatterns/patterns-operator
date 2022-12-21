@@ -102,11 +102,15 @@ spec:
                       from TargetRepo is broken
                     type: string
                   originRepo:
-                    description: Unused
+                    description: Upstream git repo containing the pattern to deploy
+                    type: string
+                  originRevision:
+                    description: Branch, tag or commit in the upstream git repository.
+                      Does not support short-sha's. Default to HEAD
                     type: string
                   pollInterval:
                     description: 'Interval in seconds to poll for drifts between origin
-                      and target repositories. Default: 30 seconds'
+                      and target repositories. Default: 180 seconds'
                     type: integer
                   targetRepo:
                     description: Git repo containing the pattern to deploy. Must use
@@ -114,7 +118,7 @@ spec:
                     type: string
                   targetRevision:
                     description: 'Branch, tag, or commit to deploy.  Does not support
-                      short-sha''s. Default: main'
+                      short-sha''s. Default: HEAD'
                     type: string
                 required:
                 - targetRepo
