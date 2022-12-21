@@ -166,6 +166,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err != nil {
 				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
 			}
+		} else {
+			err := r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
+			if err != nil {
+				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
+			}
 		}
 	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift

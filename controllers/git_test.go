@@ -530,6 +530,32 @@ var _ = Describe("Drift watcher", func() {
 				return len(pattern.Status.Conditions) == 1
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions to be %d but found %d", 1, len(pattern.Status.Conditions))
 		})
+
+		It("updates the interval of an existing repository pair", func() {
+			mockGitClient.EXPECT().NewRemoteClient(gomock.Any()).Return(mockRemote).AnyTimes()
+			mockRemote.EXPECT().List(gomock.Any()).Return(firstCommitReference, nil).AnyTimes()
+
+			watch := newWatcher(mockGitClient)
+			watch.watch()
+			// Add both reference pairs and wait for the drift evaluation to kick in and add the first condition
+			err := watch.add(foo, defaultNamespace, 5)
+			Expect(err).NotTo(HaveOccurred())
+			err = watch.add(bar, defaultNamespace, 4)
+			Expect(err).NotTo(HaveOccurred())
+			// update the first element but with longer interval
+			err = watch.updateInterval(bar, defaultNamespace, 6)
+			Expect(err).NotTo(HaveOccurred())
+			// check the order of processing pairs
+			Expect(watch.repoPairs[0].name).To(Equal(foo))
+			Expect(watch.repoPairs[1].name).To(Equal(bar))
+			// wait for the first element to be processed at least once
+			var pattern api.Pattern
+			Eventually(func() bool {
+				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pattern)
+				Expect(err).NotTo(HaveOccurred())
+				return len(pattern.Status.Conditions) == 1
+			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions to be %d but found %d", 1, len(pattern.Status.Conditions))
+		})
 	})
 
 	var _ = Context("when running in parallel", func() {

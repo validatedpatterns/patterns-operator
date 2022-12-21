@@ -145,6 +145,7 @@ func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient Git
 
 type DriftWatcher interface {
 	add(name, namespace string, interval int) error
+	updateInterval(name, namespace string, interval int) error
 	remove(name, namespace string) error
 	watch() chan interface{}
 	isWatching(name, namespace string) bool
@@ -181,6 +182,37 @@ func (d *driftWatcher) add(name, namespace string, interval int) error {
 	sort.Sort(d.repoPairs)
 	// Notify of updates
 	d.updateCh <- struct{}{}
+	return nil
+}
+
+// update checks if the new interval differs from the stored one and requeues the reference to ensure the new interval is reflected
+func (d *driftWatcher) updateInterval(name, namespace string, interval int) error {
+	if d.updateCh == nil {
+		return fmt.Errorf("unable to update interval for %s in %s when watch has not yet started", name, namespace)
+	}
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	for index, item := range d.repoPairs {
+		if item.name == name && item.namespace == namespace {
+			if item.interval != time.Duration(interval)*time.Second {
+				d.stopTimer()
+				d.logger.V(1).Info(fmt.Sprintf("New interval detected for %s in %s: %d second(s)", name, namespace, interval))
+				pair := repositoryPair{
+					name:      name,
+					namespace: namespace,
+					kClient:   d.kClient,
+					interval:  time.Duration(interval) * time.Second,
+					nextCheck: time.Now().Add(time.Duration(interval) * time.Second),
+					gitClient: d.gitClient}
+				d.repoPairs = append(d.repoPairs[:index], d.repoPairs[index+1:]...)
+				d.repoPairs = append(d.repoPairs, &pair)
+				sort.Sort(d.repoPairs)
+				// Notify of updates
+				d.updateCh <- struct{}{}
+				return nil
+			}
+		}
+	}
 	return nil
 }
 
