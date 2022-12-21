@@ -156,8 +156,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- Git Drift monitoring
 	gitConfig := qualifiedInstance.Spec.GitConfig
-	// if both git repositories are defined in the pattern's git configuration
-	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" {
+	// if both git repositories are defined in the pattern's git configuration and the polling interval is not set to disable watching
+	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
 		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 			// start monitoring drifts for this pattern
 			err := r.driftWatcher.add(qualifiedInstance.Name,
@@ -168,7 +168,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		}
 	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-		// The pattern has been updated an it no longer contains both origin and target fields, we should stop watching for it
+		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
 		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
@@ -354,9 +354,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.ClusterGroupName = "default"
 	}
 
-	// interval cannot be less than 30 seconds to avoid drowning the API server in requests
-	if output.Spec.GitConfig.PollInterval < 30 {
-		output.Spec.GitConfig.PollInterval = 30
+	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
+	// value of -1 effectivelly disables the watch for this pattern.
+	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
+		output.Spec.GitConfig.PollInterval = 180
 	}
 
 	return nil, output
