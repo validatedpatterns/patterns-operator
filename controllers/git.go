@@ -27,44 +27,53 @@ var (
 )
 
 type repositoryPair struct {
-	gitClient                                       GitClient
-	name, namespace, origin, target, targetRevision string
-	interval                                        time.Duration
-	lastCheck, nextCheck                            time.Time
+	gitClient            GitClient
+	kClient              client.Client
+	name, namespace      string
+	interval             time.Duration
+	lastCheck, nextCheck time.Time
 }
 
 func (r repositoryPair) hasDrifted() (bool, error) {
-	origin := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "origin", URLs: []string{r.origin}})
-	target := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "target", URLs: []string{r.target}})
+	p := &api.Pattern{}
+	err := r.kClient.Get(context.Background(), types.NamespacedName{Name: r.name, Namespace: r.namespace}, p)
+	if err != nil {
+		return false, err
+	}
+	if p.Spec.GitConfig.OriginRepo == "" || p.Spec.GitConfig.TargetRepo == "" {
+		return false, fmt.Errorf("git config does not contain origin and targer repositories")
+	}
+	origin := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "origin", URLs: []string{p.Spec.GitConfig.OriginRepo}})
+	target := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "target", URLs: []string{p.Spec.GitConfig.TargetRepo}})
 
 	originRefs, err := origin.List(&git.ListOptions{})
 	if err != nil {
 		return false, err
 	}
 	if len(originRefs) == 0 {
-		return false, fmt.Errorf("no references found for origin %s", r.origin)
+		return false, fmt.Errorf("no references found for origin %s", p.Spec.GitConfig.OriginRepo)
 	}
 	targetRefs, err := target.List(&git.ListOptions{})
 	if err != nil {
 		return false, err
 	}
 	if len(targetRefs) == 0 {
-		return false, fmt.Errorf("no references found for target %s", r.target)
+		return false, fmt.Errorf("no references found for target %s", p.Spec.GitConfig.TargetRepo)
 	}
 	originHeadRef := getHeadBranch(originRefs)
 	if originHeadRef == nil {
-		return false, fmt.Errorf("unable to find %s for origin %s", plumbing.HEAD, r.origin)
+		return false, fmt.Errorf("unable to find %s for origin %s", plumbing.HEAD, p.Spec.GitConfig.OriginRepo)
 	}
 	var targetRef *plumbing.Reference
 	targetRefName := plumbing.HEAD
-	if len(r.targetRevision) > 0 {
-		targetRefName = plumbing.NewBranchReferenceName(r.targetRevision)
+	if len(p.Spec.GitConfig.TargetRevision) > 0 {
+		targetRefName = plumbing.NewBranchReferenceName(p.Spec.GitConfig.TargetRevision)
 		targetRef = getReferenceByName(targetRefs, targetRefName)
 	} else {
 		targetRef = getHeadBranch(targetRefs)
 	}
 	if targetRef == nil {
-		return false, fmt.Errorf("unable to find %s for target %s", targetRefName, r.target)
+		return false, fmt.Errorf("unable to find %s for target %s", targetRefName, p.Spec.GitConfig.TargetRepo)
 	}
 	return originHeadRef.Hash() != targetRef.Hash(), nil
 
@@ -104,7 +113,7 @@ func (c *gitClient) NewRemoteClient(config *config.RemoteConfig) RemoteClient {
 }
 
 type driftWatcher struct {
-	kcli client.Client
+	kClient client.Client
 	//endCh is used to notify the watch routine to exit the loop
 	endCh, updateCh chan interface{}
 	repoPairs       repositoryPairs
@@ -117,7 +126,7 @@ type driftWatcher struct {
 
 func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (DriftWatcher, chan interface{}) {
 	d := &driftWatcher{
-		kcli:      kubeClient,
+		kClient:   kubeClient,
 		logger:    logger,
 		repoPairs: repositoryPairs{},
 		endCh:     make(chan interface{}),
@@ -127,7 +136,7 @@ func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient Git
 }
 
 type DriftWatcher interface {
-	add(name, namespace, origin, target, targetRevision string, interval int) error
+	add(name, namespace string, interval int) error
 	remove(name, namespace string) error
 	watch() chan interface{}
 	isWatching(name, namespace string) bool
@@ -146,7 +155,7 @@ func (d *driftWatcher) isWatching(name, namespace string) bool {
 }
 
 // add instructs the client to start monitoring for drifts between two repositories
-func (d *driftWatcher) add(name, namespace, origin, target, targetRevision string, interval int) error {
+func (d *driftWatcher) add(name, namespace string, interval int) error {
 	if d.updateCh == nil {
 		return fmt.Errorf("unable to add %s in %s when watch has not yet started", name, namespace)
 	}
@@ -154,14 +163,12 @@ func (d *driftWatcher) add(name, namespace, origin, target, targetRevision strin
 	defer d.mutex.Unlock()
 	d.stopTimer()
 	pair := repositoryPair{
-		name:           name,
-		namespace:      namespace,
-		origin:         origin,
-		target:         target,
-		targetRevision: targetRevision,
-		interval:       time.Duration(interval) * time.Second,
-		nextCheck:      time.Now().Add(time.Duration(interval) * time.Second),
-		gitClient:      d.gitClient}
+		name:      name,
+		namespace: namespace,
+		kClient:   d.kClient,
+		interval:  time.Duration(interval) * time.Second,
+		nextCheck: time.Now().Add(time.Duration(interval) * time.Second),
+		gitClient: d.gitClient}
 	d.repoPairs = append(d.repoPairs, &pair)
 	sort.Sort(d.repoPairs)
 	// Notify of updates
@@ -239,7 +246,7 @@ func (d *driftWatcher) startNewTimer() {
 				d.logger.Info(fmt.Sprintf("git repositories have drifted for resource %s in namespace %s", pair.name, pair.namespace))
 				conditionType = api.GitOutOfSync
 			}
-			err := updatePatternConditions(d.kcli, conditionType, pair.name, pair.namespace, time.Now())
+			err := updatePatternConditions(d.kClient, conditionType, pair.name, pair.namespace, time.Now())
 			if err != nil {
 				d.logger.Error(err, fmt.Sprintf("failed to update pattern condition for %s in namespace %s", pair.name, pair.namespace))
 			}

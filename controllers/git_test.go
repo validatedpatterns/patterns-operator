@@ -31,6 +31,9 @@ const (
 	hashCommitAmendedHead  string                 = "6ffb7b8f89075d66fba48c4d0000f8fb52720cf1"
 	hashCommitTestBranch   string                 = "0e34ab1c94a4b588ddea45087e956b22bddfa8a2"
 	hashCommitBugfixBranch string                 = "597db674d31dee964f464d84ee0b4f3797bb06dd"
+	foo                    string                 = "foo"
+	bar                    string                 = "bar"
+	defaultNamespace       string                 = "default"
 )
 
 var (
@@ -76,6 +79,7 @@ var _ = Describe("Git client", func() {
 		var (
 			mockGitClient                                  *MockClient
 			mockRemoteClientOrigin, mockRemoteClientTarget *MockRemoteClient
+			pattern                                        api.Pattern
 		)
 
 		BeforeEach(func() {
@@ -85,12 +89,30 @@ var _ = Describe("Git client", func() {
 			mockRemoteClientTarget = NewMockRemoteClient(ctrl)
 		})
 
+		AfterEach(func() {
+			e := k8sClient.Delete(context.Background(), &pattern)
+			Expect(e).NotTo(HaveOccurred())
+		})
 		DescribeTable("when drifting", func(originRefs, targetRefs []*plumbing.Reference, targetRef string, expected bool, errOriginList, errTargetList, errFilter error) {
+			pattern = api.Pattern{
+				ObjectMeta: v1.ObjectMeta{Name: foo, Namespace: defaultNamespace},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+				Spec: api.PatternSpec{
+					GitConfig: api.GitConfig{
+						Hostname:       foo,
+						PollInterval:   30,
+						OriginRepo:     originURL,
+						TargetRepo:     targetURL,
+						TargetRevision: targetRef}},
+			}
+			e := k8sClient.Create(context.Background(), &pattern)
+			Expect(e).NotTo(HaveOccurred())
+
 			remote := repositoryPair{
-				gitClient:      mockGitClient,
-				origin:         originURL,
-				target:         targetURL,
-				targetRevision: targetRef,
+				name:      foo,
+				namespace: defaultNamespace,
+				gitClient: mockGitClient,
+				kClient:   k8sClient,
 			}
 			mockGitClient.EXPECT().NewRemoteClient(&config.RemoteConfig{Name: "origin", URLs: []string{originURL}}).Times(1).Return(mockRemoteClientOrigin)
 			mockGitClient.EXPECT().NewRemoteClient(&config.RemoteConfig{Name: "target", URLs: []string{targetURL}}).Times(1).Return(mockRemoteClientTarget)
@@ -130,6 +152,8 @@ var _ = Describe("Git client", func() {
 			Entry("No commits found in target", firstCommitReference, noCommits, "", false, nil, nil, fmt.Errorf("unable to find HEAD for target %s", targetURL)),
 			Entry("Reference not found in target", firstCommitAmendedReference, firstCommitReference, "reference/not/found", false, nil, nil, fmt.Errorf("unable to find refs/heads/reference/not/found for target %s", targetURL)),
 		)
+	})
+	var _ = Context("git reference", func() {
 
 		DescribeTable("when retrieving the git reference", func(references []*plumbing.Reference, targetRef plumbing.ReferenceName, expected *plumbing.Reference) {
 			ret := getReferenceByName(references, targetRef)
@@ -179,10 +203,6 @@ var _ = Describe("Git client", func() {
 
 	var _ = Context("When updating the pattern conditions", func() {
 
-		const (
-			foo              = "foo"
-			defaultNamespace = "default"
-		)
 		var (
 			ctx     = context.Background()
 			pattern api.Pattern
@@ -318,49 +338,40 @@ var _ = Describe("Git client", func() {
 
 var _ = Describe("Drift watcher", func() {
 
-	const (
-		fooName          = "foo"
-		barName          = "bar"
-		defaultNamespace = "default"
-	)
+	const ()
 	var _ = Context("When watching for drifts", func() {
 		var (
-			pattern1, pattern2                 *api.Pattern
+			patternFoo                         *api.Pattern
 			ctrl                               *gomock.Controller
 			mockGitClient                      *MockClient
 			mockRemoteOrigin, mockRemoteTarget *MockRemoteClient
 		)
 
 		BeforeEach(func() {
-			pattern1 = &api.Pattern{
-				ObjectMeta: v1.ObjectMeta{Name: barName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
-			pattern2 = &api.Pattern{
-				ObjectMeta: v1.ObjectMeta{Name: fooName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
 			ctrl = gomock.NewController(GinkgoT())
 
 			mockGitClient = NewMockClient(ctrl)
 			mockRemoteOrigin = NewMockRemoteClient(ctrl)
 			mockRemoteTarget = NewMockRemoteClient(ctrl)
-			// Add the 2 patterns in etcd
-			err := k8sClient.Create(context.TODO(), pattern1)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Create(context.TODO(), pattern2)
+			// Add the pattern in etcd
+			patternFoo = &api.Pattern{
+				ObjectMeta: v1.ObjectMeta{Name: foo, Namespace: defaultNamespace},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+				Spec:       api.PatternSpec{GitConfig: api.GitConfig{OriginRepo: originURL, TargetRepo: targetURL}}}
+
+			err := k8sClient.Create(context.TODO(), patternFoo)
 			Expect(err).NotTo(HaveOccurred())
 
 		})
 
 		AfterEach(func() {
-			err := k8sClient.Delete(context.TODO(), pattern1)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Delete(context.TODO(), pattern2)
+
+			err := k8sClient.Delete(context.TODO(), patternFoo)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("detects a drift between a pair of git repositories after the second check", func() {
 			var (
-				pattern          api.Pattern
 				payloadDelivered bool
 			)
 
@@ -383,74 +394,74 @@ var _ = Describe("Drift watcher", func() {
 
 			// Add the pair
 			timestamp := time.Now()
-			err := watch.add(fooName, defaultNamespace, originURL, targetURL, "", 1)
+			err := watch.add(foo, defaultNamespace, 1)
 			Expect(err).NotTo(HaveOccurred())
-			waitFor(func() bool {
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: fooName, Namespace: defaultNamespace}, &pattern)
+			Eventually(func() bool {
+				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 				Expect(err).NotTo(HaveOccurred())
-				return len(pattern.Status.Conditions) == 1
-			}, 10)
+				return len(patternFoo.Status.Conditions) == 1
+			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions %d but found %d", 1, len(patternFoo.Status.Conditions))
 			// check that the conditions reflect the drift polling
-			Expect(pattern.Status.Conditions[0].Type).To(Equal(api.GitInSync))
-			Expect(pattern.Status.Conditions[0].Status).To(Equal(v1core.ConditionTrue))
-			Expect(pattern.Status.Conditions[0].LastUpdateTime.Time).To(BeTemporally(">", timestamp))
-			Expect(pattern.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally(">", timestamp))
+			Expect(patternFoo.Status.Conditions[0].Type).To(Equal(api.GitInSync))
+			Expect(patternFoo.Status.Conditions[0].Status).To(Equal(v1core.ConditionTrue))
+			Expect(patternFoo.Status.Conditions[0].LastUpdateTime.Time).To(BeTemporally(">", timestamp))
+			Expect(patternFoo.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally(">", timestamp))
 			// wait for the second check to report the drift
-			waitFor(func() bool {
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: fooName, Namespace: defaultNamespace}, &pattern)
+			Eventually(func() bool {
+				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 				Expect(err).NotTo(HaveOccurred())
-				return len(pattern.Status.Conditions) == 2
-			}, 10)
+				return len(patternFoo.Status.Conditions) == 2
+			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions %d but found %d", 2, len(patternFoo.Status.Conditions))
 			// notify the routine that we're closing so that it doesn't keep checking for more drifts
 			close(closeCh)
 			// retrieve the first element in the slice
-			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: fooName, Namespace: defaultNamespace}, &pattern)
+			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 			Expect(err).NotTo(HaveOccurred())
 
 			// previous condition should have status false
-			Expect(pattern.Status.Conditions[0].Type).To(Equal(api.GitInSync))
-			Expect(pattern.Status.Conditions[0].Status).To(Equal(v1core.ConditionFalse))
-			Expect(pattern.Status.Conditions[0].LastUpdateTime.Time).To(BeTemporally("==", pattern.Status.Conditions[1].LastUpdateTime.Time))
-			Expect(pattern.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally("==", pattern.Status.Conditions[0].LastUpdateTime.Time.Add(-1*time.Second)))
+			Expect(patternFoo.Status.Conditions[0].Type).To(Equal(api.GitInSync))
+			Expect(patternFoo.Status.Conditions[0].Status).To(Equal(v1core.ConditionFalse))
+			Expect(patternFoo.Status.Conditions[0].LastUpdateTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[1].LastUpdateTime.Time))
+			Expect(patternFoo.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[0].LastUpdateTime.Time.Add(-1*time.Second)))
 			// new condition should show the repositories have drifted
-			Expect(pattern.Status.Conditions[1].Type).To(Equal(api.GitOutOfSync))
-			Expect(pattern.Status.Conditions[1].Status).To(Equal(v1core.ConditionTrue))
-			Expect(pattern.Status.Conditions[1].LastTransitionTime.Time).To(BeTemporally("==", pattern.Status.Conditions[1].LastUpdateTime.Time))
-			Expect(pattern.Status.Conditions[1].LastUpdateTime.Time).To(BeTemporally("==", pattern.Status.Conditions[0].LastTransitionTime.Time.Add(time.Second)))
+			Expect(patternFoo.Status.Conditions[1].Type).To(Equal(api.GitOutOfSync))
+			Expect(patternFoo.Status.Conditions[1].Status).To(Equal(v1core.ConditionTrue))
+			Expect(patternFoo.Status.Conditions[1].LastTransitionTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[1].LastUpdateTime.Time))
+			Expect(patternFoo.Status.Conditions[1].LastUpdateTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[0].LastTransitionTime.Time.Add(time.Second)))
 		})
 
 	})
 	var _ = Context("when evaluating the processing order", func() {
 		var (
-			mockGitClient      *MockClient
-			mockRemote         *MockRemoteClient
-			pattern1, pattern2 *api.Pattern
-			ctrl               *gomock.Controller
+			mockGitClient          *MockClient
+			mockRemote             *MockRemoteClient
+			patternBar, patternFoo *api.Pattern
+			ctrl                   *gomock.Controller
 		)
 
 		BeforeEach(func() {
-			pattern1 = &api.Pattern{
-				ObjectMeta: v1.ObjectMeta{Name: barName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
-			pattern2 = &api.Pattern{
-				ObjectMeta: v1.ObjectMeta{Name: fooName, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
 			ctrl = gomock.NewController(GinkgoT())
 			mockGitClient = NewMockClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
 
-			// Add the 2 patterns in etcd
-			err := k8sClient.Create(context.TODO(), pattern1)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Create(context.TODO(), pattern2)
-			Expect(err).NotTo(HaveOccurred())
-
+			patternFoo = &api.Pattern{
+				ObjectMeta: v1.ObjectMeta{Name: foo, Namespace: defaultNamespace},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+				Spec:       api.PatternSpec{GitConfig: api.GitConfig{OriginRepo: originURL, TargetRepo: targetURL}}}
+			patternBar = &api.Pattern{
+				ObjectMeta: v1.ObjectMeta{Name: bar, Namespace: defaultNamespace},
+				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+				Spec:       api.PatternSpec{GitConfig: api.GitConfig{OriginRepo: originURL, TargetRepo: targetURL}}}
+			e := k8sClient.Create(context.Background(), patternFoo)
+			Expect(e).NotTo(HaveOccurred())
+			e = k8sClient.Create(context.Background(), patternBar)
+			Expect(e).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			err := k8sClient.Delete(context.TODO(), pattern1)
+			err := k8sClient.Delete(context.TODO(), patternFoo)
 			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Delete(context.TODO(), pattern2)
+			err = k8sClient.Delete(context.TODO(), patternBar)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -462,24 +473,25 @@ var _ = Describe("Drift watcher", func() {
 			watch.watch()
 
 			// Add both reference pairs and wait for the drift evaluation to kick in and add the first condition
-			err := watch.add(fooName, defaultNamespace, originURL, targetURL, "", 5)
+			err := watch.add(foo, defaultNamespace, 5)
 			Expect(err).NotTo(HaveOccurred())
-			err = watch.add(barName, defaultNamespace, originURL, targetURL, "", 1)
+			err = watch.add(bar, defaultNamespace, 1)
 			Expect(err).NotTo(HaveOccurred())
 			// check the order of processing pairs
-			Expect(watch.repoPairs[0].name).To(Equal(barName))
-			Expect(watch.repoPairs[1].name).To(Equal(fooName))
-			waitFor(func() bool {
-				var foo, bar api.Pattern
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: fooName, Namespace: defaultNamespace}, &foo)
+			Expect(watch.repoPairs[0].name).To(Equal(bar))
+			Expect(watch.repoPairs[1].name).To(Equal(foo))
+			Eventually(func() bool {
+				var pFoo, pBar api.Pattern
+				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pFoo)
 				Expect(err).NotTo(HaveOccurred())
-				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: barName, Namespace: defaultNamespace}, &bar)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pBar)
 				Expect(err).NotTo(HaveOccurred())
-				return len(foo.Status.Conditions) == 0 && len(bar.Status.Conditions) == 1
-			}, 10)
+				return len(pFoo.Status.Conditions) == 0 && len(pBar.Status.Conditions) == 1
+			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(),
+				"expected number of conditions for foo %d and bar %d but found %d and %d respectivelly ", 0, len(patternFoo.Status.Conditions), 1, len(patternBar.Status.Conditions))
 			//confirm the status contains a new condition with type git in sync
 			var pattern api.Pattern
-			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: barName, Namespace: defaultNamespace}, &pattern)
+			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pattern)
 			Expect(err).NotTo(HaveOccurred())
 			// check that the conditions reflect the drift polling
 			Expect(pattern.Status.Conditions[0].Type).To(Equal(api.GitInSync))
@@ -492,26 +504,26 @@ var _ = Describe("Drift watcher", func() {
 			watch := newWatcher(mockGitClient)
 			watch.watch()
 			// Add both reference pairs and wait for the drift evaluation to kick in and add the first condition
-			err := watch.add(fooName, defaultNamespace, originURL, targetURL, "", 5)
+			err := watch.add(foo, defaultNamespace, 5)
 			Expect(err).NotTo(HaveOccurred())
-			err = watch.add(barName, defaultNamespace, originURL, targetURL, "", 4)
+			err = watch.add(bar, defaultNamespace, 4)
 			Expect(err).NotTo(HaveOccurred())
 			// remove the first element
-			err = watch.remove(barName, defaultNamespace)
+			err = watch.remove(bar, defaultNamespace)
 			Expect(err).NotTo(HaveOccurred())
 			// readd the first element but with longer interval
-			err = watch.add(barName, defaultNamespace, originURL, targetURL, "", 5)
+			err = watch.add(bar, defaultNamespace, 5)
 			Expect(err).NotTo(HaveOccurred())
 			// check the order of processing pairs
-			Expect(watch.repoPairs[0].name).To(Equal(fooName))
-			Expect(watch.repoPairs[1].name).To(Equal(barName))
+			Expect(watch.repoPairs[0].name).To(Equal(foo))
+			Expect(watch.repoPairs[1].name).To(Equal(bar))
 			// wait for the first element to be processed at least once
-			waitFor(func() bool {
-				var pattern api.Pattern
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: fooName, Namespace: defaultNamespace}, &pattern)
+			var pattern api.Pattern
+			Eventually(func() bool {
+				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pattern)
 				Expect(err).NotTo(HaveOccurred())
 				return len(pattern.Status.Conditions) == 1
-			}, 10)
+			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions to be %d but found %d", 1, len(pattern.Status.Conditions))
 		})
 	})
 
@@ -528,15 +540,33 @@ var _ = Describe("Drift watcher", func() {
 			ctrl = gomock.NewController(GinkgoT())
 			mockGitClient = NewMockClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
+			// add references
+			for i := 0; i < 1000; i++ {
+				p := &api.Pattern{
+					ObjectMeta: v1.ObjectMeta{Name: fmt.Sprintf("load-%d", i), Namespace: defaultNamespace},
+					TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+					Spec:       api.PatternSpec{GitConfig: api.GitConfig{OriginRepo: originURL, TargetRepo: targetURL}}}
+				e := k8sClient.Create(context.Background(), p)
+				Expect(e).NotTo(HaveOccurred())
+			}
 
 		})
 
+		AfterEach(func() {
+			// add references
+			for i := 0; i < 1000; i++ {
+				p := &api.Pattern{
+					ObjectMeta: v1.ObjectMeta{Name: fmt.Sprintf("load-%d", i), Namespace: defaultNamespace},
+					TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()}}
+				e := k8sClient.Delete(context.Background(), p)
+				Expect(e).NotTo(HaveOccurred())
+			}
+		})
 		It("adds,removes and check for existing pairs in parallel load with random intervals", func() {
 			mockGitClient.EXPECT().NewRemoteClient(gomock.Any()).Return(mockRemote).AnyTimes()
 			mockRemote.EXPECT().List(gomock.Any()).Return(firstCommitReference, nil).AnyTimes()
 
 			watch, _ := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
-			// add references in parallel
 			wg := sync.WaitGroup{}
 			wg.Add(2)
 			go func() {
@@ -547,7 +577,7 @@ var _ = Describe("Drift watcher", func() {
 					for watch.isWatching(name, defaultNamespace) {
 						name = fmt.Sprintf("load-%d", rand.Intn(1000))
 					}
-					Expect(watch.add(name, defaultNamespace, originURL, targetURL, "", interval)).NotTo(HaveOccurred())
+					Expect(watch.add(name, defaultNamespace, interval)).NotTo(HaveOccurred())
 				}
 				wg.Done()
 			}()
@@ -567,24 +597,10 @@ var _ = Describe("Drift watcher", func() {
 	})
 })
 
-func waitFor(f func() bool, maxCount int) {
-	var count int
-	tick := time.Tick(time.Second)
-	for {
-		<-tick
-		res := f()
-		if res {
-			return
-		}
-		Expect(count).To(BeNumerically("<", maxCount))
-		count++
-	}
-}
-
 func newWatcher(gitClient GitClient) *driftWatcher {
 
 	return &driftWatcher{
-		kcli:      k8sClient,
+		kClient:   k8sClient,
 		repoPairs: repositoryPairs{},
 		endCh:     make(chan interface{}),
 		mutex:     &sync.Mutex{},

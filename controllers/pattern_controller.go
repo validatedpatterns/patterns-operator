@@ -157,16 +157,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// -- Git Drift monitoring
 	gitConfig := qualifiedInstance.Spec.GitConfig
 	// if both git repositories are defined in the pattern's git configuration
-	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-		// start monitoring drifts for this pattern
-		err := r.driftWatcher.add(qualifiedInstance.Name,
-			qualifiedInstance.Namespace,
-			gitConfig.OriginRepo,
-			gitConfig.TargetRepo,
-			gitConfig.TargetRevision,
-			gitConfig.PollInterval)
+	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" {
+		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+			// start monitoring drifts for this pattern
+			err := r.driftWatcher.add(qualifiedInstance.Name,
+				qualifiedInstance.Namespace,
+				gitConfig.PollInterval)
+			if err != nil {
+				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
+			}
+		}
+	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+		// The pattern has been updated an it no longer contains both origin and target fields, we should stop watching for it
+		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
 		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
+			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
 		}
 	}
 
