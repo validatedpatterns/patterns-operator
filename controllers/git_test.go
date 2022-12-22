@@ -395,7 +395,7 @@ var _ = Describe("Drift watcher", func() {
 				}
 				return multipleCommitsWithDifferentHashReference, nil
 			}).AnyTimes()
-			watch, closeCh := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
+			watch, closeCh := newDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
 
 			// Add the pair
 			timestamp := time.Now()
@@ -597,7 +597,7 @@ var _ = Describe("Drift watcher", func() {
 			mockGitClient.EXPECT().NewRemoteClient(gomock.Any()).Return(mockRemote).AnyTimes()
 			mockRemote.EXPECT().List(gomock.Any()).Return(firstCommitReference, nil).AnyTimes()
 
-			watch, _ := NewDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
+			watch, _ := newDriftWatcher(k8sClient, logr.New(log.NullLogSink{}), mockGitClient)
 			wg := sync.WaitGroup{}
 			wg.Add(2)
 			go func() {
@@ -628,9 +628,9 @@ var _ = Describe("Drift watcher", func() {
 	})
 })
 
-func newWatcher(gitClient GitClient) *driftWatcher {
+func newWatcher(gitClient GitClient) *watcher {
 
-	return &driftWatcher{
+	return &watcher{
 		kClient:   k8sClient,
 		repoPairs: repositoryPairs{},
 		endCh:     make(chan interface{}),

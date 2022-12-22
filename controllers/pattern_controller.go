@@ -66,7 +66,7 @@ type PatternReconciler struct {
 	fullClient     kubernetes.Interface
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
-	driftWatcher   DriftWatcher
+	driftWatcher   driftWatcher
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -202,7 +202,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("subscription found")
 
 	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.fullClient, applicationNamespace) {
+	if !haveNamespace(r.Client, applicationNamespace) {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 
@@ -469,7 +469,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
-	r.driftWatcher, _ = NewDriftWatcher(r.Client, mgr.GetLogger(), NewGitClient())
+	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)

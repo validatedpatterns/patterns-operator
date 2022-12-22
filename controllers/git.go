@@ -112,7 +112,7 @@ type GitClient interface {
 type gitClient struct {
 }
 
-func NewGitClient() GitClient {
+func newGitClient() GitClient {
 	return &gitClient{}
 }
 
@@ -120,7 +120,7 @@ func (c *gitClient) NewRemoteClient(config *config.RemoteConfig) RemoteClient {
 	return git.NewRemote(nil, config)
 }
 
-type driftWatcher struct {
+type watcher struct {
 	kClient client.Client
 	//endCh is used to notify the watch routine to exit the loop
 	endCh, updateCh chan interface{}
@@ -132,8 +132,8 @@ type driftWatcher struct {
 	gitClient       GitClient
 }
 
-func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (DriftWatcher, chan interface{}) {
-	d := &driftWatcher{
+func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan interface{}) {
+	d := &watcher{
 		kClient:   kubeClient,
 		logger:    logger,
 		repoPairs: repositoryPairs{},
@@ -143,7 +143,7 @@ func NewDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient Git
 	return d, d.watch()
 }
 
-type DriftWatcher interface {
+type driftWatcher interface {
 	add(name, namespace string, interval int) error
 	updateInterval(name, namespace string, interval int) error
 	remove(name, namespace string) error
@@ -152,7 +152,7 @@ type DriftWatcher interface {
 }
 
 // isWatching returns true if the pair name,namespace reference is being monitored for drifts, false otherwise
-func (d *driftWatcher) isWatching(name, namespace string) bool {
+func (d *watcher) isWatching(name, namespace string) bool {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 	for _, item := range d.repoPairs {
@@ -164,7 +164,7 @@ func (d *driftWatcher) isWatching(name, namespace string) bool {
 }
 
 // add instructs the client to start monitoring for drifts between two repositories
-func (d *driftWatcher) add(name, namespace string, interval int) error {
+func (d *watcher) add(name, namespace string, interval int) error {
 	if d.updateCh == nil {
 		return fmt.Errorf("unable to add %s in %s when watch has not yet started", name, namespace)
 	}
@@ -186,7 +186,7 @@ func (d *driftWatcher) add(name, namespace string, interval int) error {
 }
 
 // update checks if the new interval differs from the stored one and requeues the reference to ensure the new interval is reflected
-func (d *driftWatcher) updateInterval(name, namespace string, interval int) error {
+func (d *watcher) updateInterval(name, namespace string, interval int) error {
 	if d.updateCh == nil {
 		return fmt.Errorf("unable to update interval for %s in %s when watch has not yet started", name, namespace)
 	}
@@ -217,7 +217,7 @@ func (d *driftWatcher) updateInterval(name, namespace string, interval int) erro
 }
 
 // remove instructs the client to stop monitoring for drifts for the given resource name and namespace
-func (d *driftWatcher) remove(name, namespace string) error {
+func (d *watcher) remove(name, namespace string) error {
 	if d.updateCh == nil {
 		return fmt.Errorf("unable to remove %s in %s when watch has not yet started", name, namespace)
 	}
@@ -236,7 +236,7 @@ func (d *driftWatcher) remove(name, namespace string) error {
 	return fmt.Errorf("unable to find git remote pair for pattern %s in namespace %s", name, namespace)
 }
 
-func (d *driftWatcher) stopTimer() {
+func (d *watcher) stopTimer() {
 	// if there is an ongoing timer...
 	if d.timer != nil {
 		// ...stop the timer. Any ongoing timer is no longer valid as there are going to be changes to the slice
@@ -248,7 +248,7 @@ func (d *driftWatcher) stopTimer() {
 	}
 }
 
-func (d *driftWatcher) startNewTimer() {
+func (d *watcher) startNewTimer() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 	if len(d.repoPairs) == 0 {
@@ -303,7 +303,7 @@ func (d *driftWatcher) startNewTimer() {
 
 // watch starts the process of monitoring the drifts. The call returns a channel to be used to manage
 // the closure of the monitoring routine cleanly.
-func (d *driftWatcher) watch() chan interface{} {
+func (d *watcher) watch() chan interface{} {
 	if d.updateCh != nil {
 		return d.endCh
 	}
