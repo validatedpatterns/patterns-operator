@@ -100,7 +100,8 @@ spec:
                       from TargetRepo is broken
                     type: string
                   originRepo:
-                    description: Upstream git repo containing the pattern to deploy
+                    description: Upstream git repo containing the pattern to deploy.
+                      Used when in-cluster fork to point to the upstream pattern repository
                     type: string
                   originRevision:
                     description: Branch, tag or commit in the upstream git repository.
