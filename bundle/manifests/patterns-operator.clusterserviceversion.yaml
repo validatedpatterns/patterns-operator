@@ -21,12 +21,12 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.7
+    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.8
     description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.22.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/hybrid-cloud-patterns/patterns-operator
-  name: patterns-operator.v0.0.7
+  name: patterns-operator.v0.0.8
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -74,7 +74,8 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
-      - description: Upstream git repo containing the pattern to deploy
+      - description: Upstream git repo containing the pattern to deploy. Used when
+          in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
         path: gitSpec.originRepo
       - description: Branch, tag or commit in the upstream git repository. Does not
@@ -270,7 +271,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.7
+                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.8
                 imagePullPolicy: Always
                 livenessProbe:
                   httpGet:
@@ -357,4 +358,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.7
+  version: 0.0.8

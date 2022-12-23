@@ -56,7 +56,8 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
-      - description: Upstream git repo containing the pattern to deploy
+      - description: Upstream git repo containing the pattern to deploy. Used when
+          in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
         path: gitSpec.originRepo
       - description: Branch, tag or commit in the upstream git repository. Does not
