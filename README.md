@@ -139,7 +139,7 @@ Next, create the OperatorHub release, by creating the community operator PR:
 cd ../community-operators-prod
 git checkout -b "patterns-operator-v$VERSION"
 git add operators/patterns-operator/$VERSION/
-git commit -s -m "New v$VERSION validated patterns operator release"
+git commit -s -m "operator patterns-operator ($VERSION)"
 git push <fork-remote> "patterns-operator-v$VERSION"
 
 # Inspect the diff from the previously released version
