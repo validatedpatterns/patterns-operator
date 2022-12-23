@@ -66,6 +66,7 @@ type PatternReconciler struct {
 	fullClient     kubernetes.Interface
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
+	driftWatcher   driftWatcher
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -95,6 +96,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Reconcile() should perform at most one action in any invocation
 	// in order to simplify testing.
 	r.logger = klog.FromContext(ctx)
+
 	r.logger.Info("Reconciling Pattern")
 
 	// Logger includes name and namespace
@@ -152,6 +154,32 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
+	// -- Git Drift monitoring
+	gitConfig := qualifiedInstance.Spec.GitConfig
+	// if both git repositories are defined in the pattern's git configuration and the polling interval is not set to disable watching
+	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
+		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+			// start monitoring drifts for this pattern
+			err := r.driftWatcher.add(qualifiedInstance.Name,
+				qualifiedInstance.Namespace,
+				gitConfig.PollInterval)
+			if err != nil {
+				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
+			}
+		} else {
+			err := r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
+			if err != nil {
+				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
+			}
+		}
+	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
+		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
+		}
+	}
+
 	// -- GitOps Subscription
 	targetSub := newSubscription(*qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
@@ -174,7 +202,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("subscription found")
 
 	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.fullClient, applicationNamespace) {
+	if !haveNamespace(r.Client, applicationNamespace) {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 
@@ -218,20 +246,32 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
+func validGitRepoURL(repoURL string) error {
+	switch {
+	case strings.HasPrefix(repoURL, "git@"):
+		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
+	case strings.HasPrefix(repoURL, "https://"),
+		strings.HasPrefix(repoURL, "http://"):
+		return nil
+	default:
+		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
+	}
+}
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
-	switch {
-	case strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "git@"):
-		return errors.New(fmt.Errorf("Invalid TargetRepo: %s", input.Spec.GitConfig.TargetRepo))
-	case strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "https://"),
-		strings.HasPrefix(input.Spec.GitConfig.TargetRepo, "http://"):
-		break
-	default:
-		return errors.New(fmt.Errorf("TargetRepo must be either http/https: %s", input.Spec.GitConfig.TargetRepo))
+	gc := input.Spec.GitConfig
+	if gc.OriginRepo != "" {
+		if err := validGitRepoURL(gc.OriginRepo); err != nil {
+			return err
+		}
 	}
+	if gc.TargetRepo != "" {
+		return validGitRepoURL(gc.TargetRepo)
+	}
+	return fmt.Errorf("TargetRepo cannot be empty")
 
 	// Check the url is reachable
-	return nil
+
 }
 
 func (r *PatternReconciler) postValidation(input *api.Pattern) error {
@@ -304,17 +344,21 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	output.Status.AppClusterDomain = clusterIngress.Spec.Domain
 	output.Status.ClusterDomain = strings.Join(ss[1:], ".")
 
+	if output.Spec.GitOpsConfig == nil {
+		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
+	}
+
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
-		output.Spec.GitConfig.TargetRevision = "main"
+		output.Spec.GitConfig.TargetRevision = "HEAD"
+	}
+
+	if len(output.Spec.GitConfig.OriginRevision) == 0 {
+		output.Spec.GitConfig.OriginRevision = "HEAD"
 	}
 
 	if len(output.Spec.GitConfig.Hostname) == 0 {
 		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
 		output.Spec.GitConfig.Hostname = ss[2]
-	}
-
-	if output.Spec.GitOpsConfig == nil {
-		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
@@ -329,6 +373,12 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
+	}
+
+	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
+	// value of -1 effectivelly disables the watch for this pattern.
+	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
+		output.Spec.GitConfig.PollInterval = 180
 	}
 
 	return nil, output
@@ -363,6 +413,12 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
+		if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+			// Stop watching for drifts in the pattern's git repositories
+			if err := r.driftWatcher.remove(instance.Name, instance.Namespace); err != nil {
+				return err
+			}
+		}
 		if _, changed := updateApplication(r.argoClient, targetApp, app); changed {
 			return fmt.Errorf("updated application %q for removal\n", app.Name)
 		}
@@ -379,7 +435,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		if err := removeApplication(r.argoClient, app.Name); err != nil {
 			return err
 		}
-
 		return fmt.Errorf("waiting for application %q to be removed\n", app.Name)
 	}
 
@@ -414,7 +469,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
-
+	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)

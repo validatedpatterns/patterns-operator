@@ -20,15 +20,18 @@ import (
 	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ghodss/yaml"
 )
 
-func haveNamespace(client kubernetes.Interface, name string) bool {
-	if _, err := client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{}); err == nil {
+func haveNamespace(client client.Client, name string) bool {
+	ns := &v1.Namespace{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
 		return true
 	}
 	return false

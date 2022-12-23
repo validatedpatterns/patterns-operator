@@ -100,15 +100,23 @@ spec:
                       from TargetRepo is broken
                     type: string
                   originRepo:
-                    description: Unused
+                    description: Upstream git repo containing the pattern to deploy
                     type: string
+                  originRevision:
+                    description: Branch, tag or commit in the upstream git repository.
+                      Does not support short-sha's. Default to HEAD
+                    type: string
+                  pollInterval:
+                    description: 'Interval in seconds to poll for drifts between origin
+                      and target repositories. Default: 180 seconds'
+                    type: integer
                   targetRepo:
                     description: Git repo containing the pattern to deploy. Must use
                       https/http
                     type: string
                   targetRevision:
                     description: 'Branch, tag, or commit to deploy.  Does not support
-                      short-sha''s. Default: main'
+                      short-sha''s. Default: HEAD'
                     type: string
                 required:
                 - targetRepo
@@ -132,6 +140,34 @@ spec:
                 type: string
               clusterVersion:
                 type: string
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of deployment condition.
+                      type: string
+                  required:
+                  - lastUpdateTime
+                  - status
+                  - type
+                  type: object
+                type: array
               lastError:
                 description: Last error encountered by the pattern
                 type: string

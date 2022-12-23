@@ -56,11 +56,22 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
+      - description: Upstream git repo containing the pattern to deploy
+        displayName: Origin Repo
+        path: gitSpec.originRepo
+      - description: Branch, tag or commit in the upstream git repository. Does not
+          support short-sha's. Default to HEAD
+        displayName: Origin Revision
+        path: gitSpec.originRevision
+      - description: 'Interval in seconds to poll for drifts between origin and target
+          repositories. Default: 180 seconds'
+        displayName: Poll Interval
+        path: gitSpec.pollInterval
       - description: Git repo containing the pattern to deploy. Must use https/http
         displayName: Target Repo
         path: gitSpec.targetRepo
       - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
-          Default: main'
+          Default: HEAD'
         displayName: Target Revision
         path: gitSpec.targetRevision
       statusDescriptors:

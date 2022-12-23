@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -81,13 +82,23 @@ type GitConfig struct {
 	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
-	// Unused
+	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OriginRepo string `json:"originRepo,omitempty"`
+
+	// Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	OriginRevision string `json:"originRevision,omitempty"`
+
+	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	PollInterval int `json:"pollInterval,omitempty"`
+
 	// Git repo containing the pattern to deploy. Must use https/http
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRepo string `json:"targetRepo"`
 
-	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: main
+	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRevision string `json:"targetRevision,omitempty"`
 }
@@ -150,6 +161,8 @@ type PatternStatus struct {
 	ClusterPlatform string `json:"clusterPlatform,omitempty"`
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterVersion string `json:"clusterVersion,omitempty"`
+	//+operator-sdk:csv:customerresourcedefinitions:type=conditions
+	Conditions []PatternCondition `json:"conditions,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
@@ -178,6 +191,26 @@ type PatternList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Pattern `json:"items"`
 }
+
+type PatternCondition struct {
+	// Type of deployment condition.
+	Type PatternConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time `json:"lastUpdateTime"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
+}
+
+type PatternConditionType string
+
+const (
+	GitOutOfSync PatternConditionType = "GitOutOfSync"
+	GitInSync    PatternConditionType = "GitInSync"
+)
 
 func init() {
 	SchemeBuilder.Register(&Pattern{}, &PatternList{})
