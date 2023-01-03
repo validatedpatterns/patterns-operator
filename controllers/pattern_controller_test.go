@@ -58,7 +58,7 @@ var _ = Describe("pattern controller", func() {
 		)
 		BeforeEach(func() {
 			nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
-			reconciler = newFakeReconciler(nsOperators, buildPatternManifest(10))
+			reconciler = newFakePatternReconciler(nsOperators, buildPatternManifest(10))
 			watch = reconciler.driftWatcher.(*watcher)
 
 		})
@@ -161,7 +161,7 @@ var _ = Describe("pattern controller", func() {
 	})
 })
 
-func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
+func newFakePatternReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
 	clusterVersion := &v1.ClusterVersion{ObjectMeta: metav1.ObjectMeta{Name: "version"}, Spec: v1.ClusterVersionSpec{ClusterID: "10"}}
 	clusterInfra := &v1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.InfrastructureSpec{PlatformSpec: v1.PlatformSpec{Type: "AWS"}}}

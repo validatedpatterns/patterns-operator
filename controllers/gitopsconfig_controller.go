@@ -45,7 +45,7 @@ import (
 )
 
 var (
-	gitOpsConfigDefaultNamespacedName types.NamespacedName = types.NamespacedName{Namespace: "openshift-operators", Name: "gitopsconfig"}
+	gitOpsConfigDefaultNamespacedName types.NamespacedName = types.NamespacedName{Name: "gitopsconfig", Namespace: "openshift-operators"}
 )
 
 // GitOpsConfigReconciler reconciles a GitOpsConfig object
@@ -84,11 +84,6 @@ func (r *GitOpsConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// in order to simplify testing.
 	r.logger = klog.FromContext(ctx)
 	r.logger.Info("Reconciling GitOpsConfig")
-
-	// Logger includes name and namespace
-	// Its also wants arguments in pairs, eg.
-	// r.logger.Error(err, fmt.Sprintf("[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason))
-	// Or r.logger.Error(err, "message", "name", p.Name, "namespace", p.ObjectMeta.Namespace, "reason", reason))
 
 	// Fetch the NodeMaintenance instance
 	if !reflect.DeepEqual(gitOpsConfigDefaultNamespacedName, req.NamespacedName) {
@@ -142,10 +137,17 @@ func (r *GitOpsConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "unable set resource ownership", fmt.Errorf("unable to set ownership on GitOpsConfig resource"))
 	}
-	_, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
+	sub, err := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
+	if err != nil && !kerrors.IsNotFound(err) {
+		return r.actionPerformed(qualifiedInstance, "unable gt subscription", fmt.Errorf("unable to get the GitOps subscription"))
+	}
 	if sub == nil {
 		err := createSubscription(r.olmClient, targetSub)
-		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
+		}
+		// requeuing 1 minute later to continue the reconciliation process to give time for the gitops operator to complete deployment
+		return reconcile.Result{RequeueAfter: time.Minute}, nil
 	}
 	if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
@@ -171,7 +173,7 @@ func (r *GitOpsConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	return ctrl.Result{}, nil
+	return reconcile.Result{}, nil
 }
 
 func (r *GitOpsConfigReconciler) applyGitOpsConfigDefaults(input *api.GitOpsConfig) *api.GitOpsConfig {
@@ -199,12 +201,12 @@ func (r *GitOpsConfigReconciler) finalizeObject(instance *api.GitOpsConfig) erro
 	if controllerutil.ContainsFinalizer(instance, api.GitOpsConfigFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
 
 		// Check that there are no patterns before deleting
-		pList := api.GitOpsConfigList{}
+		pList := api.PatternList{}
 		err := r.Client.List(context.Background(), &pList, &client.ListOptions{})
 		if err != nil {
 			return err
 		}
-		if len(pList.Items) >= 0 {
+		if len(pList.Items) > 0 {
 			return fmt.Errorf("unable to remove the GitOpsConfig %s in %s as not all pattern resources have been removed,", instance.Name, instance.Namespace)
 		}
 	}
@@ -263,7 +265,8 @@ func (r *GitOpsConfigReconciler) actionPerformed(g *api.GitOpsConfig, reason str
 	if err != nil {
 		delay := time.Minute
 		return r.onReconcileErrorWithRequeue(g, reason, err, &delay)
-	} else if !g.ObjectMeta.DeletionTimestamp.IsZero() {
+	}
+	if !g.ObjectMeta.DeletionTimestamp.IsZero() {
 		delay := time.Minute * 2
 		return r.onReconcileErrorWithRequeue(g, reason, err, &delay)
 	}

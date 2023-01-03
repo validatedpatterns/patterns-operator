@@ -57,6 +57,9 @@ var _ = BeforeSuite(func() {
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
+
+	err = operatorv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 	err = gitopsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = apiv1.Install(scheme.Scheme)

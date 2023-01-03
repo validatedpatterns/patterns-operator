@@ -96,7 +96,6 @@ var _ = Describe("Git client", func() {
 		DescribeTable("when drifting", func(originRefs, targetRefs []*plumbing.Reference, originRef, targetRef string, expected bool, errOriginList, errTargetList, errOriginFilter, errTargetFilter error) {
 			pattern = api.Pattern{
 				ObjectMeta: v1.ObjectMeta{Name: foo, Namespace: defaultNamespace},
-				TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
 				Spec: api.PatternSpec{
 					GitConfig: api.GitConfig{
 						Hostname:       foo,

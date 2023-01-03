@@ -87,13 +87,13 @@ func newSubscription(config *api.GitOpsConfig) *operatorv1alpha1.Subscription {
 	}
 }
 
-func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
+func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
 
 	sub, err := client.OperatorsV1alpha1().Subscriptions(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, sub
+	return sub, nil
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
