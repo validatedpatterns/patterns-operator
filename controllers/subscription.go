@@ -103,9 +103,9 @@ func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscr
 
 func updateSubscription(client olmclient.Interface, target, current *operatorv1alpha1.Subscription) (error, bool) {
 	changed := false
-	if current == nil || current.Spec != nil {
+	if current == nil || current.Spec == nil {
 		return fmt.Errorf("current subscription was nil"), false
-	} else if target == nil || target.Spec != nil {
+	} else if target == nil || target.Spec == nil {
 		return fmt.Errorf("target subscription was nil"), false
 	}
 
