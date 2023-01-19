@@ -40,10 +40,16 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if p.Spec.GitConfig.OriginRepo == "" || p.Spec.GitConfig.TargetRepo == "" {
-		return false, fmt.Errorf("git config does not contain origin and targer repositories")
+	if (!p.Spec.GitConfig.UseInClusterFork && p.Spec.GitConfig.OriginRepo == "") ||
+		(p.Spec.GitConfig.UseInClusterFork && p.Status.InClusterRepo == "") ||
+		p.Spec.GitConfig.TargetRepo == "" {
+		return false, fmt.Errorf("git config does not contain origin and target repositories")
 	}
-	origin := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "origin", URLs: []string{p.Spec.GitConfig.OriginRepo}})
+	originRepo := p.Spec.GitConfig.OriginRepo
+	if p.Spec.GitConfig.UseInClusterFork {
+		originRepo = p.Status.InClusterRepo
+	}
+	origin := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "origin", URLs: []string{originRepo}})
 	target := r.gitClient.NewRemoteClient(&config.RemoteConfig{Name: "target", URLs: []string{p.Spec.GitConfig.TargetRepo}})
 
 	originRefs, err := origin.List(&git.ListOptions{})
@@ -51,7 +57,7 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 		return false, err
 	}
 	if len(originRefs) == 0 {
-		return false, fmt.Errorf("no references found for origin %s", p.Spec.GitConfig.OriginRepo)
+		return false, fmt.Errorf("no references found for origin %s", originRepo)
 	}
 	targetRefs, err := target.List(&git.ListOptions{})
 	if err != nil {
@@ -60,16 +66,20 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 	if len(targetRefs) == 0 {
 		return false, fmt.Errorf("no references found for target %s", p.Spec.GitConfig.TargetRepo)
 	}
+
 	var originRef *plumbing.Reference
 	originRefName := plumbing.HEAD
 	if p.Spec.GitConfig.OriginRevision != "" {
 		originRefName = plumbing.NewBranchReferenceName(p.Spec.GitConfig.OriginRevision)
 		originRef = getReferenceByName(originRefs, originRefName)
+	} else if p.Spec.GitConfig.UseInClusterFork {
+		originRefName = plumbing.NewBranchReferenceName(p.Spec.GitConfig.TargetRevision)
+		originRef = getReferenceByName(originRefs, originRefName)
 	} else {
 		originRef = getHeadBranch(originRefs)
 	}
 	if originRef == nil {
-		return false, fmt.Errorf("unable to find %s for origin %s", originRefName, p.Spec.GitConfig.OriginRepo)
+		return false, fmt.Errorf("unable to find %s for origin %s", originRefName, originRepo)
 	}
 
 	var targetRef *plumbing.Reference
@@ -83,6 +93,7 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 	if targetRef == nil {
 		return false, fmt.Errorf("unable to find %s for target %s", targetRefName, p.Spec.GitConfig.TargetRepo)
 	}
+
 	return originRef.Hash() != targetRef.Hash(), nil
 
 }

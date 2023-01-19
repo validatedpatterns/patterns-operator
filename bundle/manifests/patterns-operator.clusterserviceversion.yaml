@@ -21,12 +21,12 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.9
+    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.10
     description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
-    operators.operatorframework.io/builder: operator-sdk-v1.22.0
+    operators.operatorframework.io/builder: operator-sdk-v1.25.3
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/hybrid-cloud-patterns/patterns-operator
-  name: patterns-operator.v0.0.9
+  name: patterns-operator.v0.0.10
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -74,8 +74,7 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
-      - description: Upstream git repo containing the pattern to deploy. Used when
-          in-cluster fork to point to the upstream pattern repository
+      - description: Upstream git repo containing the pattern to deploy.
         displayName: Origin Repo
         path: gitSpec.originRepo
       - description: Branch, tag or commit in the upstream git repository. Does not
@@ -93,6 +92,11 @@ spec:
           Default: HEAD'
         displayName: Target Revision
         path: gitSpec.targetRevision
+      - description: Flag to determine if the operator should fork the target repo's
+          contents onto an in-cluster git server The pattern deployment will use the
+          in-cluster git repository instead of the target repo value
+        displayName: Use In Cluster Fork
+        path: gitSpec.useInClusterFork
       statusDescriptors:
       - displayName: App Cluster Domain
         path: appClusterDomain
@@ -137,6 +141,18 @@ spec:
           resources:
           - namespaces
           verbs:
+          - create
+          - delete
+          - get
+          - list
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          - services
+          verbs:
+          - create
+          - delete
           - get
           - list
         - apiGroups:
@@ -223,6 +239,15 @@ spec:
           - patch
           - update
         - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews
@@ -271,7 +296,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.9
+                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.10
                 imagePullPolicy: Always
                 livenessProbe:
                   httpGet:
@@ -358,4 +383,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.9
+  version: 0.0.10

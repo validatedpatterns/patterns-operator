@@ -18,6 +18,18 @@ rules:
   resources:
   - namespaces
   verbs:
+  - create
+  - delete
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
   - get
   - list
 - apiGroups:
@@ -103,3 +115,12 @@ rules:
   - list
   - patch
   - update
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - create
+  - delete
+  - get
+  - list

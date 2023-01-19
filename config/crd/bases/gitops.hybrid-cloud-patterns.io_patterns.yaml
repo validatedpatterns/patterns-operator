@@ -103,7 +103,6 @@ spec:
                     type: string
                   originRepo:
                     description: Upstream git repo containing the pattern to deploy.
-                      Used when in-cluster fork to point to the upstream pattern repository
                     type: string
                   originRevision:
                     description: Branch, tag or commit in the upstream git repository.
@@ -121,6 +120,12 @@ spec:
                     description: 'Branch, tag, or commit to deploy.  Does not support
                       short-sha''s. Default: HEAD'
                     type: string
+                  useInClusterFork:
+                    description: Flag to determine if the operator should fork the
+                      target repo's contents onto an in-cluster git server The pattern
+                      deployment will use the in-cluster git repository instead of
+                      the target repo value
+                    type: boolean
                 required:
                 - targetRepo
                 type: object
@@ -171,6 +176,12 @@ spec:
                   - type
                   type: object
                 type: array
+              inClusterRepo:
+                description: InClusterRepo contains the URL of the in-cluster hosted
+                  fork from the repository defined in the TargetRepo. This field is
+                  populated by the operator when the `UseInClusterFork` is set to
+                  true
+                type: string
               lastError:
                 description: Last error encountered by the pattern
                 type: string

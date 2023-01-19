@@ -82,7 +82,7 @@ type GitConfig struct {
 	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
-	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
+	// Upstream git repo containing the pattern to deploy.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OriginRepo string `json:"originRepo,omitempty"`
 
@@ -101,6 +101,11 @@ type GitConfig struct {
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	TargetRevision string `json:"targetRevision,omitempty"`
+
+	// Flag to determine if the operator should fork the target repo's contents onto an in-cluster git server
+	// The pattern deployment will use the in-cluster git repository instead of the target repo value
+	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	UseInClusterFork bool `json:"useInClusterFork,omitempty"`
 }
 
 type ApplyChangeType string
@@ -163,6 +168,10 @@ type PatternStatus struct {
 	ClusterVersion string `json:"clusterVersion,omitempty"`
 	//+operator-sdk:csv:customerresourcedefinitions:type=conditions
 	Conditions []PatternCondition `json:"conditions,omitempty"`
+	// InClusterRepo contains the URL of the in-cluster hosted fork from the repository defined in the TargetRepo.
+	// This field is populated by the operator when the `UseInClusterFork` is set to true
+	//+operator-sdk:csv:customerresourcedefinitions:type=status
+	InClusterRepo string `json:"inClusterRepo,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html

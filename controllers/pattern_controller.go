@@ -40,7 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
+	"github.com/argoproj/gitops-engine/pkg/health"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	routev1client "github.com/openshift/client-go/route/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 
@@ -49,6 +51,7 @@ import (
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	"github.com/hybrid-cloud-patterns/patterns-operator/internal/gitea"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
@@ -67,6 +70,8 @@ type PatternReconciler struct {
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
 	driftWatcher   driftWatcher
+	routeClient    routev1client.Interface
+	giteaClient    gitea.ClientInterface
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -75,13 +80,16 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get;create;delete;
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
 //
+// Roles for Gitea deployment
+//+kubebuilder:rbac:groups="",resources=secrets;services,verbs=get;list;create;delete;
+//+kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=get;list;create;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -154,32 +162,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
-	// -- Git Drift monitoring
-	gitConfig := qualifiedInstance.Spec.GitConfig
-	// if both git repositories are defined in the pattern's git configuration and the polling interval is not set to disable watching
-	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
-		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-			// start monitoring drifts for this pattern
-			err := r.driftWatcher.add(qualifiedInstance.Name,
-				qualifiedInstance.Namespace,
-				gitConfig.PollInterval)
-			if err != nil {
-				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
-			}
-		} else {
-			err := r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
-			if err != nil {
-				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
-			}
-		}
-	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
-		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
-		}
-	}
-
 	// -- GitOps Subscription
 	targetSub := newSubscription(*qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
@@ -208,19 +190,71 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logOnce("namespace found")
 
+	if qualifiedInstance.Spec.GitConfig.UseInClusterFork {
+		// TargetRepo not defined, instantiate a gitea server and fork origin
+		msg, err := r.createGitServer()
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, msg, err)
+		}
+		msg, err = r.provisionGitServer()
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, msg, err)
+		}
+		// fork repository
+		repoURL, msg, err := r.cloneRepository(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Spec.GitConfig.TargetRevision)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, msg, err)
+		}
+		// * Update the target URL and revision with the Gitea route instance
+		if repoURL != instance.Status.InClusterRepo {
+			instance.Status.InClusterRepo = repoURL
+			// Update object in etcd
+			err = r.Client.Status().Update(context.Background(), instance)
+			return r.actionPerformed(instance, "update target URL with local git instance", err)
+		}
+	}
+
+	// -- Git Drift monitoring
+	// if both git repositories are defined in the pattern's git configuration and the polling interval is not set to disable watching
+	if (qualifiedInstance.Spec.GitConfig.OriginRepo != "" || qualifiedInstance.Spec.GitConfig.UseInClusterFork) &&
+		qualifiedInstance.Spec.GitConfig.PollInterval != -1 {
+		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+			// start monitoring drifts for this pattern
+			err := r.driftWatcher.add(qualifiedInstance.Name,
+				qualifiedInstance.Namespace,
+				qualifiedInstance.Spec.GitConfig.PollInterval)
+			if err != nil {
+				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
+			}
+		} else {
+			err := r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, qualifiedInstance.Spec.GitConfig.PollInterval)
+			if err != nil {
+				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
+			}
+		}
+	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
+		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
+		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
+		}
+	}
+
 	// -- ArgoCD Application
 	targetApp := newApplication(*qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
-
-	err, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
-	if app == nil {
+	app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+	if err != nil && !kerrors.IsNotFound(err) {
+		return r.actionPerformed(qualifiedInstance, "get application", err)
+	}
+	if kerrors.IsNotFound(err) {
 		log.Printf("App not found: %s\n", err.Error())
-		err := createApplication(r.argoClient, targetApp)
+		_, err := createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 
-	} else if ownedBySame(targetApp, app) {
+	}
+	if ownedBySame(targetApp, app) {
 		// Check values
 		err, changed := updateApplication(r.argoClient, targetApp, app)
 		if changed {
@@ -232,7 +266,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	} else {
 		// Someone manually removed the owner ref
-		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
+		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", targetApp.Name))
 	}
 
 	// Perform validation of the site values file(s)
@@ -265,11 +299,12 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 			return err
 		}
 	}
-	if gc.TargetRepo != "" {
-		return validGitRepoURL(gc.TargetRepo)
+	if input.Status.InClusterRepo != "" && gc.UseInClusterFork {
+		if err := validGitRepoURL(input.Status.InClusterRepo); err != nil {
+			return err
+		}
 	}
-	return fmt.Errorf("TargetRepo cannot be empty")
-
+	return validGitRepoURL(gc.TargetRepo)
 	// Check the url is reachable
 
 }
@@ -376,7 +411,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
-	// value of -1 effectivelly disables the watch for this pattern.
+	// value of -1 effectively disables the watch for this pattern.
 	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
 		output.Spec.GitConfig.PollInterval = 180
 	}
@@ -402,10 +437,13 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		targetApp := newApplication(*qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
-		if app == nil {
-			log.Printf("Application has already been removed\n")
-			return nil
+		app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+		if err != nil {
+			if kerrors.IsNotFound(err) {
+				log.Printf("Application has already been removed\n")
+				return nil
+			}
+			return err
 		}
 
 		if !ownedBySame(targetApp, app) {
@@ -469,6 +507,12 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
+	if r.routeClient, err = routev1client.NewForConfig(r.config); err != nil {
+		return err
+	}
+	// empty initialization of the gitea client. This approach allows mocking the gitea client for unit tests.
+	r.giteaClient = gitea.NewClient()
+
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
@@ -510,4 +554,125 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+}
+
+func (r *PatternReconciler) createGitServer() (string, error) {
+	kCli := gitea.NewKubeClient(r.Client, r.routeClient)
+	// create the namespace manually, so we can extract the uid and gid defined in the namespace annotations.
+	// The postgresql helm chart version bundled with the gitea chart v6.0.5 doesn't accept setting gid and uid in the securityConstrains to null, which whould then remove these fields from the generated manifest
+	// instead, when it detects a null, it populates the field runAsUser and the group field with their default values of 1001, this causes the pod controller to fail to start as the uid and gid values don't match the
+	// range defined in the namespace annotation.
+	err := kCli.CreateNamespace()
+	if err != nil {
+		return "get/create gitea namespace", err
+	}
+	// create the route now and extract the spec.host to use it in the gitea helm value as the root domain.
+	rt, err := kCli.GetRoute()
+	if err != nil {
+		if !kerrors.IsNotFound(err) {
+			return "get gitea route", err
+		}
+		rt, err = kCli.CreateRoute()
+		if err != nil {
+			return "create gitea route", err
+		}
+	}
+	// create the admin secret. Gitea also creates the admin credentials but embeds the username and password in the deployment as environment values, openly visible to anyone that can describe the pod.
+	// By creating the secret, we ensure that the values are hidden from anyone who can describe the pod as their values are shown as hidden in that case.
+	_, err = kCli.CreateUserCredentials(gitea.AdminUser, gitea.AdminEmail, gitea.AdminSecretName)
+	if err != nil {
+		return "create gitea admin secret", err
+	}
+
+	app, err := getApplication(r.argoClient, gitea.ApplicationName)
+	if err != nil {
+		if !kerrors.IsNotFound(err) {
+			return "get gitea application", err
+		}
+		// the chart has not yet been installed
+		// new gitea application
+		app, err = kCli.NewApplication(rt.Spec.Host)
+		if err != nil {
+			return "create gitea application object", err
+		}
+		// create application object
+		app, err = createApplication(r.argoClient, app)
+		if err != nil {
+			return "deploy gitea application object", err
+		}
+	}
+
+	if app.Status.Health.Status != health.HealthStatusHealthy {
+		// gitea helm chart is still deploying
+		return "deploy gitea application", fmt.Errorf("gitea application not yet ready")
+	}
+
+	return "", nil
+}
+
+func (r *PatternReconciler) provisionGitServer() (string, error) {
+	kCli := gitea.NewKubeClient(r.Client, r.routeClient)
+	rt, err := kCli.GetRoute()
+	if err != nil {
+		return "get gitea route", err
+	}
+
+	s, err := kCli.GetSecret(gitea.AdminSecretName)
+	if err != nil {
+		return "get gitea admin secret", err
+	}
+
+	err = r.giteaClient.Connect(fmt.Sprintf("https://%s", rt.Spec.Host), string(s.Data["username"]), string(s.Data["password"]))
+	if err != nil {
+		return "create gitea client", err
+	}
+	// Create a new gitea user that is used to interact with gitea. This user is used to host the forked/cloned origin's repository.
+	// Basic approach is to store credentials in a secret, ideally it should be using OAuth2's in OCP and connect gitea to it
+	hasDefaultUser, err := r.giteaClient.HasDefaultUser()
+	if err != nil {
+		return "get gitea default user", err
+	}
+	if !hasDefaultUser {
+		s, err = kCli.CreateUserCredentials(gitea.DefaultUser, gitea.DefaultUserEmail, gitea.DefaultUserSecretName)
+		if err != nil {
+			return "create gitea default user credentials secret", err
+		}
+		err = r.giteaClient.CreateUser(string(s.Data["username"]), string(s.Data["password"]))
+		if err != nil {
+			return "create gitea default user", err
+		}
+	}
+	return "", nil
+}
+
+func (r *PatternReconciler) cloneRepository(originRepoURL, revision string) (string, string, error) {
+	kCli := gitea.NewKubeClient(r.Client, r.routeClient)
+
+	rt, err := kCli.GetRoute()
+	if err != nil {
+		return "", "get gitea route", err
+	}
+
+	s, err := kCli.GetSecret(gitea.DefaultUserSecretName)
+	if err != nil {
+		return "", "retrieve gitea default user pasword", err
+	}
+	// authenticate with the default user's credentials
+	err = r.giteaClient.Connect(fmt.Sprintf("https://%s", rt.Spec.Host), string(s.Data["username"]), string(s.Data["password"]))
+	if err != nil {
+		return "", "connect to gitea server as default user", err
+	}
+	// do we have a clone already?
+	repoURL, err := r.giteaClient.GetClonedRepositoryURLFor(originRepoURL, revision)
+	if err != nil {
+		return "", "check if gitea instance contains fork repository", err
+	}
+	if len(repoURL) == 0 {
+		// fetch the original repository/reference in memory and push it to the gitea instance
+		repoURL, err = r.giteaClient.CloneRepository(originRepoURL, revision, string(s.Data["username"]), string(s.Data["password"]))
+		if err != nil {
+			return "", "fork upstream repository from origin", err
+		}
+	}
+	return repoURL, "", nil
 }

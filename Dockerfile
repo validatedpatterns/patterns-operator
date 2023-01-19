@@ -28,6 +28,7 @@ COPY go.sum go.sum
 COPY vendor/ vendor/
 COPY main.go main.go
 COPY api/ api/
+COPY internal/ internal/
 COPY version/ version/
 COPY controllers/  controllers/ 
 COPY hack/ hack/
