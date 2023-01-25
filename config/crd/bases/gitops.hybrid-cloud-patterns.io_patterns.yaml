@@ -68,33 +68,6 @@ spec:
                 items:
                   type: string
                 type: array
-              gitOpsSpec:
-                properties:
-                  manualApproval:
-                    description: 'Require manual confirmation before installing and
-                      upgrading operators. Default: False'
-                    type: boolean
-                  manualSync:
-                    description: 'Require manual intervention before Argo will sync
-                      new content. Default: False'
-                    type: boolean
-                  operatorCSV:
-                    description: Specific version of openshift-gitops to deploy.  Requires
-                      UseCSV=True
-                    type: string
-                  operatorChannel:
-                    description: 'Channel to deploy openshift-gitops from. Default:
-                      stable'
-                    type: string
-                  operatorSource:
-                    description: 'Source to deploy openshift-gitops from. Default:
-                      redhat-operators'
-                    type: string
-                  useCSV:
-                    description: 'Dangerous. Force a specific version to be installed.
-                      Default: False'
-                    type: boolean
-                type: object
               gitSpec:
                 properties:
                   hostname:

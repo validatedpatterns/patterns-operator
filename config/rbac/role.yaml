@@ -95,6 +95,13 @@ rules:
 - apiGroups:
   - operators.coreos.com
   resources:
+  - installplans
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - operators.coreos.com
+  resources:
   - subscriptions
   verbs:
   - create

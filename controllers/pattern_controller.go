@@ -41,6 +41,7 @@ import (
 
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 
@@ -78,6 +79,8 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups=operators.coreos.com,resources=installplans,verbs=list;get
+
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
@@ -145,7 +148,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- Fill in defaults (changes made to a copy and not persisted)
-	err, qualifiedInstance := r.applyDefaults(instance)
+	qualifiedInstance, err := r.applyDefaults(instance)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
@@ -181,32 +184,31 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub := newSubscription(*qualifiedInstance)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	_, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
-	if sub == nil {
+	sub, err := getSubscription(r.olmClient, gitopsSubscriptionName, subscriptionNamespace)
+	if err != nil && !kerrors.IsNotFound(err) {
+		return r.actionPerformed(qualifiedInstance, "get gitops subscription", err)
+	}
+	if err != nil {
+		// deploy new subscription
+		targetSub := newSubscription(*qualifiedInstance)
+		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 		err := createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if ownedBySame(targetSub, sub) {
-		// Check version/channel etc
-		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		err, changed := updateSubscription(r.olmClient, targetSub, sub)
-		if changed {
-			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
-		}
-	} else {
-		logOnce("The gitops subscription is not owned by us, leaving untouched")
 	}
-
 	logOnce("subscription found")
-
-	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.Client, applicationNamespace) {
-		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
+	if sub.Status.InstallPlanRef == nil {
+		return r.actionPerformed(qualifiedInstance, "pending gitops deployment", fmt.Errorf("installplan for gitops subscription not found"))
+	}
+	ip, err := r.olmClient.OperatorsV1alpha1().InstallPlans(sub.Status.InstallPlanRef.Namespace).Get(context.Background(), sub.Status.InstallPlanRef.Name, metav1.GetOptions{})
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, "get gitops installplan", err)
+	}
+	if ip.Status.Phase != v1alpha1.InstallPlanPhaseComplete {
+		return r.actionPerformed(qualifiedInstance, "deploy gitops operator", fmt.Errorf("gitops operator not yet deployed"))
 	}
 
-	logOnce("namespace found")
+	logOnce("gitops deployed")
 
 	// -- ArgoCD Application
 	targetApp := newApplication(*qualifiedInstance)
@@ -214,25 +216,27 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
 
-	err, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
-	if app == nil {
-		log.Printf("App not found: %s\n", err.Error())
-		err := createApplication(r.argoClient, targetApp)
-		return r.actionPerformed(qualifiedInstance, "create application", err)
-
-	} else if ownedBySame(targetApp, app) {
-		// Check values
-		err, changed := updateApplication(r.argoClient, targetApp, app)
-		if changed {
-			if err != nil {
-				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
-			}
-			return r.actionPerformed(qualifiedInstance, "updated application", err)
+	app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			log.Printf("App not found: %s\n", err.Error())
+			err = createApplication(r.argoClient, targetApp)
 		}
-
-	} else {
+		return r.actionPerformed(qualifiedInstance, "create application", err)
+	}
+	if !ownedBySame(targetApp, app) {
 		// Someone manually removed the owner ref
-		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
+		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", targetApp.Name))
+	}
+	// Check values
+	changed, err := updateApplication(r.argoClient, targetApp, app)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, "update application", err)
+	}
+	if changed {
+		qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
+		err = r.Client.Status().Update(context.Background(), qualifiedInstance, &client.UpdateOptions{})
+		return r.actionPerformed(qualifiedInstance, "updated pattern", err)
 	}
 
 	// Perform validation of the site values file(s)
@@ -278,7 +282,7 @@ func (r *PatternReconciler) postValidation(input *api.Pattern) error {
 	return nil
 }
 
-func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
+func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, error) {
 
 	output := input.DeepCopy()
 
@@ -286,7 +290,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
 	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
 	if cv, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{}); err != nil {
-		return err, output
+		return output, err
 	} else {
 		output.Status.ClusterID = string(cv.Spec.ClusterID)
 	}
@@ -295,7 +299,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get Infrastructure.config.openshift.io/cluster  -o jsonpath='{.spec.platformSpec.type}'
 	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), "cluster", metav1.GetOptions{})
 	if err != nil {
-		return err, output
+		return output, err
 	} else {
 		//   status:
 		//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
@@ -317,14 +321,14 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get OpenShiftControllerManager/cluster -o jsonpath='{.status.version}'
 	clusterVersion, err := r.operatorClient.OpenShiftControllerManagers().Get(context.Background(), "cluster", metav1.GetOptions{})
 	if err != nil {
-		return err, output
+		return output, err
 	} else {
 		// status:
 		//   ...
 		//   version: 4.10.32
 		v, version_err := semver.NewVersion(string(clusterVersion.Status.Version))
 		if version_err != nil {
-			return version_err, output
+			return output, err
 		}
 
 		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
@@ -334,7 +338,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
 	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
 	if err != nil {
-		return err, output
+		return output, err
 	}
 
 	// "apps.mycluster.blueprints.rhecoeng.com"
@@ -343,10 +347,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	output.Status.ClusterName = ss[1]
 	output.Status.AppClusterDomain = clusterIngress.Spec.Domain
 	output.Status.ClusterDomain = strings.Join(ss[1:], ".")
-
-	if output.Spec.GitOpsConfig == nil {
-		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
-	}
 
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "HEAD"
@@ -361,16 +361,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
-		output.Spec.GitOpsConfig.OperatorChannel = "stable"
-	}
-
-	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
-		output.Spec.GitOpsConfig.OperatorSource = "redhat-operators"
-	}
-	if len(output.Spec.GitOpsConfig.OperatorCSV) == 0 {
-		output.Spec.GitOpsConfig.OperatorCSV = "v1.4.0"
-	}
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
@@ -381,7 +371,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
-	return nil, output
+	return output, nil
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
@@ -393,7 +383,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
 
 		// Prepare the app for cascaded deletion
-		err, qualifiedInstance := r.applyDefaults(instance)
+		qualifiedInstance, err := r.applyDefaults(instance)
 		if err != nil {
 			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
 			return nil
@@ -402,8 +392,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		targetApp := newApplication(*qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
-		if app == nil {
+		app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+		if err != nil && kerrors.IsNotFound(err) {
 			log.Printf("Application has already been removed\n")
 			return nil
 		}
@@ -419,8 +409,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 		}
-		if _, changed := updateApplication(r.argoClient, targetApp, app); changed {
-			return fmt.Errorf("updated application %q for removal\n", app.Name)
+		if changed, _ := updateApplication(r.argoClient, targetApp, app); changed {
+			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
 		if haveACMHub(r) {
@@ -435,7 +425,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		if err := removeApplication(r.argoClient, app.Name); err != nil {
 			return err
 		}
-		return fmt.Errorf("waiting for application %q to be removed\n", app.Name)
+		return fmt.Errorf("waiting for application %q to be removed", app.Name)
 	}
 
 	return nil

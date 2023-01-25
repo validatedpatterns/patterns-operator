@@ -179,16 +179,6 @@ func newApplication(p api.Pattern) *argoapi.Application {
 			SyncOptions: []string{"Prune=true"},
 		}
 
-	} else if !p.Spec.GitOpsConfig.ManualSync {
-		// SyncPolicy controls when and how a sync will be performed
-		spec.SyncPolicy = &argoapi.SyncPolicy{
-			// Automated will keep an application synced to the target revision
-			Automated: &argoapi.SyncPolicyAutomated{},
-			// Options allow you to specify whole app sync-options
-			SyncOptions: []string{},
-			// Retry controls failed sync retry behavior
-			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
-		}
 	}
 
 	labels := make(map[string]string)
@@ -211,13 +201,8 @@ func applicationName(p api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
-func getApplication(client argoclient.Interface, name string) (error, *argoapi.Application) {
-	if app, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
-		return err, nil
-	} else {
-		//			log.Printf("Retrieved: %s\n", objectYaml(app))
-		return nil, app
-	}
+func getApplication(client argoclient.Interface, name string) (*argoapi.Application, error) {
+	return client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{})
 }
 
 func createApplication(client argoclient.Interface, app *argoapi.Application) error {
@@ -226,16 +211,16 @@ func createApplication(client argoclient.Interface, app *argoapi.Application) er
 	return err
 }
 
-func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (error, bool) {
+func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (bool, error) {
 	//	var client argoclient.Interface
 	if current == nil {
-		return fmt.Errorf("current application was nil"), false
+		return false, fmt.Errorf("current application was nil")
 	} else if target == nil {
-		return fmt.Errorf("target application was nil"), false
+		return false, fmt.Errorf("target application was nil")
 	}
 
 	if compareSource(target.Spec.Source, current.Spec.Source) {
-		return nil, false
+		return false, nil
 	}
 
 	spec := current.Spec.DeepCopy()
@@ -243,7 +228,7 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	current.Spec = *spec
 
 	_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-	return err, true
+	return true, err
 }
 
 func removeApplication(client argoclient.Interface, name string) error {
