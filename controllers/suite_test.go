@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	apiv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -62,6 +63,8 @@ var _ = BeforeSuite(func() {
 	err = apiv1.Install(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = operatorv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = operatorv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	//+kubebuilder:scaffold:scheme
 

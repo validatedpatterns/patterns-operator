@@ -51,31 +51,31 @@ func (mr *MockRemoteClientMockRecorder) List(o interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRemoteClient)(nil).List), o)
 }
 
-// MockClient is a mock of Client interface.
-type MockClient struct {
+// MockGitClient is a mock of GitClient interface.
+type MockGitClient struct {
 	ctrl     *gomock.Controller
-	recorder *MockClientMockRecorder
+	recorder *MockGitClientMockRecorder
 }
 
-// MockClientMockRecorder is the mock recorder for MockClient.
-type MockClientMockRecorder struct {
-	mock *MockClient
+// MockGitClientMockRecorder is the mock recorder for MockGitClient.
+type MockGitClientMockRecorder struct {
+	mock *MockGitClient
 }
 
-// NewMockClient creates a new mock instance.
-func NewMockClient(ctrl *gomock.Controller) *MockClient {
-	mock := &MockClient{ctrl: ctrl}
-	mock.recorder = &MockClientMockRecorder{mock}
+// NewMockGitClient creates a new mock instance.
+func NewMockGitClient(ctrl *gomock.Controller) *MockGitClient {
+	mock := &MockGitClient{ctrl: ctrl}
+	mock.recorder = &MockGitClientMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockClient) EXPECT() *MockClientMockRecorder {
+func (m *MockGitClient) EXPECT() *MockGitClientMockRecorder {
 	return m.recorder
 }
 
 // NewRemoteClient mocks base method.
-func (m *MockClient) NewRemoteClient(c *config.RemoteConfig) RemoteClient {
+func (m *MockGitClient) NewRemoteClient(c *config.RemoteConfig) RemoteClient {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewRemoteClient", c)
 	ret0, _ := ret[0].(RemoteClient)
@@ -83,70 +83,100 @@ func (m *MockClient) NewRemoteClient(c *config.RemoteConfig) RemoteClient {
 }
 
 // NewRemoteClient indicates an expected call of NewRemoteClient.
-func (mr *MockClientMockRecorder) NewRemoteClient(c interface{}) *gomock.Call {
+func (mr *MockGitClientMockRecorder) NewRemoteClient(c interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewRemoteClient", reflect.TypeOf((*MockClient)(nil).NewRemoteClient), c)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewRemoteClient", reflect.TypeOf((*MockGitClient)(nil).NewRemoteClient), c)
 }
 
-// MockDriftWatcher is a mock of DriftWatcher interface.
-type MockDriftWatcher struct {
+// MockdriftWatcher is a mock of driftWatcher interface.
+type MockdriftWatcher struct {
 	ctrl     *gomock.Controller
-	recorder *MockDriftWatcherMockRecorder
+	recorder *MockdriftWatcherMockRecorder
 }
 
-// MockDriftWatcherMockRecorder is the mock recorder for MockDriftWatcher.
-type MockDriftWatcherMockRecorder struct {
-	mock *MockDriftWatcher
+// MockdriftWatcherMockRecorder is the mock recorder for MockdriftWatcher.
+type MockdriftWatcherMockRecorder struct {
+	mock *MockdriftWatcher
 }
 
-// NewMockDriftWatcher creates a new mock instance.
-func NewMockDriftWatcher(ctrl *gomock.Controller) *MockDriftWatcher {
-	mock := &MockDriftWatcher{ctrl: ctrl}
-	mock.recorder = &MockDriftWatcherMockRecorder{mock}
+// NewMockdriftWatcher creates a new mock instance.
+func NewMockdriftWatcher(ctrl *gomock.Controller) *MockdriftWatcher {
+	mock := &MockdriftWatcher{ctrl: ctrl}
+	mock.recorder = &MockdriftWatcherMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockDriftWatcher) EXPECT() *MockDriftWatcherMockRecorder {
+func (m *MockdriftWatcher) EXPECT() *MockdriftWatcherMockRecorder {
 	return m.recorder
 }
 
-// Add mocks base method.
-func (m *MockDriftWatcher) Add(name, namespace, origin, target string, interval int) {
+// add mocks base method.
+func (m *MockdriftWatcher) add(name, namespace string, interval int) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Add", name, namespace, origin, target, interval)
-}
-
-// Add indicates an expected call of Add.
-func (mr *MockDriftWatcherMockRecorder) Add(name, namespace, origin, target, interval interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockDriftWatcher)(nil).Add), name, namespace, origin, target, interval)
-}
-
-// Remove mocks base method.
-func (m *MockDriftWatcher) Remove(name, namespace string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Remove", name, namespace)
+	ret := m.ctrl.Call(m, "add", name, namespace, interval)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Remove indicates an expected call of Remove.
-func (mr *MockDriftWatcherMockRecorder) Remove(name, namespace interface{}) *gomock.Call {
+// add indicates an expected call of add.
+func (mr *MockdriftWatcherMockRecorder) add(name, namespace, interval interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockDriftWatcher)(nil).Remove), name, namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "add", reflect.TypeOf((*MockdriftWatcher)(nil).add), name, namespace, interval)
 }
 
-// Watch mocks base method.
-func (m *MockDriftWatcher) Watch() chan<- interface{} {
+// isWatching mocks base method.
+func (m *MockdriftWatcher) isWatching(name, namespace string) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Watch")
-	ret0, _ := ret[0].(chan<- interface{})
+	ret := m.ctrl.Call(m, "isWatching", name, namespace)
+	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// Watch indicates an expected call of Watch.
-func (mr *MockDriftWatcherMockRecorder) Watch() *gomock.Call {
+// isWatching indicates an expected call of isWatching.
+func (mr *MockdriftWatcherMockRecorder) isWatching(name, namespace interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockDriftWatcher)(nil).Watch))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "isWatching", reflect.TypeOf((*MockdriftWatcher)(nil).isWatching), name, namespace)
+}
+
+// remove mocks base method.
+func (m *MockdriftWatcher) remove(name, namespace string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "remove", name, namespace)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// remove indicates an expected call of remove.
+func (mr *MockdriftWatcherMockRecorder) remove(name, namespace interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "remove", reflect.TypeOf((*MockdriftWatcher)(nil).remove), name, namespace)
+}
+
+// updateInterval mocks base method.
+func (m *MockdriftWatcher) updateInterval(name, namespace string, interval int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "updateInterval", name, namespace, interval)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// updateInterval indicates an expected call of updateInterval.
+func (mr *MockdriftWatcherMockRecorder) updateInterval(name, namespace, interval interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "updateInterval", reflect.TypeOf((*MockdriftWatcher)(nil).updateInterval), name, namespace, interval)
+}
+
+// watch mocks base method.
+func (m *MockdriftWatcher) watch() chan interface{} {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "watch")
+	ret0, _ := ret[0].(chan interface{})
+	return ret0
+}
+
+// watch indicates an expected call of watch.
+func (mr *MockdriftWatcherMockRecorder) watch() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "watch", reflect.TypeOf((*MockdriftWatcher)(nil).watch))
 }

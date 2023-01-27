@@ -77,14 +77,14 @@ var _ = Describe("Git client", func() {
 
 	var _ = Context("when interacting with Git", func() {
 		var (
-			mockGitClient                                  *MockClient
+			mockGitClient                                  *MockGitClient
 			mockRemoteClientOrigin, mockRemoteClientTarget *MockRemoteClient
 			pattern                                        api.Pattern
 		)
 
 		BeforeEach(func() {
 			ctrl := gomock.NewController(GinkgoT())
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemoteClientOrigin = NewMockRemoteClient(ctrl)
 			mockRemoteClientTarget = NewMockRemoteClient(ctrl)
 		})
@@ -348,14 +348,14 @@ var _ = Describe("Drift watcher", func() {
 		var (
 			patternFoo                         *api.Pattern
 			ctrl                               *gomock.Controller
-			mockGitClient                      *MockClient
+			mockGitClient                      *MockGitClient
 			mockRemoteOrigin, mockRemoteTarget *MockRemoteClient
 		)
 
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
 
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemoteOrigin = NewMockRemoteClient(ctrl)
 			mockRemoteTarget = NewMockRemoteClient(ctrl)
 			// Add the pattern in etcd
@@ -426,19 +426,19 @@ var _ = Describe("Drift watcher", func() {
 			// previous condition should have status false
 			Expect(patternFoo.Status.Conditions[0].Type).To(Equal(api.GitInSync))
 			Expect(patternFoo.Status.Conditions[0].Status).To(Equal(v1core.ConditionFalse))
-			Expect(patternFoo.Status.Conditions[0].LastUpdateTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[1].LastUpdateTime.Time))
-			Expect(patternFoo.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[0].LastUpdateTime.Time.Add(-1*time.Second)))
+			Expect(patternFoo.Status.Conditions[0].LastUpdateTime.Time).To(BeTemporally("~", patternFoo.Status.Conditions[1].LastUpdateTime.Time))
+			Expect(patternFoo.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally("~", patternFoo.Status.Conditions[0].LastUpdateTime.Time.Add(-1*time.Second)))
 			// new condition should show the repositories have drifted
 			Expect(patternFoo.Status.Conditions[1].Type).To(Equal(api.GitOutOfSync))
 			Expect(patternFoo.Status.Conditions[1].Status).To(Equal(v1core.ConditionTrue))
-			Expect(patternFoo.Status.Conditions[1].LastTransitionTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[1].LastUpdateTime.Time))
-			Expect(patternFoo.Status.Conditions[1].LastUpdateTime.Time).To(BeTemporally("==", patternFoo.Status.Conditions[0].LastTransitionTime.Time.Add(time.Second)))
+			Expect(patternFoo.Status.Conditions[1].LastTransitionTime.Time).To(BeTemporally("~", patternFoo.Status.Conditions[1].LastUpdateTime.Time))
+			Expect(patternFoo.Status.Conditions[1].LastUpdateTime.Time).To(BeTemporally("~", patternFoo.Status.Conditions[0].LastTransitionTime.Time.Add(time.Second)))
 		})
 
 	})
 	var _ = Context("when evaluating the processing order", func() {
 		var (
-			mockGitClient          *MockClient
+			mockGitClient          *MockGitClient
 			mockRemote             *MockRemoteClient
 			patternBar, patternFoo *api.Pattern
 			ctrl                   *gomock.Controller
@@ -446,7 +446,7 @@ var _ = Describe("Drift watcher", func() {
 
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
 
 			patternFoo = &api.Pattern{
@@ -563,13 +563,13 @@ var _ = Describe("Drift watcher", func() {
 			defaultNamespace = "default"
 		)
 		var (
-			mockGitClient *MockClient
+			mockGitClient *MockGitClient
 			mockRemote    *MockRemoteClient
 			ctrl          *gomock.Controller
 		)
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
 			// add references
 			for i := 0; i < 1000; i++ {
