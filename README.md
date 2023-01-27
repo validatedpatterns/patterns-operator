@@ -144,7 +144,7 @@ git push <fork-remote> "patterns-operator-v$VERSION"
 
 # Inspect the diff from the previously released version
 cd operators/patterns-operator
-diff -urN $(ls -1r | grep -v ci.yaml | head -n2 | sort)
+diff -urN $(ls -1rv | grep -v ci.yaml | head -n2 | sort)
 
 # Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod
 # Use the web interface so you can fill in the web template
