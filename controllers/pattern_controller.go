@@ -135,11 +135,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	} else {
 		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
 		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
-		if updateErr := r.Client.Status().Update(context.TODO(), instance); updateErr != nil {
+		if err = r.Client.Update(context.TODO(), instance); err != nil {
 			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
-			return reconcile.Result{}, updateErr
+			return reconcile.Result{}, err
 		}
-
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
 		return reconcile.Result{}, nil
 	}
