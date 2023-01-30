@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	argocdclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
+	"github.com/argoproj/gitops-engine/pkg/health"
 	"github.com/go-logr/logr"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -28,6 +30,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned/fake"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +50,7 @@ const (
 
 var (
 	patternNamespaced = types.NamespacedName{Name: foo, Namespace: namespace}
+	gitopsNamespace   = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-gitops"}}
 )
 var _ = Describe("pattern controller", func() {
 
@@ -159,6 +163,83 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
 	})
+	var _ = Context("validates the pattern's app healh status", func() {
+		var (
+			reconciler *PatternReconciler
+			pattern    = api.Pattern{ObjectMeta: metav1.ObjectMeta{
+				Name:       foo,
+				Namespace:  namespace,
+				Finalizers: []string{api.PatternFinalizer},
+			},
+				Spec: api.PatternSpec{
+					ClusterGroupName: "default",
+					GitConfig: api.GitConfig{
+						TargetRepo: targetURL,
+					},
+				},
+			}
+		)
+		BeforeEach(func() {
+
+			operatorsNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+
+			reconciler = newFakeReconciler(operatorsNamespace, gitopsNamespace, &pattern)
+
+		})
+		It("updates the status with the app's health status code value", func() {
+			By("reconciling for the first time")
+			_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("ensuring it has created the expected resources")
+			// update the application status to reflect it has completed deployment of the helm chart
+			app, err := reconciler.argoClient.ArgoprojV1alpha1().Applications("openshift-gitops").Get(context.Background(), applicationName(pattern), metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("updating the application status to confirm it has completed its deployment")
+			app.Status.Health.Status = health.HealthStatusHealthy
+			_, err = reconciler.argoClient.ArgoprojV1alpha1().Applications("openshift-gitops").Update(context.Background(), app, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("resuming the reconciliation once the status of the gitea application is healthy")
+			_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("validating that the targetURL and targetRepo have been updated")
+			p := &api.Pattern{}
+			err = reconciler.Client.Get(context.Background(), patternNamespaced, p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p.Status.AppHealthStatus).To(Equal(health.HealthStatusHealthy))
+
+			By("changing the health status of the app and ensuring it is reflected in the pattern's status")
+			app, err = reconciler.argoClient.ArgoprojV1alpha1().Applications("openshift-gitops").Get(context.Background(), applicationName(pattern), metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			app.Status.Health.Status = health.HealthStatusDegraded
+			_, err = reconciler.argoClient.ArgoprojV1alpha1().Applications("openshift-gitops").Update(context.Background(), app, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Get(context.Background(), patternNamespaced, p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p.Status.AppHealthStatus).To(Equal(health.HealthStatusDegraded))
+		})
+
+		It("ensures the reconciliation loop has a delay when the reconciliation produces no changes or no error due to update/create/delete operation on objects derived from the pattern", func() {
+			By("reconciling for the first time")
+			// update the application status to reflect it has completed deployment of the helm chart
+			resp, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			// In practice, the reconciliation will requeue the object because it has been updated during this reconciliation loop, so the value
+			// in the RequeueAfter or even Requeue does not matter. However, this validation here covers the case in the code where the loop returns earlier
+			// due to an update/create operation without error.
+			Expect(resp.RequeueAfter).To(Equal(defaultRequeueTime))
+			// Application has been created, next reconciliation should return no changes
+			resp, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.RequeueAfter).To(Equal(defaultRequeueTime))
+		})
+	})
+
 })
 
 func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
@@ -170,12 +251,16 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		Spec:       operatorv1.OpenShiftControllerManagerSpec{},
 		Status:     operatorv1.OpenShiftControllerManagerStatus{OperatorStatus: operatorv1.OperatorStatus{Version: "4.10.3"}}}
 	ingress := &v1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.IngressSpec{Domain: "hello.world"}}
+
+	gitopsSub := &operatorv1alpha1.Subscription{ObjectMeta: metav1.ObjectMeta{Name: "openshift-gitops-operator", Namespace: "openshift-operators"}}
 	watcher, _ := newDriftWatcher(fakeClient, logr.New(log.NullLogSink{}), newGitClient())
+
 	return &PatternReconciler{
 		Scheme:         scheme.Scheme,
 		Client:         fakeClient,
-		olmClient:      olmclient.NewSimpleClientset(),
+		olmClient:      olmclient.NewSimpleClientset(gitopsSub),
 		driftWatcher:   watcher,
+		argoClient:     argocdclient.NewSimpleClientset(),
 		configClient:   configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient: operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 	}

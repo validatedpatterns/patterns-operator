@@ -52,6 +52,10 @@ import (
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
+var (
+	defaultRequeueTime = 5 * time.Minute
+)
+
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
 	client.Client
@@ -113,11 +117,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			r.logger.Info("Pattern not found")
+			// No need to requeue as the object does not exist.
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		r.logger.Info("Error reading the request object, requeuing.")
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Remove the ArgoCD application on deletion
@@ -137,9 +142,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
 		if err = r.Client.Update(context.TODO(), instance); err != nil {
 			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
-			return reconcile.Result{}, err
+			return reconcile.Result{Requeue: true}, err
 		}
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
+		// No need to force-requeue, the object has been marked for deletion and the finalizer has been removed.
 		return reconcile.Result{}, nil
 	}
 
@@ -219,7 +225,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err := createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 
-	} else if ownedBySame(targetApp, app) {
+	}
+	if qualifiedInstance.Status.AppHealthStatus != app.Status.Health.Status {
+		qualifiedInstance.Status.AppHealthStatus = app.Status.Health.Status
+		err = r.Client.Status().Update(context.Background(), qualifiedInstance, &client.UpdateOptions{})
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "update pattern status with app health status", err)
+		}
+	}
+	if ownedBySame(targetApp, app) {
 		// Check values
 		err, changed := updateApplication(r.argoClient, targetApp, app)
 		if changed {
@@ -242,7 +256,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	return ctrl.Result{}, nil
+	// Default requeuing when no changes are found. This is to ensure that the controller will periodically pull for changes to the gitops subscription and argoCD application since
+	// it is not directly managing them via the reconciliation loop (it only watches for pattern objects)
+	return ctrl.Result{RequeueAfter: defaultRequeueTime}, nil
 }
 
 func validGitRepoURL(repoURL string) error {
@@ -490,23 +506,25 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update Pattern status")
-		return reconcile.Result{}, updateErr
+		// Force requeue even if the object failed to update. This is to ensure that the reconciliation loop will execute again
+		// in cases where there are network issues that prevent establishing communication with the API server
+		return reconcile.Result{Requeue: true}, updateErr
 	}
 	if duration != nil {
 		log.Printf("Requeueing\n")
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
 	//	log.Printf("Reconciling with exponential duration")
-	return reconcile.Result{}, err
+	// No need to force requeuing as the object has been modified in the previous lines and will trigger the reconciliation logic again.
+	return reconcile.Result{RequeueAfter: defaultRequeueTime}, err
 }
 
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
+	delay := defaultRequeueTime
 	if err != nil {
-		delay := time.Minute * 1
-		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
+		delay = time.Minute
 	} else if !p.ObjectMeta.DeletionTimestamp.IsZero() {
-		delay := time.Minute * 2
-		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
+		delay = time.Minute * 2
 	}
-	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+	return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 }

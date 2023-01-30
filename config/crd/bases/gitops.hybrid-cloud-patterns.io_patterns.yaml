@@ -133,6 +133,9 @@ spec:
             properties:
               appClusterDomain:
                 type: string
+              appHealthStatus:
+                description: Health status of the generated argoCD application
+                type: string
               clusterDomain:
                 type: string
               clusterID:

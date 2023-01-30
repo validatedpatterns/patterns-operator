@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/argoproj/gitops-engine/pkg/health"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -163,6 +164,9 @@ type PatternStatus struct {
 	ClusterVersion string `json:"clusterVersion,omitempty"`
 	//+operator-sdk:csv:customerresourcedefinitions:type=conditions
 	Conditions []PatternCondition `json:"conditions,omitempty"`
+	// Health status of the generated argoCD application
+	//+operator-sdk:csv:customresourcedefinitions:type=status
+	AppHealthStatus health.HealthStatusCode `json:"appHealthStatus,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
