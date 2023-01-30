@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	argocdclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
 	"github.com/go-logr/logr"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -28,6 +29,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned/fake"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -47,6 +50,7 @@ const (
 
 var (
 	patternNamespaced = types.NamespacedName{Name: foo, Namespace: namespace}
+	gitopsNamespace   = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "openshift-gitops"}}
 )
 var _ = Describe("pattern controller", func() {
 
@@ -159,6 +163,106 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
 	})
+
+	var _ = Context("Validates the gitops subscription updates due to pattern specs", func() {
+		var (
+			reconciler         *PatternReconciler
+			pattern1, pattern2 api.Pattern
+		)
+		BeforeEach(func() {
+
+			pattern1 = api.Pattern{ObjectMeta: metav1.ObjectMeta{
+				Name:       foo,
+				Namespace:  namespace,
+				Finalizers: []string{api.PatternFinalizer},
+			},
+				Spec: api.PatternSpec{
+					ClusterGroupName: "default",
+					GitConfig: api.GitConfig{
+						TargetRepo: targetURL,
+					},
+					GitOpsConfig: &api.GitOpsConfig{OperatorChannel: "foo"},
+				},
+			}
+
+			pattern2 = api.Pattern{ObjectMeta: metav1.ObjectMeta{
+				Name:       bar,
+				Namespace:  namespace,
+				Finalizers: []string{api.PatternFinalizer},
+			},
+				Spec: api.PatternSpec{
+					ClusterGroupName: "default",
+					GitConfig: api.GitConfig{
+						TargetRepo: originURL,
+					},
+					GitOpsConfig: &api.GitOpsConfig{OperatorChannel: "bar"},
+				},
+			}
+
+			operatorsNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			reconciler = newFakeReconciler(operatorsNamespace, gitopsNamespace, &pattern1)
+
+		})
+		It("when deploying a second pattern", func() {
+			By("reconciling the first pattern when the gitops subscription does not exist")
+			_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Create(context.Background(), &pattern2, &client.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			subs, err := reconciler.olmClient.OperatorsV1alpha1().Subscriptions("openshift-operators").Get(context.Background(), "openshift-gitops-operator", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(subs).NotTo(BeNil())
+			Expect(subs.Spec.Channel).To(Equal("foo"))
+			By("reconciling the second pattern")
+			_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: bar}})
+			Expect(err).NotTo(HaveOccurred())
+			By("Ensuring that the gitops subscription has not been changed")
+			subs, err = reconciler.olmClient.OperatorsV1alpha1().Subscriptions("openshift-operators").Get(context.Background(), "openshift-gitops-operator", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(subs).NotTo(BeNil())
+			Expect(subs.Spec.Channel).To(Equal("foo"))
+		})
+		It("when the subscription has been create before the pattern outside of the reconciliation loop", func() {
+			gitopsSub := &operatorv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{Name: "openshift-gitops-operator", Namespace: "openshift-operators"},
+				Spec:       &operatorv1alpha1.SubscriptionSpec{Channel: "stable"}}
+			reconciler.olmClient = olmclient.NewSimpleClientset(gitopsSub)
+			By("reconciling the first pattern")
+			_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			By("ensuring that the gitops subscription has not been changed")
+			subs, err := reconciler.olmClient.OperatorsV1alpha1().Subscriptions("openshift-operators").Get(context.Background(), "openshift-gitops-operator", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(subs).NotTo(BeNil())
+			Expect(subs.Spec.Channel).To(Equal("stable"))
+		})
+
+		It("when there are updates to the pattern owner's gitopsconfig spec", func() {
+			By("reconciling the first pattern when the gitops subscription does not exist")
+			_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Create(context.Background(), &pattern2, &client.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			subs, err := reconciler.olmClient.OperatorsV1alpha1().Subscriptions("openshift-operators").Get(context.Background(), "openshift-gitops-operator", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(subs).NotTo(BeNil())
+			Expect(subs.Spec.Channel).To(Equal("foo"))
+			By("making changes to the pattern's gitops config section")
+			p := &api.Pattern{}
+			err = reconciler.Client.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: foo}, p)
+			Expect(err).NotTo(HaveOccurred())
+			p.Spec.GitOpsConfig.OperatorChannel = "new-channel"
+			err = reconciler.Client.Update(context.Background(), p, &client.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+			Expect(err).NotTo(HaveOccurred())
+			By("ensuring that the gitops subscription has been updated")
+			subs, err = reconciler.olmClient.OperatorsV1alpha1().Subscriptions("openshift-operators").Get(context.Background(), "openshift-gitops-operator", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(subs).NotTo(BeNil())
+			Expect(subs.Spec.Channel).To(Equal("new-channel"))
+		})
+	})
 })
 
 func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
@@ -176,6 +280,7 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		Client:         fakeClient,
 		olmClient:      olmclient.NewSimpleClientset(),
 		driftWatcher:   watcher,
+		argoClient:     argocdclient.NewSimpleClientset(),
 		configClient:   configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient: operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 	}
