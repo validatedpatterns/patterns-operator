@@ -103,34 +103,10 @@ type GitConfig struct {
 	TargetRevision string `json:"targetRevision,omitempty"`
 }
 
-type ApplyChangeType string
-
-const (
-	InstallAutomatic ApplyChangeType = "Automatic"
-	InstallManual    ApplyChangeType = "Manual"
-)
-
 type GitOpsConfig struct {
-	// Channel to deploy openshift-gitops from. Default: stable
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	OperatorChannel string `json:"operatorChannel,omitempty"`
-	// Source to deploy openshift-gitops from. Default: redhat-operators
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	OperatorSource string `json:"operatorSource,omitempty"`
-
 	// Require manual intervention before Argo will sync new content. Default: False
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	ManualSync bool `json:"manualSync,omitempty"`
-	// Require manual confirmation before installing and upgrading operators. Default: False
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	ManualApproval bool `json:"manualApproval,omitempty"`
-
-	// Specific version of openshift-gitops to deploy.  Requires UseCSV=True
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	OperatorCSV string `json:"operatorCSV,omitempty"`
-	// Dangerous. Force a specific version to be installed. Default: False
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	UseCSV bool `json:"useCSV,omitempty"`
 }
 
 // PatternStatus defines the observed state of Pattern

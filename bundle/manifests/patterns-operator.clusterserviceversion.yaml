@@ -23,7 +23,7 @@ metadata:
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.10
     description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
-    operators.operatorframework.io/builder: operator-sdk-v1.22.0
+    operators.operatorframework.io/builder: operator-sdk-v1.25.3
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/hybrid-cloud-patterns/patterns-operator
   name: patterns-operator.v0.0.10
@@ -53,27 +53,10 @@ spec:
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
-      - description: 'Require manual confirmation before installing and upgrading
-          operators. Default: False'
-        displayName: Manual Approval
-        path: gitOpsSpec.manualApproval
       - description: 'Require manual intervention before Argo will sync new content.
           Default: False'
         displayName: Manual Sync
         path: gitOpsSpec.manualSync
-      - description: Specific version of openshift-gitops to deploy.  Requires UseCSV=True
-        displayName: Operator CSV
-        path: gitOpsSpec.operatorCSV
-      - description: 'Channel to deploy openshift-gitops from. Default: stable'
-        displayName: Operator Channel
-        path: gitOpsSpec.operatorChannel
-      - description: 'Source to deploy openshift-gitops from. Default: redhat-operators'
-        displayName: Operator Source
-        path: gitOpsSpec.operatorSource
-      - description: 'Dangerous. Force a specific version to be installed. Default:
-          False'
-        displayName: Use CSV
-        path: gitOpsSpec.useCSV
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
@@ -295,10 +278,19 @@ spec:
                     memory: 64Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                volumeMounts:
+                - mountPath: /gitops-config/
+                  name: gitops-config
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: patterns-operator-controller-manager
               terminationGracePeriodSeconds: 10
+              volumes:
+              - configMap:
+                  name: patterns-operator-gitops-config
+                  optional: true
+                name: gitops-config
       permissions:
       - rules:
         - apiGroups:

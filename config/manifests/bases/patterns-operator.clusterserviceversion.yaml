@@ -35,27 +35,10 @@ spec:
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
-      - description: 'Require manual confirmation before installing and upgrading
-          operators. Default: False'
-        displayName: Manual Approval
-        path: gitOpsSpec.manualApproval
       - description: 'Require manual intervention before Argo will sync new content.
           Default: False'
         displayName: Manual Sync
         path: gitOpsSpec.manualSync
-      - description: Specific version of openshift-gitops to deploy.  Requires UseCSV=True
-        displayName: Operator CSV
-        path: gitOpsSpec.operatorCSV
-      - description: 'Channel to deploy openshift-gitops from. Default: stable'
-        displayName: Operator Channel
-        path: gitOpsSpec.operatorChannel
-      - description: 'Source to deploy openshift-gitops from. Default: redhat-operators'
-        displayName: Operator Source
-        path: gitOpsSpec.operatorSource
-      - description: 'Dangerous. Force a specific version to be installed. Default:
-          False'
-        displayName: Use CSV
-        path: gitOpsSpec.useCSV
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo

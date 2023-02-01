@@ -22,21 +22,29 @@ import (
 	"log"
 	"reflect"
 
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
-
-	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
 
 const (
-	subscriptionNamespace = "openshift-operators"
-	applicationNamespace  = "openshift-gitops"
+	subscriptionNamespace  = "openshift-operators"
+	applicationNamespace   = "openshift-gitops"
+	gitopsSubscriptionName = "openshift-gitops-operator"
+	customConfigFile       = "/gitops-config/config.json"
 )
 
-func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
+type olmClient struct {
+	client olmclient.Interface
+}
+
+func newOLMClient(client olmclient.Interface) *olmClient {
+	return &olmClient{
+		client: client,
+	}
+}
+func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1.Subscription {
 	//  apiVersion: operators.coreos.com/v1alpha1
 	//  kind: Subscription
 	//  metadata:
@@ -57,8 +65,9 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          "redhat-operators",
 		CatalogSourceNamespace: "openshift-marketplace",
-		Channel:                p.Spec.GitOpsConfig.OperatorChannel,
+		Channel:                "stable",
 		Package:                "openshift-gitops-operator",
+		StartingCSV:            "v1.4.0",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: []corev1.EnvVar{
@@ -70,43 +79,46 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 		},
 	}
 
-	if p.Spec.GitOpsConfig.UseCSV {
-		spec.StartingCSV = p.Spec.GitOpsConfig.OperatorCSV
+	if input.Channel != "" {
+		spec.Channel = input.Channel
 	}
 
-	if p.Spec.GitOpsConfig.ManualApproval {
-		spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
+	if input.CatalogSource != "" {
+		spec.CatalogSource = input.CatalogSource
+	}
+
+	if input.StartingCSV != "" {
+		spec.StartingCSV = input.StartingCSV
+	}
+
+	if spec.InstallPlanApproval != "" {
+		spec.InstallPlanApproval = input.InstallPlanApproval
 	}
 
 	return &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "openshift-gitops-operator",
+			Name:      gitopsSubscriptionName,
 			Namespace: subscriptionNamespace,
 		},
 		Spec: spec,
 	}
 }
 
-func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
-
-	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return err, nil
-	}
-	return nil, sub
+func (s *olmClient) getSubscription(name, namespace string) (*operatorv1alpha1.Subscription, error) {
+	return s.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
 }
 
-func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+func (s *olmClient) createSubscription(sub *operatorv1alpha1.Subscription) error {
+	_, err := s.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 
-func updateSubscription(client olmclient.Interface, target, current *operatorv1alpha1.Subscription) (error, bool) {
+func (s *olmClient) updateSubscription(target, current *operatorv1alpha1.Subscription) (bool, error) {
 	changed := false
 	if current == nil || current.Spec == nil {
-		return fmt.Errorf("current subscription was nil"), false
+		return false, fmt.Errorf("current subscription was nil")
 	} else if target == nil || target.Spec == nil {
-		return fmt.Errorf("target subscription was nil"), false
+		return false, fmt.Errorf("target subscription was nil")
 	}
 
 	if target.Spec.CatalogSourceNamespace != current.Spec.CatalogSourceNamespace {
@@ -139,9 +151,13 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 		target.Spec.DeepCopyInto(current.Spec)
 
-		_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-		return err, changed
+		_, err := s.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		return changed, err
 	}
 
-	return nil, changed
+	return changed, nil
+}
+
+func (s *olmClient) getInstallPlan(name string) (*operatorv1alpha1.InstallPlan, error) {
+	return s.client.OperatorsV1alpha1().InstallPlans(subscriptionNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 }

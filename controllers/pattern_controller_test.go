@@ -18,8 +18,12 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"time"
 
+	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
 	"github.com/go-logr/logr"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -28,9 +32,11 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned/fake"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
+	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -159,6 +165,139 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
 	})
+
+	var _ = Context("deploy gitops subscription", func() {
+		var (
+			reconciler *PatternReconciler
+		)
+		When("no subscription exists", func() {
+
+			BeforeEach(func() {
+				nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+				reconciler = newFakeReconciler(nsOperators, buildPatternManifest(10))
+			})
+
+			It("deploys the default subscription when no custom configuration is found", func() {
+
+				err := reconciler.deployGitopsSubscription("/file-does-not-exist")
+				Expect(err).NotTo(HaveOccurred())
+				s, err := reconciler.olmClient.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.TODO(), gitopsSubscriptionName, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(s.Spec).To(BeEquivalentTo(newSubscription(&v1alpha1.SubscriptionSpec{}).Spec))
+			})
+
+			It("deploys a custom subscription when a custom configuration is found in the filesystem", func() {
+				f, err := os.CreateTemp("", "gitops-config.yaml.*")
+				Expect(err).NotTo(HaveOccurred())
+				defer os.Remove(f.Name())
+
+				customSpec := &v1alpha1.SubscriptionSpec{
+					CatalogSource:       "my-source",
+					Channel:             "my-channel",
+					StartingCSV:         "starting-csv",
+					InstallPlanApproval: v1alpha1.ApprovalManual,
+				}
+				b, err := json.Marshal(customSpec)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = f.Write(b)
+				Expect(err).NotTo(HaveOccurred())
+				err = f.Close()
+				Expect(err).NotTo(HaveOccurred())
+				err = reconciler.deployGitopsSubscription(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				s, err := reconciler.olmClient.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.TODO(), gitopsSubscriptionName, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(s.Spec).To(BeEquivalentTo(newSubscription(customSpec).Spec))
+			})
+
+		})
+		When("a subscription already exists", func() {
+			var (
+				customSpec *v1alpha1.SubscriptionSpec
+			)
+			BeforeEach(func() {
+				nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+				reconciler = newFakeReconciler(nsOperators, buildPatternManifest(10))
+				customSpec = &v1alpha1.SubscriptionSpec{
+					CatalogSource:       "my-source",
+					Channel:             "my-channel",
+					StartingCSV:         "starting-csv",
+					InstallPlanApproval: v1alpha1.ApprovalManual,
+				}
+			})
+			It("reconciles a subscription with custom values to default configuration when no custom configuration is found", func() {
+				reconciler.olmClient = newOLMClient(olmclient.NewSimpleClientset(newSubscription(customSpec)))
+
+				err := reconciler.deployGitopsSubscription("/file-does-not-exist")
+				Expect(err).NotTo(HaveOccurred())
+				s, err := reconciler.olmClient.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.TODO(), gitopsSubscriptionName, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(s.Spec).To(BeEquivalentTo(newSubscription(&v1alpha1.SubscriptionSpec{}).Spec))
+			})
+
+			It("reconciles a subscription with default values when a custom configuration is found in the filesystem", func() {
+				reconciler.olmClient = newOLMClient(olmclient.NewSimpleClientset(newSubscription(&v1alpha1.SubscriptionSpec{})))
+				f, err := os.CreateTemp("", "gitops-config.yaml.*")
+				Expect(err).NotTo(HaveOccurred())
+				defer os.Remove(f.Name())
+
+				b, err := json.Marshal(customSpec)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = f.Write(b)
+				Expect(err).NotTo(HaveOccurred())
+				err = f.Close()
+				Expect(err).NotTo(HaveOccurred())
+				err = reconciler.deployGitopsSubscription(f.Name())
+				Expect(err).NotTo(HaveOccurred())
+				s, err := reconciler.olmClient.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.TODO(), gitopsSubscriptionName, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(s.Spec).To(BeEquivalentTo(newSubscription(customSpec).Spec))
+			})
+
+			It("validates that the reconciliation will wait until the gitops installplan has completed", func() {
+				reconciler.olmClient = newOLMClient(olmclient.NewSimpleClientset(newSubscription(&v1alpha1.SubscriptionSpec{})))
+				By("reconciling the first pattern when the gitops subscription does not exist")
+				_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+				Expect(err).To(HaveOccurred())
+				subs, err := reconciler.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(subs).NotTo(BeNil())
+				subs.Status.InstallPlanRef = &corev1.ObjectReference{
+					Kind:       "InstallPlan",
+					APIVersion: "operators.coreos.com/v1alpha1",
+					Namespace:  subscriptionNamespace,
+					Name:       "my-installplan",
+				}
+				By("updating the subscription to include the reference to the installplan")
+				_, err = reconciler.olmClient.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), subs, metav1.UpdateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+				Expect(kerrors.IsNotFound(err)).To(BeTrue())
+
+				By("creating the installplan instance with empty phase")
+				ip := &v1alpha1.InstallPlan{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-installplan",
+						Namespace: subscriptionNamespace,
+					},
+					Status: v1alpha1.InstallPlanStatus{Phase: v1alpha1.InstallPlanPhaseInstalling},
+				}
+				_, err = reconciler.olmClient.client.OperatorsV1alpha1().InstallPlans(subscriptionNamespace).Create(context.Background(), ip, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+				Expect(err).To(Equal(fmt.Errorf("gitops subscription deployment is not yet complete")))
+
+				By("updating the installplan phase to be completed")
+				ip.Status.Phase = v1alpha1.InstallPlanPhaseComplete
+				_, err = reconciler.olmClient.client.OperatorsV1alpha1().InstallPlans(subscriptionNamespace).Update(context.Background(), ip, metav1.UpdateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("validating that the reconciliation completes successfully after the gitops operator has completed its deployment")
+				_, err = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
 })
 
 func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
@@ -174,8 +313,9 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	return &PatternReconciler{
 		Scheme:         scheme.Scheme,
 		Client:         fakeClient,
-		olmClient:      olmclient.NewSimpleClientset(),
+		olmClient:      newOLMClient(olmclient.NewSimpleClientset()),
 		driftWatcher:   watcher,
+		argoClient:     argoclient.NewSimpleClientset(),
 		configClient:   configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient: operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 	}

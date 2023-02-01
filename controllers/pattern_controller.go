@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -41,6 +43,7 @@ import (
 
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 
@@ -62,7 +65,7 @@ type PatternReconciler struct {
 	config         *rest.Config
 	configClient   configclient.Interface
 	argoClient     argoclient.Interface
-	olmClient      olmclient.Interface
+	olmClient      *olmClient
 	fullClient     kubernetes.Interface
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
@@ -180,29 +183,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub := newSubscription(*qualifiedInstance)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
-
-	_, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
-	if sub == nil {
-		err := createSubscription(r.olmClient, targetSub)
-		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if ownedBySame(targetSub, sub) {
-		// Check version/channel etc
-		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		err, changed := updateSubscription(r.olmClient, targetSub, sub)
-		if changed {
-			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
-		}
-	} else {
-		logOnce("The gitops subscription is not owned by us, leaving untouched")
+	s, err := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, "get gitops subscription", err)
 	}
-
-	logOnce("subscription found")
-
-	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.Client, applicationNamespace) {
-		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
+	if s.Status.InstallPlanRef == nil {
+		return r.actionPerformed(qualifiedInstance, "get gitops installplan", fmt.Errorf("waiting for installplan to be created"))
+	}
+	p, err := r.olmClient.getInstallPlan(s.Status.InstallPlanRef.Name)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, "get gitops subscription phase", err)
+	}
+	if p.Status.Phase != operatorv1alpha1.InstallPlanPhaseComplete {
+		return r.actionPerformed(qualifiedInstance, "gitops subscription phase", fmt.Errorf("gitops subscription deployment is not yet complete"))
 	}
 
 	logOnce("namespace found")
@@ -360,16 +353,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
-		output.Spec.GitOpsConfig.OperatorChannel = "stable"
-	}
-
-	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
-		output.Spec.GitOpsConfig.OperatorSource = "redhat-operators"
-	}
-	if len(output.Spec.GitOpsConfig.OperatorCSV) == 0 {
-		output.Spec.GitOpsConfig.OperatorCSV = "v1.4.0"
-	}
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
@@ -453,9 +436,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
-		return err
-	}
+	r.olmClient = newOLMClient(olmclient.NewForConfigOrDie(r.config))
 
 	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
 		return err
@@ -469,9 +450,40 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
+
+	if err = r.deployGitopsSubscription(customConfigFile); err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
+}
+
+func (r *PatternReconciler) deployGitopsSubscription(filename string) error {
+
+	spec := operatorv1alpha1.SubscriptionSpec{}
+	storedSubscription, err := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
+	newSpec := newSubscription(&spec)
+	if err != nil && !kerrors.IsNotFound(err) {
+		return err
+	}
+	//#nosec
+	if _, err = os.Stat(filename); !os.IsNotExist(err) {
+		b, err := os.ReadFile(filename)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(b, &spec)
+		if err != nil {
+			return err
+		}
+		newSpec = newSubscription(&spec)
+	}
+	if storedSubscription == nil {
+		return r.olmClient.createSubscription(newSpec)
+	}
+	_, err = r.olmClient.updateSubscription(newSpec, storedSubscription)
+	return err
 }
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
