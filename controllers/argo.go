@@ -100,6 +100,8 @@ func newApplicationValueFiles(p api.Pattern) []string {
 	files := []string{
 		"/values-global.yaml",
 		fmt.Sprintf("/values-%s.yaml", p.Spec.ClusterGroupName),
+		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterPlatform),
+		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Status.ClusterVersion),
 		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
 		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterVersion, p.Spec.ClusterGroupName),
 		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterName),
