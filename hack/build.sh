@@ -1,13 +1,10 @@
 #!/bin/bash
 set -ex
 
-if [[ -z "$GOOS" ]] ; then
-    >&2 echo "GOOS must be set! Example: GOOS=linux GOARCH=amd64 ./hack/build.sh"
-    exit 1
-elif [[ -z "$GOARCH" ]] ; then
-    >&2 echo "GOARCH must be set! Example: GOOS=linux GOARCH=amd64 ./hack/build.sh"
-    exit 1
-fi
+# GOOS and GOARCH will be set if calling from make. Dockerfile calls this script
+# directory without calling make so the default values need to be set here also.
+[[ -z "$GOOS" ]] && GOOS=linux
+[[ -z "$GOARCH" ]] && GOARCH=amd64
 
 GIT_VERSION=$(git describe --always --tags || true)
 VERSION=${CI_UPSTREAM_VERSION:-${GIT_VERSION}}
