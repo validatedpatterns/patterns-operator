@@ -58,7 +58,7 @@ Run the operator on your local machine against a cluster's API.
 
 ```
 oc login
-oc apply -f ./config/crd/bases/*.yaml
+oc apply -f ./config/crd/bases
 # For Linux amd64
 make run
 # For MacOS arm64 (M series)
