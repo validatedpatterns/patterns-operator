@@ -2,7 +2,7 @@
 set -ex
 
 # GOOS and GOARCH will be set if calling from make. Dockerfile calls this script
-# directory without calling make so the default values need to be set here also.
+# directly without calling make so the default values need to be set here also.
 [[ -z "$GOOS" ]] && GOOS=linux
 [[ -z "$GOARCH" ]] && GOARCH=amd64
 
