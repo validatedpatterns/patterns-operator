@@ -99,14 +99,18 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 ##@ Build
 
+# Override GOOS and GOARCH to build for a different OS and architecture. For
+# example, MacOS M series (arm64) should be: GOOS=darwin GOARCH=arm64 make build
+GOOS ?= linux
+GOARCH ?= amd64
+
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
-	hack/build.sh
+	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	hack/build.sh run
-#	go run ./main.go
+	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
 
 .PHONY: docker-build
 docker-build:  ## Build docker image with the manager.
