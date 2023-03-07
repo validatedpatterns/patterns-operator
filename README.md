@@ -44,6 +44,7 @@ The subscription and anything created by Argo will not be removed and canmust be
 Removing the top-level application ensures that Argo won't try to put back anything you delete.
 
 ## Watch the logs
+
 Note that when installing via UI the namespace will be `openshift-operators` and not `patterns-operator-system`
 ```
 oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
@@ -51,7 +52,23 @@ oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o na
 
 ## Development
 
-### Test your changes
+### Test your changes (locally)
+
+Run the operator on your local machine against a cluster's API.
+
+```
+oc login
+oc apply -f ./config/crd/bases
+# For Linux amd64
+make run
+# For MacOS arm64 (M series)
+GOOS=darwin GOARCH=arm64 make run
+```
+
+### Test your changes (on cluster)
+
+Run the operator on an OpenShift cluster.
+
 ```
 BRANCH=`whoami`
 git co -b $BRANCH
@@ -65,6 +82,7 @@ VERSION=$BRANCH make deploy
 ### Test your changes (alt)
 
 Replace $USER and the version of the operator:
+
 ```
 vi somefile.go
 export IMAGE_TAG_BASE=quay.io/$USER/patterns-operator
@@ -73,8 +91,8 @@ make docker-build docker-push bundle
 make deploy
 ```
 
-
 Restart the container to pick up the latest image from quay
+
 ```
  oc delete pods -n patterns-operator-system --all; oc get pods -n patterns-operator-system -w
 ```
