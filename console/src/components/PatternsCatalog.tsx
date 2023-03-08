@@ -14,6 +14,7 @@ import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 import CubesIcon from '@patternfly/react-icons/dist/esm/icons/cubes-icon';
 import '../main.css';
 import PatternsCatalogModal from './PatternsCatalogModal';
+import PatternsCatalogItemBadge from './PatternsCatalogItemBadge';
 
 export default function PatternsCatalog() {
   const [patternManifests, loaded, loadError] = useK8sWatchResource<PatternManifest[]>({
@@ -67,6 +68,7 @@ export default function PatternsCatalog() {
     );
   }
 
+  // https://www.patternfly.org/v4/extensions/catalog-view/catalog-tile
   return (
     <>
       <PageSection className="patterns-console-plugin__cards" variant="light">
@@ -79,12 +81,11 @@ export default function PatternsCatalog() {
               // TODO: If we want an image, here's where it goes!
               // iconImg={pfLogo2}
               iconAlt="PatternFly logo"
-              badges={['Validated']}
+              badges={[<PatternsCatalogItemBadge key={0} />]}
               title={item.metadata.name}
               vendor="Validated Patterns Team"
               description={item.spec.description}
-              onClick={(event) => {
-                event.preventDefault();
+              onClick={() => {
                 setModalData(item);
                 setModalVisible(true);
               }}

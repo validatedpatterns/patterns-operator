@@ -13,8 +13,13 @@
 }
 
 .patterns-console-plugin__card {
+  color: var(--pf-c-content--Color);
   flex: 0 0 250px;
   height: 250px;
   margin: 10px;
   width: 250px;
+}
+
+.patterns-console-plugin__validated_badge {
+  color: var(--pf-global--palette--green-400);
 }
