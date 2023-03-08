@@ -35,6 +35,14 @@ export default function PatternsCatalogModel(props) {
         <p><b>Branch:</b> {data.pattern.branch}</p>
         <p><b>Type:</b> {data.pattern.badge}</p>
         <p><b>URL:</b> <a href={data.pattern.url}>{data.pattern.url}</a></p>
+        <p>
+          <b>Products:</b>
+          <ul>
+            {data.pattern.products.map((item) => {
+              return <li key={item.name}>{item.name}</li>;
+            })}
+          </ul>
+        </p>
       </Modal>
     </>
   );
