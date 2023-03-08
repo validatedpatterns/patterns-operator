@@ -13,17 +13,26 @@ export const patternManifestKind: K8sGroupVersionKind = {
 export type PatternManifest = {
   // TODO: These fields probably shouldn't all be optional
   spec: {
-    branch?: string;
-    description?: string;
-    maintainers?: string;
-    products?: PatternManifestSpecProducts[];
-    url?: string;
+    organization: {
+      description?: string;
+      maintainers?: string;
+      name?: string;
+      url?: string;
+    };
+    pattern: {
+      badge?: string;
+      branch?: string;
+      longDescription?: string;
+      shortDescription?: string;
+      maintainers?: string;
+      name?: string;
+      products?: {
+        name: string;
+      }[];
+      url?: string;
+    };
   };
 } & K8sResourceCommon;
-
-export type PatternManifestSpecProducts = {
-  name: string;
-};
 
 export const PatternManifestModel: K8sModel = {
   apiVersion: patternManifestKind.version,

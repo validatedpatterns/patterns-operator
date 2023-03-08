@@ -8,6 +8,8 @@ export default function PatternsCatalogModel(props) {
     return null;
   }
 
+  const data = props.data.spec
+
   return (
     <>
       <Modal
@@ -20,8 +22,18 @@ export default function PatternsCatalogModel(props) {
         onClose={props.onClose}
         title={props.data.metadata.name}
       >
-        <p>{props.data.metadata.name}</p>
-        <p>{props.data.spec.description}</p>
+        <h1>Organization</h1>
+        <p>Name: {data.organization.name}</p>
+        <p>Description: {data.organization.description}</p>
+        <p>URL: {data.organization.url}</p>
+        <p>Maintainers: {data.organization.maintainers}</p>
+
+        <h1>Pattern</h1>
+        <p>Name: {data.pattern.name}</p>
+        <p>Description: {data.pattern.longDescription}</p>
+        <p>Branch: {data.pattern.branch}</p>
+        <p>Type: {data.pattern.badge}</p>
+        <p>URL: {data.pattern.url}</p>
       </Modal>
     </>
   );

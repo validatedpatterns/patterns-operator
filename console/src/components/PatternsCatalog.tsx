@@ -72,19 +72,19 @@ export default function PatternsCatalog() {
   return (
     <>
       <PageSection className="patterns-console-plugin__cards" variant="light">
-        {patternManifests.map((item, index) => {
+        {patternManifests.map((item) => {
           return (
             <CatalogTile
               className="patterns-console-plugin__card"
-              key={index}
+              key={item.metadata.name}
               id={item.metadata.name}
               // TODO: If we want an image, here's where it goes!
               // iconImg={pfLogo2}
               iconAlt="PatternFly logo"
               badges={[<PatternsCatalogItemBadge key={0} />]}
-              title={item.metadata.name}
-              vendor="Validated Patterns Team"
-              description={item.spec.description}
+              title={item.spec.pattern.name}
+              vendor={item.spec.organization.name}
+              description={item.spec.pattern.shortDescription}
               onClick={() => {
                 setModalData(item);
                 setModalVisible(true);
