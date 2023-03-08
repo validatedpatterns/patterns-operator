@@ -1,8 +1,8 @@
 {
-  "name": "console-plugin-template",
+  "name": "patterns-console-plugin",
   "version": "0.0.1",
   "private": true,
-  "repository": "git@github.com:spadgett/console-plugin-template.git",
+  "repository": "https://github.com/hybrid-cloud-patterns/patterns-operator",
   "license": "Apache-2.0",
   "scripts": {
     "clean": "rm -rf dist",
@@ -57,12 +57,12 @@
     "webpack-dev-server": "^4.7.4"
   },
   "consolePlugin": {
-    "name": "console-plugin-template",
+    "name": "patterns-console-plugin",
     "version": "0.0.1",
-    "displayName": "OpenShift Console Plugin Template",
-    "description": "Template project for OpenShift console plugins. Edit package.json to change this message and the plugin name.",
+    "displayName": "Patterns Dynamic Console Plugin",
+    "description": "OpenShift dynamic console plugin for the Patterns Operator",
     "exposedModules": {
-      "ExamplePage": "./components/ExamplePage"
+      "PatternsCatalog": "./components/PatternsCatalog"
     },
     "dependencies": {
       "@console/pluginAPI": "*"

@@ -3,18 +3,27 @@
     "type": "console.page/route",
     "properties": {
       "exact": true,
-      "path": "/example",
-      "component": { "$codeRef": "ExamplePage" }
+      "path": "/patterns-catalog",
+      "component": { "$codeRef": "PatternsCatalog" }
     }
   },
   {
     "type": "console.navigation/href",
     "properties": {
-      "id": "example",
-      "name": "Plugin Example",
-      "href": "/example",
+      "id": "patterns-catalog",
+      "name": "Patterns Catalog",
+      "href": "/patterns-catalog",
       "perspective": "admin",
-      "section": "home"
+      "section": "patterns-section"
+    }
+  },
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "patterns-section",
+      "insertAfter": "home",
+      "perspective": "admin",
+      "name": "Patterns"
     }
   }
 ]
