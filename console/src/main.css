@@ -23,3 +23,7 @@
 .patterns-console-plugin__validated_badge {
   color: var(--pf-global--palette--green-400);
 }
+
+.patterns-console-plugin__community_badge {
+  color: var(--pf-global--palette--blue-400);
+}

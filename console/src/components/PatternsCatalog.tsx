@@ -81,7 +81,12 @@ export default function PatternsCatalog() {
               // TODO: If we want an image, here's where it goes!
               // iconImg={pfLogo2}
               iconAlt="PatternFly logo"
-              badges={[<PatternsCatalogItemBadge key={0} />]}
+              badges={[
+                <PatternsCatalogItemBadge
+                  key={0}
+                  text={item.spec.pattern.badge}
+                />,
+              ]}
               title={item.spec.pattern.name}
               vendor={item.spec.organization.name}
               description={item.spec.pattern.shortDescription}
