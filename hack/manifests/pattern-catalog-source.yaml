@@ -1,0 +1,8 @@
+# Example PatternCatalogSource for testing
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: PatternCatalogSource
+metadata:
+  name: my-pattern-catalog
+  namespace: default
+spec:
+  source: 'https://raw.githubusercontent.com/RyanMillerC/pattern-catalog/main/catalog.yaml'

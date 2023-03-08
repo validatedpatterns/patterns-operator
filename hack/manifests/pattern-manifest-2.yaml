@@ -1,0 +1,36 @@
+# Example PatternCatalogSource for testing
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: PatternManifest
+metadata:
+  name: multicluster-devsecops
+  namespace: default
+spec:
+  organization:
+    name: Hybrid Cloud Patterns
+    description: >
+      Open source repository of cloud native solution patterns. This repository
+      is maintained by Red Hat with contributions from customers and partners.
+    maintainers: team-validated-patterns@redhat.com
+    url: https://github.com/hybrid-cloud-patterns
+  pattern:
+    name: Multicluster DevSecOps
+    shortDescription: A horizontal solution for multicluster DevSecOps use cases
+    longDescription: >
+      This pattern demonstrates a horizontal solution for multicluster DevSecOps
+      use cases. It is derived from the multi-cloud GitOps pattern with added
+      products to provide a complete DevSecOps workflow. This includes CI/CD
+      pipelines with security gates; image scanning, signing and storage in a
+      secure registry; deployment to secured clusters that provide advanced
+      security monitoring and alerting.
+    badge: Community
+    branch: main
+    maintainers: team-validated-patterns@redhat.com
+    products:
+      - name: Red Hat Advanced Cluster Management
+      - name: Red Hat OpenShift GitOps
+      - name: Red Hat OpenShift Pipelines
+      - name: Red Hat Quay Enterprise
+      - name: Red Hat Open Data Foundation
+      - name: Red Hat Advanced Cluster Security
+      - name: Hashicorp Vault
+    url: https://github.com/hybrid-cloud-patterns/multicluster-devsecops

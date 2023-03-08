@@ -1,0 +1,38 @@
+# Example PatternCatalogSource for testing
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: PatternManifest
+metadata:
+  name: industrial-edge
+  namespace: default
+spec:
+  organization:
+    name: Hybrid Cloud Patterns
+    description: >
+      Open source repository of cloud native solution patterns. This repository
+      is maintained by Red Hat with contributions from customers and partners.
+    maintainers: team-validated-patterns@redhat.com
+    url: https://github.com/hybrid-cloud-patterns
+  pattern:
+    name: Industrial Edge
+    shortDescription: A horizontal solution for Industrial Edge use cases
+    longDescription: >
+      This pattern demonstrates a horizontal solution for Industrial Edge use
+      cases. It is derived from the MANUela work done by Red Hat Middleware
+      Solution Architects in Germany in 2019/20. The name MANUela stands for
+      MANUfacturing Edge Lightweight Accelerator, you will see this acronym in a
+      lot of artifacts.
+    badge: Validated
+    branch: stable
+    maintainers: team-validated-patterns@redhat.com
+    products:
+      - name: Red Hat Advanced Cluster Management
+      - name: Red Hat OpenShift GitOps
+      - name: Red Hat OpenShift Pipelines
+      - name: Red Hat AMQ
+      - name: Red Hat AMQ Streams
+      - name: Red Hat Integration
+      - name: Quay.io
+      - name: Open Data Hub
+      - name: Seldon
+      - name: Hashicorp Vault
+    url: https://github.com/hybrid-cloud-patterns/industrial-edge
