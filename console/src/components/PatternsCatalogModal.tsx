@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Modal } from '@patternfly/react-core';
+import { Button, Modal, ModalVariant } from '@patternfly/react-core';
 import '../main.css';
 
 export default function PatternsCatalogModel(props) {
@@ -20,20 +20,21 @@ export default function PatternsCatalogModel(props) {
         ]}
         isOpen={props.isOpen}
         onClose={props.onClose}
-        title={props.data.metadata.name}
+        title={data.pattern.name}
+        variant={ModalVariant.medium}
       >
-        <h1>Organization</h1>
-        <p>Name: {data.organization.name}</p>
-        <p>Description: {data.organization.description}</p>
-        <p>URL: {data.organization.url}</p>
-        <p>Maintainers: {data.organization.maintainers}</p>
-
-        <h1>Pattern</h1>
-        <p>Name: {data.pattern.name}</p>
-        <p>Description: {data.pattern.longDescription}</p>
-        <p>Branch: {data.pattern.branch}</p>
-        <p>Type: {data.pattern.badge}</p>
-        <p>URL: {data.pattern.url}</p>
+        <h2>Organization</h2>
+        <p><b>Name:</b> {data.organization.name}</p>
+        <p><b>Description:</b> {data.organization.description}</p>
+        <p><b>URL:</b> <a href={data.organization.url}>{data.organization.url}</a></p>
+        <p><b>Maintainers:</b> {data.organization.maintainers}</p>
+        <br /> {/* TODO: Replace this hack */}
+        <h2>Pattern</h2>
+        <p><b>Name:</b> {data.pattern.name}</p>
+        <p><b>Description:</b> {data.pattern.longDescription}</p>
+        <p><b>Branch:</b> {data.pattern.branch}</p>
+        <p><b>Type:</b> {data.pattern.badge}</p>
+        <p><b>URL:</b> <a href={data.pattern.url}>{data.pattern.url}</a></p>
       </Modal>
     </>
   );
