@@ -22,6 +22,8 @@ import (
 	"log"
 	"reflect"
 
+"gopkg.in/yaml.v2"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -144,4 +146,57 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 	}
 
 	return nil, changed
+}
+
+
+func buildSubscriptionExclusions(p api.Pattern, client olmclient.Interface) []string {
+        disabled := []string
+	valueFiles := newApplicationValueFiles(p)
+	for _, f := range valueFiles {
+		valuesFile := filepath.Join(p.Status.Path, f)
+		if _, err := os.Stat(valuesFile); !os.IsNotExist(err) {
+
+			parsedSubs := parseValueSubs(valuesFile)
+ 		        for _, key := range parsedSubs.keys() {
+			    // handle arrays too
+			     targetSub := parsedSubs[key]
+			     namespace := "openshift-operators"
+			     if sub["namespace"] != nil {
+			     	namespace = sub["namespace"]
+			     }
+		              _, sub := getSubscription(client, targetSub["name"], namespace)
+		             if sub != nil && !ownedBySame(targetSub, sub) {
+		                disabled = append(disabled, fmt.Sprintf("clusterGroup.subscriptions.%s.disabled", key))
+		             }
+                        }
+		}
+	}
+        return disabled
+}
+
+func parseValueSubs(filename string) map[string]interface{} {
+
+    yamlFile, err := ioutil.ReadFile(filename)
+
+    if err != nil {
+        panic(err)
+    }
+
+    var jsonconfig map[string]interface{}
+
+    err = yaml.Unmarshal(yamlFile, &jsonconfig)
+    if err != nil {
+        panic(err)
+    }
+
+    //subs := jsonconfig.clusterGroup.subscriptions
+    cg := jsonconfig["clusterGroup"].(map[string]interface{})
+    subs := cg["subscriptions"].(map[string]interface{})
+
+    if substr, err = yaml.Marshal(subs); err != nil {
+        log.Println("Found subs: ", substr)
+        log.Println("Found sub keys: ", subs.keys())
+    }
+
+    return subs
 }
