@@ -180,6 +180,8 @@ func cloneRepo(url string, directory string, token string) error {
 	var options = &git.CloneOptions{
 		URL:      url,
 		Progress: os.Stdout,
+		Depth: 0,
+		// ReferenceName: plumbing.ReferenceName,
 	}
 
 	if len(token) > 0 {
