@@ -82,7 +82,7 @@ spec:
                     type: string
                   operatorChannel:
                     description: 'Channel to deploy openshift-gitops from. Default:
-                      stable'
+                      gitops-1.8'
                     type: string
                   operatorSource:
                     description: 'Source to deploy openshift-gitops from. Default:

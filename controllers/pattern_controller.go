@@ -361,7 +361,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
-		output.Spec.GitOpsConfig.OperatorChannel = "stable"
+		output.Spec.GitOpsConfig.OperatorChannel = "gitops-1.8"
 	}
 
 	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {

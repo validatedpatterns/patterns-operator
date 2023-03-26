@@ -111,7 +111,7 @@ const (
 )
 
 type GitOpsConfig struct {
-	// Channel to deploy openshift-gitops from. Default: stable
+	// Channel to deploy openshift-gitops from. Default: gitops-1.8
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OperatorChannel string `json:"operatorChannel,omitempty"`
 	// Source to deploy openshift-gitops from. Default: redhat-operators
