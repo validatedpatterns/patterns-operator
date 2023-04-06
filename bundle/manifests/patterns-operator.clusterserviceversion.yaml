@@ -64,7 +64,7 @@ spec:
       - description: Specific version of openshift-gitops to deploy.  Requires UseCSV=True
         displayName: Operator CSV
         path: gitOpsSpec.operatorCSV
-      - description: 'Channel to deploy openshift-gitops from. Default: stable'
+      - description: 'Channel to deploy openshift-gitops from. Default: gitops-1.8'
         displayName: Operator Channel
         path: gitOpsSpec.operatorChannel
       - description: 'Source to deploy openshift-gitops from. Default: redhat-operators'

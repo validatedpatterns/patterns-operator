@@ -43,7 +43,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	//    name: openshift-gitops-operator
 	//    namespace: openshift-operators
 	//  spec:
-	//    channel: stable
+	//    channel: v1.8.x
 	//    installPlanApproval: Automatic
 	//    name: openshift-gitops-operator
 	//    source: redhat-operators
