@@ -1,0 +1,42 @@
+# This catalog is used for testing OLM deployment outside of the OperatorHub
+# community catalog. You should only use this catalog for validating OLM
+# bundles and for testing OLM upgrades against an OpenShift cluster.
+#
+# $VERSION and $BUNDLE_IMG will be replaced by `make catalog-build`
+#
+# If you want to test upgrading, replace this file's contents with an
+# uncommented copy of this (replace bundle image and versions, can't do that
+# automatically):
+#
+# schema: olm.package
+# name: patterns-operator
+# defaultChannel: fast
+# ---
+# schema: olm.channel
+# package: patterns-operator
+# name: fast
+# entries:
+# # Old Version
+# - name: patterns-operator.v0.0.12
+# # New Version
+# - name: patterns-operator.v0.0.13
+#   replaces: patterns-operator.v0.0.12
+# ---
+# schema: olm.bundle
+# image: quay.io/youruser/patterns-operator-bundle:v0.0.12
+# ---
+# schema: olm.bundle
+# image: quay.io/youruser/patterns-operator-bundle:v0.0.13
+#
+schema: olm.package
+name: patterns-operator
+defaultChannel: fast
+---
+schema: olm.channel
+package: patterns-operator
+name: fast
+entries:
+- name: patterns-operator.v$VERSION
+---
+schema: olm.bundle
+image: $BUNDLE_IMG

@@ -240,20 +240,21 @@ ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+# Build an OLM catalog image by adding the bundle image to a simple catalog using the
+# operator package manager tool, 'opm'. For more information see:
+# https://olm.operatorframework.io/docs/reference/catalog-templates
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+catalog-build: opm ## Build an OLM catalog image (for testing).
+	cat catalog/template.yaml | BUNDLE_IMG=$(BUNDLE_IMG) VERSION=$(VERSION) envsubst > catalog/_template.yaml
+	$(OPM) alpha render-template basic -o yaml < catalog/_template.yaml > catalog/catalog.yaml
+	cd catalog ; docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t $(CATALOG_IMG) .
 
-# Push the catalog image.
 .PHONY: catalog-push
-catalog-push: ## Push a catalog image.
+catalog-push: ## Push the OLM catalog image (for testing).
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 .PHONY: catalog-install
-catalog-install: config/samples/pattern-catalog-$(VERSION).yaml
+catalog-install: config/samples/pattern-catalog-$(VERSION).yaml ## Install the OLM catalog on a cluster (for testing).
 	-oc delete -f config/samples/pattern-catalog-$(VERSION).yaml
 	oc create -f config/samples/pattern-catalog-$(VERSION).yaml
 

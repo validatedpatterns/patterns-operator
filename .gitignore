@@ -15,7 +15,6 @@ testbin/*
 *.out
 
 # Kubernetes Generated files - skip generated files, except for vendored files
-
 !vendor/**/zz_generated.*
 
 # editor and IDE paraphernalia
@@ -24,3 +23,7 @@ testbin/*
 *.swo
 *~
 manager
+
+# Generated OLM catalog and template
+/catalog/catalog.yaml
+/catalog/_template.yaml
