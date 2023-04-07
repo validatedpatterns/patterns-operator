@@ -26,6 +26,12 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
+# Override CONTAINER_PLATFORM and CONTAINER_OS to build for a different OS and
+# architecture. These should probably always be amd64/linux unless you're
+# running the container images on another OS or arch.
+CONTAINER_OS ?= linux
+CONTAINER_PLATFORM ?= amd64
+
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
@@ -114,7 +120,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build:  ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -182,12 +188,11 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
-
 
 .PHONY: csv-date
 csv-date: ## Set createdAt date in the CSV.
@@ -255,7 +260,6 @@ catalog-install: config/samples/pattern-catalog-$(VERSION).yaml
 config/samples/pattern-catalog-$(VERSION).yaml:
 	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
 	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
-
 
 golangci-lint:
 	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.46.2 golangci-lint run -v
