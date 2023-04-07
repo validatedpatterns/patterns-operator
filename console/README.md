@@ -5,7 +5,7 @@ works with OpenShift 4.10, see the `release-4.10` branch of
 [openshift/console-plugin-template].
 
 [OpenShift Console Dynamic plugins] allow you to extend the
-[OpenShift Console UI] at runtime, adding custom pages and other extensions.
+[OpenShift Console] at runtime, adding custom pages and other extensions.
 They are based on [Webpack Module Federation]. Plugins are registered with
 console using the `ConsolePlugin` custom resource and enabled in the console
 operator config by a cluster administrator.
