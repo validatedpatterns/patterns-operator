@@ -1,49 +1,25 @@
-# OpenShift Console Plugin Template
+# Patterns Operator - OpenShift Console Dynamic Plugin
 
-This project is a minimal template for writing a new OpenShift Console dynamic
-plugin. It requires OpenShift 4.11. For an example of a plugin that works with
-OpenShift 4.10, see the `release-4.10` branch.
+At the moment this requires OpenShift 4.11. (For an example of a plugin that works with
+OpenShift 4.10, see the `release-4.10` branch of [openshift/console-plugin-template].
 
-[Dynamic plugins](https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk)
-allow you to extend the
-[OpenShift UI](https://github.com/openshift/console)
-at runtime, adding custom pages and other extensions. They are based on
-[webpack module federation](https://webpack.js.org/concepts/module-federation/).
-Plugins are registered with console using the `ConsolePlugin` custom resource
-and enabled in the console operator config by a cluster administrator.
+[OpenShift Console Dynamic plugins] allow you to extend the [OpenShift Console
+UI] at runtime, adding custom pages and other extensions. They are based on
+[Webpack Module Federation]. Plugins are registered with console using the
+`ConsolePlugin` custom resource and enabled in the console operator config by a
+cluster administrator.
 
-[Node.js](https://nodejs.org/en/) and [yarn](https://yarnpkg.com) are required
-to build and run the example. To run OpenShift console in a container, either
-[Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io) and
-[oc](https://console.redhat.com/openshift/downloads) are required.
+The following are required to build the plugin:
 
-## Getting started
+- [Node.js]
+- [yarn]
+- [podman] 3.2.0+ - **Preferred**
+- [Docker] - Alternate
 
-After cloning this repo, you should update the plugin metadata such as the
-plugin name in the `consolePlugin` declaration of [package.json](package.json).
+If you want to test against a real cluster, you will also need:
 
-```json
-"consolePlugin": {
-  "name": "my-plugin",
-  "version": "0.0.1",
-  "displayName": "My Plugin",
-  "description": "Enjoy this shiny, new console plugin!",
-  "exposedModules": {
-    "ExamplePage": "./components/ExamplePage"
-  },
-  "dependencies": {
-    "@console/pluginAPI": "*"
-  }
-}
-```
-
-The template adds a single example page in the Home navigation section. The
-extension is declared in the [console-extensions.json](console-extensions.json)
-file and the React component is declared in
-[src/components/ExamplePage.tsx](src/components/ExamplePage.tsx).
-
-You can run the plugin using a local development environment or build an image
-to deploy it to a cluster.
+- A running [OpenShift Cluster]
+- [OpenShift CLI] - oc
 
 ## Development
 
@@ -56,8 +32,8 @@ In one terminal window, run:
 
 In another terminal window, run:
 
-1. `oc login` (requires [oc](https://console.redhat.com/openshift/downloads) and an [OpenShift cluster](https://console.redhat.com/openshift/create))
-2. `yarn run start-console` (requires [Docker](https://www.docker.com) or [podman 3.2.0+](https://podman.io))
+1. `oc login`
+2. `yarn run start-console`
 
 This will run the OpenShift console in a container connected to the cluster
 you've logged into. The plugin HTTP server runs on port 9001 with CORS enabled.
@@ -67,8 +43,7 @@ Navigate to <http://localhost:9000/example> to see the running plugin.
 
 If you are using podman on a Mac with Apple silicon, `yarn run start-console`
 might fail since it runs an amd64 image. You can workaround the problem with
-[qemu-user-static](https://github.com/multiarch/qemu-user-static) by running
-these commands:
+[qemu-user-static] by running these commands:
 
 ```bash
 podman machine ssh
@@ -79,12 +54,11 @@ systemctl reboot
 
 ### Option 2: Docker + VSCode Remote Container
 
-Make sure the
-[Remote Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-extension is installed. This method uses Docker Compose where one container is
-the OpenShift console and the second container is the plugin. It requires that
-you have access to an existing OpenShift cluster. After the initial build, the
-cached containers will help you start developing in seconds.
+Make sure the [Remote Containers] extension is installed. This method uses
+Docker Compose where one container is the OpenShift console and the second
+container is the plugin. It requires that you have access to an existing
+OpenShift cluster. After the initial build, the cached containers will help you
+start developing in seconds.
 
 1. Create a `dev.env` file inside the `.devcontainer` folder with the correct values for your cluster:
 
@@ -99,7 +73,7 @@ OC_PASS=<password>
 3. `yarn run start`
 4. Navigate to <http://localhost:9000/example>
 
-## Docker image
+## Container image
 
 Before you can deploy your plugin on a cluster, you must build an image and
 push it to an image registry.
@@ -126,35 +100,14 @@ NOTE: If you have a Mac with Apple silicon, you will need to add the flag
 `--platform=linux/amd64` when building the image to target the correct platform
 to run in-cluster.
 
-## Deployment on cluster
-
-A [Helm](https://helm.sh) chart is available to deploy the plugin to an OpenShift environment.
-
-The following Helm parameters are required:
-
-`plugin.image`: The location of the image containing the plugin that was previously pushed
-
-Additional parameters can be specified if desired. Consult the chart [values](charts/openshift-console-plugin/values.yaml) file for the full set of supported parameters.
-
-### Installing the Helm Chart
-
-Install the chart using the name of the plugin as the Helm release name into a new namespace or an existing namespace as specified by the `my-plugin-namespace` parameter and providing the location of the image within the `plugin.image` parameter by using the following command:
-
-```shell
-helm upgrade -i  my-plugin charts/openshift-console-plugin -n my-plugin-namespace --create-namespace --set plugin.image=my-plugin-image-location
-```
-
-NOTE: When deploying on OpenShift 4.10, it is recommended to add the parameter `--set plugin.securityContext.enabled=false` which will omit configurations related to Pod Security.
-
 ## Linting
 
 This project adds prettier, eslint, and stylelint. Linting can be run with
 `yarn run lint`.
 
 The stylelint config disallows hex colors since these cause problems with dark
-mode (starting in OpenShift console 4.11). You should use the
-[PatternFly global CSS variables](https://patternfly-react-main.surge.sh/developer-resources/global-css-variables#global-css-variables)
-for colors instead.
+mode (starting in OpenShift console 4.11). You should use the [PatternFly
+Global CSS Variables] for colors instead.
 
 The stylelint config also disallows naked element selectors like `table` and
 `.pf-` or `.co-` prefixed classes. This prevents plugins from accidentally
@@ -165,6 +118,23 @@ break console styles!
 
 ## References
 
-- [Console Plugin SDK README](https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk)
-- [Customization Plugin Example](https://github.com/spadgett/console-customization-plugin)
-- [Dynamic Plugin Enhancement Proposal](https://github.com/openshift/enhancements/blob/master/enhancements/console/dynamic-plugins.md)
+- [Console Plugin SDK README]
+- [Customization Plugin Example]
+- [Dynamic Plugin Enhancement Proposal]
+
+[Console Plugin SDK README]: https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk
+[Customization Plugin Example]: https://github.com/spadgett/console-customization-plugin
+[Docker]: https://www.docker.com
+[Dynamic Plugin Enhancement Proposal]: https://github.com/openshift/enhancements/blob/master/enhancements/console/dynamic-plugins.md
+[Node.js]: https://nodejs.org/en/
+[OpenShift CLI]: https://console.redhat.com/openshift/downloads
+[OpenShift Console Dynamic Plugins]: https://github.com/openshift/console/tree/master/frontend/packages/console-dynamic-plugin-sdk
+[OpenShift Console]: https://github.com/openshift/console
+[OpenShift cluster]: https://console.redhat.com/openshift/create
+[PatternFly Global CSS Variables]: https://patternfly-react-main.surge.sh/developer-resources/global-css-variables#global-css-variables
+[Podman]: https://podman.io
+[Remote Containers]: https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers
+[Webpack Module Federation]: https://webpack.js.org/concepts/module-federation
+[Yarn]: https://yarnpkg.com
+[openshift/console-plugin-template]: https://github.com/openshift/console-plugin-template
+[qemu-user-static]: https://github.com/multiarch/qemu-user-static
