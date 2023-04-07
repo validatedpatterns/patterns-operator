@@ -1,13 +1,14 @@
 # Patterns Operator - OpenShift Console Dynamic Plugin
 
-At the moment this requires OpenShift 4.11. (For an example of a plugin that works with
-OpenShift 4.10, see the `release-4.10` branch of [openshift/console-plugin-template].
+At the moment this requires OpenShift 4.11. (For an example of a plugin that
+works with OpenShift 4.10, see the `release-4.10` branch of
+[openshift/console-plugin-template].
 
-[OpenShift Console Dynamic plugins] allow you to extend the [OpenShift Console
-UI] at runtime, adding custom pages and other extensions. They are based on
-[Webpack Module Federation]. Plugins are registered with console using the
-`ConsolePlugin` custom resource and enabled in the console operator config by a
-cluster administrator.
+[OpenShift Console Dynamic plugins] allow you to extend the
+[OpenShift Console UI] at runtime, adding custom pages and other extensions.
+They are based on [Webpack Module Federation]. Plugins are registered with
+console using the `ConsolePlugin` custom resource and enabled in the console
+operator config by a cluster administrator.
 
 The following are required to build the plugin:
 
@@ -106,8 +107,8 @@ This project adds prettier, eslint, and stylelint. Linting can be run with
 `yarn run lint`.
 
 The stylelint config disallows hex colors since these cause problems with dark
-mode (starting in OpenShift console 4.11). You should use the [PatternFly
-Global CSS Variables] for colors instead.
+mode (starting in OpenShift console 4.11). You should use the
+[PatternFly Global CSS Variables] for colors instead.
 
 The stylelint config also disallows naked element selectors like `table` and
 `.pf-` or `.co-` prefixed classes. This prevents plugins from accidentally
