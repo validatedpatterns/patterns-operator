@@ -1,4 +1,3 @@
-
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -24,3 +23,6 @@ testbin/*
 *.swo
 *~
 manager
+
+# Environment file for local testing
+.env
