@@ -10,6 +10,18 @@ They are based on [Webpack Module Federation]. Plugins are registered with
 console using the `ConsolePlugin` custom resource and enabled in the console
 operator config by a cluster administrator.
 
+## What This Plugin Does
+
+This plugin provides a catalog of patterns in the OpenShift Console. This
+catalog is similar in appearance and workflow to the OperatorHub catalog built
+into OpenShift.
+
+This plugin is installed automatically by the Patterns Operator. The plugin's
+releases exist as a separate container image that is updated on each operator
+release.
+
+## Development
+
 The following are required to build the plugin:
 
 - [Node.js]
@@ -22,7 +34,6 @@ If you want to test against a real cluster, you will also need:
 - A running [OpenShift Cluster]
 - [OpenShift CLI] - oc
 
-## Development
 
 ### Option 1: Local
 
@@ -76,30 +87,12 @@ OC_PASS=<password>
 
 ## Container image
 
-Before you can deploy your plugin on a cluster, you must build an image and
-push it to an image registry.
+Building the console plugin container image is done from the Makefile at the
+root of the patterns-operator repo. It works the same way that `docker-build`
+and `docker-push` do.
 
-1. Build the image:
-
-   ```sh
-   docker build -t quay.io/my-repositroy/my-plugin:latest .
-   ```
-
-2. Run the image:
-
-   ```sh
-   docker run -it --rm -d -p 9001:80 quay.io/my-repository/my-plugin:latest
-   ```
-
-3. Push the image:
-
-   ```sh
-   docker push quay.io/my-repository/my-plugin:latest
-   ```
-
-NOTE: If you have a Mac with Apple silicon, you will need to add the flag
-`--platform=linux/amd64` when building the image to target the correct platform
-to run in-cluster.
+* `make console-build` - Build container image for console plugin
+* `make console-push` - Push container image for console plugin
 
 ## Linting
 
