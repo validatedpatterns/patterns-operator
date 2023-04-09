@@ -20,17 +20,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 
-"gopkg.in/yaml.v2"
+	"io/ioutil"
+	"path/filepath"
+
+	"gopkg.in/yaml.v2"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
 
 const (
@@ -148,55 +155,61 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 	return nil, changed
 }
 
-
-func buildSubscriptionExclusions(p api.Pattern, client olmclient.Interface) []string {
-        disabled := []string
+func buildSubscriptionExclusions(p api.Pattern, scheme *runtime.Scheme, client olmclient.Interface) []string {
+	disabled := []string{}
 	valueFiles := newApplicationValueFiles(p)
 	for _, f := range valueFiles {
 		valuesFile := filepath.Join(p.Status.Path, f)
 		if _, err := os.Stat(valuesFile); !os.IsNotExist(err) {
 
 			parsedSubs := parseValueSubs(valuesFile)
- 		        for _, key := range parsedSubs.keys() {
-			    // handle arrays too
-			     targetSub := parsedSubs[key]
-			     namespace := "openshift-operators"
-			     if sub["namespace"] != nil {
-			     	namespace = sub["namespace"]
-			     }
-		              _, sub := getSubscription(client, targetSub["name"], namespace)
-		             if sub != nil && !ownedBySame(targetSub, sub) {
-		                disabled = append(disabled, fmt.Sprintf("clusterGroup.subscriptions.%s.disabled", key))
-		             }
-                        }
+			for key := range parsedSubs {
+				// handle arrays too
+				patternSub := parsedSubs[key].(map[string]interface{})
+				namespace := "openshift-operators"
+				if patternSub["namespace"] != nil {
+					namespace = patternSub["namespace"].(string)
+				}
+
+				_, liveSub := getSubscription(client, patternSub["name"].(string), namespace)
+				if liveSub != nil {
+					targetSub := newSubscription(p)
+					_ = controllerutil.SetOwnerReference(&p, targetSub, scheme)
+					if !ownedBySame(targetSub, liveSub) {
+						disabled = append(disabled, fmt.Sprintf("clusterGroup.subscriptions.%s.disabled", key))
+					}
+				}
+			}
 		}
 	}
-        return disabled
+	return disabled
 }
 
 func parseValueSubs(filename string) map[string]interface{} {
 
-    yamlFile, err := ioutil.ReadFile(filename)
+	yamlFile, err := ioutil.ReadFile(filename)
 
-    if err != nil {
-        panic(err)
-    }
+	if err != nil {
+		panic(err)
+	}
 
-    var jsonconfig map[string]interface{}
+	var jsonconfig map[string]interface{}
 
-    err = yaml.Unmarshal(yamlFile, &jsonconfig)
-    if err != nil {
-        panic(err)
-    }
+	err = yaml.Unmarshal(yamlFile, &jsonconfig)
+	if err != nil {
+		panic(err)
+	}
 
-    //subs := jsonconfig.clusterGroup.subscriptions
-    cg := jsonconfig["clusterGroup"].(map[string]interface{})
-    subs := cg["subscriptions"].(map[string]interface{})
+	//subs := jsonconfig.clusterGroup.subscriptions
+	cg := jsonconfig["clusterGroup"].(map[string]interface{})
+	subs := cg["subscriptions"].(map[string]interface{})
 
-    if substr, err = yaml.Marshal(subs); err != nil {
-        log.Println("Found subs: ", substr)
-        log.Println("Found sub keys: ", subs.keys())
-    }
+	if substr, err := yaml.Marshal(subs); err != nil {
+		log.Println("Found subs: ", substr)
+		for key := range subs {
+			log.Println("Found sub: ", key)
+		}
+	}
 
-    return subs
+	return subs
 }
