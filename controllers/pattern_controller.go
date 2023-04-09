@@ -20,19 +20,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
+
+	"path/filepath"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
-	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -397,7 +402,30 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
+	if len(output.Status.Path) == 0 {
+		output.Status.Path = filepath.Join(os.TempDir(), output.Namespace, output.Name)
+	}
+
 	return nil, output
+}
+
+func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (error, string) {
+	if len(key) == 0 {
+		return nil, ""
+	}
+	tokenSecret := &corev1.Secret{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
+	if err != nil {
+		//      if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
+		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", secret, namespace))
+		return err, ""
+	}
+
+	if val, ok := tokenSecret.Data[key]; ok {
+		// See also https://github.com/kubernetes/client-go/issues/198
+		return nil, string(val)
+	}
+	return errors.New(fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace)), ""
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
