@@ -30,9 +30,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
@@ -46,6 +45,16 @@ const (
 )
 
 func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
+	return namedSubscription("openshift-gitops-operator",
+		subscriptionNamespace,
+		p.Spec.GitOpsConfig.OperatorChannel,
+		fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName), // eg. multicloud-gitops-hub
+		p.Spec.GitOpsConfig.OperatorCSV,
+		p.Spec.GitOpsConfig.UseCSV,
+		p.Spec.GitOpsConfig.ManualApproval)
+}
+
+func namedSubscription(name, namespace, channel, owner, operatorCSV string, useCSV, manualApproval bool) *operatorv1alpha1.Subscription {
 	//  apiVersion: operators.coreos.com/v1alpha1
 	//  kind: Subscription
 	//  metadata:
@@ -66,7 +75,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          "redhat-operators",
 		CatalogSourceNamespace: "openshift-marketplace",
-		Channel:                p.Spec.GitOpsConfig.OperatorChannel,
+		Channel:                channel,
 		Package:                "openshift-gitops-operator",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
@@ -79,18 +88,20 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 		},
 	}
 
-	if p.Spec.GitOpsConfig.UseCSV {
-		spec.StartingCSV = p.Spec.GitOpsConfig.OperatorCSV
+	if useCSV {
+		spec.StartingCSV = operatorCSV
 	}
 
-	if p.Spec.GitOpsConfig.ManualApproval {
+	if manualApproval {
 		spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
 	}
 
+	labels := map[string]string{"app.kubernetes.io/instance": owner}
 	return &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "openshift-gitops-operator",
-			Namespace: subscriptionNamespace,
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: spec,
 	}
@@ -98,7 +109,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 
 func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
 
-	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	sub, err := client.OperatorsV1alpha1().Subscriptions(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return err, nil
 	}
@@ -106,7 +117,7 @@ func getSubscription(client olmclient.Interface, name, namespace string) (error,
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	_, err := client.OperatorsV1alpha1().Subscriptions(sub.Namespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 
@@ -158,6 +169,10 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 func buildSubscriptionExclusions(p api.Pattern, scheme *runtime.Scheme, client olmclient.Interface) []string {
 	disabled := []string{}
 	valueFiles := newApplicationValueFiles(p)
+
+	selfOwner := fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
+	ownerKey := "app.kubernetes.io/instance"
+
 	for _, f := range valueFiles {
 		valuesFile := filepath.Join(p.Status.Path, f)
 		if _, err := os.Stat(valuesFile); !os.IsNotExist(err) {
@@ -165,19 +180,21 @@ func buildSubscriptionExclusions(p api.Pattern, scheme *runtime.Scheme, client o
 			parsedSubs := parseValueSubs(valuesFile)
 			for key := range parsedSubs {
 				// handle arrays too
-				patternSub := parsedSubs[key].(map[string]interface{})
+				patternSub := parsedSubs[key].(map[interface{}]interface{})
 				namespace := "openshift-operators"
 				if patternSub["namespace"] != nil {
 					namespace = patternSub["namespace"].(string)
 				}
 
 				_, liveSub := getSubscription(client, patternSub["name"].(string), namespace)
-				if liveSub != nil {
-					targetSub := newSubscription(p)
-					_ = controllerutil.SetOwnerReference(&p, targetSub, scheme)
-					if !ownedBySame(targetSub, liveSub) {
-						disabled = append(disabled, fmt.Sprintf("clusterGroup.subscriptions.%s.disabled", key))
-					}
+				if liveSub == nil {
+					continue
+				}
+				//    labels:
+				//      app.kubernetes.io/instance: multicloud-gitops-hub
+				val, ok := liveSub.Labels[ownerKey]
+				if !ok || val != selfOwner {
+					disabled = append(disabled, fmt.Sprintf("clusterGroup.subscriptions.%s.disabled", key))
 				}
 			}
 		}
@@ -185,8 +202,9 @@ func buildSubscriptionExclusions(p api.Pattern, scheme *runtime.Scheme, client o
 	return disabled
 }
 
-func parseValueSubs(filename string) map[string]interface{} {
+func parseValueSubs(filename string) map[interface{}]interface{} {
 
+	//log.Println("Reading", filename)
 	yamlFile, err := ioutil.ReadFile(filename)
 
 	if err != nil {
@@ -200,16 +218,23 @@ func parseValueSubs(filename string) map[string]interface{} {
 		panic(err)
 	}
 
-	//subs := jsonconfig.clusterGroup.subscriptions
-	cg := jsonconfig["clusterGroup"].(map[string]interface{})
-	subs := cg["subscriptions"].(map[string]interface{})
-
-	if substr, err := yaml.Marshal(subs); err != nil {
-		log.Println("Found subs: ", substr)
-		for key := range subs {
-			log.Println("Found sub: ", key)
-		}
+	if jsonconfig["clusterGroup"] == nil {
+		return make(map[interface{}]interface{}, 0)
 	}
+	// log.Println("Found CG", reflect.TypeOf(jsonconfig["clusterGroup"]), jsonconfig["clusterGroup"])
+
+	cg := jsonconfig["clusterGroup"].(map[interface{}]interface{})
+	if cg["subscriptions"] == nil {
+		return make(map[interface{}]interface{}, 0)
+	}
+
+	subs := cg["subscriptions"].(map[interface{}]interface{})
+	//if substr, err := yaml.Marshal(subs); err != nil {
+	//	log.Println("Found subs: ", substr)
+	//	for key := range subs {
+	//		log.Println("Found sub: ", key)
+	//	}
+	//}
 
 	return subs
 }
