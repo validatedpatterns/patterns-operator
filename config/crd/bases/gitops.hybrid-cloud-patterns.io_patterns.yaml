@@ -121,6 +121,13 @@ spec:
                     description: 'Branch, tag, or commit to deploy.  Does not support
                       short-sha''s. Default: HEAD'
                     type: string
+                  tokenSecret:
+                    description: Account              string `json:"account,omitempty"`
+                    type: string
+                  tokenSecretKey:
+                    type: string
+                  tokenSecretNamespace:
+                    type: string
                 required:
                 - targetRepo
                 type: object
@@ -176,6 +183,10 @@ spec:
                 type: string
               lastStep:
                 description: Last action related to the pattern
+                type: string
+              path:
+                type: string
+              revision:
                 type: string
               version:
                 description: Number of updates to the pattern
