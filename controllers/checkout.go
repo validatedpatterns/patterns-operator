@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 
+	"path/filepath"
+
 	"github.com/go-git/go-git/v5"
 	//	. "github.com/go-git/go-git/v5/_examples"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -174,6 +176,11 @@ func checkoutRevision(directory, token, commit string) error {
 
 func cloneRepo(url string, directory string, token string) error {
 
+	gitDir := filepath.Join(directory, ".git")
+	if _, err := os.Stat(gitDir); err == nil {
+		fmt.Printf("%s already exists\n", gitDir)
+		return nil
+	}
 	fmt.Printf("git clone %s into %s\n", url, directory)
 
 	// Clone the given repository to the given directory
