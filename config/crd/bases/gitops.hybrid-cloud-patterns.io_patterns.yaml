@@ -49,6 +49,9 @@ spec:
             properties:
               clusterGroupName:
                 type: string
+              dynamicSubscriptions:
+                description: Disable pre-existing subscriptions
+                type: boolean
               extraParameters:
                 description: '.Name is dot separated per the helm --set syntax, such
                   as:   global.something.field'
@@ -133,6 +136,7 @@ spec:
                 type: object
             required:
             - clusterGroupName
+            - dynamicSubscriptions
             - gitSpec
             type: object
           status:

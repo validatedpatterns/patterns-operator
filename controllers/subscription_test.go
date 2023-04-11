@@ -60,13 +60,13 @@ var _ = Describe("pattern controller", func() {
 
 		})
 		It("pattern into empty cluster", func() {
-
 			By("building the exclusion list")
-			propSet := buildSubscriptionExclusions(*qp, reconciler.Scheme, reconciler.olmClient)
+			valueFiles := newApplicationValueFiles(*qp)
+			paramList := newApplicationParameters(*qp, valueFiles, reconciler.olmClient)
+			fmt.Println(paramList)
 
-			fmt.Println(propSet)
-			By(fmt.Sprintf("checking the exclusion list %s", propSet))
-			Expect(propSet).To(HaveLen(0))
+			By("checking the parameter list")
+			Expect(paramList).To(HaveLen(10))
 		})
 		It("pattern into cluster with foreign ACM", func() {
 			By("creating an ACM subscription")
@@ -80,11 +80,33 @@ var _ = Describe("pattern controller", func() {
 			Expect(createSubscription(reconciler.olmClient, sub)).To(Succeed())
 
 			By("building the exclusion list")
-			propSet := buildSubscriptionExclusions(*qp, reconciler.Scheme, reconciler.olmClient)
-			fmt.Println(propSet)
+			valueFiles := newApplicationValueFiles(*qp)
+			paramList := newApplicationParameters(*qp, valueFiles, reconciler.olmClient)
+			fmt.Println(paramList)
 
-			By(fmt.Sprintf("checking the exclusion list %s", propSet))
-			Expect(propSet).To(HaveLen(1))
+			By("checking the parameter list")
+			Expect(paramList).To(HaveLen(11))
+			Expect(paramList[10].Name).To(Equal("clusterGroup.subscriptions.acm.disabled"))
+		})
+		It("pattern into cluster with DynamicSubscriptions disabled", func() {
+			By("creating an ACM subscription")
+			sub := namedSubscription("advanced-cluster-management",
+				"open-cluster-management",
+				"release-2.6",
+				"dummy-dummy",
+				"advanced-cluster-management.v2.6.1",
+				false,
+				false)
+			Expect(createSubscription(reconciler.olmClient, sub)).To(Succeed())
+
+			By("building the exclusion list")
+			qp.Spec.DynamicSubscriptions = false
+			valueFiles := newApplicationValueFiles(*qp)
+			paramList := newApplicationParameters(*qp, valueFiles, reconciler.olmClient)
+			fmt.Println(paramList)
+
+			By("checking the parameter list")
+			Expect(paramList).To(HaveLen(10))
 		})
 		It("pattern into cluster with self-owned ACM", func() {
 			By("creating an owned ACM subscription")
@@ -99,11 +121,12 @@ var _ = Describe("pattern controller", func() {
 			Expect(createSubscription(reconciler.olmClient, sub)).To(Succeed())
 
 			By("building the exclusion list")
-			propSet := buildSubscriptionExclusions(*qp, reconciler.Scheme, reconciler.olmClient)
-			fmt.Println(propSet)
+			valueFiles := newApplicationValueFiles(*qp)
+			paramList := newApplicationParameters(*qp, valueFiles, reconciler.olmClient)
+			fmt.Println(paramList)
 
-			By(fmt.Sprintf("checking the exclusion list %s", propSet))
-			Expect(propSet).To(HaveLen(0))
+			By("checking the parameter list")
+			Expect(paramList).To(HaveLen(10))
 		})
 	})
 })
@@ -115,7 +138,8 @@ func buildNamedPatternManifest(name string) *api.Pattern {
 		Finalizers: []string{api.PatternFinalizer},
 	},
 		Spec: api.PatternSpec{
-			ClusterGroupName: "hub",
+			ClusterGroupName:     "hub",
+			DynamicSubscriptions: true,
 			GitConfig: api.GitConfig{
 				TargetRevision: "main",
 				TargetRepo:     "http://github.com/hybrid-cloud-patterns/multicloud-gitops",

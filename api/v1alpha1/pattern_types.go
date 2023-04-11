@@ -71,6 +71,9 @@ type PatternSpec struct {
 
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
+
+	// Disable pre-existing subscriptions
+	DynamicSubscriptions bool `json:"dynamicSubscriptions"`
 }
 
 type GitConfig struct {

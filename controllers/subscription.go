@@ -30,8 +30,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
@@ -166,9 +164,8 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 	return nil, changed
 }
 
-func buildSubscriptionExclusions(p api.Pattern, scheme *runtime.Scheme, client olmclient.Interface) []string {
+func buildLiveSubscriptionExclusions(p api.Pattern, valueFiles []string, client olmclient.Interface) []string {
 	disabled := []string{}
-	valueFiles := newApplicationValueFiles(p)
 
 	selfOwner := fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 	ownerKey := "app.kubernetes.io/instance"
@@ -190,6 +187,7 @@ func buildSubscriptionExclusions(p api.Pattern, scheme *runtime.Scheme, client o
 				if liveSub == nil {
 					continue
 				}
+				log.Println("Checking ownership", liveSub)
 				//    labels:
 				//      app.kubernetes.io/instance: multicloud-gitops-hub
 				val, ok := liveSub.Labels[ownerKey]

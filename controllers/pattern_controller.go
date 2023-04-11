@@ -154,21 +154,23 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 
-	var token = ""
-	if len(qualifiedInstance.Spec.GitConfig.TokenSecret) > 0 {
-		if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
-			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
+	if qualifiedInstance.Spec.DynamicSubscriptions {
+		var token = ""
+		if len(qualifiedInstance.Spec.GitConfig.TokenSecret) > 0 {
+			if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
+				return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
+			}
 		}
-	}
 
-	gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		err := cloneRepo(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token)
-		return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
-	}
+		gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
+		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+			err := cloneRepo(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token)
+			return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
+		}
 
-	if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
-		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
+		if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
+			return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
+		}
 	}
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
@@ -230,7 +232,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// -- ArgoCD Application
-	targetApp := newApplication(*qualifiedInstance)
+	targetApp := newApplication(*qualifiedInstance, r.olmClient)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
@@ -443,7 +445,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		targetApp := newApplication(*qualifiedInstance)
+		targetApp := newApplication(*qualifiedInstance, nil)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))
