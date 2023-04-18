@@ -1,7 +1,8 @@
 # Patterns Operator - OpenShift Console Dynamic Plugin
 
-At the moment this requires OpenShift 4.11. (For an example of a plugin that
-works with OpenShift 4.10, see the `release-4.10` branch of
+At the moment this requires OpenShift 4.11. It may be possible to get this
+working on OpenShift 4.10, if needed. For an example plugin that works with
+OpenShift 4.10, see the `release-4.10` branch of
 [openshift/console-plugin-template].
 
 [OpenShift Console Dynamic plugins] allow you to extend the
