@@ -112,13 +112,28 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
 
+# These should probably always be linux/amd64 unless the machine/cluster you
+# are running on is a different OS/Arch
+CONTAINER_PLATFORM ?= amd64
+CONTAINER_OS ?= linux
+
 .PHONY: docker-build
 docker-build:  ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t $(IMG) .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
+
+.PHONY: console-build ## Build docker image for console plugin.
+console-build:
+	cd ./console; yarn install
+	cd ./console; yarn build
+	cd ./console; docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t $(IMAGE_TAG_BASE)-console-plugin:v$(VERSION) .
+
+.PHONY: console-push ## Push docker image for console plugin.
+console-push:
+	$(MAKE) docker-push IMG=$(IMAGE_TAG_BASE)-console-plugin:v$(VERSION)
 
 ##@ Deployment
 
