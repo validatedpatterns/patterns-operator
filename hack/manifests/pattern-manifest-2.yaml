@@ -4,17 +4,21 @@ kind: PatternManifest
 metadata:
   name: multicluster-devsecops
   namespace: default
+  labels:
+    "gitops.hybrid-cloud-patterns.io/source": "default"
 spec:
   organization:
     name: Hybrid Cloud Patterns
     description: >
       Open source repository of cloud native solution patterns. This repository
       is maintained by Red Hat with contributions from customers and partners.
-    maintainers: team-validated-patterns@redhat.com
+    maintainers:
+    - name: Validated Patterns Team
+      email: team-validated-patterns@redhat.com
     url: https://github.com/hybrid-cloud-patterns
   pattern:
     name: Multicluster DevSecOps
-    shortDescription: A horizontal solution for multicluster DevSecOps use cases
+    description: A horizontal solution for multicluster DevSecOps use cases
     longDescription: >
       This pattern demonstrates a horizontal solution for multicluster DevSecOps
       use cases. It is derived from the multi-cloud GitOps pattern with added
@@ -22,15 +26,18 @@ spec:
       pipelines with security gates; image scanning, signing and storage in a
       secure registry; deployment to secured clusters that provide advanced
       security monitoring and alerting.
-    badge: Community
     branch: main
-    maintainers: team-validated-patterns@redhat.com
+    gitRepo: https://github.com/hybrid-cloud-patterns/multicluster-devsecops.git
     products:
-      - name: Red Hat Advanced Cluster Management
-      - name: Red Hat OpenShift GitOps
-      - name: Red Hat OpenShift Pipelines
-      - name: Red Hat Quay Enterprise
-      - name: Red Hat Open Data Foundation
-      - name: Red Hat Advanced Cluster Security
-      - name: Hashicorp Vault
+      - Red Hat Advanced Cluster Management
+      - Red Hat OpenShift GitOps
+      - Red Hat OpenShift Pipelines
+      - Red Hat Quay Enterprise
+      - Red Hat Open Data Foundation
+      - Red Hat Advanced Cluster Security
+      - Hashicorp Vault
+    maintainers:
+    - name: Validated Patterns Team
+      email: team-validated-patterns@redhat.com
+    type: Community
     url: https://github.com/hybrid-cloud-patterns/multicluster-devsecops
