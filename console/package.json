@@ -1,5 +1,5 @@
 {
-  "name": "patterns-console-plugin",
+  "name": "patterns-operator-console-plugin",
   "version": "0.0.1",
   "private": true,
   "repository": "https://github.com/hybrid-cloud-patterns/patterns-operator",
@@ -57,7 +57,7 @@
     "webpack-dev-server": "^4.7.4"
   },
   "consolePlugin": {
-    "name": "patterns-console-plugin",
+    "name": "patterns-operator-console-plugin",
     "version": "0.0.1",
     "displayName": "Patterns Dynamic Console Plugin",
     "description": "OpenShift dynamic console plugin for the Patterns Operator",
