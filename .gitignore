@@ -24,6 +24,7 @@ testbin/*
 *~
 manager
 
-# Generated OLM catalog and template
+# Catalog files generated for OLM testing
 /catalog/catalog.yaml
 /catalog/_template.yaml
+/config/samples/pattern-catalog-*.yaml
