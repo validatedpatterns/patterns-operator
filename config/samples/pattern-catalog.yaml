@@ -1,8 +1,9 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: pattern-index
+  name: test-pattern-operator
   namespace: openshift-marketplace
 spec:
+  displayName: Test Pattern Operator
   sourceType: grpc
   image: CATALOG_IMG
