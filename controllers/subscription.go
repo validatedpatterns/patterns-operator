@@ -55,7 +55,7 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 	//          value: "*"
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          "redhat-operators",
+		CatalogSource:          p.Spec.GitOpsConfig.OperatorSource,
 		CatalogSourceNamespace: "openshift-marketplace",
 		Channel:                p.Spec.GitOpsConfig.OperatorChannel,
 		Package:                "openshift-gitops-operator",
