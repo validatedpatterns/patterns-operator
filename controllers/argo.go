@@ -26,11 +26,12 @@ import (
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
+	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
-func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
+func newApplicationParameters(p api.Pattern, valueFiles []string, client olmclient.Interface) []argoapi.HelmParameter {
 
 	parameters := []argoapi.HelmParameter{
 		{
@@ -76,6 +77,17 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 		},
 	}
 
+	if len(valueFiles) > 0 && client != nil && p.Spec.DynamicSubscriptions {
+		log.Println("Spec: ", p.Spec)
+		excludeList := buildLiveSubscriptionExclusions(p, valueFiles, client)
+		for _, excludeParam := range excludeList {
+			parameters = append(parameters, argoapi.HelmParameter{
+				Name:  excludeParam,
+				Value: "1",
+			})
+		}
+	}
+
 	for _, extra := range p.Spec.ExtraParameters {
 		if !updateHelmParameter(extra, parameters) {
 			log.Printf("Parameter %q = %q added", extra.Name, extra.Value)
@@ -114,12 +126,13 @@ func newApplicationValueFiles(p api.Pattern) []string {
 	return files
 }
 
-func newApplication(p api.Pattern) *argoapi.Application {
+func newApplication(p api.Pattern, client olmclient.Interface) *argoapi.Application {
 
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
 	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
 
+	valueFiles := newApplicationValueFiles(p)
 	spec := argoapi.ApplicationSpec{
 
 		// Source is a reference to the location of the application's manifests or chart
@@ -128,10 +141,10 @@ func newApplication(p api.Pattern) *argoapi.Application {
 			Path:           "common/clustergroup",
 			TargetRevision: p.Spec.GitConfig.TargetRevision,
 			Helm: &argoapi.ApplicationSourceHelm{
-				ValueFiles: newApplicationValueFiles(p),
+				ValueFiles: valueFiles,
 
 				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
-				Parameters: newApplicationParameters(p),
+				Parameters: newApplicationParameters(p, valueFiles, client),
 
 				// ReleaseName is the Helm release name to use. If omitted it will use the application name
 				// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`

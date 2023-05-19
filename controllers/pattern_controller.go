@@ -20,19 +20,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
+
+	"path/filepath"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
-	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -149,6 +154,25 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 
+	if qualifiedInstance.Spec.DynamicSubscriptions {
+		var token = ""
+		if len(qualifiedInstance.Spec.GitConfig.TokenSecret) > 0 {
+			if err, token = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
+				return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
+			}
+		}
+
+		gitDir := filepath.Join(qualifiedInstance.Status.Path, ".git")
+		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+			err := cloneRepo(qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.Path, token)
+			return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
+		}
+
+		if err := checkoutRevision(qualifiedInstance.Status.Path, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
+			return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
+		}
+	}
+
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
@@ -208,7 +232,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// -- ArgoCD Application
-	targetApp := newApplication(*qualifiedInstance)
+	targetApp := newApplication(*qualifiedInstance, r.olmClient)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
@@ -380,7 +404,30 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
+	if len(output.Status.Path) == 0 {
+		output.Status.Path = filepath.Join(os.TempDir(), output.Namespace, output.Name)
+	}
+
 	return nil, output
+}
+
+func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (error, string) {
+	if len(key) == 0 {
+		return nil, ""
+	}
+	tokenSecret := &corev1.Secret{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
+	if err != nil {
+		//      if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
+		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", secret, namespace))
+		return err, ""
+	}
+
+	if val, ok := tokenSecret.Data[key]; ok {
+		// See also https://github.com/kubernetes/client-go/issues/198
+		return nil, string(val)
+	}
+	return errors.New(fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace)), ""
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
@@ -398,7 +445,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		targetApp := newApplication(*qualifiedInstance)
+		targetApp := newApplication(*qualifiedInstance, nil)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 		_, app := getApplication(r.argoClient, applicationName(*qualifiedInstance))

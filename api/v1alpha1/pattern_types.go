@@ -71,6 +71,9 @@ type PatternSpec struct {
 
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
+
+	// Disable pre-existing subscriptions
+	DynamicSubscriptions bool `json:"dynamicSubscriptions"`
 }
 
 type GitConfig struct {
@@ -78,9 +81,9 @@ type GitConfig struct {
 	Hostname string `json:"hostname,omitempty"`
 
 	//Account              string `json:"account,omitempty"`
-	//TokenSecret          string `json:"tokenSecret,omitempty"`
-	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
-	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
+	TokenSecret          string `json:"tokenSecret,omitempty"`
+	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
+	TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
 	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
@@ -148,6 +151,9 @@ type PatternStatus struct {
 	// Number of updates to the pattern
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	Version int `json:"version,omitempty"`
+
+	Path     string `json:"path,omitempty"`
+	Revision string `json:"revision,omitempty"`
 
 	//+operator-sdk:csv:customresourcedefinitions:type=status
 	ClusterName string `json:"clusterName,omitempty"`

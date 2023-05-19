@@ -49,6 +49,9 @@ spec:
             properties:
               clusterGroupName:
                 type: string
+              dynamicSubscriptions:
+                description: Disable pre-existing subscriptions
+                type: boolean
               extraParameters:
                 description: '.Name is dot separated per the helm --set syntax, such
                   as:   global.something.field'
@@ -121,11 +124,19 @@ spec:
                     description: 'Branch, tag, or commit to deploy.  Does not support
                       short-sha''s. Default: HEAD'
                     type: string
+                  tokenSecret:
+                    description: Account              string `json:"account,omitempty"`
+                    type: string
+                  tokenSecretKey:
+                    type: string
+                  tokenSecretNamespace:
+                    type: string
                 required:
                 - targetRepo
                 type: object
             required:
             - clusterGroupName
+            - dynamicSubscriptions
             - gitSpec
             type: object
           status:
@@ -176,6 +187,10 @@ spec:
                 type: string
               lastStep:
                 description: Last action related to the pattern
+                type: string
+              path:
+                type: string
+              revision:
                 type: string
               version:
                 description: Number of updates to the pattern
