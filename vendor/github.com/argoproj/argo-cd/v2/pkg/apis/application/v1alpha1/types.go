@@ -14,11 +14,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/argoproj/gitops-engine/pkg/health"
 	synccommon "github.com/argoproj/gitops-engine/pkg/sync/common"
 	"github.com/ghodss/yaml"
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/argoproj/argo-cd/v2/util/collections"
 	"github.com/argoproj/argo-cd/v2/util/helm"
+	"github.com/argoproj/argo-cd/v2/util/security"
 )
 
 // Application is a definition of Application resource.
@@ -55,7 +57,7 @@ type Application struct {
 // ApplicationSpec represents desired application state. Contains link to repository with application definition and additional parameters link definition revision.
 type ApplicationSpec struct {
 	// Source is a reference to the location of the application's manifests or chart
-	Source ApplicationSource `json:"source" protobuf:"bytes,1,opt,name=source"`
+	Source *ApplicationSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
 	// Destination is a reference to the target Kubernetes server and namespace
 	Destination ApplicationDestination `json:"destination" protobuf:"bytes,2,name=destination"`
 	// Project is a reference to the project this application belongs to.
@@ -73,6 +75,9 @@ type ApplicationSpec struct {
 	// Increasing will increase the space used to store the history, so we do not recommend increasing it.
 	// Default is 10.
 	RevisionHistoryLimit *int64 `json:"revisionHistoryLimit,omitempty" protobuf:"bytes,7,name=revisionHistoryLimit"`
+
+	// Sources is a reference to the location of the application's manifests or chart
+	Sources ApplicationSources `json:"sources,omitempty" protobuf:"bytes,8,opt,name=sources"`
 }
 
 type TrackingMethod string
@@ -164,14 +169,62 @@ type ApplicationSource struct {
 	Helm *ApplicationSourceHelm `json:"helm,omitempty" protobuf:"bytes,7,opt,name=helm"`
 	// Kustomize holds kustomize specific options
 	Kustomize *ApplicationSourceKustomize `json:"kustomize,omitempty" protobuf:"bytes,8,opt,name=kustomize"`
-	// Ksonnet holds ksonnet specific options
-	Ksonnet *ApplicationSourceKsonnet `json:"ksonnet,omitempty" protobuf:"bytes,9,opt,name=ksonnet"`
 	// Directory holds path/directory specific options
 	Directory *ApplicationSourceDirectory `json:"directory,omitempty" protobuf:"bytes,10,opt,name=directory"`
-	// ConfigManagementPlugin holds config management plugin specific options
+	// Plugin holds config management plugin specific options
 	Plugin *ApplicationSourcePlugin `json:"plugin,omitempty" protobuf:"bytes,11,opt,name=plugin"`
 	// Chart is a Helm chart name, and must be specified for applications sourced from a Helm repo.
 	Chart string `json:"chart,omitempty" protobuf:"bytes,12,opt,name=chart"`
+	// Ref is reference to another source within sources field. This field will not be used if used with a `source` tag.
+	Ref string `json:"ref,omitempty" protobuf:"bytes,13,opt,name=ref"`
+}
+
+// ApplicationSources contains list of required information about the sources of an application
+type ApplicationSources []ApplicationSource
+
+func (s ApplicationSources) Equals(other ApplicationSources) bool {
+	if len(s) != len(other) {
+		return false
+	}
+	for i := range s {
+		if !s[i].Equals(other[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *ApplicationSpec) GetSource() ApplicationSource {
+	// if Application has multiple sources, return the first source in sources
+	if a.HasMultipleSources() {
+		return a.Sources[0]
+	}
+	if a.Source != nil {
+		return *a.Source
+	}
+	return ApplicationSource{}
+}
+
+func (a *ApplicationSpec) GetSources() ApplicationSources {
+	if a.HasMultipleSources() {
+		return a.Sources
+	}
+	if a.Source != nil {
+		return ApplicationSources{*a.Source}
+	}
+	return ApplicationSources{}
+}
+
+func (a *ApplicationSpec) HasMultipleSources() bool {
+	return a.Sources != nil && len(a.Sources) > 0
+}
+
+func (a *ApplicationSpec) GetSourcePtr() *ApplicationSource {
+	// if Application has multiple sources, return the first source in sources
+	if a.HasMultipleSources() {
+		return &a.Sources[0]
+	}
+	return a.Source
 }
 
 // AllowsConcurrentProcessing returns true if given application source can be processed concurrently
@@ -180,9 +233,6 @@ func (a *ApplicationSource) AllowsConcurrentProcessing() bool {
 	// Kustomize with parameters requires changing kustomization.yaml file
 	case a.Kustomize != nil:
 		return a.Kustomize.AllowsConcurrentProcessing()
-	// Kustomize with parameters requires changing params.libsonnet file
-	case a.Ksonnet != nil:
-		return a.Ksonnet.AllowsConcurrentProcessing()
 	}
 	return true
 }
@@ -208,7 +258,6 @@ func (a *ApplicationSource) IsZero() bool {
 			a.TargetRevision == "" &&
 			a.Helm.IsZero() &&
 			a.Kustomize.IsZero() &&
-			a.Ksonnet.IsZero() &&
 			a.Directory.IsZero() &&
 			a.Plugin.IsZero()
 }
@@ -219,7 +268,6 @@ type ApplicationSourceType string
 const (
 	ApplicationSourceTypeHelm      ApplicationSourceType = "Helm"
 	ApplicationSourceTypeKustomize ApplicationSourceType = "Kustomize"
-	ApplicationSourceTypeKsonnet   ApplicationSourceType = "Ksonnet"
 	ApplicationSourceTypeDirectory ApplicationSourceType = "Directory"
 	ApplicationSourceTypePlugin    ApplicationSourceType = "Plugin"
 )
@@ -231,6 +279,14 @@ const (
 	RefreshTypeNormal RefreshType = "normal"
 	RefreshTypeHard   RefreshType = "hard"
 )
+
+type RefTarget struct {
+	Repo           Repository `protobuf:"bytes,1,opt,name=repo"`
+	TargetRevision string     `protobuf:"bytes,2,opt,name=targetRevision"`
+	Chart          string     `protobuf:"bytes,3,opt,name=chart"`
+}
+
+type RefTargetRevisionMapping map[string]*RefTarget
 
 // ApplicationSourceHelm holds helm specific options
 type ApplicationSourceHelm struct {
@@ -244,7 +300,7 @@ type ApplicationSourceHelm struct {
 	Values string `json:"values,omitempty" protobuf:"bytes,4,opt,name=values"`
 	// FileParameters are file parameters to the helm template
 	FileParameters []HelmFileParameter `json:"fileParameters,omitempty" protobuf:"bytes,5,opt,name=fileParameters"`
-	// Version is the Helm version to use for templating (either "2" or "3")
+	// Version is the Helm version to use for templating ("3")
 	Version string `json:"version,omitempty" protobuf:"bytes,6,opt,name=version"`
 	// PassCredentials pass credentials to all domains (Helm's --pass-credentials)
 	PassCredentials bool `json:"passCredentials,omitempty" protobuf:"bytes,7,opt,name=passCredentials"`
@@ -451,31 +507,6 @@ func (j *ApplicationSourceJsonnet) IsZero() bool {
 	return j == nil || len(j.ExtVars) == 0 && len(j.TLAs) == 0 && len(j.Libs) == 0
 }
 
-// ApplicationSourceKsonnet holds ksonnet specific options
-type ApplicationSourceKsonnet struct {
-	// Environment is a ksonnet application environment name
-	Environment string `json:"environment,omitempty" protobuf:"bytes,1,opt,name=environment"`
-	// Parameters are a list of ksonnet component parameter override values
-	Parameters []KsonnetParameter `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
-}
-
-// KsonnetParameter is a ksonnet component parameter
-type KsonnetParameter struct {
-	Component string `json:"component,omitempty" protobuf:"bytes,1,opt,name=component"`
-	Name      string `json:"name" protobuf:"bytes,2,opt,name=name"`
-	Value     string `json:"value" protobuf:"bytes,3,opt,name=value"`
-}
-
-// AllowsConcurrentProcessing returns true if multiple processes can run ksonnet builds on the same source at the same time
-func (k *ApplicationSourceKsonnet) AllowsConcurrentProcessing() bool {
-	return len(k.Parameters) == 0
-}
-
-// IsZero returns true if the KSonnet options of an application are considered to be empty
-func (k *ApplicationSourceKsonnet) IsZero() bool {
-	return k == nil || k.Environment == "" && len(k.Parameters) == 0
-}
-
 // ApplicationSourceDirectory holds options for applications of type plain YAML or Jsonnet
 type ApplicationSourceDirectory struct {
 	// Recurse specifies whether to scan a directory recursively for manifests
@@ -493,10 +524,63 @@ func (d *ApplicationSourceDirectory) IsZero() bool {
 	return d == nil || !d.Recurse && d.Jsonnet.IsZero()
 }
 
+type ApplicationSourcePluginParameter struct {
+	// Name is the name identifying a parameter.
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// String_ is the value of a string type parameter.
+	String_ *string `json:"string,omitempty" protobuf:"bytes,5,opt,name=string"`
+	// Map is the value of a map type parameter.
+	Map map[string]string `json:"map,omitempty" protobuf:"bytes,3,rep,name=map"`
+	// Array is the value of an array type parameter.
+	Array []string `json:"array,omitempty" protobuf:"bytes,4,rep,name=array"`
+}
+
+type ApplicationSourcePluginParameters []ApplicationSourcePluginParameter
+
+// Environ builds a list of environment variables to represent parameters sent to a plugin from the Application
+// manifest. Parameters are represented as one large stringified JSON array (under `ARGOCD_APP_PARAMETERS`). They're
+// also represented as individual environment variables, each variable's key being an escaped version of the parameter's
+// name.
+func (p ApplicationSourcePluginParameters) Environ() ([]string, error) {
+	out, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal plugin parameters: %w", err)
+	}
+	jsonParam := fmt.Sprintf("ARGOCD_APP_PARAMETERS=%s", string(out))
+
+	env := []string{jsonParam}
+
+	for _, param := range p {
+		envBaseName := fmt.Sprintf("PARAM_%s", escaped(param.Name))
+		if param.String_ != nil {
+			env = append(env, fmt.Sprintf("%s=%s", envBaseName, *param.String_))
+		}
+		if param.Map != nil {
+			for key, value := range param.Map {
+				env = append(env, fmt.Sprintf("%s_%s=%s", envBaseName, escaped(key), value))
+			}
+		}
+		if param.Array != nil {
+			for i, value := range param.Array {
+				env = append(env, fmt.Sprintf("%s_%d=%s", envBaseName, i, value))
+			}
+		}
+	}
+
+	return env, nil
+}
+
+func escaped(paramName string) string {
+	newParamName := strings.ToUpper(paramName)
+	invalidParamCharRegex := regexp.MustCompile("[^A-Z0-9_]")
+	return invalidParamCharRegex.ReplaceAllString(newParamName, "_")
+}
+
 // ApplicationSourcePlugin holds options specific to config management plugins
 type ApplicationSourcePlugin struct {
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-	Env  `json:"env,omitempty" protobuf:"bytes,2,opt,name=env"`
+	Name       string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Env        `json:"env,omitempty" protobuf:"bytes,2,opt,name=env"`
+	Parameters ApplicationSourcePluginParameters `json:"parameters,omitempty" protobuf:"bytes,3,opt,name=parameters"`
 }
 
 // IsZero returns true if the ApplicationSourcePlugin is considered empty
@@ -546,6 +630,13 @@ type ApplicationDestination struct {
 	isServerInferred bool `json:"-"`
 }
 
+type ResourceHealthLocation string
+
+var (
+	ResourceHealthLocationInline  ResourceHealthLocation = ""
+	ResourceHealthLocationAppTree ResourceHealthLocation = "appTree"
+)
+
 // ApplicationStatus contains status information for the application
 type ApplicationStatus struct {
 	// Resources is a list of Kubernetes resources managed by this application
@@ -569,6 +660,10 @@ type ApplicationStatus struct {
 	SourceType ApplicationSourceType `json:"sourceType,omitempty" protobuf:"bytes,9,opt,name=sourceType"`
 	// Summary contains a list of URLs and container images used by this application
 	Summary ApplicationSummary `json:"summary,omitempty" protobuf:"bytes,10,opt,name=summary"`
+	// ResourceHealthSource indicates where the resource health status is stored: inline if not set or appTree
+	ResourceHealthSource ResourceHealthLocation `json:"resourceHealthSource,omitempty" protobuf:"bytes,11,opt,name=resourceHealthSource"`
+	// SourceTypes specifies the type of the sources included in the application
+	SourceTypes []ApplicationSourceType `json:"sourceTypes,omitempty" protobuf:"bytes,12,opt,name=sourceTypes"`
 }
 
 // JWTTokens represents a list of JWT tokens
@@ -657,6 +752,12 @@ type SyncOperation struct {
 	Manifests []string `json:"manifests,omitempty" protobuf:"bytes,8,opt,name=manifests"`
 	// SyncOptions provide per-sync sync-options, e.g. Validate=false
 	SyncOptions SyncOptions `json:"syncOptions,omitempty" protobuf:"bytes,9,opt,name=syncOptions"`
+	// Sources overrides the source definition set in the application.
+	// This is typically set in a Rollback operation and is nil during a Sync operation
+	Sources ApplicationSources `json:"sources,omitempty" protobuf:"bytes,10,opt,name=sources"`
+	// Revisions is the list of revision (Git) or chart version (Helm) which to sync each source in sources field for the application to
+	// If omitted, will use the revision specified in app spec.
+	Revisions []string `json:"revisions,omitempty" protobuf:"bytes,11,opt,name=revisions"`
 }
 
 // IsApplyStrategy returns true if the sync strategy is "apply"
@@ -721,6 +822,11 @@ func (o SyncOptions) HasOption(option string) bool {
 	return false
 }
 
+type ManagedNamespaceMetadata struct {
+	Labels      map[string]string `json:"labels,omitempty" protobuf:"bytes,1,opt,name=labels"`
+	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,2,opt,name=annotations"`
+}
+
 // SyncPolicy controls when a sync will be performed in response to updates in git
 type SyncPolicy struct {
 	// Automated will keep an application synced to the target revision
@@ -729,6 +835,8 @@ type SyncPolicy struct {
 	SyncOptions SyncOptions `json:"syncOptions,omitempty" protobuf:"bytes,2,opt,name=syncOptions"`
 	// Retry controls failed sync retry behavior
 	Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
+	// ManagedNamespaceMetadata controls metadata in the given namespace (if CreateNamespace=true)
+	ManagedNamespaceMetadata *ManagedNamespaceMetadata `json:"managedNamespaceMetadata,omitempty" protobuf:"bytes,4,opt,name=managedNamespaceMetadata"`
 }
 
 // IsZero returns true if the sync policy is empty
@@ -858,7 +966,6 @@ type RevisionMetadata struct {
 	// Floating tags can move from one revision to another
 	Tags []string `json:"tags,omitempty" protobuf:"bytes,3,opt,name=tags"`
 	// Message contains the message associated with the revision, most likely the commit message.
-	// The message is truncated to the first newline or 64 characters (which ever comes first)
 	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
 	// SignatureInfo contains a hint on the signer if the revision was signed with GPG, and signature verification is enabled.
 	SignatureInfo string `json:"signatureInfo,omitempty" protobuf:"bytes,5,opt,name=signatureInfo"`
@@ -872,6 +979,10 @@ type SyncOperationResult struct {
 	Revision string `json:"revision" protobuf:"bytes,2,opt,name=revision"`
 	// Source records the application source information of the sync, used for comparing auto-sync
 	Source ApplicationSource `json:"source,omitempty" protobuf:"bytes,3,opt,name=source"`
+	// Source records the application source information of the sync, used for comparing auto-sync
+	Sources ApplicationSources `json:"sources,omitempty" protobuf:"bytes,4,opt,name=sources"`
+	// Revisions holds the revision this sync operation was performed for respective indexed source in sources field
+	Revisions []string `json:"revisions,omitempty" protobuf:"bytes,5,opt,name=revisions"`
 }
 
 // ResourceResult holds the operation result details of a specific resource
@@ -934,7 +1045,7 @@ func (r ResourceResults) PruningRequired() (num int) {
 // RevisionHistory contains history information about a previous sync
 type RevisionHistory struct {
 	// Revision holds the revision the sync was performed against
-	Revision string `json:"revision" protobuf:"bytes,2,opt,name=revision"`
+	Revision string `json:"revision,omitempty" protobuf:"bytes,2,opt,name=revision"`
 	// DeployedAt holds the time the sync operation completed
 	DeployedAt metav1.Time `json:"deployedAt" protobuf:"bytes,4,opt,name=deployedAt"`
 	// ID is an auto incrementing identifier of the RevisionHistory
@@ -943,6 +1054,10 @@ type RevisionHistory struct {
 	Source ApplicationSource `json:"source,omitempty" protobuf:"bytes,6,opt,name=source"`
 	// DeployStartedAt holds the time the sync operation started
 	DeployStartedAt *metav1.Time `json:"deployStartedAt,omitempty" protobuf:"bytes,7,opt,name=deployStartedAt"`
+	// Sources is a reference to the application sources used for the sync operation
+	Sources ApplicationSources `json:"sources,omitempty" protobuf:"bytes,8,opt,name=sources"`
+	// Revisions holds the revision of each source in sources field the sync was performed against
+	Revisions []string `json:"revisions,omitempty" protobuf:"bytes,9,opt,name=revisions"`
 }
 
 // ApplicationWatchEvent contains information about application change.
@@ -981,7 +1096,7 @@ const (
 	SyncStatusCodeUnknown SyncStatusCode = "Unknown"
 	// SyncStatusCodeOutOfSync indicates that desired and live states match
 	SyncStatusCodeSynced SyncStatusCode = "Synced"
-	// SyncStatusCodeOutOfSync indicates that there is a drift beween desired and live states
+	// SyncStatusCodeOutOfSync indicates that there is a drift between desired and live states
 	SyncStatusCodeOutOfSync SyncStatusCode = "OutOfSync"
 )
 
@@ -1025,9 +1140,11 @@ type ApplicationCondition struct {
 // ComparedTo contains application source and target which was used for resources comparison
 type ComparedTo struct {
 	// Source is a reference to the application's source used for comparison
-	Source ApplicationSource `json:"source" protobuf:"bytes,1,opt,name=source"`
+	Source ApplicationSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
 	// Destination is a reference to the application's destination used for comparison
 	Destination ApplicationDestination `json:"destination" protobuf:"bytes,2,opt,name=destination"`
+	// Sources is a reference to the application's multiple sources used for comparison
+	Sources ApplicationSources `json:"sources,omitempty" protobuf:"bytes,3,opt,name=sources"`
 }
 
 // SyncStatus contains information about the currently observed live and desired states of an application
@@ -1038,6 +1155,8 @@ type SyncStatus struct {
 	ComparedTo ComparedTo `json:"comparedTo,omitempty" protobuf:"bytes,2,opt,name=comparedTo"`
 	// Revision contains information about the revision the comparison has been performed to
 	Revision string `json:"revision,omitempty" protobuf:"bytes,3,opt,name=revision"`
+	// Revisions contains information about the revisions of multiple sources the comparison has been performed to
+	Revisions []string `json:"revisions,omitempty" protobuf:"bytes,4,opt,name=revisions"`
 }
 
 // HealthStatus contains information about the currently observed health state of an application or resource
@@ -1208,6 +1327,7 @@ type ResourceStatus struct {
 	Health          *HealthStatus  `json:"health,omitempty" protobuf:"bytes,7,opt,name=health"`
 	Hook            bool           `json:"hook,omitempty" protobuf:"bytes,8,opt,name=hook"`
 	RequiresPruning bool           `json:"requiresPruning,omitempty" protobuf:"bytes,9,opt,name=requiresPruning"`
+	SyncWave        int64          `json:"syncWave,omitempty" protobuf:"bytes,10,opt,name=syncWave"`
 }
 
 // GroupKindVersion returns the GVK schema type for given resource status
@@ -1574,6 +1694,19 @@ func isValidAction(action string) bool {
 	return false
 }
 
+// TODO: same as validActions, refacotor to use rbacpolicy.ResourceApplications etc.
+var validResources = map[string]bool{
+	"applications": true,
+	"repositories": true,
+	"clusters":     true,
+	"exec":         true,
+	"logs":         true,
+}
+
+func isValidResource(resource string) bool {
+	return validResources[resource]
+}
+
 func validatePolicy(proj string, role string, policy string) error {
 	policyComponents := strings.Split(policy, ",")
 	if len(policyComponents) != 6 || strings.Trim(policyComponents[0], " ") != "p" {
@@ -1587,7 +1720,7 @@ func validatePolicy(proj string, role string, policy string) error {
 	}
 	// resource
 	resource := strings.Trim(policyComponents[2], " ")
-	if resource != "applications" && resource != "repositories" && resource != "clusters" {
+	if !isValidResource(resource) {
 		return status.Errorf(codes.InvalidArgument, "invalid policy rule '%s': project resource must be: 'applications', 'repositories' or 'clusters', not '%s'", policy, resource)
 	}
 	// action
@@ -1618,14 +1751,28 @@ func validateRoleName(name string) error {
 	return nil
 }
 
-var invalidChars = regexp.MustCompile("[,\n\r\t]")
+var invalidChars = regexp.MustCompile("[\"\n\r\t]")
 
 func validateGroupName(name string) error {
-	if strings.TrimSpace(name) == "" {
+	n := []rune(name)
+	name = strings.TrimSpace(name)
+	if len(name) > 1 && strings.HasPrefix(name, "\"") && strings.HasSuffix(name, "\"") {
+		// Remove surrounding quotes for further inspection of the group name
+		name = name[1 : len(name)-1]
+	} else if strings.Contains(name, ",") {
+		return status.Errorf(codes.InvalidArgument, "group '%s' must be quoted", name)
+	}
+	if name == "" {
 		return status.Errorf(codes.InvalidArgument, "group '%s' is empty", name)
 	}
 	if invalidChars.MatchString(name) {
 		return status.Errorf(codes.InvalidArgument, "group '%s' contains invalid characters", name)
+	}
+	if len(n) > 1 && unicode.IsSpace(n[0]) {
+		return status.Errorf(codes.InvalidArgument, "group '%s' contains a leading space", name)
+	}
+	if len(n) > 1 && unicode.IsSpace(n[len(n)-1]) {
+		return status.Errorf(codes.InvalidArgument, "group '%s' contains a trailing space", name)
 	}
 	return nil
 }
@@ -1680,6 +1827,10 @@ type AppProjectSpec struct {
 	SignatureKeys []SignatureKey `json:"signatureKeys,omitempty" protobuf:"bytes,10,opt,name=signatureKeys"`
 	// ClusterResourceBlacklist contains list of blacklisted cluster level resources
 	ClusterResourceBlacklist []metav1.GroupKind `json:"clusterResourceBlacklist,omitempty" protobuf:"bytes,11,opt,name=clusterResourceBlacklist"`
+	// SourceNamespaces defines the namespaces application resources are allowed to be created in
+	SourceNamespaces []string `json:"sourceNamespaces,omitempty" protobuf:"bytes,12,opt,name=sourceNamespaces"`
+	// PermitOnlyProjectScopedClusters determines whether destinations can only reference clusters which are project-scoped
+	PermitOnlyProjectScopedClusters bool `json:"permitOnlyProjectScopedClusters,omitempty" protobuf:"bytes,13,opt,name=permitOnlyProjectScopedClusters"`
 }
 
 // SyncWindows is a collection of sync windows in this project
@@ -1847,7 +1998,7 @@ func (w *SyncWindows) Matches(app *Application) *SyncWindows {
 		for _, w := range *w {
 			if len(w.Applications) > 0 {
 				for _, a := range w.Applications {
-					if globMatch(a, app.Name) {
+					if globMatch(a, app.Name, false) {
 						matchingWindows = append(matchingWindows, w)
 						break
 					}
@@ -1856,8 +2007,8 @@ func (w *SyncWindows) Matches(app *Application) *SyncWindows {
 			if len(w.Clusters) > 0 {
 				for _, c := range w.Clusters {
 					dst := app.Spec.Destination
-					dstNameMatched := dst.Name != "" && globMatch(c, dst.Name)
-					dstServerMatched := dst.Server != "" && globMatch(c, dst.Server)
+					dstNameMatched := dst.Name != "" && globMatch(c, dst.Name, false)
+					dstServerMatched := dst.Server != "" && globMatch(c, dst.Server, false)
 					if dstNameMatched || dstServerMatched {
 						matchingWindows = append(matchingWindows, w)
 						break
@@ -1866,7 +2017,7 @@ func (w *SyncWindows) Matches(app *Application) *SyncWindows {
 			}
 			if len(w.Namespaces) > 0 {
 				for _, n := range w.Namespaces {
-					if globMatch(n, app.Spec.Destination.Namespace) {
+					if globMatch(n, app.Spec.Destination.Namespace, false) {
 						matchingWindows = append(matchingWindows, w)
 						break
 					}
@@ -2088,6 +2239,11 @@ type ConfigManagementPlugin struct {
 	LockRepo bool     `json:"lockRepo,omitempty" protobuf:"bytes,4,name=lockRepo"`
 }
 
+// HelmOptions holds helm options
+type HelmOptions struct {
+	ValuesFileSchemes []string `protobuf:"bytes,1,opt,name=valuesFileSchemes"`
+}
+
 // KustomizeOptions are options for kustomize to use when building manifests
 type KustomizeOptions struct {
 	// BuildOptions is a string of build parameters to use when calling `kustomize build`
@@ -2113,7 +2269,6 @@ func (app *Application) IsRefreshRequested() (RefreshType, bool) {
 	if annotations == nil {
 		return refreshType, false
 	}
-
 	typeStr, ok := annotations[AnnotationKeyRefresh]
 	if !ok {
 		return refreshType, false
@@ -2122,7 +2277,6 @@ func (app *Application) IsRefreshRequested() (RefreshType, bool) {
 	if typeStr == string(RefreshTypeHard) {
 		refreshType = RefreshTypeHard
 	}
-
 	return refreshType, true
 }
 
@@ -2252,9 +2406,6 @@ func (source *ApplicationSource) ExplicitType() (*ApplicationSourceType, error) 
 	if source.Helm != nil {
 		appTypes = append(appTypes, ApplicationSourceTypeHelm)
 	}
-	if source.Ksonnet != nil {
-		appTypes = append(appTypes, ApplicationSourceTypeKsonnet)
-	}
 	if source.Directory != nil {
 		appTypes = append(appTypes, ApplicationSourceTypeDirectory)
 	}
@@ -2353,18 +2504,19 @@ func SetK8SConfigDefaults(config *rest.Config) error {
 	}
 
 	dial := (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
+		Timeout:   K8sTCPTimeout,
+		KeepAlive: K8sTCPKeepAlive,
 	}).DialContext
 	transport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		TLSHandshakeTimeout: 10 * time.Second,
+		TLSHandshakeTimeout: K8sTLSHandshakeTimeout,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConns:        K8sMaxIdleConnections,
 		MaxIdleConnsPerHost: K8sMaxIdleConnections,
 		MaxConnsPerHost:     K8sMaxIdleConnections,
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
+		IdleConnTimeout:     K8sTCPIdleConnTimeout,
 	})
 	tr, err := rest.HTTPWrappersForConfig(config, transport)
 	if err != nil {
@@ -2375,6 +2527,9 @@ func SetK8SConfigDefaults(config *rest.Config) error {
 	config.TLSClientConfig = rest.TLSClientConfig{}
 	config.AuthProvider = nil
 	config.ExecProvider = nil
+
+	// Set server-side timeout
+	config.Timeout = K8sServerSideTimeout
 
 	config.Transport = tr
 	return nil
@@ -2410,7 +2565,7 @@ func (c *Cluster) RawRestConfig() *rest.Config {
 			CAData:     c.Config.TLSClientConfig.CAData,
 		}
 		if c.Config.AWSAuthConfig != nil {
-			args := []string{"eks", "get-token", "--cluster-name", c.Config.AWSAuthConfig.ClusterName}
+			args := []string{"aws", "--cluster-name", c.Config.AWSAuthConfig.ClusterName}
 			if c.Config.AWSAuthConfig.RoleARN != "" {
 				args = append(args, "--role-arn", c.Config.AWSAuthConfig.RoleARN)
 			}
@@ -2418,8 +2573,8 @@ func (c *Cluster) RawRestConfig() *rest.Config {
 				Host:            c.Server,
 				TLSClientConfig: tlsClientConfig,
 				ExecProvider: &api.ExecConfig{
-					APIVersion:      "client.authentication.k8s.io/v1alpha1",
-					Command:         "aws",
+					APIVersion:      "client.authentication.k8s.io/v1beta1",
+					Command:         "argocd-k8s-auth",
 					Args:            args,
 					InteractiveMode: api.NeverExecInteractiveMode,
 				},
@@ -2459,6 +2614,9 @@ func (c *Cluster) RawRestConfig() *rest.Config {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to create K8s REST config: %v", err))
 	}
+	config.Timeout = K8sServerSideTimeout
+	config.QPS = K8sClientConfigQPS
+	config.Burst = K8sClientConfigBurst
 	return config
 }
 
@@ -2521,4 +2679,34 @@ func (d *ApplicationDestination) MarshalJSON() ([]byte, error) {
 		dest.Server = ""
 	}
 	return json.Marshal(&struct{ *Alias }{Alias: (*Alias)(dest)})
+}
+
+// InstanceName returns the name of the application as used in the instance
+// tracking values, i.e. in the format <namespace>_<name>. When the namespace
+// of the application is similar to the value of defaultNs, only the name of
+// the application is returned to keep backwards compatibility.
+func (a *Application) InstanceName(defaultNs string) string {
+	// When app has no namespace set, or the namespace is the default ns, we
+	// return just the application name
+	if a.Namespace == "" || a.Namespace == defaultNs {
+		return a.Name
+	}
+	return a.Namespace + "_" + a.Name
+}
+
+// QualifiedName returns the full qualified name of the application, including
+// the name of the namespace it is created in delimited by a forward slash,
+// i.e. <namespace>/<appname>
+func (a *Application) QualifiedName() string {
+	if a.Namespace == "" {
+		return a.Name
+	} else {
+		return a.Namespace + "/" + a.Name
+	}
+}
+
+// RBACName returns the full qualified RBAC resource name for the application
+// in a backwards-compatible way.
+func (a *Application) RBACName(defaultNS string) string {
+	return security.AppRBACName(defaultNS, a.Spec.GetProject(), a.Namespace, a.Name)
 }
