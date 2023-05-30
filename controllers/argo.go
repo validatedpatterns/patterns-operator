@@ -114,6 +114,15 @@ func newApplicationValueFiles(p api.Pattern) []string {
 	return files
 }
 
+func newApplicationValues(p api.Pattern) string {
+	s := "extraParametersNested:\n"
+	for _, extra := range p.Spec.ExtraParameters {
+		line := fmt.Sprintf("  %s: %s\n", extra.Name, extra.Value)
+		s = s + line
+	}
+	return s
+}
+
 func newApplication(p api.Pattern) *argoapi.Application {
 
 	// Argo uses...
@@ -133,6 +142,8 @@ func newApplication(p api.Pattern) *argoapi.Application {
 				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
 				Parameters: newApplicationParameters(p),
 
+				// This is to be able to pass down the extraParams to the single applications
+				Values: newApplicationValues(p),
 				// ReleaseName is the Helm release name to use. If omitted it will use the application name
 				// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`
 				// Values specifies Helm values to be passed to helm template, typically defined as a block
