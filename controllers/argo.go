@@ -132,7 +132,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 	spec := argoapi.ApplicationSpec{
 
 		// Source is a reference to the location of the application's manifests or chart
-		Source: argoapi.ApplicationSource{
+		Source: &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.GitConfig.TargetRepo,
 			Path:           "common/clustergroup",
 			TargetRevision: p.Spec.GitConfig.TargetRevision,
@@ -263,7 +263,7 @@ func removeApplication(client argoclient.Interface, name string) error {
 	return client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
-func compareSource(goal, actual argoapi.ApplicationSource) bool {
+func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 	if goal.RepoURL != actual.RepoURL {
 		log.Printf("RepoURL changed %s -> %s\n", actual.RepoURL, goal.RepoURL)
 		return false
