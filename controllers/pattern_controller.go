@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
@@ -313,19 +312,15 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	// Cluster Version
-	// oc get OpenShiftControllerManager/cluster -o jsonpath='{.status.version}'
-	clusterVersion, err := r.operatorClient.OpenShiftControllerManagers().Get(context.Background(), "cluster", metav1.GetOptions{})
+	// oc get clusterversion/version -o yaml
+	clusterVersions, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
 	if err != nil {
 		return err, output
 	} else {
-		// status:
-		//   ...
-		//   version: 4.10.32
-		v, version_err := semver.NewVersion(string(clusterVersion.Status.Version))
+		v, version_err := getCurrentClusterVersion(*clusterVersions)
 		if version_err != nil {
 			return version_err, output
 		}
-
 		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 	}
 
