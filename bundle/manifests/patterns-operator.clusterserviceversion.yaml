@@ -22,9 +22,9 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.17
-    createdAt: 2023-07-18 22:49:29
+    createdAt: 2023-07-26 15:50:32
     description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
-    operators.operatorframework.io/builder: operator-sdk-v1.28.1
+    operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/hybrid-cloud-patterns/patterns-operator
   name: patterns-operator.v0.0.17
@@ -42,6 +42,29 @@ spec:
         name: patterns
         version: v1alpha1
       specDescriptors:
+      - description: Git repo containing the pattern to deploy. Must use https/http
+        displayName: Target Repo
+        path: gitSpec.targetRepo
+      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
+          Default: HEAD'
+        displayName: Target Revision
+        path: gitSpec.targetRevision
+      - description: Upstream git repo containing the pattern to deploy. Used when
+          in-cluster fork to point to the upstream pattern repository
+        displayName: Origin Repo
+        path: gitSpec.originRepo
+      - description: Branch, tag or commit in the upstream git repository. Does not
+          support short-sha's. Default to HEAD
+        displayName: Origin Revision
+        path: gitSpec.originRevision
+      - description: 'Interval in seconds to poll for drifts between origin and target
+          repositories. Default: 180 seconds'
+        displayName: Poll Interval
+        path: gitSpec.pollInterval
+      - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
+          is broken
+        displayName: Hostname
+        path: gitSpec.hostname
       - displayName: Cluster Group Name
         path: clusterGroupName
       - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
@@ -75,25 +98,6 @@ spec:
           False'
         displayName: Use CSV
         path: gitOpsSpec.useCSV
-      - description: Upstream git repo containing the pattern to deploy. Used when
-          in-cluster fork to point to the upstream pattern repository
-        displayName: Origin Repo
-        path: gitSpec.originRepo
-      - description: Branch, tag or commit in the upstream git repository. Does not
-          support short-sha's. Default to HEAD
-        displayName: Origin Revision
-        path: gitSpec.originRevision
-      - description: 'Interval in seconds to poll for drifts between origin and target
-          repositories. Default: 180 seconds'
-        displayName: Poll Interval
-        path: gitSpec.pollInterval
-      - description: Git repo containing the pattern to deploy. Must use https/http
-        displayName: Target Repo
-        path: gitSpec.targetRepo
-      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
-          Default: HEAD'
-        displayName: Target Revision
-        path: gitSpec.targetRevision
       statusDescriptors:
       - displayName: App Cluster Domain
         path: appClusterDomain
