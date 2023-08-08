@@ -75,33 +75,34 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
-	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
-	Hostname string `json:"hostname,omitempty"`
-
 	//Account              string `json:"account,omitempty"`
 	//TokenSecret          string `json:"tokenSecret,omitempty"`
 	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
-	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	OriginRepo string `json:"originRepo,omitempty"`
-
-	// Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	OriginRevision string `json:"originRevision,omitempty"`
-
-	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
-	PollInterval int `json:"pollInterval,omitempty"`
-
 	// Git repo containing the pattern to deploy. Must use https/http
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	TargetRepo string `json:"targetRepo"`
 
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=2
 	TargetRevision string `json:"targetRevision,omitempty"`
+
+	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=3
+	OriginRepo string `json:"originRepo,omitempty"`
+
+	// Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=4
+	OriginRevision string `json:"originRevision,omitempty"`
+
+	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=5
+	PollInterval int `json:"pollInterval,omitempty"`
+
+	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=6
+	Hostname string `json:"hostname,omitempty"`
 }
 
 type ApplyChangeType string
@@ -112,7 +113,7 @@ const (
 )
 
 type GitOpsConfig struct {
-	// Channel to deploy openshift-gitops from. Default: stable
+	// Channel to deploy openshift-gitops from. Default: gitops-1.8
 	//+operator-sdk:csv:customresourcedefinitions:type=spec
 	OperatorChannel string `json:"operatorChannel,omitempty"`
 	// Source to deploy openshift-gitops from. Default: redhat-operators

@@ -244,7 +244,18 @@ var _ = Describe("pattern controller", func() {
 
 func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
-	clusterVersion := &v1.ClusterVersion{ObjectMeta: metav1.ObjectMeta{Name: "version"}, Spec: v1.ClusterVersionSpec{ClusterID: "10"}}
+	clusterVersion := &v1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{Name: "version"},
+		Spec:       v1.ClusterVersionSpec{ClusterID: "10"},
+		Status: v1.ClusterVersionStatus{
+			History: []v1.UpdateHistory{
+				{
+					State:   "Completed",
+					Version: "4.10.3",
+				},
+			},
+		},
+	}
 	clusterInfra := &v1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.InfrastructureSpec{PlatformSpec: v1.PlatformSpec{Type: "AWS"}}}
 	osControlManager := &operatorv1.OpenShiftControllerManager{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},

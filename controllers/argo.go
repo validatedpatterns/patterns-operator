@@ -100,6 +100,8 @@ func newApplicationValueFiles(p api.Pattern) []string {
 	files := []string{
 		"/values-global.yaml",
 		fmt.Sprintf("/values-%s.yaml", p.Spec.ClusterGroupName),
+		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterPlatform),
+		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Status.ClusterVersion),
 		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
 		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterVersion, p.Spec.ClusterGroupName),
 		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterName),
@@ -112,6 +114,15 @@ func newApplicationValueFiles(p api.Pattern) []string {
 	return files
 }
 
+func newApplicationValues(p api.Pattern) string {
+	s := "extraParametersNested:\n"
+	for _, extra := range p.Spec.ExtraParameters {
+		line := fmt.Sprintf("  %s: %s\n", extra.Name, extra.Value)
+		s = s + line
+	}
+	return s
+}
+
 func newApplication(p api.Pattern) *argoapi.Application {
 
 	// Argo uses...
@@ -121,7 +132,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 	spec := argoapi.ApplicationSpec{
 
 		// Source is a reference to the location of the application's manifests or chart
-		Source: argoapi.ApplicationSource{
+		Source: &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.GitConfig.TargetRepo,
 			Path:           "common/clustergroup",
 			TargetRevision: p.Spec.GitConfig.TargetRevision,
@@ -131,6 +142,8 @@ func newApplication(p api.Pattern) *argoapi.Application {
 				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
 				Parameters: newApplicationParameters(p),
 
+				// This is to be able to pass down the extraParams to the single applications
+				Values: newApplicationValues(p),
 				// ReleaseName is the Helm release name to use. If omitted it will use the application name
 				// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`
 				// Values specifies Helm values to be passed to helm template, typically defined as a block
@@ -250,7 +263,7 @@ func removeApplication(client argoclient.Interface, name string) error {
 	return client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
-func compareSource(goal, actual argoapi.ApplicationSource) bool {
+func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 	if goal.RepoURL != actual.RepoURL {
 		log.Printf("RepoURL changed %s -> %s\n", actual.RepoURL, goal.RepoURL)
 		return false
