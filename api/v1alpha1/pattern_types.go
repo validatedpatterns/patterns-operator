@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/argoproj/gitops-engine/pkg/health"
+	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -135,6 +135,20 @@ type GitOpsConfig struct {
 	UseCSV bool `json:"useCSV,omitempty"`
 }
 
+// PatternApplicationInfo defines the Applications
+// Status for the Pattern.
+// This structure is part of the PatternStatus as an array
+// The Application Status will be included as part of the Observed state of Pattern
+type PatternApplicationInfo struct {
+	Name             string                         `json:"name,omitempty"`
+	AppSyncStatus    string                         `json:"syncStatus,omitempty"`
+	AppHealthStatus  string                         `json:"healthStatus,omitempty"`
+	AppHealthMessage string                         `json:"healthMessage,omitempty"`
+	AppReconcileTime string                         `json:"lastReconcileTime,omitempty"`
+	Conditions       []argoapi.ApplicationCondition `json:"conditions,omitempty"`
+	Resources        []argoapi.ResourceStatus       `json:"resources,omitempty"`
+}
+
 // PatternStatus defines the observed state of Pattern
 type PatternStatus struct {
 	// Observed state of the pattern
@@ -165,9 +179,8 @@ type PatternStatus struct {
 	ClusterVersion string `json:"clusterVersion,omitempty"`
 	//+operator-sdk:csv:customerresourcedefinitions:type=conditions
 	Conditions []PatternCondition `json:"conditions,omitempty"`
-	// Health status of the generated argoCD application
-	//+operator-sdk:csv:customresourcedefinitions:type=status
-	AppHealthStatus health.HealthStatusCode `json:"appHealthStatus,omitempty"`
+	//+operator-sdk:csv:customerresourcedefinitions:type=status
+	Applications []PatternApplicationInfo `json:"applications,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
@@ -215,6 +228,13 @@ type PatternConditionType string
 const (
 	GitOutOfSync PatternConditionType = "GitOutOfSync"
 	GitInSync    PatternConditionType = "GitInSync"
+	Synced       PatternConditionType = "Synced"
+	OutOfSync    PatternConditionType = "OutOfSync"
+	Unknown      PatternConditionType = "Unknown"
+	Degraded     PatternConditionType = "Degraded"
+	Progressing  PatternConditionType = "Progressing"
+	Missing      PatternConditionType = "Missing"
+	Suspended    PatternConditionType = "Suspended"
 )
 
 func init() {

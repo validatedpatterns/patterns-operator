@@ -282,6 +282,7 @@ func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 	return compareHelmSource(*goal.Helm, *actual.Helm)
 
 }
+
 func compareHelmSource(goal, actual argoapi.ApplicationSourceHelm) bool {
 	if !compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) {
 		return false

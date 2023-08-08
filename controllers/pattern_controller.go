@@ -49,10 +49,7 @@ import (
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
-)
-
-var (
-	defaultRequeueTime = 5 * time.Minute
+	Client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // PatternReconciler reconciles a Pattern object
@@ -116,12 +113,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			r.logger.Info("Pattern not found")
-			// No need to requeue as the object does not exist.
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		r.logger.Info("Error reading the request object, requeuing.")
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 
 	// Remove the ArgoCD application on deletion
@@ -141,10 +137,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
 		if err = r.Client.Update(context.TODO(), instance); err != nil {
 			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
-			return reconcile.Result{Requeue: true}, err
+			return reconcile.Result{}, err
 		}
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
-		// No need to force-requeue, the object has been marked for deletion and the finalizer has been removed.
 		return reconcile.Result{}, nil
 	}
 
@@ -152,6 +147,27 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
+	}
+	r.logger.Info("Applied Defaults")
+
+	// MBP-184 Implementation
+	// Ensure that the openshift-gitops namespace is present
+	// This namespace gets created by the OpenShift GitOps operator
+	// when it is installed.
+	if haveNamespace(r.Client, applicationNamespace) {
+		// If there are Application status present reset the array
+		if len(qualifiedInstance.Status.Applications) > 0 {
+			qualifiedInstance.Status.Applications = nil
+		}
+
+		// Retrieve the Pattern Application Details and apply them to the CR
+		qualifiedInstance, err = r.applyPatternAppDetails(r.argoClient, qualifiedInstance)
+
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "application pattern details", err)
+		}
+
+		r.logger.Info("Applied Pattern details")
 	}
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
@@ -224,15 +240,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err := createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 
-	}
-	if qualifiedInstance.Status.AppHealthStatus != app.Status.Health.Status {
-		qualifiedInstance.Status.AppHealthStatus = app.Status.Health.Status
-		err = r.Client.Status().Update(context.Background(), qualifiedInstance, &client.UpdateOptions{})
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "update pattern status with app health status", err)
-		}
-	}
-	if ownedBySame(targetApp, app) {
+	} else if ownedBySame(targetApp, app) {
 		// Check values
 		err, changed := updateApplication(r.argoClient, targetApp, app)
 		if changed {
@@ -255,9 +263,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	// Default requeuing when no changes are found. This is to ensure that the controller will periodically pull for changes to the gitops subscription and argoCD application since
-	// it is not directly managing them via the reconciliation loop (it only watches for pattern objects)
-	return ctrl.Result{RequeueAfter: defaultRequeueTime}, nil
+	// MBP-184 Implementation
+	// This is a temporary hack to ensure that the Reconcile loop
+	// gets called every 3 minutes.
+	// TODO: Need to create a watch routing for Pattern Applications
+	result := ctrl.Result{
+		Requeue:      false,
+		RequeueAfter: 180 * time.Second,
+	}
+	return result, nil
 }
 
 func validGitRepoURL(repoURL string) error {
@@ -501,25 +515,93 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	updateErr := r.Client.Status().Update(context.TODO(), p)
 	if updateErr != nil {
 		r.logger.Error(updateErr, "Failed to update Pattern status")
-		// Force requeue even if the object failed to update. This is to ensure that the reconciliation loop will execute again
-		// in cases where there are network issues that prevent establishing communication with the API server
-		return reconcile.Result{Requeue: true}, updateErr
+		return reconcile.Result{}, updateErr
 	}
 	if duration != nil {
 		log.Printf("Requeueing\n")
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
 	//	log.Printf("Reconciling with exponential duration")
-	// No need to force requeuing as the object has been modified in the previous lines and will trigger the reconciliation logic again.
-	return reconcile.Result{RequeueAfter: defaultRequeueTime}, err
+	return reconcile.Result{}, err
 }
 
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {
-	delay := defaultRequeueTime
 	if err != nil {
-		delay = time.Minute
+		delay := time.Minute * 1
+		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	} else if !p.ObjectMeta.DeletionTimestamp.IsZero() {
-		delay = time.Minute * 2
+		delay := time.Minute * 2
+		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
-	return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
+	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+}
+
+// MBP-184 Implementation
+// applyPatternAppDetails retrieves the status for the Pattern applications created in ArgoCD.
+// Once the Application Status is retrieve it appends the information
+// to the array and the CR is updated.
+func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, input *api.Pattern) (*api.Pattern, error) {
+	output := input.DeepCopy()
+	var applicationInfo api.PatternApplicationInfo
+
+	// Buid the namespace from the Pattern ObjectMeta.Name and Spec.ClusterGroupName
+	ns := output.ObjectMeta.Name + "-" + output.Spec.ClusterGroupName
+	// oc get Applications -n [pattern-name]-hub
+	// E.G. oc get Applications -n multicloud-gitops-hub
+	applications, err := client.ArgoprojV1alpha1().Applications(ns).List(context.Background(), metav1.ListOptions{})
+
+	// Return error
+	if err != nil {
+		return output, err
+	}
+
+	// Reset the array since we are going to replace it with the new application status
+	if len(output.Status.Applications) > 0 {
+		output.Status.Applications = nil
+	}
+
+	// Loop through the Pattern Applications and append the details to the Applications array
+	for _, app := range applications.Items {
+		//fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
+		// Add Application information to ApplicationInfo struct
+		applicationInfo.Name = app.Name
+		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
+		applicationInfo.AppHealthMessage = app.Status.Health.Message
+		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
+		applicationInfo.AppReconcileTime = app.Status.ReconciledAt.String()
+		if len(app.Status.Conditions) <= 0 {
+			applicationInfo.Conditions = nil // Reset Conditions array
+		} else {
+			applicationInfo.Conditions = append(applicationInfo.Conditions, app.Status.Conditions...)
+		}
+
+		// Now let's append the Application Information
+		output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
+	}
+
+	// Update CR for the Pattern Instance
+	if output.Status.Applications != nil {
+		// Create an empty Pattern CR
+		patternCR := &api.Pattern{}
+
+		// Get the current Pattern CR
+		_ = r.Client.Get(context.TODO(), Client.ObjectKey{
+			Namespace: "openshift-operators",
+			Name:      output.ObjectMeta.Name}, patternCR)
+
+		// Replace the array in the CR for the applications
+		// with the newly generated array
+		patternCR.Status.Applications = output.Status.Applications
+
+		// Update last step in CR
+		patternCR.Status.LastStep = "update pattern application status"
+
+		// Now let's update the CR with the application status data.
+		err = r.Client.Status().Update(context.Background(), patternCR)
+		if err != nil {
+			return output, err
+		}
+
+	}
+	return output, err
 }
