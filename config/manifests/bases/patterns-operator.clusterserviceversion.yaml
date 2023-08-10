@@ -42,6 +42,8 @@ spec:
           repositories. Default: 180 seconds'
         displayName: Poll Interval
         path: gitSpec.pollInterval
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:number
       - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
           is broken
         displayName: Hostname

@@ -108,6 +108,7 @@ spec:
                       Does not support short-sha's. Default to HEAD
                     type: string
                   pollInterval:
+                    default: 180
                     description: 'Interval in seconds to poll for drifts between origin
                       and target repositories. Default: 180 seconds'
                     type: integer
