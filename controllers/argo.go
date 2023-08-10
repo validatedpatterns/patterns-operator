@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -95,21 +96,21 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 	return parameters
 }
 
-func newApplicationValueFiles(p api.Pattern) []string {
-
+func newApplicationValueFiles(p api.Pattern, prefix string) []string {
 	files := []string{
-		"/values-global.yaml",
-		fmt.Sprintf("/values-%s.yaml", p.Spec.ClusterGroupName),
-		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterPlatform),
-		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Status.ClusterVersion),
-		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
-		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterVersion, p.Spec.ClusterGroupName),
-		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterName),
+		fmt.Sprintf("%s/values-global.yaml", prefix),
+		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Spec.ClusterGroupName),
+		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterPlatform),
+		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Status.ClusterVersion),
+		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
+		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterVersion, p.Spec.ClusterGroupName),
+		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterName),
 	}
 
 	for _, extra := range p.Spec.ExtraValueFiles {
-		log.Printf("Values file %q added", extra)
-		files = append(files, extra)
+		extraValueFile := fmt.Sprintf("%s/%s", prefix, strings.TrimPrefix(extra, "/"))
+		log.Printf("Values file %q added", extraValueFile)
+		files = append(files, extraValueFile)
 	}
 	return files
 }
@@ -137,7 +138,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 			Path:           "common/clustergroup",
 			TargetRevision: p.Spec.GitConfig.TargetRevision,
 			Helm: &argoapi.ApplicationSourceHelm{
-				ValueFiles: newApplicationValueFiles(p),
+				ValueFiles: newApplicationValueFiles(p, ""),
 
 				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
 				Parameters: newApplicationParameters(p),
