@@ -103,6 +103,24 @@ type GitConfig struct {
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=6
 	Hostname string `json:"hostname,omitempty"`
+
+	// (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup argo application
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=7
+	// +kubebuilder:default:=false
+	MultiSourceSupport bool `json:"multiSourceSupport,omitempty"`
+
+	// The url multiSourceRepoURL when deploying the clustergroup argo application
+	// Defaults to https://mbaldessari.github.io/vp-helm-charts/
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	MultiSourceRepoUrl string `json:"multiSourceRepoUrl,omitempty"`
+
+	// The chart inside the repo to target for installation. Defaults to 'clustergroup'
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=9
+	MultiSourceRepoChart string `json:"multiSourceRepoChart,omitempty"`
+
+	//Enable multiSourceRepoURL when deploying the clustergroup argo application
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=10
+	MultiSourceTargetRevision string `json:"multiSourceTargetRevision,omitempty"`
 }
 
 type ApplyChangeType string

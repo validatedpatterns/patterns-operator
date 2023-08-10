@@ -99,6 +99,23 @@ spec:
                     description: Optional. FQDN of the git server if automatic parsing
                       from TargetRepo is broken
                     type: string
+                  multiSourceRepoChart:
+                    description: The chart inside the repo to target for installation.
+                      Defaults to 'clustergroup'
+                    type: string
+                  multiSourceRepoUrl:
+                    description: The url multiSourceRepoURL when deploying the clustergroup
+                      argo application Defaults to https://mbaldessari.github.io/vp-helm-charts/
+                    type: string
+                  multiSourceSupport:
+                    default: false
+                    description: Enable multiSourceSupport when deploying the clustergroup
+                      argo application
+                    type: boolean
+                  multiSourceTargetRevision:
+                    description: Enable multiSourceRepoURL when deploying the clustergroup
+                      argo application
+                    type: string
                   originRepo:
                     description: Upstream git repo containing the pattern to deploy.
                       Used when in-cluster fork to point to the upstream pattern repository

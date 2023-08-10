@@ -31,8 +31,11 @@ var _ = Describe("Argo Pattern", func() {
 			Spec: api.PatternSpec{
 				ClusterGroupName: "foogroup",
 				GitConfig: api.GitConfig{
-					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
-					TargetRevision: "main",
+					TargetRepo:                "https://github.com/validatedpatterns/multicloud-gitops",
+					TargetRevision:            "main",
+					MultiSourceRepoUrl:        "https://mbaldessari.github.io/charts-test",
+					MultiSourceRepoChart:      "clustergroup",
+					MultiSourceTargetRevision: "0.0.*",
 				},
 				GitOpsConfig: &api.GitOpsConfig{
 					ManualSync: false,
@@ -66,8 +69,20 @@ var _ = Describe("Argo Pattern", func() {
 	})
 
 	Describe("Testing newApplication function", func() {
-		var argoApp *argoapi.Application
+		var argoApp, multiSourceArgoApp *argoapi.Application
+		var appSource *argoapi.ApplicationSource
 		BeforeEach(func() {
+			appSource = &argoapi.ApplicationSource{
+				RepoURL:        pattern.Spec.GitConfig.TargetRepo,
+				Path:           "common/clustergroup",
+				TargetRevision: pattern.Spec.GitConfig.TargetRevision,
+				Helm: &argoapi.ApplicationSourceHelm{
+					ValueFiles:              newApplicationValueFiles(*pattern, ""),
+					Parameters:              newApplicationParameters(*pattern),
+					Values:                  newApplicationValues(*pattern),
+					IgnoreMissingValueFiles: true,
+				},
+			}
 			argoApp = &argoapi.Application{
 				ObjectMeta: v1.ObjectMeta{
 					Name:      applicationName(*pattern),
@@ -77,17 +92,7 @@ var _ = Describe("Argo Pattern", func() {
 					},
 				},
 				Spec: argoapi.ApplicationSpec{
-					Source: &argoapi.ApplicationSource{
-						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
-						Path:           "common/clustergroup",
-						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
-						Helm: &argoapi.ApplicationSourceHelm{
-							ValueFiles:              newApplicationValueFiles(*pattern, ""),
-							Parameters:              newApplicationParameters(*pattern),
-							Values:                  newApplicationValues(*pattern),
-							IgnoreMissingValueFiles: true,
-						},
-					},
+					Source: appSource,
 					Destination: argoapi.ApplicationDestination{
 						Name:      "in-cluster",
 						Namespace: pattern.Namespace,
@@ -100,13 +105,37 @@ var _ = Describe("Argo Pattern", func() {
 				},
 			}
 			controllerutil.AddFinalizer(argoApp, argoapi.ForegroundPropagationPolicyFinalizer)
+
 		})
-		Context("Default", func() {
+		Context("Default single source", func() {
 			It("Returns an argo application", func() {
 				// This is needed to debug any failures as gomega truncates the diff output
 				format.MaxDepth = 100
 				format.MaxLength = 0
 				Expect(newApplication(*pattern)).To(Equal(argoApp))
+			})
+		})
+		Context("Default multi source", func() {
+			It("Returns an argo application with multiple sources", func() {
+				// This is needed to debug any failures as gomega truncates the diff output
+				format.MaxDepth = 100
+				format.MaxLength = 0
+				multiSourceArgoApp = argoApp.DeepCopy()
+				multiSourceArgoApp.Spec.Source = nil
+				appSource.RepoURL = pattern.Spec.GitConfig.MultiSourceRepoUrl
+				appSource.Chart = pattern.Spec.GitConfig.MultiSourceRepoChart
+				appSource.Path = ""
+				appSource.TargetRevision = pattern.Spec.GitConfig.MultiSourceTargetRevision
+				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
+					{
+						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
+						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
+						Ref:            "values",
+					},
+					*appSource,
+				}
+				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(*pattern, "$values")
+				Expect(newMultiSourceApplication(*pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
 	})
@@ -313,6 +342,11 @@ var _ = Describe("Argo Pattern", func() {
 					{
 						Name:        "global.localClusterName",
 						Value:       "barcluster",
+						ForceString: false,
+					},
+					{
+						Name:        "global.multiSourceSupport",
+						Value:       "false",
 						ForceString: false,
 					},
 				}
