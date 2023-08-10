@@ -642,7 +642,6 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 			if err != nil {
 				return false, err
 			}
-			fmt.Println("Updated Pattern CR")
 			return true, nil
 		}
 	}
