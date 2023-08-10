@@ -164,7 +164,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		qualifiedInstance, err = r.applyPatternAppDetails(r.argoClient, qualifiedInstance)
 
 		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "application pattern details", err)
+			// Let's just inform that there was an error retrieving the Application details
+			r.logger.Info("Application Pattern Details: ", err)
 		}
 
 		r.logger.Info("Applied Pattern details")
@@ -259,6 +260,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
+
+	// Update CR if necessary
+	var fUpdate bool
+	fUpdate, err = r.updatePatternCRDetails(qualifiedInstance)
+
+	if err == nil && fUpdate {
+		log.Printf("\x1b[32;1m\tPattern CR Updated\x1b[0m\n")
+	}
+
 	// Report statistics
 
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
@@ -565,43 +575,76 @@ func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, 
 		//fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
 		// Add Application information to ApplicationInfo struct
 		applicationInfo.Name = app.Name
+		applicationInfo.Namespace = app.Spec.Destination.Namespace
 		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
 		applicationInfo.AppHealthMessage = app.Status.Health.Message
 		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
 		applicationInfo.AppReconcileTime = app.Status.ReconciledAt.String()
-		if len(app.Status.Conditions) <= 0 {
-			applicationInfo.Conditions = nil // Reset Conditions array
-		} else {
-			applicationInfo.Conditions = append(applicationInfo.Conditions, app.Status.Conditions...)
-		}
 
 		// Now let's append the Application Information
 		output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
 	}
 
+	return output, err
+}
+
+// MBP-184 Implementation
+// updatePatternCRDetails compares the current CR Status.Applications array
+// against the instance.Status.Applications array.
+// Returns true if the CR was updated else it returns false
+func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
+	fUpdateCR := false
+
 	// Update CR for the Pattern Instance
-	if output.Status.Applications != nil {
+	if input.Status.Applications != nil {
 		// Create an empty Pattern CR
 		patternCR := &api.Pattern{}
 
 		// Get the current Pattern CR
 		_ = r.Client.Get(context.TODO(), Client.ObjectKey{
 			Namespace: "openshift-operators",
-			Name:      output.ObjectMeta.Name}, patternCR)
+			Name:      input.ObjectMeta.Name}, patternCR)
 
-		// Replace the array in the CR for the applications
-		// with the newly generated array
-		patternCR.Status.Applications = output.Status.Applications
+		// Check to see if the Pattern CR has a list of Applications
+		// If it doesn't and we have a list of Applications
+		// Let's update the Pattern CR and set the update flag to true
+		if len(patternCR.Status.Applications) <= 0 && len(input.Status.Applications) > 0 {
+			patternCR.Status.Applications = input.Status.Applications
+			fUpdateCR = true
+		} else if len(patternCR.Status.Applications) == len(input.Status.Applications) {
+			// Compare the array items in the CR for the applications
+			// with the current instance array
+			for index, value := range input.Status.Applications {
+				// Only check AppSyncStatus or AppHealthStatus
+				// Checking the entire array will always update the CR since
+				// ArgoCD updates the ReconcileAt timestamp
+				if value.AppSyncStatus != patternCR.Status.Applications[index].AppSyncStatus ||
+					value.AppHealthStatus != patternCR.Status.Applications[index].AppHealthStatus {
+					fmt.Println("Comparing: ", value, " ==> against: ", patternCR.Status.Applications[index])
+					patternCR.Status.Applications[index] = value
+					fUpdateCR = true
 
-		// Update last step in CR
-		patternCR.Status.LastStep = "update pattern application status"
-
-		// Now let's update the CR with the application status data.
-		err = r.Client.Status().Update(context.Background(), patternCR)
-		if err != nil {
-			return output, err
+				}
+			}
+		} else {
+			// Replace it ... user might've added an application
+			patternCR.Status.Applications = input.Status.Applications
+			fUpdateCR = true
 		}
 
+		// Update the Pattern CR if different
+		if fUpdateCR {
+			// Update last step in CR
+			patternCR.Status.LastStep = "update pattern application status"
+
+			// Now let's update the CR with the application status data.
+			err := r.Client.Status().Update(context.Background(), patternCR)
+			if err != nil {
+				return false, err
+			}
+			fmt.Println("Updated Pattern CR")
+			return true, nil
+		}
 	}
-	return output, err
+	return false, nil
 }
