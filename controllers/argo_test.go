@@ -28,11 +28,17 @@ var _ = Describe("Argo Pattern", func() {
 			TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
 			Spec: api.PatternSpec{
 				ClusterGroupName: "foogroup",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
+					TargetRevision: "main",
+				},
 			},
 			Status: api.PatternStatus{
-				ClusterPlatform: "AWS",
-				ClusterVersion:  "4.12",
-				ClusterName:     "bar",
+				ClusterPlatform:  "AWS",
+				ClusterVersion:   "4.12",
+				ClusterName:      "barcluster",
+				AppClusterDomain: "apps.hub-cluster.validatedpatterns.io",
+				ClusterDomain:    "hub-cluster.validatedpatterns.io",
 			},
 		}
 		defaultValueFiles = []string{
@@ -42,7 +48,7 @@ var _ = Describe("Argo Pattern", func() {
 			"/values-AWS-4.12.yaml",
 			"/values-AWS-foogroup.yaml",
 			"/values-4.12-foogroup.yaml",
-			"/values-bar.yaml",
+			"/values-barcluster.yaml",
 		}
 	})
 
@@ -186,7 +192,87 @@ var _ = Describe("Argo Pattern", func() {
 				}
 				Expect(updateHelmParameter(existantParam, actualHelm)).To(Equal(true))
 			})
-
+		})
+		Context("Application Parameters", func() {
+			var appParameters []argoapi.HelmParameter
+			BeforeEach(func() {
+				appParameters = []argoapi.HelmParameter{
+					{
+						Name:        "global.pattern",
+						Value:       "multicloud-gitops-test",
+						ForceString: false,
+					},
+					{
+						Name:        "global.namespace",
+						Value:       "default",
+						ForceString: false,
+					},
+					{
+						Name:        "global.repoURL",
+						Value:       "https://github.com/validatedpatterns/multicloud-gitops",
+						ForceString: false,
+					},
+					{
+						Name:        "global.targetRevision",
+						Value:       "main",
+						ForceString: false,
+					},
+					{
+						Name:        "global.hubClusterDomain",
+						Value:       "apps.hub-cluster.validatedpatterns.io",
+						ForceString: false,
+					},
+					{
+						Name:        "global.localClusterDomain",
+						Value:       "apps.hub-cluster.validatedpatterns.io",
+						ForceString: false,
+					},
+					{
+						Name:        "global.clusterDomain",
+						Value:       "hub-cluster.validatedpatterns.io",
+						ForceString: false,
+					},
+					{
+						Name:        "global.clusterVersion",
+						Value:       "4.12",
+						ForceString: false,
+					},
+					{
+						Name:        "global.clusterPlatform",
+						Value:       "AWS",
+						ForceString: false,
+					},
+					{
+						Name:        "global.localClusterName",
+						Value:       "barcluster",
+						ForceString: false,
+					},
+				}
+			})
+			It("Test default newApplicationParameters", func() {
+				Expect(newApplicationParameters(*pattern)).To(Equal(appParameters))
+			})
+			It("Test newApplicationParameters with extra parameters", func() {
+				pattern.Spec.ExtraParameters = []api.PatternParameter{
+					{
+						Name:  "test1",
+						Value: "test1value",
+					},
+					{
+						Name:  "test2",
+						Value: "test2value",
+					},
+				}
+				Expect(newApplicationParameters(*pattern)).To(Equal(append(appParameters,
+					argoapi.HelmParameter{
+						Name:  "test1",
+						Value: "test1value",
+					},
+					argoapi.HelmParameter{
+						Name:  "test2",
+						Value: "test2value",
+					})))
+			})
 		})
 	})
 })
