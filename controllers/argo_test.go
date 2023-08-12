@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func prefixArray(a []string, prefix string) []string {
@@ -22,6 +23,8 @@ var _ = Describe("Argo Pattern", func() {
 	var defaultValueFiles []string
 	BeforeEach(func() {
 		pattern = &api.Pattern{
+			ObjectMeta: v1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
+			TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
 			Spec: api.PatternSpec{
 				ClusterGroupName: "foogroup",
 			},
@@ -40,6 +43,14 @@ var _ = Describe("Argo Pattern", func() {
 			"/values-4.12-foogroup.yaml",
 			"/values-bar.yaml",
 		}
+	})
+
+	Describe("Testing applicationName function", func() {
+		Context("Default", func() {
+			It("Returns default application name", func() {
+				Expect(applicationName(*pattern)).To(Equal("multicloud-gitops-test-foogroup"))
+			})
+		})
 	})
 
 	Describe("Testing newApplicationValueFiles function", func() {
