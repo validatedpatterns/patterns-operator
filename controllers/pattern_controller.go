@@ -575,7 +575,7 @@ func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, 
 		//fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
 		// Add Application information to ApplicationInfo struct
 		applicationInfo.Name = app.Name
-		applicationInfo.Namespace = app.Spec.Destination.Namespace
+		applicationInfo.Namespace = app.Namespace
 		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
 		applicationInfo.AppHealthMessage = app.Status.Health.Message
 		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
