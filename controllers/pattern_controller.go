@@ -579,7 +579,6 @@ func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, 
 		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
 		applicationInfo.AppHealthMessage = app.Status.Health.Message
 		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
-		applicationInfo.AppReconcileTime = app.Status.ReconciledAt.String()
 
 		// Now let's append the Application Information
 		output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())

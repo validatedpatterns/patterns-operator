@@ -144,7 +144,6 @@ type PatternApplicationInfo struct {
 	AppSyncStatus    string `json:"syncStatus,omitempty"`
 	AppHealthStatus  string `json:"healthStatus,omitempty"`
 	AppHealthMessage string `json:"healthMessage,omitempty"`
-	AppReconcileTime string `json:"lastReconcileTime,omitempty"`
 }
 
 // PatternStatus defines the observed state of Pattern
