@@ -5,10 +5,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func prefixArray(a []string, prefix string) []string {
@@ -31,6 +33,9 @@ var _ = Describe("Argo Pattern", func() {
 				GitConfig: api.GitConfig{
 					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
 					TargetRevision: "main",
+				},
+				GitOpsConfig: &api.GitOpsConfig{
+					ManualSync: false,
 				},
 			},
 			Status: api.PatternStatus{
@@ -56,6 +61,52 @@ var _ = Describe("Argo Pattern", func() {
 		Context("Default", func() {
 			It("Returns default application name", func() {
 				Expect(applicationName(*pattern)).To(Equal("multicloud-gitops-test-foogroup"))
+			})
+		})
+	})
+
+	Describe("Testing newApplication function", func() {
+		var argoApp *argoapi.Application
+		BeforeEach(func() {
+			argoApp = &argoapi.Application{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      applicationName(*pattern),
+					Namespace: "openshift-gitops",
+					Labels: map[string]string{
+						"pattern": applicationName(*pattern),
+					},
+				},
+				Spec: argoapi.ApplicationSpec{
+					Source: &argoapi.ApplicationSource{
+						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
+						Path:           "common/clustergroup",
+						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
+						Helm: &argoapi.ApplicationSourceHelm{
+							ValueFiles:              newApplicationValueFiles(*pattern, ""),
+							Parameters:              newApplicationParameters(*pattern),
+							Values:                  newApplicationValues(*pattern),
+							IgnoreMissingValueFiles: true,
+						},
+					},
+					Destination: argoapi.ApplicationDestination{
+						Name:      "in-cluster",
+						Namespace: pattern.Namespace,
+					},
+					Project: "default",
+					SyncPolicy: &argoapi.SyncPolicy{
+						Automated:   &argoapi.SyncPolicyAutomated{},
+						SyncOptions: []string{},
+					},
+				},
+			}
+			controllerutil.AddFinalizer(argoApp, argoapi.ForegroundPropagationPolicyFinalizer)
+		})
+		Context("Default", func() {
+			It("Returns an argo application", func() {
+				// This is needed to debug any failures as gomega truncates the diff output
+				format.MaxDepth = 100
+				format.MaxLength = 0
+				Expect(newApplication(*pattern)).To(Equal(argoApp))
 			})
 		})
 	})
