@@ -230,6 +230,21 @@ func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.Applicat
 	}
 }
 
+func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
+	labels := make(map[string]string)
+	labels["pattern"] = applicationName(p)
+	app := argoapi.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      applicationName(p),
+			Namespace: applicationNamespace,
+			Labels:    labels,
+		},
+		Spec: spec,
+	}
+	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
+	return &app
+}
+
 func newApplication(p api.Pattern) *argoapi.Application {
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
@@ -244,19 +259,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 	spec := commonApplicationSpec(p, []argoapi.ApplicationSource{source})
 
 	spec.SyncPolicy = commonSyncPolicy(p)
-	labels := make(map[string]string)
-	labels["pattern"] = applicationName(p)
-	app := argoapi.Application{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      applicationName(p),
-			Namespace: applicationNamespace,
-			Labels:    labels,
-		},
-		Spec: spec,
-	}
-
-	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
-	return &app
+	return newArgoApplication(p, spec)
 }
 
 func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
@@ -281,19 +284,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 
 	spec := commonApplicationSpec(p, sources)
 	spec.SyncPolicy = commonSyncPolicy(p)
-	labels := make(map[string]string)
-	labels["pattern"] = applicationName(p)
-	app := argoapi.Application{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      applicationName(p),
-			Namespace: applicationNamespace,
-			Labels:    labels,
-		},
-		Spec: spec,
-	}
-
-	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
-	return &app
+	return newArgoApplication(p, spec)
 }
 
 func applicationName(p api.Pattern) string {
