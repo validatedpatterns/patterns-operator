@@ -48,12 +48,12 @@ spec:
           is broken
         displayName: Hostname
         path: gitSpec.hostname
-      - description: Enable multiSourceSupport when deploying the clustergroup argo
-          application
+      - description: (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup
+          argo application
         displayName: Multi Source Support
         path: gitSpec.multiSourceSupport
       - description: The url multiSourceRepoURL when deploying the clustergroup argo
-          application Defaults to https://mbaldessari.github.io/vp-helm-charts/
+          application Defaults to https://validatedpatterns.github.io/helm-charts/
         displayName: Multi Source Repo Url
         path: gitSpec.multiSourceRepoUrl
       - description: The chart inside the repo to target for installation. Defaults

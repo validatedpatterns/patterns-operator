@@ -35,7 +35,7 @@ var _ = Describe("Argo Pattern", func() {
 				GitConfig: api.GitConfig{
 					TargetRepo:                "https://github.com/validatedpatterns/multicloud-gitops",
 					TargetRevision:            "main",
-					MultiSourceRepoUrl:        "https://mbaldessari.github.io/charts-test",
+					MultiSourceRepoUrl:        "https://validatedpatterns.github.io/helm-charts",
 					MultiSourceRepoChart:      "clustergroup",
 					MultiSourceTargetRevision: "0.0.*",
 				},
@@ -389,7 +389,7 @@ var _ = Describe("Argo Pattern", func() {
 					},
 					argoapi.HelmParameter{
 						Name:  "global.multiSourceRepoUrl",
-						Value: "https://mbaldessari.github.io/charts-test",
+						Value: "https://validatedpatterns.github.io/helm-charts",
 					},
 					argoapi.HelmParameter{
 						Name:  "global.multiSourceRepoChart",

@@ -110,7 +110,7 @@ type GitConfig struct {
 	MultiSourceSupport bool `json:"multiSourceSupport,omitempty"`
 
 	// The url multiSourceRepoURL when deploying the clustergroup argo application
-	// Defaults to https://mbaldessari.github.io/vp-helm-charts/
+	// Defaults to https://validatedpatterns.github.io/helm-charts/
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=8
 	MultiSourceRepoUrl string `json:"multiSourceRepoUrl,omitempty"`
 
