@@ -344,15 +344,16 @@ var _ = Describe("Argo Pattern", func() {
 						Value:       "barcluster",
 						ForceString: false,
 					},
-					{
+				}
+			})
+			It("Test default newApplicationParameters", func() {
+				Expect(newApplicationParameters(*pattern)).To(Equal(append(appParameters,
+					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
 						Value:       "false",
 						ForceString: false,
 					},
-				}
-			})
-			It("Test default newApplicationParameters", func() {
-				Expect(newApplicationParameters(*pattern)).To(Equal(appParameters))
+				)))
 			})
 			It("Test newApplicationParameters with extra parameters", func() {
 				pattern.Spec.ExtraParameters = []api.PatternParameter{
@@ -367,12 +368,38 @@ var _ = Describe("Argo Pattern", func() {
 				}
 				Expect(newApplicationParameters(*pattern)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
+						Name:        "global.multiSourceSupport",
+						Value:       "false",
+						ForceString: false,
+					},
+					argoapi.HelmParameter{
 						Name:  "test1",
 						Value: "test1value",
 					},
 					argoapi.HelmParameter{
 						Name:  "test2",
 						Value: "test2value",
+					})))
+			})
+			It("Test newApplicationParameters with multiSource", func() {
+				pattern.Spec.GitConfig.MultiSourceSupport = true
+				Expect(newApplicationParameters(*pattern)).To(Equal(append(appParameters,
+					argoapi.HelmParameter{
+						Name:        "global.multiSourceSupport",
+						Value:       "true",
+						ForceString: false,
+					},
+					argoapi.HelmParameter{
+						Name:  "global.multiSourceRepoUrl",
+						Value: "https://mbaldessari.github.io/charts-test",
+					},
+					argoapi.HelmParameter{
+						Name:  "global.multiSourceRepoChart",
+						Value: "clustergroup",
+					},
+					argoapi.HelmParameter{
+						Name:  "global.multiSourceTargetRevision",
+						Value: "0.0.*",
 					})))
 			})
 		})
