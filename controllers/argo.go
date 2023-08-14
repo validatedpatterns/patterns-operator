@@ -362,12 +362,18 @@ func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 		log.Printf("Path changed %s -> %s\n", actual.Path, goal.Path)
 		return false
 	}
+
+	// if both .Helm structs are nil, we compared everything already and we can just
+	// return true here without invoking compareHelmSource()
+	if goal.Helm == nil && actual.Helm == nil {
+		return true
+	}
+	// but if one .Helm struct is nil and the other one is not then we can safely return false
 	if goal.Helm == nil || actual.Helm == nil {
 		return false
 	}
 
 	return compareHelmSource(*goal.Helm, *actual.Helm)
-
 }
 
 func compareSources(goal, actual argoapi.ApplicationSources) bool {
