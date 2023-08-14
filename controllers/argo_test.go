@@ -24,6 +24,8 @@ func prefixArray(a []string, prefix string) []string {
 var _ = Describe("Argo Pattern", func() {
 	var pattern *api.Pattern
 	var defaultValueFiles []string
+	var argoApp, multiSourceArgoApp *argoapi.Application
+	var appSource *argoapi.ApplicationSource
 	BeforeEach(func() {
 		pattern = &api.Pattern{
 			ObjectMeta: v1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
@@ -58,6 +60,40 @@ var _ = Describe("Argo Pattern", func() {
 			"/values-4.12-foogroup.yaml",
 			"/values-barcluster.yaml",
 		}
+
+		appSource = &argoapi.ApplicationSource{
+			RepoURL:        pattern.Spec.GitConfig.TargetRepo,
+			Path:           "common/clustergroup",
+			TargetRevision: pattern.Spec.GitConfig.TargetRevision,
+			Helm: &argoapi.ApplicationSourceHelm{
+				ValueFiles:              newApplicationValueFiles(*pattern, ""),
+				Parameters:              newApplicationParameters(*pattern),
+				Values:                  newApplicationValues(*pattern),
+				IgnoreMissingValueFiles: true,
+			},
+		}
+		argoApp = &argoapi.Application{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      applicationName(*pattern),
+				Namespace: "openshift-gitops",
+				Labels: map[string]string{
+					"pattern": applicationName(*pattern),
+				},
+			},
+			Spec: argoapi.ApplicationSpec{
+				Source: appSource,
+				Destination: argoapi.ApplicationDestination{
+					Name:      "in-cluster",
+					Namespace: pattern.Namespace,
+				},
+				Project: "default",
+				SyncPolicy: &argoapi.SyncPolicy{
+					Automated:   &argoapi.SyncPolicyAutomated{},
+					SyncOptions: []string{},
+				},
+			},
+		}
+		controllerutil.AddFinalizer(argoApp, argoapi.ForegroundPropagationPolicyFinalizer)
 	})
 
 	Describe("Testing applicationName function", func() {
@@ -69,44 +105,6 @@ var _ = Describe("Argo Pattern", func() {
 	})
 
 	Describe("Testing newApplication function", func() {
-		var argoApp, multiSourceArgoApp *argoapi.Application
-		var appSource *argoapi.ApplicationSource
-		BeforeEach(func() {
-			appSource = &argoapi.ApplicationSource{
-				RepoURL:        pattern.Spec.GitConfig.TargetRepo,
-				Path:           "common/clustergroup",
-				TargetRevision: pattern.Spec.GitConfig.TargetRevision,
-				Helm: &argoapi.ApplicationSourceHelm{
-					ValueFiles:              newApplicationValueFiles(*pattern, ""),
-					Parameters:              newApplicationParameters(*pattern),
-					Values:                  newApplicationValues(*pattern),
-					IgnoreMissingValueFiles: true,
-				},
-			}
-			argoApp = &argoapi.Application{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      applicationName(*pattern),
-					Namespace: "openshift-gitops",
-					Labels: map[string]string{
-						"pattern": applicationName(*pattern),
-					},
-				},
-				Spec: argoapi.ApplicationSpec{
-					Source: appSource,
-					Destination: argoapi.ApplicationDestination{
-						Name:      "in-cluster",
-						Namespace: pattern.Namespace,
-					},
-					Project: "default",
-					SyncPolicy: &argoapi.SyncPolicy{
-						Automated:   &argoapi.SyncPolicyAutomated{},
-						SyncOptions: []string{},
-					},
-				},
-			}
-			controllerutil.AddFinalizer(argoApp, argoapi.ForegroundPropagationPolicyFinalizer)
-
-		})
 		Context("Default single source", func() {
 			It("Returns an argo application", func() {
 				// This is needed to debug any failures as gomega truncates the diff output
@@ -402,6 +400,40 @@ var _ = Describe("Argo Pattern", func() {
 						Value: "0.0.*",
 					})))
 			})
+		})
+
+		Context("Compare Sources", func() {
+			var multiSourceArgoApp *argoapi.Application
+			var sources []argoapi.ApplicationSource
+
+			BeforeEach(func() {
+				multiSourceArgoApp = newMultiSourceApplication(*pattern)
+				sources = multiSourceArgoApp.Spec.Sources
+			})
+			It("compareSource() function identical", func() {
+				Expect(compareSource(appSource, appSource)).To(Equal(true))
+			})
+			It("compareSource() function differing", func() {
+				appSourceChanged := appSource.DeepCopy()
+				appSourceChanged.Path = "different"
+				Expect(compareSource(appSource, appSourceChanged)).To(Equal(false))
+			})
+			It("compareSources() function with nil arg1", func() {
+				Expect(compareSources(sources, nil)).To(Equal(false))
+			})
+			It("compareSources() function with nil arg2", func() {
+				Expect(compareSources(nil, sources)).To(Equal(false))
+			})
+			It("compareSources() function different length", func() {
+				Expect(compareSources(sources, append(sources, *appSource))).To(Equal(false))
+			})
+			It("compareSources() function one length 0 argument", func() {
+				Expect(compareSources(sources, []argoapi.ApplicationSource{})).To(Equal(false))
+			})
+			It("compareSources() function identical", func() {
+				Expect(compareSources(sources, sources)).To(Equal(true))
+			})
+
 		})
 	})
 })
