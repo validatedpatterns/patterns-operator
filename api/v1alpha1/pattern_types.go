@@ -117,13 +117,13 @@ type MultiSourceConfig struct {
 
 	// The url multiSourceRepoURL when deploying the clustergroup argo application
 	// Defaults to https://validatedpatterns.github.io/helm-charts/
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
 	// +kubebuilder:default:="https://validatedpatterns.github.io/helm-charts/"
 	MultiSourceRepoUrl string `json:"multiSourceRepoUrl,omitempty"`
 
 	// Which chart version for the clustergroup helm chart
 	// Defaults to "0.0.*"
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
 	// +kubebuilder:default:="0.0.*"
 	MultiSourceChartRevision string `json:"multiSourceChartRevision,omitempty"`
 }

@@ -74,10 +74,14 @@ spec:
           application Defaults to https://validatedpatterns.github.io/helm-charts/
         displayName: Multi Source Repo Url
         path: multiSourceConfig.multiSourceRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
       - description: Which chart version for the clustergroup helm chart Defaults
           to "0.0.*"
         displayName: Multi Source Chart Revision
         path: multiSourceConfig.multiSourceChartRevision
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
       - description: 'Require manual confirmation before installing and upgrading
           operators. Default: False'
         displayName: Manual Approval
