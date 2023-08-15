@@ -125,15 +125,25 @@ spec:
                 type: object
               multiSourceConfig:
                 properties:
-                  multiSourceChartRevision:
+                  multiSourceClusterGroupChartGitRevision:
+                    default: main
+                    description: The git reference when deploying the clustergroup
+                      helm chart directly from a git repo Defaults to 'main'. Only
+                      used when MultiSourceClusterGroupGitRepoUrl is not set to ''
+                    type: string
+                  multiSourceClusterGroupChartVersion:
                     default: 0.0.*
                     description: Which chart version for the clustergroup helm chart
                       Defaults to "0.0.*"
                     type: string
-                  multiSourceRepoUrl:
+                  multiSourceClusterGroupGitRepoUrl:
+                    description: The url when deploying the clustergroup helm chart
+                      directly from a git repo Defaults to '' which means not used
+                    type: string
+                  multiSourceHelmRepoUrl:
                     default: https://validatedpatterns.github.io/helm-charts/
-                    description: The url multiSourceRepoURL when deploying the clustergroup
-                      argo application Defaults to https://validatedpatterns.github.io/helm-charts/
+                    description: The helm chart url to fetch the helm charts from
+                      in order to deploy the pattern Defaults to https://validatedpatterns.github.io/helm-charts/
                     type: string
                   multiSourceSupport:
                     default: false

@@ -373,11 +373,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
-	if len(output.Spec.MultiSourceConfig.MultiSourceRepoUrl) == 0 {
-		output.Spec.MultiSourceConfig.MultiSourceRepoUrl = "https://validatedpatterns.github.io/helm-charts"
+	if len(output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl) == 0 {
+		output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl = "https://validatedpatterns.github.io/helm-charts"
 	}
-	if len(output.Spec.MultiSourceConfig.MultiSourceChartRevision) == 0 {
-		output.Spec.MultiSourceConfig.MultiSourceChartRevision = "0.0.*"
+	if len(output.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion) == 0 {
+		output.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion = "0.0.*"
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests

@@ -115,17 +115,28 @@ type MultiSourceConfig struct {
 	// +kubebuilder:default:=false
 	MultiSourceSupport bool `json:"multiSourceSupport,omitempty"`
 
-	// The url multiSourceRepoURL when deploying the clustergroup argo application
+	// The helm chart url to fetch the helm charts from in order to deploy the pattern
 	// Defaults to https://validatedpatterns.github.io/helm-charts/
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
 	// +kubebuilder:default:="https://validatedpatterns.github.io/helm-charts/"
-	MultiSourceRepoUrl string `json:"multiSourceRepoUrl,omitempty"`
+	MultiSourceHelmRepoUrl string `json:"multiSourceHelmRepoUrl,omitempty"`
 
 	// Which chart version for the clustergroup helm chart
 	// Defaults to "0.0.*"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
 	// +kubebuilder:default:="0.0.*"
-	MultiSourceChartRevision string `json:"multiSourceChartRevision,omitempty"`
+	MultiSourceClusterGroupChartVersion string `json:"multiSourceClusterGroupChartVersion,omitempty"`
+
+	// The url when deploying the clustergroup helm chart directly from a git repo
+	// Defaults to '' which means not used
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
+	MultiSourceClusterGroupGitRepoUrl string `json:"multiSourceClusterGroupGitRepoUrl,omitempty"`
+
+	// The git reference when deploying the clustergroup helm chart directly from a git repo
+	// Defaults to 'main'. Only used when MultiSourceClusterGroupGitRepoUrl is not set to ''
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
+	// +kubebuilder:default:="main"
+	MultiSourceClusterGroupChartGitRevision string `json:"multiSourceClusterGroupChartGitRevision,omitempty"`
 }
 
 type ApplyChangeType string

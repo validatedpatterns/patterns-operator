@@ -90,16 +90,29 @@ spec:
         path: multiSourceConfig.multiSourceSupport
       - displayName: Git Ops Config
         path: gitOpsSpec
-      - description: The url multiSourceRepoURL when deploying the clustergroup argo
-          application Defaults to https://validatedpatterns.github.io/helm-charts/
-        displayName: Multi Source Repo Url
-        path: multiSourceConfig.multiSourceRepoUrl
+      - description: The helm chart url to fetch the helm charts from in order to
+          deploy the pattern Defaults to https://validatedpatterns.github.io/helm-charts/
+        displayName: Multi Source Helm Repo Url
+        path: multiSourceConfig.multiSourceHelmRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
       - description: Which chart version for the clustergroup helm chart Defaults
           to "0.0.*"
-        displayName: Multi Source Chart Revision
-        path: multiSourceConfig.multiSourceChartRevision
+        displayName: Multi Source Cluster Group Chart Version
+        path: multiSourceConfig.multiSourceClusterGroupChartVersion
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
+      - description: The url when deploying the clustergroup helm chart directly from
+          a git repo Defaults to '' which means not used
+        displayName: Multi Source Cluster Group Git Repo Url
+        path: multiSourceConfig.multiSourceClusterGroupGitRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
+      - description: The git reference when deploying the clustergroup helm chart
+          directly from a git repo Defaults to 'main'. Only used when MultiSourceClusterGroupGitRepoUrl
+          is not set to ''
+        displayName: Multi Source Cluster Group Chart Git Revision
+        path: multiSourceConfig.multiSourceClusterGroupChartGitRevision
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
       - description: 'Require manual confirmation before installing and upgrading

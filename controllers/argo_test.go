@@ -37,8 +37,8 @@ var _ = Describe("Argo Pattern", func() {
 					TargetRevision: "main",
 				},
 				MultiSourceConfig: api.MultiSourceConfig{
-					MultiSourceRepoUrl:       "https://validatedpatterns.github.io/helm-charts",
-					MultiSourceChartRevision: "0.0.*",
+					MultiSourceHelmRepoUrl:              "https://validatedpatterns.github.io/helm-charts",
+					MultiSourceClusterGroupChartVersion: "0.0.*",
 				},
 				GitOpsConfig: &api.GitOpsConfig{
 					ManualSync: false,
@@ -121,10 +121,10 @@ var _ = Describe("Argo Pattern", func() {
 				format.MaxLength = 0
 				multiSourceArgoApp = argoApp.DeepCopy()
 				multiSourceArgoApp.Spec.Source = nil
-				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceRepoUrl
+				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl
 				appSource.Chart = "clustergroup"
 				appSource.Path = ""
-				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceChartRevision
+				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion
 				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
 					{
 						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
