@@ -34,10 +34,10 @@ type PatternParameter struct {
 	// Important: Run "make generate" to regenerate code after modifying this file
 	// Foo is an example field of Pattern. Edit pattern_types.go to remove/update
 
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	Name string `json:"name"`
 
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=2
 	Value string `json:"value"`
 }
 
@@ -54,19 +54,23 @@ type PatternSpec struct {
 	// SPEC FIELDS - desired state of cluster
 	// Important: Run "make generate" to regenerate code after modifying this file
 
-	GitConfig    GitConfig     `json:"gitSpec"`
-	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
-
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=3
 	ClusterGroupName string `json:"clusterGroupName"`
+
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=4
+	GitConfig GitConfig `json:"gitSpec"`
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=5
+	MultiSourceConfig MultiSourceConfig `json:"multiSourceConfig,omitempty"`
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
 
 	// .Name is dot separated per the helm --set syntax, such as:
 	//   global.something.field
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=6
 	ExtraParameters []PatternParameter `json:"extraParameters,omitempty"`
 
 	// URLs to additional Helm parameter files
-	//+operator-sdk:csv:customresourcedefinitions:type=spec
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=7
 	ExtraValueFiles []string `json:"extraValueFiles,omitempty"`
 
 	// Look for external changes every N minutes
@@ -103,7 +107,9 @@ type GitConfig struct {
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=6
 	Hostname string `json:"hostname,omitempty"`
+}
 
+type MultiSourceConfig struct {
 	// (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup argo application
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=7
 	// +kubebuilder:default:=false
@@ -111,12 +117,15 @@ type GitConfig struct {
 
 	// The url multiSourceRepoURL when deploying the clustergroup argo application
 	// Defaults to https://validatedpatterns.github.io/helm-charts/
-	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	// +kubebuilder:default:="https://validatedpatterns.github.io/helm-charts/"
 	MultiSourceRepoUrl string `json:"multiSourceRepoUrl,omitempty"`
 
-	//Enable multiSourceRepoURL when deploying the clustergroup argo application
-	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=10
-	MultiSourceTargetRevision string `json:"multiSourceTargetRevision,omitempty"`
+	// Which chart version for the clustergroup helm chart
+	// Defaults to "0.0.*"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9
+	// +kubebuilder:default:="0.0.*"
+	MultiSourceChartRevision string `json:"multiSourceChartRevision,omitempty"`
 }
 
 type ApplyChangeType string

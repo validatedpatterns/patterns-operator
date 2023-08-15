@@ -78,19 +78,19 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 		},
 		{
 			Name:  "global.multiSourceSupport",
-			Value: strconv.FormatBool(p.Spec.GitConfig.MultiSourceSupport),
+			Value: strconv.FormatBool(p.Spec.MultiSourceConfig.MultiSourceSupport),
 		},
 	}
 
-	if p.Spec.GitConfig.MultiSourceSupport {
+	if p.Spec.MultiSourceConfig.MultiSourceSupport {
 		multiSourceParameters := []argoapi.HelmParameter{
 			{
 				Name:  "global.multiSourceRepoUrl",
-				Value: p.Spec.GitConfig.MultiSourceRepoUrl,
+				Value: p.Spec.MultiSourceConfig.MultiSourceRepoUrl,
 			},
 			{
 				Name:  "global.multiSourceTargetRevision",
-				Value: p.Spec.GitConfig.MultiSourceTargetRevision,
+				Value: p.Spec.MultiSourceConfig.MultiSourceChartRevision,
 			},
 		}
 
@@ -268,9 +268,9 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 	sources = append(sources, *valuesSource)
 
 	baseSource := &argoapi.ApplicationSource{
-		RepoURL:        p.Spec.GitConfig.MultiSourceRepoUrl,
+		RepoURL:        p.Spec.MultiSourceConfig.MultiSourceRepoUrl,
 		Chart:          "clustergroup",
-		TargetRevision: p.Spec.GitConfig.MultiSourceTargetRevision,
+		TargetRevision: p.Spec.MultiSourceConfig.MultiSourceChartRevision,
 		Helm:           commonApplicationSourceHelm(p, "$values"),
 	}
 	sources = append(sources, *baseSource)

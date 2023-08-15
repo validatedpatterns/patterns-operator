@@ -99,23 +99,6 @@ spec:
                     description: Optional. FQDN of the git server if automatic parsing
                       from TargetRepo is broken
                     type: string
-                  multiSourceRepoChart:
-                    description: The chart inside the repo to target for installation.
-                      Defaults to 'clustergroup'
-                    type: string
-                  multiSourceRepoUrl:
-                    description: The url multiSourceRepoURL when deploying the clustergroup
-                      argo application Defaults to https://validatedpatterns.github.io/helm-charts/
-                    type: string
-                  multiSourceSupport:
-                    default: false
-                    description: (EXPERIMENTAL) Enable multiSourceSupport when deploying
-                      the clustergroup argo application
-                    type: boolean
-                  multiSourceTargetRevision:
-                    description: Enable multiSourceRepoURL when deploying the clustergroup
-                      argo application
-                    type: string
                   originRepo:
                     description: Upstream git repo containing the pattern to deploy.
                       Used when in-cluster fork to point to the upstream pattern repository
@@ -139,6 +122,24 @@ spec:
                     type: string
                 required:
                 - targetRepo
+                type: object
+              multiSourceConfig:
+                properties:
+                  multiSourceChartRevision:
+                    default: 0.0.*
+                    description: Which chart version for the clustergroup helm chart
+                      Defaults to "0.0.*"
+                    type: string
+                  multiSourceRepoUrl:
+                    default: https://validatedpatterns.github.io/helm-charts/
+                    description: The url multiSourceRepoURL when deploying the clustergroup
+                      argo application Defaults to https://validatedpatterns.github.io/helm-charts/
+                    type: string
+                  multiSourceSupport:
+                    default: false
+                    description: (EXPERIMENTAL) Enable multiSourceSupport when deploying
+                      the clustergroup argo application
+                    type: boolean
                 type: object
             required:
             - clusterGroupName

@@ -33,10 +33,12 @@ var _ = Describe("Argo Pattern", func() {
 			Spec: api.PatternSpec{
 				ClusterGroupName: "foogroup",
 				GitConfig: api.GitConfig{
-					TargetRepo:                "https://github.com/validatedpatterns/multicloud-gitops",
-					TargetRevision:            "main",
-					MultiSourceRepoUrl:        "https://validatedpatterns.github.io/helm-charts",
-					MultiSourceTargetRevision: "0.0.*",
+					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
+					TargetRevision: "main",
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					MultiSourceRepoUrl:       "https://validatedpatterns.github.io/helm-charts",
+					MultiSourceChartRevision: "0.0.*",
 				},
 				GitOpsConfig: &api.GitOpsConfig{
 					ManualSync: false,
@@ -119,10 +121,10 @@ var _ = Describe("Argo Pattern", func() {
 				format.MaxLength = 0
 				multiSourceArgoApp = argoApp.DeepCopy()
 				multiSourceArgoApp.Spec.Source = nil
-				appSource.RepoURL = pattern.Spec.GitConfig.MultiSourceRepoUrl
+				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceRepoUrl
 				appSource.Chart = "clustergroup"
 				appSource.Path = ""
-				appSource.TargetRevision = pattern.Spec.GitConfig.MultiSourceTargetRevision
+				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceChartRevision
 				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
 					{
 						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
@@ -379,7 +381,7 @@ var _ = Describe("Argo Pattern", func() {
 					})))
 			})
 			It("Test newApplicationParameters with multiSource", func() {
-				pattern.Spec.GitConfig.MultiSourceSupport = true
+				pattern.Spec.MultiSourceConfig.MultiSourceSupport = true
 				Expect(newApplicationParameters(*pattern)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",

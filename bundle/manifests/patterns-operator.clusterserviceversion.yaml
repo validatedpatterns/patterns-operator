@@ -43,17 +43,25 @@ spec:
         name: patterns
         version: v1alpha1
       specDescriptors:
+      - displayName: Name
+        path: extraParameters[0].name
       - description: Git repo containing the pattern to deploy. Must use https/http
         displayName: Target Repo
         path: gitSpec.targetRepo
+      - displayName: Value
+        path: extraParameters[0].value
       - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
           Default: HEAD'
         displayName: Target Revision
         path: gitSpec.targetRevision
+      - displayName: Cluster Group Name
+        path: clusterGroupName
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
         path: gitSpec.originRepo
+      - displayName: Git Config
+        path: gitSpec
       - description: Branch, tag or commit in the upstream git repository. Does not
           support short-sha's. Default to HEAD
         displayName: Origin Revision
@@ -64,38 +72,32 @@ spec:
         path: gitSpec.pollInterval
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:number
+      - displayName: Multi Source Config
+        path: multiSourceConfig
+      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
+        displayName: Extra Parameters
+        path: extraParameters
       - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
           is broken
         displayName: Hostname
         path: gitSpec.hostname
-      - description: (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup
-          argo application
-        displayName: Multi Source Support
-        path: gitSpec.multiSourceSupport
-      - description: The url multiSourceRepoURL when deploying the clustergroup argo
-          application Defaults to https://validatedpatterns.github.io/helm-charts/
-        displayName: Multi Source Repo Url
-        path: gitSpec.multiSourceRepoUrl
-      - description: The chart inside the repo to target for installation. Defaults
-          to 'clustergroup'
-        displayName: Multi Source Repo Chart
-        path: gitSpec.multiSourceRepoChart
-      - description: Enable multiSourceRepoURL when deploying the clustergroup argo
-          application
-        displayName: Multi Source Target Revision
-        path: gitSpec.multiSourceTargetRevision
-      - displayName: Cluster Group Name
-        path: clusterGroupName
-      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
-        displayName: Extra Parameters
-        path: extraParameters
-      - displayName: Name
-        path: extraParameters[0].name
-      - displayName: Value
-        path: extraParameters[0].value
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
+      - description: (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup
+          argo application
+        displayName: Multi Source Support
+        path: multiSourceConfig.multiSourceSupport
+      - displayName: Git Ops Config
+        path: gitOpsSpec
+      - description: The url multiSourceRepoURL when deploying the clustergroup argo
+          application Defaults to https://validatedpatterns.github.io/helm-charts/
+        displayName: Multi Source Repo Url
+        path: multiSourceConfig.multiSourceRepoUrl
+      - description: Which chart version for the clustergroup helm chart Defaults
+          to "0.0.*"
+        displayName: Multi Source Chart Revision
+        path: multiSourceConfig.multiSourceChartRevision
       - description: 'Require manual confirmation before installing and upgrading
           operators. Default: False'
         displayName: Manual Approval
