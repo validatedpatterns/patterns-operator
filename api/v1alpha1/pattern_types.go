@@ -114,10 +114,6 @@ type GitConfig struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=8
 	MultiSourceRepoUrl string `json:"multiSourceRepoUrl,omitempty"`
 
-	// The chart inside the repo to target for installation. Defaults to 'clustergroup'
-	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=9
-	MultiSourceRepoChart string `json:"multiSourceRepoChart,omitempty"`
-
 	//Enable multiSourceRepoURL when deploying the clustergroup argo application
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,order=10
 	MultiSourceTargetRevision string `json:"multiSourceTargetRevision,omitempty"`

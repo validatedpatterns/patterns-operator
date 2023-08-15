@@ -99,10 +99,6 @@ spec:
                     description: Optional. FQDN of the git server if automatic parsing
                       from TargetRepo is broken
                     type: string
-                  multiSourceRepoChart:
-                    description: The chart inside the repo to target for installation.
-                      Defaults to 'clustergroup'
-                    type: string
                   multiSourceRepoUrl:
                     description: The url multiSourceRepoURL when deploying the clustergroup
                       argo application Defaults to https://validatedpatterns.github.io/helm-charts/

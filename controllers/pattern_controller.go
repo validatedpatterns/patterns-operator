@@ -373,12 +373,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
-	// FIXME: these three ifs need fixing before merging anything
 	if len(output.Spec.GitConfig.MultiSourceRepoUrl) == 0 {
 		output.Spec.GitConfig.MultiSourceRepoUrl = "https://validatedpatterns.github.io/helm-charts"
-	}
-	if len(output.Spec.GitConfig.MultiSourceRepoChart) == 0 {
-		output.Spec.GitConfig.MultiSourceRepoChart = "clustergroup"
 	}
 	if len(output.Spec.GitConfig.MultiSourceTargetRevision) == 0 {
 		output.Spec.GitConfig.MultiSourceTargetRevision = "0.0.*"
