@@ -111,7 +111,7 @@ type GitConfig struct {
 
 type MultiSourceConfig struct {
 	// (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup argo application
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	// +kubebuilder:default:=false
 	MultiSourceSupport bool `json:"multiSourceSupport,omitempty"`
 

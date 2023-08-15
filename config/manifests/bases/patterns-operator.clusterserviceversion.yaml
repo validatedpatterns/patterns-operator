@@ -68,6 +68,8 @@ spec:
           argo application
         displayName: Multi Source Support
         path: multiSourceConfig.multiSourceSupport
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
       - displayName: Git Ops Config
         path: gitOpsSpec
       - description: The helm chart url to fetch the helm charts from in order to
