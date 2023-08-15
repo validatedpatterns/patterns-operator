@@ -260,6 +260,8 @@ func newApplication(p api.Pattern) *argoapi.Application {
 
 func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 	sources := []argoapi.ApplicationSource{}
+	var baseSource *argoapi.ApplicationSource
+
 	valuesSource := &argoapi.ApplicationSource{
 		RepoURL:        p.Spec.GitConfig.TargetRepo,
 		TargetRevision: p.Spec.GitConfig.TargetRevision,
@@ -267,16 +269,24 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 	}
 	sources = append(sources, *valuesSource)
 
-	baseSource := &argoapi.ApplicationSource{
-		RepoURL:        p.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl,
-		Chart:          "clustergroup",
-		TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion,
-		Helm:           commonApplicationSourceHelm(p, "$values"),
+	// If we do not specify a custom repo for the clustergroup chart, let's use the default
+	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
+	if len(p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision) == 0 {
+		baseSource = &argoapi.ApplicationSource{
+			RepoURL:        p.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl,
+			Chart:          "clustergroup",
+			TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion,
+			Helm:           commonApplicationSourceHelm(p, "$values"),
+		}
+	} else {
+		baseSource = &argoapi.ApplicationSource{
+			RepoURL:        p.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl,
+			Path:           ".",
+			TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision,
+			Helm:           commonApplicationSourceHelm(p, "$values"),
+		}
 	}
 	sources = append(sources, *baseSource)
-	// Argo uses...
-	// r := regexp.MustCompile("(/|:)")
-	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
 
 	spec := commonApplicationSpec(p, sources)
 	spec.SyncPolicy = commonSyncPolicy(p)

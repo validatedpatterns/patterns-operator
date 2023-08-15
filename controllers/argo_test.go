@@ -119,12 +119,36 @@ var _ = Describe("Argo Pattern", func() {
 				// This is needed to debug any failures as gomega truncates the diff output
 				format.MaxDepth = 100
 				format.MaxLength = 0
-				multiSourceArgoApp = argoApp.DeepCopy()
-				multiSourceArgoApp.Spec.Source = nil
 				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl
 				appSource.Chart = "clustergroup"
 				appSource.Path = ""
 				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion
+				multiSourceArgoApp = argoApp.DeepCopy()
+				multiSourceArgoApp.Spec.Source = nil
+				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
+					{
+						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
+						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
+						Ref:            "values",
+					},
+					*appSource,
+				}
+				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(*pattern, "$values")
+				Expect(newMultiSourceApplication(*pattern)).To(Equal(multiSourceArgoApp))
+			})
+		})
+		Context("multiSource with MultiSourceClusterGroupChartGitRevision set", func() {
+			It("Returns an argo application with multiple sources with clustergroup pointing to a git repo", func() {
+				format.MaxDepth = 100
+				format.MaxLength = 0
+				pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl = "https://github.com/validatedpatterns/clustergroup-chart"
+				pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision = "testbranch"
+				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl
+				appSource.Chart = ""
+				appSource.Path = "."
+				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision
+				multiSourceArgoApp = argoApp.DeepCopy()
+				multiSourceArgoApp.Spec.Source = nil
 				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
 					{
 						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
