@@ -141,9 +141,9 @@ spec:
                       directly from a git repo Defaults to '' which means not used
                     type: string
                   multiSourceHelmRepoUrl:
-                    default: https://validatedpatterns.github.io/helm-charts/
+                    default: https://charts.validatedpatterns.io/
                     description: The helm chart url to fetch the helm charts from
-                      in order to deploy the pattern Defaults to https://validatedpatterns.github.io/helm-charts/
+                      in order to deploy the pattern Defaults to https://charts.validatedpatterns.io/
                     type: string
                   multiSourceSupport:
                     default: false

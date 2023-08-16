@@ -374,7 +374,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.ClusterGroupName = "default"
 	}
 	if len(output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl) == 0 {
-		output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl = "https://validatedpatterns.github.io/helm-charts"
+		output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl = "https://charts.validatedpatterns.io/"
 	}
 	if len(output.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion) == 0 {
 		output.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion = "0.0.*"

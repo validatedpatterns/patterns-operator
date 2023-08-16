@@ -93,7 +93,7 @@ spec:
       - displayName: Git Ops Config
         path: gitOpsSpec
       - description: The helm chart url to fetch the helm charts from in order to
-          deploy the pattern Defaults to https://validatedpatterns.github.io/helm-charts/
+          deploy the pattern Defaults to https://charts.validatedpatterns.io/
         displayName: Multi Source Helm Repo Url
         path: multiSourceConfig.multiSourceHelmRepoUrl
         x-descriptors:
