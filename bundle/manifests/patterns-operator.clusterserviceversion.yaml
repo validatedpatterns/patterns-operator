@@ -105,14 +105,15 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
       - description: The url when deploying the clustergroup helm chart directly from
-          a git repo Defaults to '' which means not used
+          a git repo Defaults to '' which means not used (Only used when developing
+          the clustergroup helm chart)
         displayName: Multi Source Cluster Group Git Repo Url
         path: multiSourceConfig.multiSourceClusterGroupGitRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
       - description: The git reference when deploying the clustergroup helm chart
-          directly from a git repo Defaults to 'main'. Only used when MultiSourceClusterGroupGitRepoUrl
-          is not set to ''
+          directly from a git repo Defaults to 'main'. (Only used when developing
+          the clustergroup helm chart)
         displayName: Multi Source Cluster Group Chart Git Revision
         path: multiSourceConfig.multiSourceClusterGroupChartGitRevision
         x-descriptors:

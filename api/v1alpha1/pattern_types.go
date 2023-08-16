@@ -128,12 +128,12 @@ type MultiSourceConfig struct {
 	MultiSourceClusterGroupChartVersion string `json:"multiSourceClusterGroupChartVersion,omitempty"`
 
 	// The url when deploying the clustergroup helm chart directly from a git repo
-	// Defaults to '' which means not used
+	// Defaults to '' which means not used (Only used when developing the clustergroup helm chart)
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
 	MultiSourceClusterGroupGitRepoUrl string `json:"multiSourceClusterGroupGitRepoUrl,omitempty"`
 
 	// The git reference when deploying the clustergroup helm chart directly from a git repo
-	// Defaults to 'main'. Only used when MultiSourceClusterGroupGitRepoUrl is not set to ''
+	// Defaults to 'main'. (Only used when developing the clustergroup helm chart)
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
 	// +kubebuilder:default:="main"
 	MultiSourceClusterGroupChartGitRevision string `json:"multiSourceClusterGroupChartGitRevision,omitempty"`

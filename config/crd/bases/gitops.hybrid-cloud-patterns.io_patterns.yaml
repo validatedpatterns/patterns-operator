@@ -128,8 +128,8 @@ spec:
                   multiSourceClusterGroupChartGitRevision:
                     default: main
                     description: The git reference when deploying the clustergroup
-                      helm chart directly from a git repo Defaults to 'main'. Only
-                      used when MultiSourceClusterGroupGitRepoUrl is not set to ''
+                      helm chart directly from a git repo Defaults to 'main'. (Only
+                      used when developing the clustergroup helm chart)
                     type: string
                   multiSourceClusterGroupChartVersion:
                     default: 0.0.*
@@ -139,6 +139,7 @@ spec:
                   multiSourceClusterGroupGitRepoUrl:
                     description: The url when deploying the clustergroup helm chart
                       directly from a git repo Defaults to '' which means not used
+                      (Only used when developing the clustergroup helm chart)
                     type: string
                   multiSourceHelmRepoUrl:
                     default: https://charts.validatedpatterns.io/
