@@ -265,7 +265,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 	valuesSource := &argoapi.ApplicationSource{
 		RepoURL:        p.Spec.GitConfig.TargetRepo,
 		TargetRevision: p.Spec.GitConfig.TargetRevision,
-		Ref:            "values",
+		Ref:            "patternref",
 	}
 	sources = append(sources, *valuesSource)
 
@@ -276,14 +276,14 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 			RepoURL:        p.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl,
 			Chart:          "clustergroup",
 			TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion,
-			Helm:           commonApplicationSourceHelm(p, "$values"),
+			Helm:           commonApplicationSourceHelm(p, "$patternref"),
 		}
 	} else {
 		baseSource = &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl,
 			Path:           ".",
 			TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision,
-			Helm:           commonApplicationSourceHelm(p, "$values"),
+			Helm:           commonApplicationSourceHelm(p, "$patternref"),
 		}
 	}
 	sources = append(sources, *baseSource)

@@ -129,11 +129,11 @@ var _ = Describe("Argo Pattern", func() {
 					{
 						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
 						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
-						Ref:            "values",
+						Ref:            "patternref",
 					},
 					*appSource,
 				}
-				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(*pattern, "$values")
+				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(*pattern, "$patternref")
 				Expect(newMultiSourceApplication(*pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
@@ -153,11 +153,11 @@ var _ = Describe("Argo Pattern", func() {
 					{
 						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
 						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
-						Ref:            "values",
+						Ref:            "patternref",
 					},
 					*appSource,
 				}
-				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(*pattern, "$values")
+				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(*pattern, "$patternref")
 				Expect(newMultiSourceApplication(*pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
