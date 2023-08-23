@@ -1,15 +1,12 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal AS builder
 RUN microdnf install git-core golang -y && microdnf clean all
-#
-# Until ubi has golang 1.18
-#FROM golang:1.18-alpine as builder
-#RUN apk add --no-cache git bash
-#
-# Or use...
-ENV GO_VERSION=1.19
-RUN go install golang.org/dl/go${GO_VERSION}@latest
-RUN ~/go/bin/go${GO_VERSION} download
-RUN /bin/cp -f ~/go/bin/go${GO_VERSION} /usr/bin/go
+
+# ubi8 now has golang 1.19 so we use that.
+# If a different version is needed, uncomment the following
+# ENV GO_VERSION=1.19
+# RUN go install golang.org/dl/go${GO_VERSION}@latest
+# RUN ~/go/bin/go${GO_VERSION} download
+# RUN /bin/cp -f ~/go/bin/go${GO_VERSION} /usr/bin/go
 
 RUN go version
 
