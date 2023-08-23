@@ -110,33 +110,33 @@ type GitConfig struct {
 }
 
 type MultiSourceConfig struct {
-	// (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup argo application
+	// (EXPERIMENTAL) Enable multi-source support when deploying the clustergroup argo application
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	// +kubebuilder:default:=false
-	MultiSourceSupport bool `json:"multiSourceSupport,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 
 	// The helm chart url to fetch the helm charts from in order to deploy the pattern
 	// Defaults to https://charts.validatedpatterns.io/
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	// +kubebuilder:default:="https://charts.validatedpatterns.io/"
-	MultiSourceHelmRepoUrl string `json:"multiSourceHelmRepoUrl,omitempty"`
+	HelmRepoUrl string `json:"helmRepoUrl,omitempty"`
 
 	// Which chart version for the clustergroup helm chart
 	// Defaults to "0.0.*"
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	// +kubebuilder:default:="0.0.*"
-	MultiSourceClusterGroupChartVersion string `json:"multiSourceClusterGroupChartVersion,omitempty"`
+	ClusterGroupChartVersion string `json:"clusterGroupChartVersion,omitempty"`
 
 	// The url when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to '' which means not used (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
-	MultiSourceClusterGroupGitRepoUrl string `json:"multiSourceClusterGroupGitRepoUrl,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	ClusterGroupGitRepoUrl string `json:"clusterGroupGitRepoUrl,omitempty"`
 
 	// The git reference when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to 'main'. (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	// +kubebuilder:default:="main"
-	MultiSourceClusterGroupChartGitRevision string `json:"multiSourceClusterGroupChartGitRevision,omitempty"`
+	ClusterGroupChartGitRevision string `json:"clusterGroupChartGitRevision,omitempty"`
 }
 
 type ApplyChangeType string

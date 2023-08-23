@@ -125,32 +125,32 @@ spec:
                 type: object
               multiSourceConfig:
                 properties:
-                  multiSourceClusterGroupChartGitRevision:
+                  clusterGroupChartGitRevision:
                     default: main
                     description: The git reference when deploying the clustergroup
                       helm chart directly from a git repo Defaults to 'main'. (Only
                       used when developing the clustergroup helm chart)
                     type: string
-                  multiSourceClusterGroupChartVersion:
+                  clusterGroupChartVersion:
                     default: 0.0.*
                     description: Which chart version for the clustergroup helm chart
                       Defaults to "0.0.*"
                     type: string
-                  multiSourceClusterGroupGitRepoUrl:
+                  clusterGroupGitRepoUrl:
                     description: The url when deploying the clustergroup helm chart
                       directly from a git repo Defaults to '' which means not used
                       (Only used when developing the clustergroup helm chart)
                     type: string
-                  multiSourceHelmRepoUrl:
+                  enabled:
+                    default: false
+                    description: (EXPERIMENTAL) Enable multi-source support when deploying
+                      the clustergroup argo application
+                    type: boolean
+                  helmRepoUrl:
                     default: https://charts.validatedpatterns.io/
                     description: The helm chart url to fetch the helm charts from
                       in order to deploy the pattern Defaults to https://charts.validatedpatterns.io/
                     type: string
-                  multiSourceSupport:
-                    default: false
-                    description: (EXPERIMENTAL) Enable multiSourceSupport when deploying
-                      the clustergroup argo application
-                    type: boolean
                 type: object
             required:
             - clusterGroupName

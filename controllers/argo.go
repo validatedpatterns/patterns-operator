@@ -78,19 +78,19 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 		},
 		{
 			Name:  "global.multiSourceSupport",
-			Value: strconv.FormatBool(p.Spec.MultiSourceConfig.MultiSourceSupport),
+			Value: strconv.FormatBool(p.Spec.MultiSourceConfig.Enabled),
 		},
 	}
 
-	if p.Spec.MultiSourceConfig.MultiSourceSupport {
+	if p.Spec.MultiSourceConfig.Enabled {
 		multiSourceParameters := []argoapi.HelmParameter{
 			{
 				Name:  "global.multiSourceRepoUrl",
-				Value: p.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl,
+				Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
 			},
 			{
 				Name:  "global.multiSourceTargetRevision",
-				Value: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion,
+				Value: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
 			},
 		}
 
@@ -271,18 +271,18 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 
 	// If we do not specify a custom repo for the clustergroup chart, let's use the default
 	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
-	if len(p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision) == 0 {
+	if len(p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision) == 0 {
 		baseSource = &argoapi.ApplicationSource{
-			RepoURL:        p.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl,
+			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
 			Chart:          "clustergroup",
-			TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion,
+			TargetRevision: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
 			Helm:           commonApplicationSourceHelm(p, "$patternref"),
 		}
 	} else {
 		baseSource = &argoapi.ApplicationSource{
-			RepoURL:        p.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl,
+			RepoURL:        p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl,
 			Path:           ".",
-			TargetRevision: p.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision,
+			TargetRevision: p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision,
 			Helm:           commonApplicationSourceHelm(p, "$patternref"),
 		}
 	}

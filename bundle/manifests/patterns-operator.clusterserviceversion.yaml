@@ -84,40 +84,40 @@ spec:
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
-      - description: (EXPERIMENTAL) Enable multiSourceSupport when deploying the clustergroup
-          argo application
-        displayName: Multi Source Support
-        path: multiSourceConfig.multiSourceSupport
+      - description: (EXPERIMENTAL) Enable multi-source support when deploying the
+          clustergroup argo application
+        displayName: Enabled
+        path: multiSourceConfig.enabled
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
       - displayName: Git Ops Config
         path: gitOpsSpec
       - description: The helm chart url to fetch the helm charts from in order to
           deploy the pattern Defaults to https://charts.validatedpatterns.io/
-        displayName: Multi Source Helm Repo Url
-        path: multiSourceConfig.multiSourceHelmRepoUrl
+        displayName: Helm Repo Url
+        path: multiSourceConfig.helmRepoUrl
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
       - description: Which chart version for the clustergroup helm chart Defaults
           to "0.0.*"
-        displayName: Multi Source Cluster Group Chart Version
-        path: multiSourceConfig.multiSourceClusterGroupChartVersion
+        displayName: Cluster Group Chart Version
+        path: multiSourceConfig.clusterGroupChartVersion
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
       - description: The url when deploying the clustergroup helm chart directly from
           a git repo Defaults to '' which means not used (Only used when developing
           the clustergroup helm chart)
-        displayName: Multi Source Cluster Group Git Repo Url
-        path: multiSourceConfig.multiSourceClusterGroupGitRepoUrl
+        displayName: Cluster Group Git Repo Url
+        path: multiSourceConfig.clusterGroupGitRepoUrl
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
       - description: The git reference when deploying the clustergroup helm chart
           directly from a git repo Defaults to 'main'. (Only used when developing
           the clustergroup helm chart)
-        displayName: Multi Source Cluster Group Chart Git Revision
-        path: multiSourceConfig.multiSourceClusterGroupChartGitRevision
+        displayName: Cluster Group Chart Git Revision
+        path: multiSourceConfig.clusterGroupChartGitRevision
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.multiSourceSupport:true
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
       - description: 'Require manual confirmation before installing and upgrading
           operators. Default: False'
         displayName: Manual Approval

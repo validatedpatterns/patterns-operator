@@ -208,7 +208,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	targetApp := &argoapi.Application{}
 	// -- ArgoCD Application
-	if qualifiedInstance.Spec.MultiSourceConfig.MultiSourceSupport {
+	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
 		targetApp = newMultiSourceApplication(*qualifiedInstance)
 	} else {
 		targetApp = newApplication(*qualifiedInstance)
@@ -373,11 +373,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
-	if len(output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl) == 0 {
-		output.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl = "https://charts.validatedpatterns.io/"
+	if len(output.Spec.MultiSourceConfig.HelmRepoUrl) == 0 {
+		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
 	}
-	if len(output.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion) == 0 {
-		output.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion = "0.0.*"
+	if len(output.Spec.MultiSourceConfig.ClusterGroupChartVersion) == 0 {
+		output.Spec.MultiSourceConfig.ClusterGroupChartVersion = "0.0.*"
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests

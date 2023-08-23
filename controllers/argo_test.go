@@ -37,8 +37,8 @@ var _ = Describe("Argo Pattern", func() {
 					TargetRevision: "main",
 				},
 				MultiSourceConfig: api.MultiSourceConfig{
-					MultiSourceHelmRepoUrl:              "https://charts.validatedpatterns.io/",
-					MultiSourceClusterGroupChartVersion: "0.0.*",
+					HelmRepoUrl:              "https://charts.validatedpatterns.io/",
+					ClusterGroupChartVersion: "0.0.*",
 				},
 				GitOpsConfig: &api.GitOpsConfig{
 					ManualSync: false,
@@ -119,10 +119,10 @@ var _ = Describe("Argo Pattern", func() {
 				// This is needed to debug any failures as gomega truncates the diff output
 				format.MaxDepth = 100
 				format.MaxLength = 0
-				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceHelmRepoUrl
+				appSource.RepoURL = pattern.Spec.MultiSourceConfig.HelmRepoUrl
 				appSource.Chart = "clustergroup"
 				appSource.Path = ""
-				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartVersion
+				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.ClusterGroupChartVersion
 				multiSourceArgoApp = argoApp.DeepCopy()
 				multiSourceArgoApp.Spec.Source = nil
 				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
@@ -141,12 +141,12 @@ var _ = Describe("Argo Pattern", func() {
 			It("Returns an argo application with multiple sources with clustergroup pointing to a git repo", func() {
 				format.MaxDepth = 100
 				format.MaxLength = 0
-				pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl = "https://github.com/validatedpatterns/clustergroup-chart"
-				pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision = "testbranch"
-				appSource.RepoURL = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupGitRepoUrl
+				pattern.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl = "https://github.com/validatedpatterns/clustergroup-chart"
+				pattern.Spec.MultiSourceConfig.ClusterGroupChartGitRevision = "testbranch"
+				appSource.RepoURL = pattern.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl
 				appSource.Chart = ""
 				appSource.Path = "."
-				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.MultiSourceClusterGroupChartGitRevision
+				appSource.TargetRevision = pattern.Spec.MultiSourceConfig.ClusterGroupChartGitRevision
 				multiSourceArgoApp = argoApp.DeepCopy()
 				multiSourceArgoApp.Spec.Source = nil
 				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
@@ -405,7 +405,7 @@ var _ = Describe("Argo Pattern", func() {
 					})))
 			})
 			It("Test newApplicationParameters with multiSource", func() {
-				pattern.Spec.MultiSourceConfig.MultiSourceSupport = true
+				pattern.Spec.MultiSourceConfig.Enabled = true
 				Expect(newApplicationParameters(*pattern)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
