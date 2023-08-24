@@ -7,4 +7,5 @@ spec:
   gitSpec:
     targetRepo: "https://github.com/hybrid-cloud-patterns/multicloud-gitops"
     targetRevision: "main"
+    multiSourceSupport: false
 

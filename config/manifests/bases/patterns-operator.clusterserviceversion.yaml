@@ -23,17 +23,25 @@ spec:
         name: patterns
         version: v1alpha1
       specDescriptors:
+      - displayName: Name
+        path: extraParameters[0].name
       - description: Git repo containing the pattern to deploy. Must use https/http
         displayName: Target Repo
         path: gitSpec.targetRepo
+      - displayName: Value
+        path: extraParameters[0].value
       - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
           Default: HEAD'
         displayName: Target Revision
         path: gitSpec.targetRevision
+      - displayName: Cluster Group Name
+        path: clusterGroupName
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
         path: gitSpec.originRepo
+      - displayName: Git Config
+        path: gitSpec
       - description: Branch, tag or commit in the upstream git repository. Does not
           support short-sha's. Default to HEAD
         displayName: Origin Revision
@@ -44,22 +52,52 @@ spec:
         path: gitSpec.pollInterval
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:number
+      - displayName: Multi Source Config
+        path: multiSourceConfig
+      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
+        displayName: Extra Parameters
+        path: extraParameters
       - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
           is broken
         displayName: Hostname
         path: gitSpec.hostname
-      - displayName: Cluster Group Name
-        path: clusterGroupName
-      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
-        displayName: Extra Parameters
-        path: extraParameters
-      - displayName: Name
-        path: extraParameters[0].name
-      - displayName: Value
-        path: extraParameters[0].value
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
+      - description: (EXPERIMENTAL) Enable multi-source support when deploying the
+          clustergroup argo application
+        displayName: Enabled
+        path: multiSourceConfig.enabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - displayName: Git Ops Config
+        path: gitOpsSpec
+      - description: The helm chart url to fetch the helm charts from in order to
+          deploy the pattern Defaults to https://charts.validatedpatterns.io/
+        displayName: Helm Repo Url
+        path: multiSourceConfig.helmRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: Which chart version for the clustergroup helm chart Defaults
+          to "0.0.*"
+        displayName: Cluster Group Chart Version
+        path: multiSourceConfig.clusterGroupChartVersion
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: The url when deploying the clustergroup helm chart directly from
+          a git repo Defaults to '' which means not used (Only used when developing
+          the clustergroup helm chart)
+        displayName: Cluster Group Git Repo Url
+        path: multiSourceConfig.clusterGroupGitRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: The git reference when deploying the clustergroup helm chart
+          directly from a git repo Defaults to 'main'. (Only used when developing
+          the clustergroup helm chart)
+        displayName: Cluster Group Chart Git Revision
+        path: multiSourceConfig.clusterGroupChartGitRevision
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
       - description: 'Require manual confirmation before installing and upgrading
           operators. Default: False'
         displayName: Manual Approval
