@@ -271,7 +271,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 
 	// If we do not specify a custom repo for the clustergroup chart, let's use the default
 	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
-	if len(p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision) == 0 {
+	if len(p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl) == 0 {
 		baseSource = &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
 			Chart:          "clustergroup",
