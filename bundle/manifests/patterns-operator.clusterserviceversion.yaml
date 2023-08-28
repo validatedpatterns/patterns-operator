@@ -13,6 +13,7 @@ metadata:
           "spec": {
             "clusterGroupName": "hub",
             "gitSpec": {
+              "multiSourceSupport": false,
               "targetRepo": "https://github.com/hybrid-cloud-patterns/multicloud-gitops",
               "targetRevision": "main"
             }
@@ -21,13 +22,13 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.17
-    createdAt: 2023-07-26 15:50:32
-    description: An operator to deploy and manage architecture patterns from https://hybrid-cloud-patterns.io
+    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.19
+    createdAt: 2023-08-26 10:58:01
+    description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    repository: https://github.com/hybrid-cloud-patterns/patterns-operator
-  name: patterns-operator.v0.0.17
+    repository: https://github.com/validatedpatterns/patterns-operator
+  name: patterns-operator.v0.0.19
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -42,17 +43,25 @@ spec:
         name: patterns
         version: v1alpha1
       specDescriptors:
+      - displayName: Name
+        path: extraParameters[0].name
       - description: Git repo containing the pattern to deploy. Must use https/http
         displayName: Target Repo
         path: gitSpec.targetRepo
+      - displayName: Value
+        path: extraParameters[0].value
       - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
           Default: HEAD'
         displayName: Target Revision
         path: gitSpec.targetRevision
+      - displayName: Cluster Group Name
+        path: clusterGroupName
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
         path: gitSpec.originRepo
+      - displayName: Git Config
+        path: gitSpec
       - description: Branch, tag or commit in the upstream git repository. Does not
           support short-sha's. Default to HEAD
         displayName: Origin Revision
@@ -61,22 +70,54 @@ spec:
           repositories. Default: 180 seconds'
         displayName: Poll Interval
         path: gitSpec.pollInterval
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:number
+      - displayName: Multi Source Config
+        path: multiSourceConfig
+      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
+        displayName: Extra Parameters
+        path: extraParameters
       - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
           is broken
         displayName: Hostname
         path: gitSpec.hostname
-      - displayName: Cluster Group Name
-        path: clusterGroupName
-      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
-        displayName: Extra Parameters
-        path: extraParameters
-      - displayName: Name
-        path: extraParameters[0].name
-      - displayName: Value
-        path: extraParameters[0].value
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
+      - description: (EXPERIMENTAL) Enable multi-source support when deploying the
+          clustergroup argo application
+        displayName: Enabled
+        path: multiSourceConfig.enabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - displayName: Git Ops Config
+        path: gitOpsSpec
+      - description: The helm chart url to fetch the helm charts from in order to
+          deploy the pattern Defaults to https://charts.validatedpatterns.io/
+        displayName: Helm Repo Url
+        path: multiSourceConfig.helmRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: Which chart version for the clustergroup helm chart Defaults
+          to "0.0.*"
+        displayName: Cluster Group Chart Version
+        path: multiSourceConfig.clusterGroupChartVersion
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: The url when deploying the clustergroup helm chart directly from
+          a git repo Defaults to '' which means not used (Only used when developing
+          the clustergroup helm chart)
+        displayName: Cluster Group Git Repo Url
+        path: multiSourceConfig.clusterGroupGitRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: The git reference when deploying the clustergroup helm chart
+          directly from a git repo Defaults to 'main'. (Only used when developing
+          the clustergroup helm chart)
+        displayName: Cluster Group Chart Git Revision
+        path: multiSourceConfig.clusterGroupChartGitRevision
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
       - description: 'Require manual confirmation before installing and upgrading
           operators. Default: False'
         displayName: Manual Approval
@@ -121,7 +162,7 @@ spec:
         displayName: Version
         path: version
       version: v1alpha1
-  description: Deploys and manages architecture patterns from https://hybrid-cloud-patterns.io
+  description: Deploys and manages architecture patterns from https://validatedpatterns.io
   displayName: Validated Patterns Operator
   icon:
   - base64data: iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAgMAAADQNkYNAAAAAXNSR0IArs4c6QAAAAxQTFRF+/v7IWSdx3A4LDpGRm1eQgAAAnhJREFUaN7t2Ltt5TAQhWFzBcGAE0WKnbsJqgQFYj1WKQwJVqGSVICA2fu+ehwM52DD1eRf8p+I/Pg477zzzvu3q0aeTDT55Ekz0+SbJ36hyS9PRFjheFKJsJU/edKIsJW/eeJF2Mq/PBFhKzueVFcysbOwpLmSmZ2FJf5KFnYWloiwlR1PqjuZ2Fk40tzJzM7CEX8nCzsLR0TYyo4n1ZNM7CwMaZ5kZmdhiH+ShZ2FISJsZceT6k0mdhY7ad5kZmexE/8mCzuLnYiwlR1PqjWZ2FmspFmTmZ3FSvyaLOwsViLCVnY8qbZkYmexkWZLZnYWG/FbsrCz2IgIW9nxpNqTiZ3FQpo9mdlZLMTvycLOYiEibGXHk+pIJnaWMmmOZGZnKRN/JAs7C/+OKd8fNFWBgI8B16nkC5C6QCIgvUp+AGkLJAEyqCQDEgokAxLUxoC4IhkB0Sp/AVIXSQREq/wDSFskCZBBbXwkoUgyIEFtfCDOQEZAOq3xgdQGEgHptcYH0hpIAmRQG+9JMJAMSFAb74gzkRGQTmu8I7WJREB6rfGOtCaSABnUxlsSTCQDEtTGG+KMZASk0xpvSG0kEZBea7whrZEkQAa18ZoEI8mABLXxijgzGQHptMYrUptJBKTXGq9IayYJkEFt/CbBTDIgQW38Io4gIyCd1vhFaoJEQHqt8Yu0BEmADGrjJwkEyYAEtfGDOIqMgHRa4wepKRIB6bXGD9JSJAEyqI3vJFAkAxLUxjfiSDIC0mmNb6QmSQSk1xrfSEuSBMigNr6SQJIMSFAbX4ijyQhIpzW+kJomEZBea3whLU0SIIPaOKcQCsOcd955/9f9BYUNIA2v1ub2AAAAAElFTkSuQmCC
@@ -276,7 +317,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.17
+                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.19
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -355,7 +396,7 @@ spec:
   - Architecture
   links:
   - name: Hybrid Cloud Patterns
-    url: https://hybrid-cloud-patterns.io
+    url: https://validatedpatterns.io
   maintainers:
   - email: hybrid-cloud-patterns@googlegroups.com
     name: patterns-team
@@ -363,4 +404,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.17
+  version: 0.0.19

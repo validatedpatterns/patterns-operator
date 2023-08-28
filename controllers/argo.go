@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -74,6 +76,25 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 			Name:  "global.localClusterName",
 			Value: p.Status.ClusterName,
 		},
+		{
+			Name:  "global.multiSourceSupport",
+			Value: strconv.FormatBool(p.Spec.MultiSourceConfig.Enabled),
+		},
+	}
+
+	if p.Spec.MultiSourceConfig.Enabled {
+		multiSourceParameters := []argoapi.HelmParameter{
+			{
+				Name:  "global.multiSourceRepoUrl",
+				Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
+			},
+			{
+				Name:  "global.multiSourceTargetRevision",
+				Value: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
+			},
+		}
+
+		parameters = append(parameters, multiSourceParameters...)
 	}
 
 	for _, extra := range p.Spec.ExtraParameters {
@@ -95,21 +116,21 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 	return parameters
 }
 
-func newApplicationValueFiles(p api.Pattern) []string {
-
+func newApplicationValueFiles(p api.Pattern, prefix string) []string {
 	files := []string{
-		"/values-global.yaml",
-		fmt.Sprintf("/values-%s.yaml", p.Spec.ClusterGroupName),
-		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterPlatform),
-		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Status.ClusterVersion),
-		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
-		fmt.Sprintf("/values-%s-%s.yaml", p.Status.ClusterVersion, p.Spec.ClusterGroupName),
-		fmt.Sprintf("/values-%s.yaml", p.Status.ClusterName),
+		fmt.Sprintf("%s/values-global.yaml", prefix),
+		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Spec.ClusterGroupName),
+		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterPlatform),
+		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Status.ClusterVersion),
+		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
+		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterVersion, p.Spec.ClusterGroupName),
+		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterName),
 	}
 
 	for _, extra := range p.Spec.ExtraValueFiles {
-		log.Printf("Values file %q added", extra)
-		files = append(files, extra)
+		extraValueFile := fmt.Sprintf("%s/%s", prefix, strings.TrimPrefix(extra, "/"))
+		log.Printf("Values file %q added", extraValueFile)
+		files = append(files, extraValueFile)
 	}
 	return files
 }
@@ -123,44 +144,34 @@ func newApplicationValues(p api.Pattern) string {
 	return s
 }
 
-func newApplication(p api.Pattern) *argoapi.Application {
-
-	// Argo uses...
-	// r := regexp.MustCompile("(/|:)")
-	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
-
-	spec := argoapi.ApplicationSpec{
-
-		// Source is a reference to the location of the application's manifests or chart
-		Source: &argoapi.ApplicationSource{
-			RepoURL:        p.Spec.GitConfig.TargetRepo,
-			Path:           "common/clustergroup",
-			TargetRevision: p.Spec.GitConfig.TargetRevision,
-			Helm: &argoapi.ApplicationSourceHelm{
-				ValueFiles: newApplicationValueFiles(p),
-
-				// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
-				Parameters: newApplicationParameters(p),
-
-				// This is to be able to pass down the extraParams to the single applications
-				Values: newApplicationValues(p),
-				// ReleaseName is the Helm release name to use. If omitted it will use the application name
-				// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`
-				// Values specifies Helm values to be passed to helm template, typically defined as a block
-				// Values string `json:"values,omitempty" protobuf:"bytes,4,opt,name=values"`
-				// FileParameters are file parameters to the helm template
-				// FileParameters []HelmFileParameter `json:"fileParameters,omitempty" protobuf:"bytes,5,opt,name=fileParameters"`
-				// Version is the Helm version to use for templating (either "2" or "3")
-				// Version string `json:"version,omitempty" protobuf:"bytes,6,opt,name=version"`
-				// PassCredentials pass credentials to all domains (Helm's --pass-credentials)
-				// PassCredentials bool `json:"passCredentials,omitempty" protobuf:"bytes,7,opt,name=passCredentials"`
-				// IgnoreMissingValueFiles prevents helm template from failing when valueFiles do not exist locally by not appending them to helm template --values
-				// Only applies to local files
-				IgnoreMissingValueFiles: true,
-				// SkipCrds skips custom resource definition installation step (Helm's --skip-crds)
-				// SkipCrds bool `json:"skipCrds,omitempty" protobuf:"bytes,9,opt,name=skipCrds"`
+func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
+	var syncPolicy *argoapi.SyncPolicy
+	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+		syncPolicy = &argoapi.SyncPolicy{
+			// Automated will keep an application synced to the target revision
+			Automated: &argoapi.SyncPolicyAutomated{
+				Prune: true,
 			},
-		},
+			// Options allow you to specify whole app sync-SyncOptions
+			SyncOptions: []string{"Prune=true"},
+		}
+
+	} else if !p.Spec.GitOpsConfig.ManualSync {
+		// SyncPolicy controls when and how a sync will be performed
+		syncPolicy = &argoapi.SyncPolicy{
+			// Automated will keep an application synced to the target revision
+			Automated: &argoapi.SyncPolicyAutomated{},
+			// Options allow you to specify whole app sync-options
+			SyncOptions: []string{},
+			// Retry controls failed sync retry behavior
+			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
+		}
+	}
+	return syncPolicy
+}
+
+func commonApplicationSpec(p api.Pattern, sources []argoapi.ApplicationSource) argoapi.ApplicationSpec {
+	spec := argoapi.ApplicationSpec{
 		Destination: argoapi.ApplicationDestination{
 			Name:      "in-cluster",
 			Namespace: p.Namespace,
@@ -179,31 +190,43 @@ func newApplication(p api.Pattern) *argoapi.Application {
 		// Increasing will increase the space used to store the history, so we do not recommend increasing it.
 		// Default is 10.
 		// RevisionHistoryLimit *int64 `json:"revisionHistoryLimit,omitempty" protobuf:"bytes,7,name=revisionHistoryLimit"`
-
 	}
-
-	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
-		spec.SyncPolicy = &argoapi.SyncPolicy{
-			// Automated will keep an application synced to the target revision
-			Automated: &argoapi.SyncPolicyAutomated{
-				Prune: true,
-			},
-			// Options allow you to specify whole app sync-SyncOptions
-			SyncOptions: []string{"Prune=true"},
-		}
-
-	} else if !p.Spec.GitOpsConfig.ManualSync {
-		// SyncPolicy controls when and how a sync will be performed
-		spec.SyncPolicy = &argoapi.SyncPolicy{
-			// Automated will keep an application synced to the target revision
-			Automated: &argoapi.SyncPolicyAutomated{},
-			// Options allow you to specify whole app sync-options
-			SyncOptions: []string{},
-			// Retry controls failed sync retry behavior
-			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
-		}
+	if len(sources) == 1 {
+		spec.Source = &sources[0]
+	} else {
+		spec.Sources = sources
 	}
+	return spec
+}
 
+func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
+	return &argoapi.ApplicationSourceHelm{
+		ValueFiles: newApplicationValueFiles(p, prefix),
+
+		// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
+		Parameters: newApplicationParameters(p),
+
+		// This is to be able to pass down the extraParams to the single applications
+		Values: newApplicationValues(p),
+		// ReleaseName is the Helm release name to use. If omitted it will use the application name
+		// ReleaseName string `json:"releaseName,omitempty" protobuf:"bytes,3,opt,name=releaseName"`
+		// Values specifies Helm values to be passed to helm template, typically defined as a block
+		// Values string `json:"values,omitempty" protobuf:"bytes,4,opt,name=values"`
+		// FileParameters are file parameters to the helm template
+		// FileParameters []HelmFileParameter `json:"fileParameters,omitempty" protobuf:"bytes,5,opt,name=fileParameters"`
+		// Version is the Helm version to use for templating (either "2" or "3")
+		// Version string `json:"version,omitempty" protobuf:"bytes,6,opt,name=version"`
+		// PassCredentials pass credentials to all domains (Helm's --pass-credentials)
+		// PassCredentials bool `json:"passCredentials,omitempty" protobuf:"bytes,7,opt,name=passCredentials"`
+		// IgnoreMissingValueFiles prevents helm template from failing when valueFiles do not exist locally by not appending them to helm template --values
+		// Only applies to local files
+		IgnoreMissingValueFiles: true,
+		// SkipCrds skips custom resource definition installation step (Helm's --skip-crds)
+		// SkipCrds bool `json:"skipCrds,omitempty" protobuf:"bytes,9,opt,name=skipCrds"`
+	}
+}
+
+func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
 	labels := make(map[string]string)
 	labels["pattern"] = applicationName(p)
 	app := argoapi.Application{
@@ -214,10 +237,60 @@ func newApplication(p api.Pattern) *argoapi.Application {
 		},
 		Spec: spec,
 	}
-
 	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
 	return &app
+}
 
+func newApplication(p api.Pattern) *argoapi.Application {
+	// Argo uses...
+	// r := regexp.MustCompile("(/|:)")
+	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
+	// Source is a reference to the location of the application's manifests or chart
+	source := argoapi.ApplicationSource{
+		RepoURL:        p.Spec.GitConfig.TargetRepo,
+		Path:           "common/clustergroup",
+		TargetRevision: p.Spec.GitConfig.TargetRevision,
+		Helm:           commonApplicationSourceHelm(p, ""),
+	}
+	spec := commonApplicationSpec(p, []argoapi.ApplicationSource{source})
+
+	spec.SyncPolicy = commonSyncPolicy(p)
+	return newArgoApplication(p, spec)
+}
+
+func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
+	sources := []argoapi.ApplicationSource{}
+	var baseSource *argoapi.ApplicationSource
+
+	valuesSource := &argoapi.ApplicationSource{
+		RepoURL:        p.Spec.GitConfig.TargetRepo,
+		TargetRevision: p.Spec.GitConfig.TargetRevision,
+		Ref:            "patternref",
+	}
+	sources = append(sources, *valuesSource)
+
+	// If we do not specify a custom repo for the clustergroup chart, let's use the default
+	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
+	if len(p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl) == 0 {
+		baseSource = &argoapi.ApplicationSource{
+			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
+			Chart:          "clustergroup",
+			TargetRevision: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
+			Helm:           commonApplicationSourceHelm(p, "$patternref"),
+		}
+	} else {
+		baseSource = &argoapi.ApplicationSource{
+			RepoURL:        p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl,
+			Path:           ".",
+			TargetRevision: p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision,
+			Helm:           commonApplicationSourceHelm(p, "$patternref"),
+		}
+	}
+	sources = append(sources, *baseSource)
+
+	spec := commonApplicationSpec(p, sources)
+	spec.SyncPolicy = commonSyncPolicy(p)
+	return newArgoApplication(p, spec)
 }
 
 func applicationName(p api.Pattern) string {
@@ -246,9 +319,14 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	} else if target == nil {
 		return fmt.Errorf("target application was nil"), false
 	}
-
-	if compareSource(target.Spec.Source, current.Spec.Source) {
-		return nil, false
+	if current.Spec.Sources == nil {
+		if compareSource(target.Spec.Source, current.Spec.Source) {
+			return nil, false
+		}
+	} else {
+		if compareSources(target.Spec.Sources, current.Spec.Sources) {
+			return nil, false
+		}
 	}
 
 	spec := current.Spec.DeepCopy()
@@ -264,6 +342,9 @@ func removeApplication(client argoclient.Interface, name string) error {
 }
 
 func compareSource(goal, actual *argoapi.ApplicationSource) bool {
+	if goal == nil || actual == nil {
+		return false
+	}
 	if goal.RepoURL != actual.RepoURL {
 		log.Printf("RepoURL changed %s -> %s\n", actual.RepoURL, goal.RepoURL)
 		return false
@@ -279,9 +360,39 @@ func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 		return false
 	}
 
-	return compareHelmSource(*goal.Helm, *actual.Helm)
+	// if both .Helm structs are nil, we compared everything already and we can just
+	// return true here without invoking compareHelmSource()
+	if goal.Helm == nil && actual.Helm == nil {
+		return true
+	}
+	// but if one .Helm struct is nil and the other one is not then we can safely return false
+	if goal.Helm == nil || actual.Helm == nil {
+		return false
+	}
 
+	return compareHelmSource(*goal.Helm, *actual.Helm)
 }
+
+func compareSources(goal, actual argoapi.ApplicationSources) bool {
+	if actual == nil || goal == nil {
+		return false
+	}
+	if len(actual) != len(goal) {
+		return false
+	}
+	if len(actual) == 0 || len(goal) == 0 {
+		return false
+	}
+	for i := range actual {
+		// avoids memory aliasing (the iteration variable is reused, so v changes but &v is always the same)
+		value := actual[i]
+		if !compareSource(&value, &goal[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func compareHelmSource(goal, actual argoapi.ApplicationSourceHelm) bool {
 	if !compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) {
 		return false
