@@ -150,27 +150,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	r.logger.Info("Applied Defaults")
 
-	// MBP-184 Implementation
-	// Ensure that the openshift-gitops namespace is present
-	// This namespace gets created by the OpenShift GitOps operator
-	// when it is installed.
-	if haveNamespace(r.Client, applicationNamespace) {
-		// If there are Application status present reset the array
-		if len(qualifiedInstance.Status.Applications) > 0 {
-			qualifiedInstance.Status.Applications = nil
-		}
-
-		// Retrieve the Pattern Application Details and apply them to the CR
-		qualifiedInstance, err = r.applyPatternAppDetails(r.argoClient, qualifiedInstance)
-
-		if err != nil {
-			// Let's just inform that there was an error retrieving the Application details
-			r.logger.Info("Application Pattern Details: ", err)
-		}
-
-		r.logger.Info("Applied Pattern details")
-	}
-
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
@@ -264,6 +243,20 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Perform validation of the site values file(s)
 	if err := r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
+	}
+
+	// MBP-184 Implementation
+	// Ensure that the openshift-gitops namespace is present
+	// This namespace gets created by the OpenShift GitOps operator
+	// when it is installed.
+
+	qualifiedInstance, err = r.applyPatternAppDetails(r.argoClient, qualifiedInstance)
+
+	if err != nil {
+		// Let's just inform that there was an error retrieving the Application details
+		r.logger.Info("Application Pattern Details: ", err)
+	} else {
+		r.logger.Info("Applied Pattern details")
 	}
 
 	// Update CR if necessary

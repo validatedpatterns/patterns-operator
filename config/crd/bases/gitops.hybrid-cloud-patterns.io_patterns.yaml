@@ -172,8 +172,6 @@ spec:
                       type: string
                     healthStatus:
                       type: string
-                    lastReconcileTime:
-                      type: string
                     name:
                       type: string
                     namespace:
