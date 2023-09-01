@@ -19,6 +19,8 @@ package controllers
 import (
 	"fmt"
 	"log"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -155,4 +157,24 @@ func parseAndReturnVersion(versionStr string) (*semver.Version, error) {
 		return nil, fmt.Errorf("failed to parse version %s: %w", versionStr, err)
 	}
 	return s, nil
+}
+
+// Extract the last part of a git repo url
+func extractRepositoryName(gitURL string) (string, error) {
+	// We use ParseRequestURI because the URL is assument to be absolute
+	// and we want to error out if that is not the case
+	parsedURL, err := url.ParseRequestURI(gitURL)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract the last part of the path, which is usually the repository name
+	repoName := path.Base(parsedURL.Path)
+
+	// Remove the ".git" extension if present
+	if len(repoName) > 4 && repoName[len(repoName)-4:] == ".git" {
+		repoName = repoName[:len(repoName)-4]
+	}
+
+	return repoName, nil
 }
