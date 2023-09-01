@@ -29,3 +29,4 @@ manager
 /catalog/_template.yaml
 /config/samples/pattern-catalog-*.yaml
 bundle.Dockerfile
+**/apikey.txt
