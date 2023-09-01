@@ -12,8 +12,6 @@ GIT_COMMIT=$(git rev-list -1 HEAD || true)
 COMMIT=${CI_UPSTREAM_COMMIT:-${GIT_COMMIT}}
 BUILD_DATE=$(date --utc -Iseconds)
 
-mkdir -p _out
-
 LDFLAGS="-s -w "
 REPO="github.com/hybrid-cloud-patterns/patterns-operator"
 LDFLAGS+="-X $REPO/version.Version=${VERSION} "
