@@ -89,3 +89,30 @@ var _ = Describe("ExtractRepositoryName", func() {
 		Expect(err).NotTo(BeNil())
 	})
 })
+
+var _ = Describe("validGitRepoURL", func() {
+	It("should return an error for 'git@' URL", func() {
+		repoURL := "git@example.com:username/repo.git"
+		err := validGitRepoURL(repoURL)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("invalid repository URL"))
+		Expect(err.Error()).To(ContainSubstring(repoURL))
+	})
+
+	It("should return nil for 'http://' and 'https://' URLs", func() {
+		httpURL := "http://example.com/username/repo.git"
+		httpsURL := "https://example.com/username/repo.git"
+		errHTTP := validGitRepoURL(httpURL)
+		errHTTPS := validGitRepoURL(httpsURL)
+		Expect(errHTTP).NotTo(HaveOccurred())
+		Expect(errHTTPS).NotTo(HaveOccurred())
+	})
+
+	It("should return an error for unsupported URL formats", func() {
+		unsupportedURL := "ftp://example.com/username/repo.git"
+		err := validGitRepoURL(unsupportedURL)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("repository URL must be either http/https"))
+		Expect(err.Error()).To(ContainSubstring(unsupportedURL))
+	})
+})

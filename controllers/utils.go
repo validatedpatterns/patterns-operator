@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 
@@ -177,4 +178,16 @@ func extractRepositoryName(gitURL string) (string, error) {
 	}
 
 	return repoName, nil
+}
+
+func validGitRepoURL(repoURL string) error {
+	switch {
+	case strings.HasPrefix(repoURL, "git@"):
+		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
+	case strings.HasPrefix(repoURL, "https://"),
+		strings.HasPrefix(repoURL, "http://"):
+		return nil
+	default:
+		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
+	}
 }
