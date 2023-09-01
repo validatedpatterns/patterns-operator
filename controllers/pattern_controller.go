@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -282,17 +281,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return result, nil
 }
 
-func validGitRepoURL(repoURL string) error {
-	switch {
-	case strings.HasPrefix(repoURL, "git@"):
-		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
-	case strings.HasPrefix(repoURL, "https://"),
-		strings.HasPrefix(repoURL, "http://"):
-		return nil
-	default:
-		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
-	}
-}
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
 	gc := input.Spec.GitConfig

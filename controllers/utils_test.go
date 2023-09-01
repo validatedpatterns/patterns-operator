@@ -55,3 +55,64 @@ func TestParameterUnpacking(t *testing.T) {
 	Expect(err).NotTo(HaveOccurred())
 	fmt.Printf("Converted values:\n%s\n", out_s)
 }
+
+var _ = Describe("ExtractRepositoryName", func() {
+	It("should extract the repository name from various URL formats", func() {
+		testCases := []struct {
+			inputURL     string
+			expectedName string
+		}{
+			{"https://github.com/username/repo.git", "repo"},
+			{"https://github.com/username/repo", "repo"},
+			{"https://github.com/username/repo.git/", "repo"},
+			{"https://github.com/username/repo/", "repo"},
+			{"https://gitlab.com/username/my-project.git", "my-project"},
+			{"https://gitlab.com/username/my-project", "my-project"},
+			{"https://bitbucket.org/username/myrepo.git", "myrepo"},
+			{"https://bitbucket.org/username/myrepo", "myrepo"},
+			{"https://example.com/username/repo.git", "repo"},
+			{"https://example.com/username/repo", "repo"},
+			{"https://example.com/username/repo.git/", "repo"},
+			{"https://example.com/username/repo/", "repo"},
+		}
+
+		for _, testCase := range testCases {
+			repoName, err := extractRepositoryName(testCase.inputURL)
+			Expect(err).To(BeNil())
+			Expect(repoName).To(Equal(testCase.expectedName))
+		}
+	})
+
+	It("should return an error for an invalid URL", func() {
+		invalidURL := "invalid-url"
+		_, err := extractRepositoryName(invalidURL)
+		Expect(err).NotTo(BeNil())
+	})
+})
+
+var _ = Describe("validGitRepoURL", func() {
+	It("should return an error for 'git@' URL", func() {
+		repoURL := "git@example.com:username/repo.git"
+		err := validGitRepoURL(repoURL)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("invalid repository URL"))
+		Expect(err.Error()).To(ContainSubstring(repoURL))
+	})
+
+	It("should return nil for 'http://' and 'https://' URLs", func() {
+		httpURL := "http://example.com/username/repo.git"
+		httpsURL := "https://example.com/username/repo.git"
+		errHTTP := validGitRepoURL(httpURL)
+		errHTTPS := validGitRepoURL(httpsURL)
+		Expect(errHTTP).NotTo(HaveOccurred())
+		Expect(errHTTPS).NotTo(HaveOccurred())
+	})
+
+	It("should return an error for unsupported URL formats", func() {
+		unsupportedURL := "ftp://example.com/username/repo.git"
+		err := validGitRepoURL(unsupportedURL)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("repository URL must be either http/https"))
+		Expect(err.Error()).To(ContainSubstring(unsupportedURL))
+	})
+})
