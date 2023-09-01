@@ -23,26 +23,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-
-	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -281,6 +280,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return result, nil
 }
 
+func validGitRepoURL(repoURL string) error {
+	switch {
+	case strings.HasPrefix(repoURL, "git@"):
+		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
+	case strings.HasPrefix(repoURL, "https://"),
+		strings.HasPrefix(repoURL, "http://"):
+		return nil
+	default:
+		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
+	}
+}
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
 	gc := input.Spec.GitConfig
@@ -545,35 +555,44 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, input *api.Pattern) (*api.Pattern, error) {
 	output := input.DeepCopy()
 	var applicationInfo api.PatternApplicationInfo
+	var labelFilter = "validatedpatterns.io/pattern=" + output.ObjectMeta.Name
 
-	// Buid the namespace from the Pattern ObjectMeta.Name and Spec.ClusterGroupName
-	ns := output.ObjectMeta.Name + "-" + output.Spec.ClusterGroupName
-	// oc get Applications -n [pattern-name]-hub
-	// E.G. oc get Applications -n multicloud-gitops-hub
-	applications, err := client.ArgoprojV1alpha1().Applications(ns).List(context.Background(), metav1.ListOptions{})
-
-	// Return error
+	nameSpaceList, err := r.fullClient.CoreV1().Namespaces().List(context.Background(),
+		metav1.ListOptions{})
 	if err != nil {
-		return output, err
+		return nil, err
 	}
 
-	// Reset the array since we are going to replace it with the new application status
-	if len(output.Status.Applications) > 0 {
-		output.Status.Applications = nil
-	}
+	for _, ns := range nameSpaceList.Items {
+		if strings.Contains(ns.Name, output.ObjectMeta.Name) {
+			// oc get Applications -n [pattern-name]-hub
+			// E.G. oc get Applications -n multicloud-gitops-hub
+			//fmt.Println("Processing: ", string(ns.Name))
+			applications, err := client.ArgoprojV1alpha1().Applications(string(ns.Name)).List(context.Background(),
+				metav1.ListOptions{
+					LabelSelector: labelFilter,
+				})
+			if err != nil {
+				//fmt.Println("Did not find Applications", err)
+				return nil, err
+			}
+			if len(applications.Items) > 0 {
+				output.Status.Applications = nil
+			}
+			// Loop through the Pattern Applications and append the details to the Applications array
+			for _, app := range applications.Items {
+				fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
+				// Add Application information to ApplicationInfo struct
+				applicationInfo.Name = app.Name
+				applicationInfo.Namespace = app.Namespace
+				applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
+				applicationInfo.AppHealthMessage = app.Status.Health.Message
+				applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
 
-	// Loop through the Pattern Applications and append the details to the Applications array
-	for _, app := range applications.Items {
-		//fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
-		// Add Application information to ApplicationInfo struct
-		applicationInfo.Name = app.Name
-		applicationInfo.Namespace = app.Namespace
-		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
-		applicationInfo.AppHealthMessage = app.Status.Health.Message
-		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
-
-		// Now let's append the Application Information
-		output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
+				// Now let's append the Application Information
+				output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
+			}
+		}
 	}
 
 	return output, err
