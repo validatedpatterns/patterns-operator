@@ -544,44 +544,37 @@ func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, 
 	var applicationInfo api.PatternApplicationInfo
 	var labelFilter = "validatedpatterns.io/pattern=" + output.ObjectMeta.Name
 
-	nameSpaceList, err := r.fullClient.CoreV1().Namespaces().List(context.Background(),
-		metav1.ListOptions{})
+	// Retrieving all applications that contain the label
+	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
+	//
+	// The VP framework adds the label to each application it creates.
+	applications, err := client.ArgoprojV1alpha1().Applications("").List(context.Background(),
+		metav1.ListOptions{
+			LabelSelector: labelFilter,
+		})
 	if err != nil {
+		//fmt.Println("Did not find Applications", err)
 		return nil, err
 	}
 
-	for _, ns := range nameSpaceList.Items {
-		if strings.Contains(ns.Name, output.ObjectMeta.Name) {
-			// oc get Applications -n [pattern-name]-hub
-			// E.G. oc get Applications -n multicloud-gitops-hub
-			//fmt.Println("Processing: ", string(ns.Name))
-			applications, err := client.ArgoprojV1alpha1().Applications(string(ns.Name)).List(context.Background(),
-				metav1.ListOptions{
-					LabelSelector: labelFilter,
-				})
-			if err != nil {
-				//fmt.Println("Did not find Applications", err)
-				return nil, err
-			}
-			if len(applications.Items) > 0 {
-				output.Status.Applications = nil
-			}
-			// Loop through the Pattern Applications and append the details to the Applications array
-			for _, app := range applications.Items {
-				fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
-				// Add Application information to ApplicationInfo struct
-				applicationInfo.Name = app.Name
-				applicationInfo.Namespace = app.Namespace
-				applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
-				applicationInfo.AppHealthMessage = app.Status.Health.Message
-				applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
-
-				// Now let's append the Application Information
-				output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
-			}
-		}
+	// Reset the array
+	if len(applications.Items) > 0 {
+		output.Status.Applications = nil
 	}
 
+	// Loop through the Pattern Applications and append the details to the Applications array
+	for _, app := range applications.Items {
+		// fmt.Println(app.Name, " ==> [", app.Status.Health.Status, "] == [", app.Status.Sync.Status, "]")
+		// Add Application information to ApplicationInfo struct
+		applicationInfo.Name = app.Name
+		applicationInfo.Namespace = app.Namespace
+		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
+		applicationInfo.AppHealthMessage = app.Status.Health.Message
+		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
+
+		// Now let's append the Application Information
+		output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
+	}
 	return output, err
 }
 
