@@ -31,7 +31,7 @@ COPY hack/ hack/
 COPY .git/ .git/
 
 # Build
-RUN hack/build.sh
+RUN --mount=type=secret,id=apikey hack/build.sh
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details

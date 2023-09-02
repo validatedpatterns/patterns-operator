@@ -23,4 +23,10 @@ case $1 in
     "run") EXTRA="run";;
     *)	EXTRA="build -o manager";;
 esac
+
+touch controllers/apikey.txt
+if [ -f "/run/secrets/apikey" ]; then
+    cp -f /run/secrets/apikey controllers/apikey.txt
+fi
+
 GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go $EXTRA -ldflags="${LDFLAGS}" main.go

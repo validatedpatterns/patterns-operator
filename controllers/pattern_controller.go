@@ -50,10 +50,13 @@ import (
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
+const ReconcileLoopRequeueTime = 180 * time.Second
+
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	AnalyticsClient VpAnalyticsInterface
 
 	logger logr.Logger
 
@@ -144,8 +147,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// -- Fill in defaults (changes made to a copy and not persisted)
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
+
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
+	r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance)
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
@@ -242,10 +247,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
 	// Report statistics
-
+	r.AnalyticsClient.SendPatternUpdateInfo(instance)
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	return ctrl.Result{}, nil
+	result := ctrl.Result{
+		Requeue:      false,
+		RequeueAfter: ReconcileLoopRequeueTime,
+	}
+
+	return result, nil
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {

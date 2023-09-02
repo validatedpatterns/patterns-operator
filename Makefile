@@ -13,6 +13,8 @@ HOME=/tmp
 export HOME=/tmp
 endif
 
+APIKEYFILE ?= controllers/apikey.txt
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -127,17 +129,21 @@ test: manifests generate fmt vet envtest ## Run tests.
 GOOS ?= linux
 GOARCH ?= amd64
 
+.PHONY: apikey
+apikey: ## Generates an empty apikey file if one does not exist already
+	@touch $(APIKEYFILE)
+
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
+build: apikey generate fmt vet ## Build manager binary.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: apikey manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
 
 .PHONY: docker-build
-docker-build:  ## Build docker image with the manager.
-	docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t ${IMG} .
+docker-build: apikey ## Build docker image with the manager.
+	docker build --secret id=apikey,src=$(APIKEYFILE) --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.

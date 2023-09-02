@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -84,9 +85,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	isAnalyticsDisabled := strings.ToLower(os.Getenv("ANALYTICS")) == "false"
 	if err = (&controllers.PatternReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		AnalyticsClient: controllers.AnalyticsInit("", isAnalyticsDisabled, setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pattern")
 		os.Exit(1)
