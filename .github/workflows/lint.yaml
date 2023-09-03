@@ -14,6 +14,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Set up Api Key
+        shell: bash
+        run: |
+          set -e
+          export APIFILE="controllers/apikey.txt"
+          echo '' > "${APIFILE}"
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:

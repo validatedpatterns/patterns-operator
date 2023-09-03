@@ -183,12 +183,13 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	ingress := &v1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.IngressSpec{Domain: "hello.world"}}
 	watcher, _ := newDriftWatcher(fakeClient, logr.New(log.NullLogSink{}), newGitClient())
 	return &PatternReconciler{
-		Scheme:         scheme.Scheme,
-		Client:         fakeClient,
-		olmClient:      olmclient.NewSimpleClientset(),
-		driftWatcher:   watcher,
-		configClient:   configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
-		operatorClient: operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
+		Scheme:          scheme.Scheme,
+		Client:          fakeClient,
+		olmClient:       olmclient.NewSimpleClientset(),
+		driftWatcher:    watcher,
+		configClient:    configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
+		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
+		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
 	}
 }
 
@@ -205,5 +206,43 @@ func buildPatternManifest(interval int) *api.Pattern {
 				PollInterval: interval,
 			},
 		},
+		Status: api.PatternStatus{
+			ClusterPlatform: "AWS",
+			ClusterVersion:  "1.2.3",
+		},
 	}
 }
+
+var _ = Describe("ExtractRepositoryName", func() {
+	It("should extract the repository name from various URL formats", func() {
+		testCases := []struct {
+			inputURL     string
+			expectedName string
+		}{
+			{"https://github.com/username/repo.git", "repo"},
+			{"https://github.com/username/repo", "repo"},
+			{"https://github.com/username/repo.git/", "repo"},
+			{"https://github.com/username/repo/", "repo"},
+			{"https://gitlab.com/username/my-project.git", "my-project"},
+			{"https://gitlab.com/username/my-project", "my-project"},
+			{"https://bitbucket.org/username/myrepo.git", "myrepo"},
+			{"https://bitbucket.org/username/myrepo", "myrepo"},
+			{"https://example.com/username/repo.git", "repo"},
+			{"https://example.com/username/repo", "repo"},
+			{"https://example.com/username/repo.git/", "repo"},
+			{"https://example.com/username/repo/", "repo"},
+		}
+
+		for _, testCase := range testCases {
+			repoName, err := extractRepositoryName(testCase.inputURL)
+			Expect(err).To(BeNil())
+			Expect(repoName).To(Equal(testCase.expectedName))
+		}
+	})
+
+	It("should return an error for an invalid URL", func() {
+		invalidURL := "invalid-url"
+		_, err := extractRepositoryName(invalidURL)
+		Expect(err).NotTo(BeNil())
+	})
+})

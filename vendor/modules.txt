@@ -108,6 +108,8 @@ github.com/beorn7/perks/quantile
 # github.com/blang/semver/v4 v4.0.0
 ## explicit; go 1.14
 github.com/blang/semver/v4
+# github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
+## explicit
 # github.com/bombsimon/logrusr/v2 v2.0.1
 ## explicit; go 1.13
 github.com/bombsimon/logrusr/v2
@@ -506,6 +508,12 @@ github.com/robfig/cron/v3
 # github.com/russross/blackfriday v1.5.2
 ## explicit
 github.com/russross/blackfriday
+# github.com/segmentio/analytics-go/v3 v3.2.1
+## explicit; go 1.17
+github.com/segmentio/analytics-go/v3
+# github.com/segmentio/backo-go v1.0.0
+## explicit
+github.com/segmentio/backo-go
 # github.com/sergi/go-diff v1.1.0
 ## explicit; go 1.12
 github.com/sergi/go-diff/diffmatchpatch

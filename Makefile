@@ -13,6 +13,8 @@ HOME=/tmp
 export HOME=/tmp
 endif
 
+APIKEYFILE ?= controllers/apikey.txt
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -105,7 +107,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: apikey controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
@@ -117,7 +119,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: apikey manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 ##@ Build
@@ -127,17 +129,21 @@ test: manifests generate fmt vet envtest ## Run tests.
 GOOS ?= linux
 GOARCH ?= amd64
 
+.PHONY: apikey
+apikey: ## Generates an empty apikey file if one does not exist already
+	@touch $(APIKEYFILE)
+
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
+build: apikey generate fmt vet ## Build manager binary.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: apikey manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
 
 .PHONY: docker-build
-docker-build:  ## Build docker image with the manager.
-	docker build --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t ${IMG} .
+docker-build: apikey ## Build docker image with the manager.
+	docker build --secret id=apikey,src=$(APIKEYFILE) --platform $(CONTAINER_OS)/$(CONTAINER_PLATFORM) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -295,5 +301,6 @@ config/samples/pattern-catalog-$(VERSION).yaml:
 	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
 	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
 
-golangci-lint:
-	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.46.2 golangci-lint run -v
+.PHONY: golangci-lint
+golangci-lint: ## Run golangci-lint locally
+	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.54.2 golangci-lint run -v
