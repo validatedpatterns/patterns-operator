@@ -73,6 +73,9 @@ type PatternSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7
 	ExtraValueFiles []string `json:"extraValueFiles,omitempty"`
 
+	// Analytics UUID. Leave empty to autogenerate a random one
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9
+	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
 }

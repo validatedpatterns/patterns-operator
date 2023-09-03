@@ -189,7 +189,7 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		driftWatcher:    watcher,
 		configClient:    configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
-		AnalyticsClient: AnalyticsInit("", true, logr.New(log.NullLogSink{})),
+		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
 	}
 }
 

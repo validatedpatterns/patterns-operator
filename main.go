@@ -89,7 +89,7 @@ func main() {
 	if err = (&controllers.PatternReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
-		AnalyticsClient: controllers.AnalyticsInit("", isAnalyticsDisabled, setupLog),
+		AnalyticsClient: controllers.AnalyticsInit(isAnalyticsDisabled, setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pattern")
 		os.Exit(1)

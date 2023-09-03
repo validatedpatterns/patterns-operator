@@ -39,6 +39,13 @@ type VpAnalytics struct {
 	lastUpdate      time.Time
 }
 
+func getAnalyticsUUID(p *api.Pattern) string {
+	if p.Spec.AnalyticsUUID == "" {
+		return uuid.New().String()
+	}
+	return p.Spec.AnalyticsUUID
+}
+
 // This called at the beginning of the reconciliation loop and only once
 func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	// If we already sent this event skip it
@@ -54,7 +61,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	properties.Set("pattern", p.Name)
 	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 	v.client.Enqueue(analytics.Identify{
-		UserId: v.vpUUID,
+		UserId: getAnalyticsUUID(p),
 		Traits: analytics.NewTraits().
 			SetName("VP User").
 			Set("platform", p.Status.ClusterPlatform).
@@ -77,7 +84,7 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 	v.logger.Info("Sending an update Info event")
 	base, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 	v.client.Enqueue(analytics.Track{
-		UserId: v.vpUUID,
+		UserId: getAnalyticsUUID(p),
 		Event:  UpdateEvent,
 		Properties: analytics.NewProperties().
 			Set("pattern", p.Name).
@@ -101,7 +108,7 @@ func decodeApiKey(k string) string {
 	return strings.TrimRight(string(rawKey), "\r\n")
 }
 
-func AnalyticsInit(vp_uuid string, disabled bool, logger logr.Logger) *VpAnalytics {
+func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 	v := VpAnalytics{}
 
 	if disabled {
@@ -111,11 +118,6 @@ func AnalyticsInit(vp_uuid string, disabled bool, logger logr.Logger) *VpAnalyti
 		return &v
 	}
 
-	if vp_uuid == "" {
-		v.vpUUID = uuid.New().String()
-	} else {
-		v.vpUUID = vp_uuid
-	}
 	v.logger = logger
 	s := decodeApiKey(api_key)
 	if s != "" {

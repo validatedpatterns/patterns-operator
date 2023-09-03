@@ -78,6 +78,9 @@ spec:
         path: multiSourceConfig.helmRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+      - description: Analytics UUID. Leave empty to autogenerate a random one
+        displayName: Analytics UUID
+        path: analyticsUUID
       - description: Which chart version for the clustergroup helm chart Defaults
           to "0.0.*"
         displayName: Cluster Group Chart Version
