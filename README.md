@@ -175,10 +175,10 @@ git checkout main
 git pull
 git tag $VERSION
 git push <upstream-remote> $VERSION
-# At this point make sure quay.io rebuilt the image with the right tag:
-# https://quay.io/repository/hybridcloudpatterns/patterns-operator?tab=tags
-# If the image did not get built (because the trigger got disabled), all the CI
-# jobs for the community-operators-prod PR will fail
+
+# Starting 2023-09-01 we do not let quay rebuilt the container. It is being built by a workflow
+# triggered when pushing a numeric tag (x.y.z). So check the result of the 'vp-patterns/update-quay-image'
+# GH action.
 
 # Sync the bundle/ folder to the community-operators-prod git repo
 rsync -va bundle/ ../community-operators-prod/operators/patterns-operator/$VERSION
