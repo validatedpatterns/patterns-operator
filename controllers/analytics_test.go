@@ -66,28 +66,28 @@ var _ = Describe("decodeApiKey", func() {
 	})
 })
 
+// The VpAnalytics tests are somewhat scarce due to the fact that we do not want to send
+// spurious results around (i.e. disabled is true during unit testing)
 var _ = Describe("VpAnalytics", func() {
 	var (
 		vpAnalytics *VpAnalytics
+		pattern     *api.Pattern
 	)
 
 	BeforeEach(func() {
-		vpAnalytics = AnalyticsInit("test-uuid", false, logr.New(log.NullLogSink{}))
+		vpAnalytics = AnalyticsInit("test-uuid", true, logr.New(log.NullLogSink{}))
+		pattern = &api.Pattern{}
 	})
 
-	It("should send pattern installation info", func() {
-		pattern := &api.Pattern{}
+	It("should not send pattern installation info as disabled is true", func() {
 		vpAnalytics.SendPatternInstallationInfo(pattern)
 
-		Expect(vpAnalytics.sentInstallInfo).To(BeTrue())
+		Expect(vpAnalytics.sentInstallInfo).To(BeFalse())
 	})
 
-	It("should send pattern update info", func() {
-		// Add your test logic here
-
-		pattern := &api.Pattern{}
+	It("should not send pattern update info as disabled is true", func() {
 		vpAnalytics.SendPatternUpdateInfo(pattern)
 
-		Expect(vpAnalytics.lastUpdate).To(BeTemporally("~", time.Now(), time.Second))
+		Expect(vpAnalytics.sentInstallInfo).To(BeFalse())
 	})
 })
