@@ -25,5 +25,4 @@ jobs:
               echo "Key is set"
               echo "${KEY}" > "${APIFILE}"
           fi
-          echo "${KEY}" > "${APIFILE}"
           make docker-build
