@@ -47,10 +47,13 @@ jobs:
           export APIFILE="controllers/apikey.txt"
           trap "rm -f ${APIFILE}" SIGINT EXIT
 
-          if [ -n "${KEY}" ]; then
+          if [ -z "${KEY}" ]; then
+              echo "Key is empty"
               echo '' > "${APIFILE}"
+          else
+              echo "Key is set"
+              echo "${KEY}" > "${APIFILE}"
           fi
-          echo "${KEY}" > "${APIFILE}"
           make docker-build
           echo "${{ secrets.QUAY_ROBOT_TOKEN }}" | docker login -u="${{ secrets.QUAY_ROBOT_USER }}" --password-stdin quay.io
           docker images
