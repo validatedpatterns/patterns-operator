@@ -46,6 +46,26 @@ func hasIntervalPassedWithCurrentTime(lastUpdate, currentTime time.Time) bool {
 	return currentTime.Sub(lastUpdate).Minutes() >= RefreshIntervalMinutes
 }
 
+var _ = Describe("decodeApiKey", func() {
+	It("should decode a valid base64 encoded key", func() {
+		base64Key := "SGVsbG8gd29ybGQ=" // "Hello world" encoded
+		result := decodeApiKey(base64Key)
+		Expect(result).To(Equal("Hello world"))
+	})
+
+	It("should return an empty string for an invalid base64 encoded key", func() {
+		invalidBase64Key := "InvalidKey@123"
+		result := decodeApiKey(invalidBase64Key)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("should return an empty string for an empty input", func() {
+		emptyKey := ""
+		result := decodeApiKey(emptyKey)
+		Expect(result).To(BeEmpty())
+	})
+})
+
 var _ = Describe("VpAnalytics", func() {
 	var (
 		vpAnalytics *VpAnalytics
