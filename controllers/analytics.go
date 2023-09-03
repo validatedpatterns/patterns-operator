@@ -31,7 +31,6 @@ const (
 )
 
 type VpAnalytics struct {
-	vpUUID          string
 	apiKey          string
 	client          analytics.Client
 	logger          logr.Logger
@@ -60,7 +59,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	}
 	properties.Set("pattern", p.Name)
 	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
-	v.client.Enqueue(analytics.Identify{
+	err := v.client.Enqueue(analytics.Identify{
 		UserId: getAnalyticsUUID(p),
 		Traits: analytics.NewTraits().
 			SetName("VP User").
@@ -70,6 +69,10 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 			Set("repobasename", baseGitRepo).
 			Set("pattern", p.Name),
 	})
+	if err != nil {
+		v.logger.Info("Sending Installation info failed:", "info", err)
+		return
+	}
 	v.sentInstallInfo = true
 }
 
@@ -83,7 +86,7 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 	}
 	v.logger.Info("Sending an update Info event")
 	base, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
-	v.client.Enqueue(analytics.Track{
+	err := v.client.Enqueue(analytics.Track{
 		UserId: getAnalyticsUUID(p),
 		Event:  UpdateEvent,
 		Properties: analytics.NewProperties().
@@ -91,6 +94,10 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 			Set("ocpversion", p.Status.ClusterVersion).
 			Set("gitbase", base),
 	})
+	if err != nil {
+		v.logger.Info("Sending update info failed:", "info", err)
+		return
+	}
 	v.lastUpdate = time.Now()
 }
 
