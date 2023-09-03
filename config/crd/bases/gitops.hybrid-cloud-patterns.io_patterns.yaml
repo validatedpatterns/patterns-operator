@@ -47,7 +47,7 @@ spec:
             properties:
               analyticsUUID:
                 description: Analytics UUID. Leave empty to autogenerate a random
-                  one
+                  one. Not PII information
                 type: string
               clusterGroupName:
                 type: string
