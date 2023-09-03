@@ -301,5 +301,6 @@ config/samples/pattern-catalog-$(VERSION).yaml:
 	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
 	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
 
-golangci-lint:
-	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.46.2 golangci-lint run -v
+.PHONY: golangci-lint
+golangci-lint: ## Run golangci-lint locally
+	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.54.2 golangci-lint run -v
