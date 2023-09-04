@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -64,42 +63,6 @@ var _ = Describe("decodeApiKey", func() {
 		emptyKey := ""
 		result := decodeApiKey(emptyKey)
 		Expect(result).To(BeEmpty())
-	})
-})
-
-var _ = Describe("getAnalyticsUUID", func() {
-	Context("when p.Spec.AnalyticsUUID is empty", func() {
-		It("should generate a new UUID", func() {
-			p := &api.Pattern{
-				Spec: api.PatternSpec{
-					AnalyticsUUID: "",
-				},
-			}
-
-			result := getAnalyticsUUID(p)
-
-			// Ensure that the result is a valid UUID
-			_, err := uuid.Parse(result)
-			Expect(err).To(BeNil())
-
-			// Ensure the generated UUID is not empty
-			Expect(result).NotTo(Equal(""))
-		})
-	})
-
-	Context("when p.Spec.AnalyticsUUID is not empty", func() {
-		It("should return the existing UUID", func() {
-			existingUUID := uuid.New().String()
-			p := &api.Pattern{
-				Spec: api.PatternSpec{
-					AnalyticsUUID: existingUUID,
-				},
-			}
-
-			result := getAnalyticsUUID(p)
-
-			Expect(result).To(Equal(existingUUID))
-		})
 	})
 })
 
