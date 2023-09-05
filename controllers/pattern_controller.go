@@ -49,10 +49,13 @@ import (
 	Client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const ReconcileLoopRequeueTime = 180 * time.Second
+
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	AnalyticsClient VpAnalyticsInterface
 
 	logger logr.Logger
 
@@ -143,9 +146,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// -- Fill in defaults (changes made to a copy and not persisted)
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
+
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
-	r.logger.Info("Applied Defaults")
+	r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance)
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
@@ -265,19 +269,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Report statistics
-
+	r.AnalyticsClient.SendPatternUpdateInfo(instance)
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	// MBP-184 Implementation
-	// This is a temporary hack to ensure that the Reconcile loop
-	// gets called every 3 minutes.
-	// TODO: Need to create a watch routing for Pattern Applications
 	result := ctrl.Result{
 		Requeue:      false,
-		RequeueAfter: 180 * time.Second,
+		RequeueAfter: ReconcileLoopRequeueTime,
 	}
+
 	return result, nil
 }
+
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
 	gc := input.Spec.GitConfig
