@@ -46,7 +46,6 @@ import (
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
-	Client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const ReconcileLoopRequeueTime = 180 * time.Second
@@ -581,8 +580,7 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// Create an empty Pattern CR
 	existingPatternCR := &api.Pattern{}
 
-	// Get the current Pattern CR
-	err := r.Client.Get(context.TODO(), Client.ObjectKey{
+	err := r.Client.Get(context.TODO(), client.ObjectKey{
 		Namespace: "openshift-operators",
 		Name:      input.ObjectMeta.Name}, existingPatternCR)
 
