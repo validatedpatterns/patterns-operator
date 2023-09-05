@@ -535,7 +535,7 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 // applyPatternAppDetails retrieves the status for the Pattern applications created in ArgoCD.
 // Once the Application Status is retrieve it appends the information
 // to the array and the CR is updated.
-func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, input *api.Pattern) (*api.Pattern, error) {
+func (r *PatternReconciler) applyPatternAppDetails(argoClient argoclient.Interface, input *api.Pattern) (*api.Pattern, error) {
 	output := input.DeepCopy()
 	var applicationInfo api.PatternApplicationInfo
 	var labelFilter = "validatedpatterns.io/pattern=" + output.ObjectMeta.Name
@@ -544,7 +544,7 @@ func (r *PatternReconciler) applyPatternAppDetails(client argoclient.Interface, 
 	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
 	//
 	// The VP framework adds the label to each application it creates.
-	applications, err := client.ArgoprojV1alpha1().Applications("").List(context.Background(),
+	applications, err := argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
 		metav1.ListOptions{
 			LabelSelector: labelFilter,
 		})
