@@ -260,7 +260,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	fUpdate, err = r.updatePatternCRDetails(qualifiedInstance)
 
 	if err == nil && fUpdate {
-		log.Printf("\x1b[32;1m\tPattern CR Updated\x1b[0m\n")
+		r.logger.Info("Pattern CR Updated")
 	}
 
 	// Report statistics
@@ -553,9 +553,7 @@ func (r *PatternReconciler) applyPatternAppDetails(argoClient argoclient.Interfa
 	}
 
 	// Reset the array
-	if len(applications.Items) > 0 {
-		output.Status.Applications = nil
-	}
+	output.Status.Applications = nil
 
 	// Loop through the Pattern Applications and append the details to the Applications array
 	for _, app := range applications.Items {
