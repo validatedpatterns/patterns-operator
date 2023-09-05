@@ -532,7 +532,6 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
 }
 
-// MBP-184 Implementation
 // applyPatternAppDetails retrieves the status for the Pattern applications created in ArgoCD.
 // Once the Application Status is retrieve it appends the information
 // to the array and the CR is updated.
