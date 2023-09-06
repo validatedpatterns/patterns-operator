@@ -576,7 +576,6 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	fUpdateCR := false
 
 	// Update CR for the Pattern Instance
-	//if input.Status.Applications != nil {
 	// Create an empty Pattern CR
 	existingPatternCR := &api.Pattern{}
 
