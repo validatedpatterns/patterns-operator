@@ -567,9 +567,9 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// Check to see if the Pattern CR has a list of Applications
 	// If it doesn't and we have a list of Applications
 	// Let's update the Pattern CR and set the update flag to true
-	if len(existingApplications) <= 0 && len(input.Status.Applications) > 0 {
+	if len(existingApplications) != len(input.Status.Applications) {
 		fUpdateCR = true
-	} else if len(existingApplications) == len(input.Status.Applications) {
+	} else {
 		// Compare the array items in the CR for the applications
 		// with the current instance array
 		for _, value := range input.Status.Applications {
@@ -583,13 +583,11 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 				}
 			}
 		}
-	} else {
-		fUpdateCR = true
 	}
 
 	// Update the Pattern CR if difference was found
 	if fUpdateCR {
-		input.Status.LastStep = `Pattern CR Updated`
+		input.Status.LastStep = `update pattern application status`
 		// Now let's update the CR with the application status data.
 		err := r.Client.Status().Update(context.Background(), input)
 		if err != nil {
