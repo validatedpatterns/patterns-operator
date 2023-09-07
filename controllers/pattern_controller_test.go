@@ -158,7 +158,6 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].namespace).To(Equal(namespace))
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
-		// LRC - Added test
 		It("adding a pattern with application status", func() {
 			p = &api.Pattern{}
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
