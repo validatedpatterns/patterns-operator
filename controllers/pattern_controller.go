@@ -530,7 +530,10 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	var applicationInfo api.PatternApplicationInfo
 	var labelFilter = "validatedpatterns.io/pattern=" + input.ObjectMeta.Name
 
-	existingPatternCR := input.DeepCopy()
+	// Copy just the applications
+	// Used to compare against input which will be updated with
+	// current application status
+	existingApplications := input.Status.DeepCopy().Applications
 
 	// Retrieving all applications that contain the label
 	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
@@ -548,6 +551,7 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	input.Status.Applications = nil
 
 	// Loop through the Pattern Applications and append the details to the Applications array
+	// into input
 	for _, app := range applications.Items {
 		// Add Application information to ApplicationInfo struct
 		applicationInfo.Name = app.Name
@@ -563,38 +567,31 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// Check to see if the Pattern CR has a list of Applications
 	// If it doesn't and we have a list of Applications
 	// Let's update the Pattern CR and set the update flag to true
-	if len(existingPatternCR.Status.Applications) <= 0 && len(input.Status.Applications) > 0 {
-		existingPatternCR.Status.Applications = input.Status.Applications
+	if len(existingApplications) <= 0 && len(input.Status.Applications) > 0 {
 		fUpdateCR = true
-	} else if len(existingPatternCR.Status.Applications) == len(input.Status.Applications) {
+	} else if len(existingApplications) == len(input.Status.Applications) {
 		// Compare the array items in the CR for the applications
 		// with the current instance array
 		for _, value := range input.Status.Applications {
-			for index, existingValue := range existingPatternCR.Status.Applications {
-				// Only check AppSyncStatus or AppHealthStatus
-				// Checking the entire array will always update the CR since
-				// ArgoCD updates the ReconcileAt timestamp
+			for _, existingValue := range existingApplications {
+				// Check if AppSyncStatus or AppHealthStatus have been updated
 				if value.Name == existingValue.Name &&
 					(value.AppSyncStatus != existingValue.AppSyncStatus ||
 						value.AppHealthStatus != existingValue.AppHealthStatus) {
-					existingPatternCR.Status.Applications[index] = value
 					fUpdateCR = true
+					break // We found a difference break out
 				}
 			}
 		}
 	} else {
-		// Replace it ... user might've added an application
-		existingPatternCR.Status.Applications = input.Status.Applications
 		fUpdateCR = true
 	}
 
-	// Update the Pattern CR if different
+	// Update the Pattern CR if difference was found
 	if fUpdateCR {
-		// Update last step in CR
-		existingPatternCR.Status.LastStep = "update pattern application status"
-
+		input.Status.LastStep = `Pattern CR Updated`
 		// Now let's update the CR with the application status data.
-		err := r.Client.Status().Update(context.Background(), existingPatternCR)
+		err := r.Client.Status().Update(context.Background(), input)
 		if err != nil {
 			return false, err
 		}
