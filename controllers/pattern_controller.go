@@ -527,7 +527,6 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 // Returns true if the CR was updated else it returns false
 func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
 	fUpdateCR := false
-	var applicationInfo api.PatternApplicationInfo
 	var labelFilter = "validatedpatterns.io/pattern=" + input.ObjectMeta.Name
 
 	// Copy just the applications
@@ -554,14 +553,16 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// into input
 	for _, app := range applications.Items {
 		// Add Application information to ApplicationInfo struct
-		applicationInfo.Name = app.Name
-		applicationInfo.Namespace = app.Namespace
-		applicationInfo.AppHealthStatus = string(app.Status.Health.Status)
-		applicationInfo.AppHealthMessage = app.Status.Health.Message
-		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
+		var applicationInfo api.PatternApplicationInfo = api.PatternApplicationInfo{
+			Name:             app.Name,
+			Namespace:        app.Namespace,
+			AppHealthStatus:  string(app.Status.Health.Status),
+			AppHealthMessage: app.Status.Health.Message,
+			AppSyncStatus:    string(app.Status.Sync.Status),
+		}
 
 		// Now let's append the Application Information
-		input.Status.Applications = append(input.Status.Applications, *applicationInfo.DeepCopy())
+		input.Status.Applications = append(input.Status.Applications, applicationInfo)
 	}
 
 	// Check to see if the Pattern CR has a list of Applications
