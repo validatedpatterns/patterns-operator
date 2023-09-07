@@ -245,15 +245,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
 
-	qualifiedInstance, err = r.applyPatternAppDetails(r.argoClient, qualifiedInstance)
-
-	if err != nil {
-		// Let's just inform that there was an error retrieving the Application details
-		r.logger.Info("Application Pattern Details: ", err)
-	} else {
-		r.logger.Info("Applied Pattern details")
-	}
-
 	// Update CR if necessary
 	var fUpdate bool
 	fUpdate, err = r.updatePatternCRDetails(qualifiedInstance)
@@ -531,28 +522,30 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
 }
 
-// applyPatternAppDetails retrieves the status for the Pattern applications created in ArgoCD.
-// Once the Application Status is retrieve it appends the information
-// to the array and the CR is updated.
-func (r *PatternReconciler) applyPatternAppDetails(argoClient argoclient.Interface, input *api.Pattern) (*api.Pattern, error) {
-	output := input.DeepCopy()
+// updatePatternCRDetails compares the current CR Status.Applications array
+// against the instance.Status.Applications array.
+// Returns true if the CR was updated else it returns false
+func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
+	fUpdateCR := false
 	var applicationInfo api.PatternApplicationInfo
-	var labelFilter = "validatedpatterns.io/pattern=" + output.ObjectMeta.Name
+	var labelFilter = "validatedpatterns.io/pattern=" + input.ObjectMeta.Name
+
+	existingPatternCR := input.DeepCopy()
 
 	// Retrieving all applications that contain the label
 	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
 	//
 	// The VP framework adds the label to each application it creates.
-	applications, err := argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
+	applications, err := r.argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
 		metav1.ListOptions{
 			LabelSelector: labelFilter,
 		})
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	// Reset the array
-	output.Status.Applications = nil
+	input.Status.Applications = nil
 
 	// Loop through the Pattern Applications and append the details to the Applications array
 	for _, app := range applications.Items {
@@ -564,27 +557,7 @@ func (r *PatternReconciler) applyPatternAppDetails(argoClient argoclient.Interfa
 		applicationInfo.AppSyncStatus = string(app.Status.Sync.Status)
 
 		// Now let's append the Application Information
-		output.Status.Applications = append(output.Status.Applications, *applicationInfo.DeepCopy())
-	}
-	return output, err
-}
-
-// updatePatternCRDetails compares the current CR Status.Applications array
-// against the instance.Status.Applications array.
-// Returns true if the CR was updated else it returns false
-func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
-	fUpdateCR := false
-
-	// Update CR for the Pattern Instance
-	// Create an empty Pattern CR
-	existingPatternCR := &api.Pattern{}
-
-	err := r.Client.Get(context.TODO(), client.ObjectKey{
-		Namespace: "openshift-operators",
-		Name:      input.ObjectMeta.Name}, existingPatternCR)
-
-	if err != nil {
-		return false, err
+		input.Status.Applications = append(input.Status.Applications, *applicationInfo.DeepCopy())
 	}
 
 	// Check to see if the Pattern CR has a list of Applications
