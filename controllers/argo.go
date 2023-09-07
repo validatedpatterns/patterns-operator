@@ -228,7 +228,6 @@ func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.Applicat
 
 func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
 	labels := make(map[string]string)
-	labels["pattern"] = applicationName(p)
 	labels["validatedpatterns.io/pattern"] = p.Name
 	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
