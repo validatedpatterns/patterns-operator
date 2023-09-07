@@ -78,7 +78,6 @@ var _ = Describe("Argo Pattern", func() {
 				Name:      applicationName(*pattern),
 				Namespace: "openshift-gitops",
 				Labels: map[string]string{
-					"pattern":                      applicationName(*pattern),
 					"validatedpatterns.io/pattern": pattern.Name,
 				},
 			},
