@@ -165,6 +165,25 @@ spec:
             properties:
               appClusterDomain:
                 type: string
+              applications:
+                items:
+                  description: PatternApplicationInfo defines the Applications Status
+                    for the Pattern. This structure is part of the PatternStatus as
+                    an array The Application Status will be included as part of the
+                    Observed state of Pattern
+                  properties:
+                    healthMessage:
+                      type: string
+                    healthStatus:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    syncStatus:
+                      type: string
+                  type: object
+                type: array
               clusterDomain:
                 type: string
               clusterID:

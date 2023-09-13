@@ -28,21 +28,19 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-
-	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -246,6 +244,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
+
+	// Update CR if necessary
+	var fUpdate bool
+	fUpdate, err = r.updatePatternCRDetails(qualifiedInstance)
+
+	if err == nil && fUpdate {
+		r.logger.Info("Pattern CR Updated")
+	}
+
 	// Report statistics
 	r.AnalyticsClient.SendPatternUpdateInfo(instance)
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
@@ -513,4 +520,82 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+}
+
+// updatePatternCRDetails compares the current CR Status.Applications array
+// against the instance.Status.Applications array.
+// Returns true if the CR was updated else it returns false
+func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
+	fUpdateCR := false
+	var labelFilter = "validatedpatterns.io/pattern=" + input.ObjectMeta.Name
+
+	// Copy just the applications
+	// Used to compare against input which will be updated with
+	// current application status
+	existingApplications := input.Status.DeepCopy().Applications
+
+	// Retrieving all applications that contain the label
+	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
+	//
+	// The VP framework adds the label to each application it creates.
+	applications, err := r.argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
+		metav1.ListOptions{
+			LabelSelector: labelFilter,
+		})
+	if err != nil {
+		return false, err
+	}
+
+	// Reset the array
+	input.Status.Applications = nil
+
+	// Loop through the Pattern Applications and append the details to the Applications array
+	// into input
+	for _, app := range applications.Items {
+		// Add Application information to ApplicationInfo struct
+		var applicationInfo api.PatternApplicationInfo = api.PatternApplicationInfo{
+			Name:             app.Name,
+			Namespace:        app.Namespace,
+			AppHealthStatus:  string(app.Status.Health.Status),
+			AppHealthMessage: app.Status.Health.Message,
+			AppSyncStatus:    string(app.Status.Sync.Status),
+		}
+
+		// Now let's append the Application Information
+		input.Status.Applications = append(input.Status.Applications, applicationInfo)
+	}
+
+	// Check to see if the Pattern CR has a list of Applications
+	// If it doesn't and we have a list of Applications
+	// Let's update the Pattern CR and set the update flag to true
+	if len(existingApplications) != len(input.Status.Applications) {
+		fUpdateCR = true
+	} else {
+		// Compare the array items in the CR for the applications
+		// with the current instance array
+		for _, value := range input.Status.Applications {
+			for _, existingValue := range existingApplications {
+				// Check if AppSyncStatus or AppHealthStatus have been updated
+				if value.Name == existingValue.Name &&
+					(value.AppSyncStatus != existingValue.AppSyncStatus ||
+						value.AppHealthStatus != existingValue.AppHealthStatus) {
+					fUpdateCR = true
+					break // We found a difference break out
+				}
+			}
+		}
+	}
+
+	// Update the Pattern CR if difference was found
+	if fUpdateCR {
+		input.Status.LastStep = `update pattern application status`
+		// Now let's update the CR with the application status data.
+		err := r.Client.Status().Update(context.Background(), input)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, nil
 }

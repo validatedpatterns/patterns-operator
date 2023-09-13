@@ -158,6 +158,18 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].namespace).To(Equal(namespace))
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
+		It("adding a pattern with application status", func() {
+			p = &api.Pattern{}
+			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p.Status.Applications).To(HaveLen(0))
+			p.Status.Applications = buildTestApplicationInfoArray()
+			err = reconciler.Client.Update(context.Background(), p)
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Get(context.Background(), patternNamespaced, p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p.Status.Applications).To(HaveLen(2))
+		})
 	})
 })
 
@@ -211,6 +223,25 @@ func buildPatternManifest(interval int) *api.Pattern {
 			ClusterVersion:  "1.2.3",
 		},
 	}
+}
+
+func buildTestApplicationInfoArray() []api.PatternApplicationInfo {
+	applications := []api.PatternApplicationInfo{
+		{
+			Name:            "hello-world",
+			Namespace:       "pattern-namespace",
+			AppSyncStatus:   "Synced",
+			AppHealthStatus: "Healthy",
+		},
+		{
+			Name:            "foo",
+			Namespace:       "pattern-namespace",
+			AppSyncStatus:   "Degraded",
+			AppHealthStatus: "Synced",
+		},
+	}
+
+	return applications
 }
 
 var _ = Describe("ExtractRepositoryName", func() {
