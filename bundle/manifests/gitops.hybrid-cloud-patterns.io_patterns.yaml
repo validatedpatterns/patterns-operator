@@ -163,6 +163,10 @@ spec:
           status:
             description: PatternStatus defines the observed state of Pattern
             properties:
+              analyticsSent:
+                type: boolean
+              analyticsUUID:
+                type: string
               appClusterDomain:
                 type: string
               applications:

@@ -31,18 +31,34 @@ const (
 )
 
 type VpAnalytics struct {
-	uuid            string
-	apiKey          string
-	client          analytics.Client
-	logger          logr.Logger
-	sentInstallInfo bool
-	lastUpdate      time.Time
+	apiKey     string
+	client     analytics.Client
+	logger     logr.Logger
+	lastUpdate time.Time
+}
+
+func getNewUUID(p *api.Pattern) string {
+	var newuuid string
+	// If the user specified a UUID that is what we will use
+	if p.Spec.AnalyticsUUID != "" {
+		newuuid = p.Spec.AnalyticsUUID
+	} else {
+		// If we saved a UUID in the status let's reuse that
+		// otherwise use a generated one
+		if p.Status.AnalyticsUUID != "" {
+			newuuid = p.Status.AnalyticsUUID
+		} else {
+			newuuid = uuid.New().String()
+			p.Status.AnalyticsUUID = newuuid
+		}
+	}
+	return newuuid
 }
 
 // This called at the beginning of the reconciliation loop and only once
 func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	// If we already sent this event skip it
-	if v.client == nil || v.sentInstallInfo {
+	if v.client == nil || p.Status.AnalyticsSent {
 		return
 	}
 
@@ -53,14 +69,9 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	}
 	properties.Set("pattern", p.Name)
 	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
-	var newuuid string
-	if p.Spec.AnalyticsUUID != "" {
-		newuuid = p.Spec.AnalyticsUUID
-	} else {
-		newuuid = v.uuid
-	}
+
 	err := v.client.Enqueue(analytics.Identify{
-		UserId: newuuid,
+		UserId: getNewUUID(p),
 		Traits: analytics.NewTraits().
 			SetName("VP User").
 			Set("platform", p.Status.ClusterPlatform).
@@ -73,7 +84,8 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 		v.logger.Info("Sending Installation info failed:", "info", err)
 		return
 	}
-	v.sentInstallInfo = true
+	v.logger.Info("Sent Identify Event")
+	p.Status.AnalyticsSent = true
 }
 
 func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
@@ -84,16 +96,10 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 	if !hasIntervalPassed(v.lastUpdate) {
 		return
 	}
-	var newuuid string
-	if p.Spec.AnalyticsUUID != "" {
-		newuuid = p.Spec.AnalyticsUUID
-	} else {
-		newuuid = v.uuid
-	}
-	v.logger.Info("Sending an update Info event")
+
 	base, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 	err := v.client.Enqueue(analytics.Track{
-		UserId: newuuid,
+		UserId: getNewUUID(p),
 		Event:  UpdateEvent,
 		Properties: analytics.NewProperties().
 			Set("pattern", p.Name).
@@ -104,6 +110,7 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return
 	}
+	v.logger.Info("Sent an update Info event")
 	v.lastUpdate = time.Now()
 }
 
@@ -137,9 +144,7 @@ func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 		logger.Info("Analytics enabled")
 		v.apiKey = s
 		v.client = analytics.New(s)
-		v.sentInstallInfo = false
 		v.lastUpdate = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
-		v.uuid = uuid.New().String()
 	} else {
 		logger.Info("Analytics enabled but no API key present")
 		v.client = nil
