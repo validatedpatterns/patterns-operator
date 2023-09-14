@@ -82,12 +82,12 @@ var _ = Describe("VpAnalytics", func() {
 	It("should not send pattern installation info as disabled is true", func() {
 		vpAnalytics.SendPatternInstallationInfo(pattern)
 
-		Expect(vpAnalytics.sentInstallInfo).To(BeFalse())
+		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
 	})
 
 	It("should not send pattern update info as disabled is true", func() {
 		vpAnalytics.SendPatternUpdateInfo(pattern)
 
-		Expect(vpAnalytics.sentInstallInfo).To(BeFalse())
+		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
 	})
 })

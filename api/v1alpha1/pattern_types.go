@@ -216,6 +216,10 @@ type PatternStatus struct {
 	Conditions []PatternCondition `json:"conditions,omitempty"`
 	//+operator-sdk:csv:customerresourcedefinitions:type=status
 	Applications []PatternApplicationInfo `json:"applications,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	AnalyticsSent bool `json:"analyticsSent,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html

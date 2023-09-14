@@ -124,6 +124,10 @@ spec:
         displayName: Use CSV
         path: gitOpsSpec.useCSV
       statusDescriptors:
+      - displayName: Analytics Sent
+        path: analyticsSent
+      - displayName: Analytics UUID
+        path: analyticsUUID
       - displayName: App Cluster Domain
         path: appClusterDomain
       - displayName: Cluster Domain
