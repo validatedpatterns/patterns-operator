@@ -31,10 +31,11 @@ const (
 )
 
 type VpAnalytics struct {
-	apiKey     string
-	client     analytics.Client
-	logger     logr.Logger
-	lastUpdate time.Time
+	apiKey          string
+	client          analytics.Client
+	logger          logr.Logger
+	lastUpdate      time.Time
+	sentInstallInfo bool
 }
 
 func getNewUUID(p *api.Pattern) string {
@@ -58,7 +59,7 @@ func getNewUUID(p *api.Pattern) string {
 // This called at the beginning of the reconciliation loop and only once
 func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	// If we already sent this event skip it
-	if v.client == nil || p.Status.AnalyticsSent {
+	if v.client == nil || v.sentInstallInfo || p.Status.AnalyticsSent {
 		return
 	}
 
@@ -86,6 +87,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	}
 	v.logger.Info("Sent Identify Event")
 	p.Status.AnalyticsSent = true
+	v.sentInstallInfo = true
 }
 
 func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
@@ -144,6 +146,7 @@ func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 		logger.Info("Analytics enabled")
 		v.apiKey = s
 		v.client = analytics.New(s)
+		v.sentInstallInfo = false
 		v.lastUpdate = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
 	} else {
 		logger.Info("Analytics enabled but no API key present")
