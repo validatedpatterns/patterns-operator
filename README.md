@@ -24,24 +24,14 @@ kubectl get -f config/samples/gitops_v1alpha1_pattern.yaml -o yaml
 oc get applications -A -w
 ```
 
-### Initialize the secrets vault
+### Load secrets into the vault
 
-There are two ways to initialize and unseal the vault:
-1) By adding an ExtraParameter in the UI as follows:
-
- - Name: `clusterGroup.insecureUnsealVaultInsideCluster`
- - Value: `true`
-
-2) By cloning the pattern's repo locally and running `make vault-init`
-
-In order to load the secrets out of band into the vault you can copy
-the `values-secret.yaml.template` inside the pattern's git repo to `~/values-secret.yaml`,
-edit the secrets at your discretion and then run `make load-secrets`.
-Otherwise you can access the vault via its network route, login via the root
-token (contained in the `imperative` namespace in the `vaultkeys` secret or in
-the `common/pattern-vault.init` file, depending if you unsealed with
-`insecureUnsealVaultInsideCluster` or via `make vault-init`) and then add the secrets
-via the UI (this approach is a bit more work)
+In order to load the secrets out of band into the vault you can copy the
+`values-secret.yaml.template` inside the pattern's git repo to
+`~/values-secret.yaml`, edit the secrets at your discretion and then run `make
+load-secrets`. Otherwise you can access the vault via its network route, login
+via the root token (contained in the `imperative` namespace in the `vaultkeys`
+secret and then add the secrets via the UI (this approach is a bit more work)
 
 ### Delete the pattern
 
@@ -54,6 +44,7 @@ The subscription and anything created by Argo will not be removed and canmust be
 Removing the top-level application ensures that Argo won't try to put back anything you delete.
 
 ## Watch the logs
+
 Note that when installing via UI the namespace will be `openshift-operators` and not `patterns-operator-system`
 ```
 oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
@@ -61,8 +52,30 @@ oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o na
 
 ## Development
 
-### Test your changes
+### Test your changes locally against a remote cluster
+
+Run the operator on your machine from your local directory against a cluster's
+API.
+
+```bash
+oc login
+oc apply -f ./config/crd/bases
+# For Linux amd64
+make run
+# For MacOS arm64 (M series)
+GOOS=darwin GOARCH=arm64 make run
 ```
+
+#### Test your changes on a cluster (Maintainers only)
+
+Run the operator in a Pod on an OpenShift cluster. This will create a container
+image under the *hybridcloudpatterns* organization in Quay.
+
+**NOTE:** This method only works for maintainers who have push access to the
+GitHub repository. To test changes in a forked repo, see *Test your changes on
+a cluster (Anyone)* below.
+
+```bash
 BRANCH=`whoami`
 git co -b $BRANCH
 vi somefile.go
@@ -72,10 +85,18 @@ git push --set-upstream origin $BRANCH
 VERSION=$BRANCH make deploy
 ```
 
-### Test your changes (alt)
+#### Test your changes on a cluster (Anyone)
 
-Replace $USER and the version of the operator:
-```
+Run the operator in a Pod on an OpenShift cluster. This will create a container
+image under your user account in Quay.
+
+**NOTE:** If you're doing this for the first time, the repo in Quay will be set
+to private. You will need to change the permission on the repo to public before
+running `make deploy`.
+
+Replace $USER and the version of the operator.
+
+```bash
 vi somefile.go
 export IMAGE_TAG_BASE=quay.io/$USER/patterns-operator
 export IMG=quay.io/$USER/patterns-operator:0.0.2
@@ -83,27 +104,52 @@ make docker-build docker-push bundle
 make deploy
 ```
 
-
 Restart the container to pick up the latest image from quay
-```
- oc delete pods -n patterns-operator-system --all; oc get pods -n patterns-operator-system -w
+
+```bash
+oc delete pods -n patterns-operator-system --all; oc get pods -n patterns-operator-system -w
 ```
 
-### Upgrade testing with OLM
+### Validating end-to-end installation and upgrade path with OLM
 
-Assuming the previous version was `0.0.1`, and we're not deploying to the official Quay repository, start by defining the version, creating the 3 images, and pushing them to quay:
+The patterns operator is distributed through OLM from the official
+[Community Operators](https://github.com/redhat-openshift-ecosystem/community-operators-prod)
+catalog. It is a good idea to end-to-end validate OLM bundle changes before
+releasing a new version.
+
+The commands below will generate an operator controller image, OLM bundle
+image, and OLM catalog image under your user account in Quay. The generated
+catalog can then be installed on an OpenShift cluster which will provide an
+option to install the candidate operator version from OperatorHub.
+
+**NOTE:** If you're doing this for the first time, the repos in Quay will be
+set to private. You will need to change the permission on the repos to public
+before running `make catalog-install`.
+
+Assuming the previous version was `0.0.1`, start by defining the version,
+creating the 3 images, and pushing them to quay:
 
 ```
-export VERSION=0.0.2
+export USER=replace-me  # Replace user
+export VERSION=0.0.2    # Replace version
 IMAGE_TAG_BASE=quay.io/$USER/patterns-operator CHANNELS=fast make docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
 ```
 
-Now create the CatalogSource so the cluster can see the new version
+**NOTE:** If you run into errors with the `opm` command, upgrade your installed
+opm version. opm release [1.26.5](https://github.com/operator-framework/operator-registry/releases/tag/v1.26.5)
+or newer should be good.
+
+Now create the CatalogSource on your cluster:
 
 ```
 make catalog-install
 ```
 
+After ~60 seconds, the CatalogSource object should have the status *READY*. (It
+may briefly show the status *TRANSIENT_FAILURE* before showing *READY*.)
+
+In the OpenShift Console, navigate to OperarorHub. Search for *Patterns
+Operator*. Install the operator from the source *Test Patterns Operator*.
 
 ### Releases
 
@@ -129,6 +175,11 @@ git checkout main
 git pull
 git tag $VERSION
 git push <upstream-remote> $VERSION
+
+# Starting 2023-09-01 we do not let quay rebuilt the container. It is being built by a workflow
+# triggered when pushing a numeric tag (x.y.z). So check the result of the 'vp-patterns/update-quay-image'
+# GH action.
+
 # Sync the bundle/ folder to the community-operators-prod git repo
 rsync -va bundle/ ../community-operators-prod/operators/patterns-operator/$VERSION
 ```

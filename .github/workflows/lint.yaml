@@ -7,15 +7,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.18
+          go-version: 1.19
+
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Set up Api Key
+        shell: bash
+        run: |
+          set -e
+          export APIFILE="controllers/apikey.txt"
+          echo '' > "${APIFILE}"
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.46.2
+          version: latest
           args: --timeout 5m -v
 
           #--exclude SA5011

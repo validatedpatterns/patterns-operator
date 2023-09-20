@@ -164,6 +164,18 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].namespace).To(Equal(namespace))
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
+		It("adding a pattern with application status", func() {
+			p = &api.Pattern{}
+			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p.Status.Applications).To(HaveLen(0))
+			p.Status.Applications = buildTestApplicationInfoArray()
+			err = reconciler.Client.Update(context.Background(), p)
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Get(context.Background(), patternNamespaced, p)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(p.Status.Applications).To(HaveLen(2))
+		})
 	})
 
 	var _ = Context("deploy gitops subscription", func() {
@@ -302,7 +314,18 @@ var _ = Describe("pattern controller", func() {
 
 func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
-	clusterVersion := &v1.ClusterVersion{ObjectMeta: metav1.ObjectMeta{Name: "version"}, Spec: v1.ClusterVersionSpec{ClusterID: "10"}}
+	clusterVersion := &v1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{Name: "version"},
+		Spec:       v1.ClusterVersionSpec{ClusterID: "10"},
+		Status: v1.ClusterVersionStatus{
+			History: []v1.UpdateHistory{
+				{
+					State:   "Completed",
+					Version: "4.10.3",
+				},
+			},
+		},
+	}
 	clusterInfra := &v1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.InfrastructureSpec{PlatformSpec: v1.PlatformSpec{Type: "AWS"}}}
 	osControlManager := &operatorv1.OpenShiftControllerManager{
 		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
@@ -318,6 +341,7 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		argoClient:     argoclient.NewSimpleClientset(),
 		configClient:   configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient: operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
+		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
 	}
 }
 
@@ -334,5 +358,62 @@ func buildPatternManifest(interval int) *api.Pattern {
 				PollInterval: interval,
 			},
 		},
+		Status: api.PatternStatus{
+			ClusterPlatform: "AWS",
+			ClusterVersion:  "1.2.3",
+		},
 	}
 }
+
+func buildTestApplicationInfoArray() []api.PatternApplicationInfo {
+	applications := []api.PatternApplicationInfo{
+		{
+			Name:            "hello-world",
+			Namespace:       "pattern-namespace",
+			AppSyncStatus:   "Synced",
+			AppHealthStatus: "Healthy",
+		},
+		{
+			Name:            "foo",
+			Namespace:       "pattern-namespace",
+			AppSyncStatus:   "Degraded",
+			AppHealthStatus: "Synced",
+		},
+	}
+
+	return applications
+}
+
+var _ = Describe("ExtractRepositoryName", func() {
+	It("should extract the repository name from various URL formats", func() {
+		testCases := []struct {
+			inputURL     string
+			expectedName string
+		}{
+			{"https://github.com/username/repo.git", "repo"},
+			{"https://github.com/username/repo", "repo"},
+			{"https://github.com/username/repo.git/", "repo"},
+			{"https://github.com/username/repo/", "repo"},
+			{"https://gitlab.com/username/my-project.git", "my-project"},
+			{"https://gitlab.com/username/my-project", "my-project"},
+			{"https://bitbucket.org/username/myrepo.git", "myrepo"},
+			{"https://bitbucket.org/username/myrepo", "myrepo"},
+			{"https://example.com/username/repo.git", "repo"},
+			{"https://example.com/username/repo", "repo"},
+			{"https://example.com/username/repo.git/", "repo"},
+			{"https://example.com/username/repo/", "repo"},
+		}
+
+		for _, testCase := range testCases {
+			repoName, err := extractRepositoryName(testCase.inputURL)
+			Expect(err).To(BeNil())
+			Expect(repoName).To(Equal(testCase.expectedName))
+		}
+	})
+
+	It("should return an error for an invalid URL", func() {
+		invalidURL := "invalid-url"
+		_, err := extractRepositoryName(invalidURL)
+		Expect(err).NotTo(BeNil())
+	})
+})

@@ -19,10 +19,16 @@ package controllers
 import (
 	"fmt"
 	"log"
+	"net/url"
+	"path"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 var (
@@ -110,4 +116,78 @@ func getPatternConditionByType(conditions []api.PatternCondition, conditionType 
 		}
 	}
 	return -1, nil
+}
+
+// status:
+//  history:
+//   - completionTime: null
+//     image: quay.io/openshift-release-dev/ocp-release@sha256:af19e94813478382e36ae1fa2ae7bbbff1f903dded6180f4eb0624afe6fc6cd4
+//     startedTime: "2023-07-18T07:48:54Z"
+//     state: Partial
+//     verified: true
+//     version: 4.13.5
+//   - completionTime: "2023-07-18T07:08:50Z"
+//     image: quay.io/openshift-release-dev/ocp-release@sha256:e3fb8ace9881ae5428ae7f0ac93a51e3daa71fa215b5299cd3209e134cadfc9c
+//     startedTime: "2023-07-18T06:48:44Z"
+//     state: Completed
+//     verified: false
+//     version: 4.13.4
+//   observedGeneration: 4
+//     version: 4.10.32
+
+// This function returns the current version of the cluster. Ideally
+// We return the first version with Completed status
+// https://pkg.go.dev/github.com/openshift/api/config/v1#ClusterVersionStatus specifies that the ordering is preserved
+// We do have a fallback in case the history does either not exist or it simply has never completed an update:
+// in such cases we just fallback to the status.desired.version
+func getCurrentClusterVersion(clusterversion configv1.ClusterVersion) (*semver.Version, error) {
+	// First, check the history for completed versions
+	for _, v := range clusterversion.Status.History {
+		if v.State == "Completed" {
+			return parseAndReturnVersion(v.Version)
+		}
+	}
+
+	// If no completed versions are found, use the desired version
+	return parseAndReturnVersion(clusterversion.Status.Desired.Version)
+}
+
+func parseAndReturnVersion(versionStr string) (*semver.Version, error) {
+	s, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse version %s: %w", versionStr, err)
+	}
+	return s, nil
+}
+
+// Extract the last part of a git repo url
+func extractRepositoryName(gitURL string) (string, error) {
+	// We use ParseRequestURI because the URL is assument to be absolute
+	// and we want to error out if that is not the case
+	parsedURL, err := url.ParseRequestURI(gitURL)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract the last part of the path, which is usually the repository name
+	repoName := path.Base(parsedURL.Path)
+
+	// Remove the ".git" extension if present
+	if len(repoName) > 4 && repoName[len(repoName)-4:] == ".git" {
+		repoName = repoName[:len(repoName)-4]
+	}
+
+	return repoName, nil
+}
+
+func validGitRepoURL(repoURL string) error {
+	switch {
+	case strings.HasPrefix(repoURL, "git@"):
+		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
+	case strings.HasPrefix(repoURL, "https://"),
+		strings.HasPrefix(repoURL, "http://"):
+		return nil
+	default:
+		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
+	}
 }

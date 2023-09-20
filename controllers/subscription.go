@@ -51,7 +51,7 @@ func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1
 	//    name: openshift-gitops-operator
 	//    namespace: openshift-operators
 	//  spec:
-	//    channel: stable
+	//    channel: v1.8.x
 	//    installPlanApproval: Automatic
 	//    name: openshift-gitops-operator
 	//    source: redhat-operators
@@ -63,7 +63,7 @@ func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1
 	//          value: "*"
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          "redhat-operators",
+		CatalogSource:          p.Spec.GitOpsConfig.OperatorSource,
 		CatalogSourceNamespace: "openshift-marketplace",
 		Channel:                "stable",
 		Package:                "openshift-gitops-operator",

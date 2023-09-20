@@ -25,29 +25,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
-	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-
-	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -55,10 +51,13 @@ import (
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
+const ReconcileLoopRequeueTime = 180 * time.Second
+
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	AnalyticsClient VpAnalyticsInterface
 
 	logger logr.Logger
 
@@ -149,8 +148,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// -- Fill in defaults (changes made to a copy and not persisted)
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
+
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
+	r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance)
 
 	if err := r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
@@ -200,8 +201,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	logOnce("namespace found")
 
+	targetApp := &argoapi.Application{}
 	// -- ArgoCD Application
-	targetApp := newApplication(*qualifiedInstance)
+	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
+		targetApp = newMultiSourceApplication(*qualifiedInstance)
+	} else {
+		targetApp = newApplication(*qualifiedInstance)
+	}
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
@@ -231,24 +237,27 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
-	// Report statistics
 
+	// Update CR if necessary
+	var fUpdate bool
+	fUpdate, err = r.updatePatternCRDetails(qualifiedInstance)
+
+	if err == nil && fUpdate {
+		r.logger.Info("Pattern CR Updated")
+	}
+
+	// Report statistics
+	r.AnalyticsClient.SendPatternUpdateInfo(instance)
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
-	return ctrl.Result{}, nil
+	result := ctrl.Result{
+		Requeue:      false,
+		RequeueAfter: ReconcileLoopRequeueTime,
+	}
+
+	return result, nil
 }
 
-func validGitRepoURL(repoURL string) error {
-	switch {
-	case strings.HasPrefix(repoURL, "git@"):
-		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
-	case strings.HasPrefix(repoURL, "https://"),
-		strings.HasPrefix(repoURL, "http://"):
-		return nil
-	default:
-		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
-	}
-}
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// TARGET_REPO=$(shell git remote show origin | grep Push | sed -e 's/.*URL:[[:space:]]*//' -e 's%:[a-z].*@%@%' -e 's%:%/%' -e 's%git@%https://%' )
 	gc := input.Spec.GitConfig
@@ -306,19 +315,15 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	// Cluster Version
-	// oc get OpenShiftControllerManager/cluster -o jsonpath='{.status.version}'
-	clusterVersion, err := r.operatorClient.OpenShiftControllerManagers().Get(context.Background(), "cluster", metav1.GetOptions{})
+	// oc get clusterversion/version -o yaml
+	clusterVersions, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
 	if err != nil {
 		return err, output
 	} else {
-		// status:
-		//   ...
-		//   version: 4.10.32
-		v, version_err := semver.NewVersion(string(clusterVersion.Status.Version))
+		v, version_err := getCurrentClusterVersion(*clusterVersions)
 		if version_err != nil {
 			return version_err, output
 		}
-
 		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 	}
 
@@ -355,6 +360,12 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
+	}
+	if len(output.Spec.MultiSourceConfig.HelmRepoUrl) == 0 {
+		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
+	}
+	if len(output.Spec.MultiSourceConfig.ClusterGroupChartVersion) == 0 {
+		output.Spec.MultiSourceConfig.ClusterGroupChartVersion = "0.0.*"
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
@@ -521,4 +532,82 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+}
+
+// updatePatternCRDetails compares the current CR Status.Applications array
+// against the instance.Status.Applications array.
+// Returns true if the CR was updated else it returns false
+func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
+	fUpdateCR := false
+	var labelFilter = "validatedpatterns.io/pattern=" + input.ObjectMeta.Name
+
+	// Copy just the applications
+	// Used to compare against input which will be updated with
+	// current application status
+	existingApplications := input.Status.DeepCopy().Applications
+
+	// Retrieving all applications that contain the label
+	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
+	//
+	// The VP framework adds the label to each application it creates.
+	applications, err := r.argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
+		metav1.ListOptions{
+			LabelSelector: labelFilter,
+		})
+	if err != nil {
+		return false, err
+	}
+
+	// Reset the array
+	input.Status.Applications = nil
+
+	// Loop through the Pattern Applications and append the details to the Applications array
+	// into input
+	for _, app := range applications.Items {
+		// Add Application information to ApplicationInfo struct
+		var applicationInfo api.PatternApplicationInfo = api.PatternApplicationInfo{
+			Name:             app.Name,
+			Namespace:        app.Namespace,
+			AppHealthStatus:  string(app.Status.Health.Status),
+			AppHealthMessage: app.Status.Health.Message,
+			AppSyncStatus:    string(app.Status.Sync.Status),
+		}
+
+		// Now let's append the Application Information
+		input.Status.Applications = append(input.Status.Applications, applicationInfo)
+	}
+
+	// Check to see if the Pattern CR has a list of Applications
+	// If it doesn't and we have a list of Applications
+	// Let's update the Pattern CR and set the update flag to true
+	if len(existingApplications) != len(input.Status.Applications) {
+		fUpdateCR = true
+	} else {
+		// Compare the array items in the CR for the applications
+		// with the current instance array
+		for _, value := range input.Status.Applications {
+			for _, existingValue := range existingApplications {
+				// Check if AppSyncStatus or AppHealthStatus have been updated
+				if value.Name == existingValue.Name &&
+					(value.AppSyncStatus != existingValue.AppSyncStatus ||
+						value.AppHealthStatus != existingValue.AppHealthStatus) {
+					fUpdateCR = true
+					break // We found a difference break out
+				}
+			}
+		}
+	}
+
+	// Update the Pattern CR if difference was found
+	if fUpdateCR {
+		input.Status.LastStep = `update pattern application status`
+		// Now let's update the CR with the application status data.
+		err := r.Client.Status().Update(context.Background(), input)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, nil
 }
