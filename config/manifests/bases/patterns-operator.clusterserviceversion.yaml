@@ -110,7 +110,6 @@ spec:
           Default: False'
         displayName: Manual Sync
         path: gitOpsSpec.manualSync
-<<<<<<< HEAD
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
@@ -130,21 +129,6 @@ spec:
           Default: HEAD'
         displayName: Target Revision
         path: gitSpec.targetRevision
-=======
-      - description: Specific version of openshift-gitops to deploy.  Requires UseCSV=True
-        displayName: Operator CSV
-        path: gitOpsSpec.operatorCSV
-      - description: 'Channel to deploy openshift-gitops from. Default: gitops-1.8'
-        displayName: Operator Channel
-        path: gitOpsSpec.operatorChannel
-      - description: 'Source to deploy openshift-gitops from. Default: redhat-operators'
-        displayName: Operator Source
-        path: gitOpsSpec.operatorSource
-      - description: 'Dangerous. Force a specific version to be installed. Default:
-          False'
-        displayName: Use CSV
-        path: gitOpsSpec.useCSV
->>>>>>> main
       statusDescriptors:
       - displayName: Analytics Sent
         path: analyticsSent
