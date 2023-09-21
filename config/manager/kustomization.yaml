@@ -1,4 +1,5 @@
 resources:
+- patterns-operator-gitops-config.yaml
 - manager.yaml
 
 generatorOptions:
@@ -12,5 +13,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: quay.io/hybridcloudpatterns/patterns-operator
-  newTag: 0.0.24
+  newName: quay.io/claudiol/patterns-operator
+  newTag: 6.6.21
