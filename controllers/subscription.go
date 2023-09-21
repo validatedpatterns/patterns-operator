@@ -65,9 +65,9 @@ func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          "redhat-operators", //LRC - TODO p.Spec.GitOpsConfig.OperatorSource,
 		CatalogSourceNamespace: "openshift-marketplace",
-		Channel:                "stable",
+		Channel:                "latest",
 		Package:                "openshift-gitops-operator",
-		StartingCSV:            "v1.4.0",
+		StartingCSV:            "",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: []corev1.EnvVar{

@@ -156,16 +156,17 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 			SyncOptions: []string{"Prune=true"},
 		}
 
-	} else if !p.Spec.GitOpsConfig.ManualSync {
-		// SyncPolicy controls when and how a sync will be performed
-		syncPolicy = &argoapi.SyncPolicy{
-			// Automated will keep an application synced to the target revision
-			Automated: &argoapi.SyncPolicyAutomated{},
-			// Options allow you to specify whole app sync-options
-			SyncOptions: []string{},
-			// Retry controls failed sync retry behavior
-			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
-		}
+		// LRC TODO: Deleting this section since it is no longer in the CRD
+		//	} else if !p.Spec.GitOpsConfig.ManualSync {
+		//		// SyncPolicy controls when and how a sync will be performed
+		//		syncPolicy = &argoapi.SyncPolicy{
+		//			// Automated will keep an application synced to the target revision
+		//			Automated: &argoapi.SyncPolicyAutomated{},
+		//			// Options allow you to specify whole app sync-options
+		//			SyncOptions: []string{},
+		//			// Retry controls failed sync retry behavior
+		//			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
+		//		}
 	}
 	return syncPolicy
 }

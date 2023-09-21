@@ -183,6 +183,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	// Deploy openshift-gitops subscription from config map
 	err = r.deployGitopsSubscription(customConfigFile)
 	if err != nil {
 		fmt.Print("Error: ", err)
@@ -201,6 +202,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "get gitops subscription phase", err)
 	}
+	fmt.Println("Status phase: ", p.Status.Phase)
 	if p.Status.Phase != operatorv1alpha1.InstallPlanPhaseComplete {
 		return r.actionPerformed(qualifiedInstance, "gitops subscription phase", fmt.Errorf("gitops subscription deployment is not yet complete"))
 	}
@@ -468,9 +470,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 
-	// if err = r.deployGitopsSubscription(customConfigFile); err != nil {
-	// 	return err
-	// }
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
@@ -482,40 +481,32 @@ func (r *PatternReconciler) deployGitopsSubscription(filename string) error {
 	storedSubscription, err := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
 	newSpec := newSubscription(&spec)
 	if err != nil && !kerrors.IsNotFound(err) {
-		fmt.Println("Errors retrieving the subscription")
 		return err
 	}
 
-	fmt.Println("No errors retrieving the subscription: ")
-	fmt.Println("Stored subscription: ", storedSubscription)
-	fmt.Println("NewSpec subscription: ", newSpec)
 	//#nosec
 	if _, err = os.Stat(filename); !os.IsNotExist(err) {
-		fmt.Println("Reading the config map [" + filename + "]")
 		data, err := os.ReadFile(filename)
 		if err != nil {
-			fmt.Println("Error reading file")
 			return err
 		}
 		err = json.Unmarshal(data, &spec)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Spec CatalogSource looks like this: ", spec.CatalogSource)
-		fmt.Println("Spec Channel looks like this: ", spec.Channel)
-		fmt.Println("Spec CatalogSourceNamespace looks like this: ", spec.CatalogSourceNamespace)
-		fmt.Println("Spec Package looks like this: ", spec.Package)
-
 		newSpec = newSubscription(&spec)
-		fmt.Println("NewSpec returned looks like this: ", newSpec)
 	}
-	if storedSubscription == nil {
+
+	if storedSubscription.Name == "" {
 		fmt.Println("Calling createSubscription")
 		return r.olmClient.createSubscription(newSpec)
+	} else if (storedSubscription.Spec.Channel != newSpec.Spec.Channel) ||
+		(storedSubscription.Spec.StartingCSV != newSpec.Spec.StartingCSV) {
+		fmt.Println("Calling updateSubscription")
+		_, err = r.olmClient.updateSubscription(newSpec, storedSubscription)
+		return err
 	}
-	fmt.Println("Calling updateSubscription")
-	_, err = r.olmClient.updateSubscription(newSpec, storedSubscription)
-	return err
+	return nil
 }
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {

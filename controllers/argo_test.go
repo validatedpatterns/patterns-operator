@@ -40,9 +40,9 @@ var _ = Describe("Argo Pattern", func() {
 					HelmRepoUrl:              "https://charts.validatedpatterns.io/",
 					ClusterGroupChartVersion: "0.0.*",
 				},
-				GitOpsConfig: &api.GitOpsConfig{
-					ManualSync: false,
-				},
+				//				GitOpsConfig: &api.GitOpsConfig{
+				//					ManualSync: false,
+				//				},
 			},
 			Status: api.PatternStatus{
 				ClusterPlatform:  "AWS",

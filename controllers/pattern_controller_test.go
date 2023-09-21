@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
+	//argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
 	"github.com/go-logr/logr"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -334,13 +334,13 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	ingress := &v1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.IngressSpec{Domain: "hello.world"}}
 	watcher, _ := newDriftWatcher(fakeClient, logr.New(log.NullLogSink{}), newGitClient())
 	return &PatternReconciler{
-		Scheme:         scheme.Scheme,
-		Client:         fakeClient,
-		olmClient:      newOLMClient(olmclient.NewSimpleClientset()),
-		driftWatcher:   watcher,
-		argoClient:     argoclient.NewSimpleClientset(),
-		configClient:   configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
-		operatorClient: operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
+		Scheme:       scheme.Scheme,
+		Client:       fakeClient,
+		olmClient:    newOLMClient(olmclient.NewSimpleClientset()),
+		driftWatcher: watcher,
+		//	argoClient:      argoclient.NewSimpleClientset(),
+		configClient:    configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
+		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
 	}
 }
