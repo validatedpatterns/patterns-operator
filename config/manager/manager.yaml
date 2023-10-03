@@ -65,6 +65,6 @@ spec:
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
-          name: patterns-operator-gitops-config
+          name: gitops-config
           optional: true
         name: gitops-config
