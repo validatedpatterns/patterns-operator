@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -27,6 +28,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,6 +39,10 @@ import (
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -70,6 +76,12 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
+
+	// Create initial config map for gitops
+	err := createGitOpsConfigMap()
+	if err != nil {
+		setupLog.Error(err, "unable to GitOps create config map")
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -118,4 +130,37 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Operator Version: %s", version.Version))
 	setupLog.Info(fmt.Sprintf("Git Commit: %s", version.GitCommit))
 	setupLog.Info(fmt.Sprintf("Build Date: %s", version.BuildDate))
+}
+
+func createGitOpsConfigMap() error {
+	config, _ := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	clientset, _ := kubernetes.NewForConfig(config)
+	configMapData := make(map[string]string, 0)
+	cmProperties := `
+	gitops.source: "redhat-operators",   
+	gitops.name: "openshift-gitops-operator",   
+	gitops.channel: "gitops-1.8",   
+	gitops.sourceNamespace: "openshift-marketplace",   
+	gitops.installApprovalPlan: "Automatic"
+	`
+	configMapData["gitops"] = cmProperties
+	configMap := corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gitops-config",
+			Namespace: "openshift-operators",
+		},
+		Data: configMapData,
+	}
+
+	if _, err := clientset.CoreV1().ConfigMaps("openshift-operators").Get("gitops-config", metav1.GetOptions{}); errors.IsNotFound(err) {
+		_, err = clientset.CoreV1().ConfigMaps("openshift-operators").Create(context.Background(), &configMap, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
