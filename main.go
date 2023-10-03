@@ -133,7 +133,7 @@ func printVersion() {
 }
 
 func createGitOpsConfigMap() error {
-	config, _ := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	config, _ := clientcmd.BuildConfigFromFlags("", "")
 	clientset, _ := kubernetes.NewForConfig(config)
 	configMapData := make(map[string]string, 0)
 	cmProperties := `
@@ -156,7 +156,7 @@ func createGitOpsConfigMap() error {
 		Data: configMapData,
 	}
 
-	if _, err := clientset.CoreV1().ConfigMaps("openshift-operators").Get("gitops-config", metav1.GetOptions{}); errors.IsNotFound(err) {
+	if _, err := clientset.CoreV1().ConfigMaps("openshift-operators").Get(context.Background(), "gitops-config", metav1.GetOptions{}); errors.IsNotFound(err) {
 		_, err = clientset.CoreV1().ConfigMaps("openshift-operators").Create(context.Background(), &configMap, metav1.CreateOptions{})
 		if err != nil {
 			return err
