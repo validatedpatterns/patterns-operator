@@ -46,7 +46,7 @@ import (
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/common"
+	"github.com/hybrid-cloud-patterns/patterns-operator/controllers/common"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 

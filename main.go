@@ -37,8 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
+	"github.com/hybrid-cloud-patterns/patterns-operator/controllers/common"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
