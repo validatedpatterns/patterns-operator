@@ -18,10 +18,8 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -48,6 +46,7 @@ import (
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
@@ -203,14 +202,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "get gitops subscription phase", err)
 	}
-	fmt.Println("Status phase: ", p.Status.Phase)
 	if p.Status.Phase != operatorv1alpha1.InstallPlanPhaseComplete {
 		return r.actionPerformed(qualifiedInstance, "gitops subscription phase", fmt.Errorf("gitops subscription deployment is not yet complete"))
 	}
 
 	logOnce("namespace found")
 
-	targetApp := &argoapi.Application{}
+	var targetApp *argoapi.Application
 	// -- ArgoCD Application
 	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
 		targetApp = newMultiSourceApplication(*qualifiedInstance)
@@ -478,24 +476,41 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *PatternReconciler) deployGitopsSubscription(filename string) error {
 
-	spec := operatorv1alpha1.SubscriptionSpec{}
-	storedSubscription, err := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
-	newSpec := newSubscription(&spec)
-	if err != nil && !kerrors.IsNotFound(err) {
-		return err
-	}
+	storedSubscription, _ := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
+	var newSpec *operatorv1alpha1.Subscription
 
-	//#nosec
-	if _, err = os.Stat(filename); !os.IsNotExist(err) {
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			return err
+	// Check if the config map exists and read the config map values
+	if cm, err := r.fullClient.CoreV1().ConfigMaps(common.OperatorNamespace).Get(context.Background(), common.OperatorConfigFile, metav1.GetOptions{}); err == nil {
+		// Config Map exists
+		// Read config parameters
+
+		cmData := cm.Data
+
+		var installPlanApproval operatorv1alpha1.Approval
+
+		if cmData["gitops.installApprovalPlan"] == "Manual" {
+			installPlanApproval = operatorv1alpha1.ApprovalManual
+		} else {
+			installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 		}
-		err = json.Unmarshal(data, &spec)
-		if err != nil {
-			return err
+
+		configSpec := operatorv1alpha1.SubscriptionSpec{
+			CatalogSource:          cmData["gitops.source"],
+			CatalogSourceNamespace: cmData["gitops.sourceNamespace"],
+			Package:                cmData["gitops.name"],
+			Channel:                cmData["gitops.channel"],
+			StartingCSV:            cmData["gitops.csv"],
+			InstallPlanApproval:    installPlanApproval,
+			Config:                 &operatorv1alpha1.SubscriptionConfig{},
 		}
+
+		newSpec = newSubscription(&configSpec)
+	} else {
+		spec := operatorv1alpha1.SubscriptionSpec{}
 		newSpec = newSubscription(&spec)
+		if err != nil && !kerrors.IsNotFound(err) {
+			return err
+		}
 	}
 
 	if storedSubscription.Name == "" {
@@ -504,7 +519,7 @@ func (r *PatternReconciler) deployGitopsSubscription(filename string) error {
 	} else if (storedSubscription.Spec.Channel != newSpec.Spec.Channel) ||
 		(storedSubscription.Spec.StartingCSV != newSpec.Spec.StartingCSV) {
 		fmt.Println("Calling updateSubscription")
-		_, err = r.olmClient.updateSubscription(newSpec, storedSubscription)
+		_, err := r.olmClient.updateSubscription(newSpec, storedSubscription)
 		return err
 	}
 	return nil

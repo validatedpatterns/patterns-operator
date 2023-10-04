@@ -22,6 +22,7 @@ import (
 	"log"
 	"reflect"
 
+	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
@@ -63,10 +64,10 @@ func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1
 	//          value: "*"
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          "redhat-operators", //LRC - TODO p.Spec.GitOpsConfig.OperatorSource,
-		CatalogSourceNamespace: "openshift-marketplace",
-		Channel:                "latest",
-		Package:                "openshift-gitops-operator",
+		CatalogSource:          common.GitOpsDefaultCatalogSource,
+		CatalogSourceNamespace: common.GitOpsDefaultCatalogSourceNamespace,
+		Channel:                common.GitOpsDefaultChannel,
+		Package:                common.GitOpsDefaultPackageName,
 		StartingCSV:            "",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
