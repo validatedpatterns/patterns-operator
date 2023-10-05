@@ -23,7 +23,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.24
-    createdAt: 2023-09-18 09:20:21
+    createdAt: 2023-10-04 21:27:52
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -90,18 +90,16 @@ spec:
         path: multiSourceConfig.enabled
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - displayName: Git Ops Config
-        path: gitOpsSpec
+      - description: Analytics UUID. Leave empty to autogenerate a random one. Not
+          PII information
+        displayName: Analytics UUID
+        path: analyticsUUID
       - description: The helm chart url to fetch the helm charts from in order to
           deploy the pattern Defaults to https://charts.validatedpatterns.io/
         displayName: Helm Repo Url
         path: multiSourceConfig.helmRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
-      - description: Analytics UUID. Leave empty to autogenerate a random one. Not
-          PII information
-        displayName: Analytics UUID
-        path: analyticsUUID
       - description: Which chart version for the clustergroup helm chart Defaults
           to "0.0.*"
         displayName: Cluster Group Chart Version
@@ -122,49 +120,6 @@ spec:
         path: multiSourceConfig.clusterGroupChartGitRevision
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
-      - description: 'Require manual confirmation before installing and upgrading
-          operators. Default: False'
-        displayName: Manual Approval
-        path: gitOpsSpec.manualApproval
-      - description: 'Require manual intervention before Argo will sync new content.
-          Default: False'
-        displayName: Manual Sync
-        path: gitOpsSpec.manualSync
-<<<<<<< HEAD
-      - description: Upstream git repo containing the pattern to deploy. Used when
-          in-cluster fork to point to the upstream pattern repository
-        displayName: Origin Repo
-        path: gitSpec.originRepo
-      - description: Branch, tag or commit in the upstream git repository. Does not
-          support short-sha's. Default to HEAD
-        displayName: Origin Revision
-        path: gitSpec.originRevision
-      - description: 'Interval in seconds to poll for drifts between origin and target
-          repositories. Default: 180 seconds'
-        displayName: Poll Interval
-        path: gitSpec.pollInterval
-      - description: Git repo containing the pattern to deploy. Must use https/http
-        displayName: Target Repo
-        path: gitSpec.targetRepo
-      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
-          Default: HEAD'
-        displayName: Target Revision
-        path: gitSpec.targetRevision
-=======
-      - description: Specific version of openshift-gitops to deploy.  Requires UseCSV=True
-        displayName: Operator CSV
-        path: gitOpsSpec.operatorCSV
-      - description: 'Channel to deploy openshift-gitops from. Default: gitops-1.8'
-        displayName: Operator Channel
-        path: gitOpsSpec.operatorChannel
-      - description: 'Source to deploy openshift-gitops from. Default: redhat-operators'
-        displayName: Operator Source
-        path: gitOpsSpec.operatorSource
-      - description: 'Dangerous. Force a specific version to be installed. Default:
-          False'
-        displayName: Use CSV
-        path: gitOpsSpec.useCSV
->>>>>>> main
       statusDescriptors:
       - displayName: Analytics Sent
         path: analyticsSent
@@ -290,6 +245,13 @@ spec:
         - apiGroups:
           - operators.coreos.com
           resources:
+          - installplans
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - operators.coreos.com
+          resources:
           - subscriptions
           verbs:
           - create
@@ -381,7 +343,7 @@ spec:
               terminationGracePeriodSeconds: 10
               volumes:
               - configMap:
-                  name: patterns-operator-gitops-config
+                  name: gitops-config
                   optional: true
                 name: gitops-config
       permissions:

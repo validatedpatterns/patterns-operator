@@ -27,6 +27,7 @@ COPY main.go main.go
 COPY api/ api/
 COPY version/ version/
 COPY controllers/  controllers/ 
+COPY common/ common/
 COPY hack/ hack/
 COPY .git/ .git/
 

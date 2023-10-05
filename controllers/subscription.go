@@ -22,7 +22,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/hybrid-cloud-patterns/patterns-operator/controllers/common"
+	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
