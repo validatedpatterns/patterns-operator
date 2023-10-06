@@ -28,8 +28,8 @@ import (
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
-
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 )
 
 func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
@@ -144,6 +144,18 @@ func newApplicationValues(p api.Pattern) string {
 	return s
 }
 
+// This function looks at the map entries read
+// from the patterns config map for the ManualSync
+// entry.
+func commonSyncPolicyFromConfigMap() bool {
+	var value bool = true
+
+	if configValueWithDefault(common.PatternsOperatorConfig, "gitops.ManualSync", common.GitOpsDefaultManualSync) == "false" {
+		value = false
+	}
+	return value
+}
+
 func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 	var syncPolicy *argoapi.SyncPolicy
 	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -155,18 +167,17 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 			// Options allow you to specify whole app sync-SyncOptions
 			SyncOptions: []string{"Prune=true"},
 		}
-
 		// LRC TODO: Deleting this section since it is no longer in the CRD
-		//	} else if !p.Spec.GitOpsConfig.ManualSync {
-		//		// SyncPolicy controls when and how a sync will be performed
-		//		syncPolicy = &argoapi.SyncPolicy{
-		//			// Automated will keep an application synced to the target revision
-		//			Automated: &argoapi.SyncPolicyAutomated{},
-		//			// Options allow you to specify whole app sync-options
-		//			SyncOptions: []string{},
-		//			// Retry controls failed sync retry behavior
-		//			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
-		//		}
+	} else if !commonSyncPolicyFromConfigMap() {
+		// SyncPolicy controls when and how a sync will be performed
+		syncPolicy = &argoapi.SyncPolicy{
+			// Automated will keep an application synced to the target revision
+			Automated: &argoapi.SyncPolicyAutomated{},
+			// Options allow you to specify whole app sync-options
+			SyncOptions: []string{},
+			// Retry controls failed sync retry behavior
+			// Retry *RetryStrategy `json:"retry,omitempty" protobuf:"bytes,3,opt,name=retry"`
+		}
 	}
 	return syncPolicy
 }
