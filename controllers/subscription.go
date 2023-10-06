@@ -144,15 +144,6 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 	return *newSpec.DeepCopy(), nil
 }
 
-// func (s *olmClient) getSubscription(name, namespace string) (*operatorv1alpha1.Subscription, error) {
-// 	return s.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
-// }
-
-// func (s *olmClient) createSubscription(sub *operatorv1alpha1.Subscription) error {
-// 	_, err := s.client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
-// 	return err
-// }
-
 func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
 
 	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
@@ -162,7 +153,6 @@ func getSubscription(client olmclient.Interface, name, namespace string) (*opera
 	return sub, nil
 }
 
-// LRC - Copied implementation from upstream subscription.go
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
 	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
