@@ -37,15 +37,6 @@ const (
 	customConfigFile       = "/gitops-config/config.json"
 )
 
-// type olmClient struct {
-// 	client olmclient.Interface
-// }
-
-//	func newOLMClient(client olmclient.Interface) *olmClient {
-//		return &olmClient{
-//			client: client,
-//		}
-//	}
 func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1.Subscription {
 	//  apiVersion: operators.coreos.com/v1alpha1
 	//  kind: Subscription
@@ -110,7 +101,11 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 	var newSpec *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	if cm, err := r.CoreV1().ConfigMaps(common.OperatorNamespace).Get(context.Background(), common.OperatorConfigFile, metav1.GetOptions{}); err == nil {
+	if cm, err := r.CoreV1().ConfigMaps(common.OperatorNamespace).Get(context.Background(), common.OperatorConfigFile, metav1.GetOptions{}); err != nil {
+		fmt.Println("Patterns Config Map not found. Using default subscriptions values for OpenShift GitOps.")
+		spec := operatorv1alpha1.SubscriptionSpec{}
+		newSpec = newSubscription(&spec)
+	} else {
 		// Config Map exists
 		// Read config parameters
 
@@ -135,10 +130,6 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 		}
 
 		newSpec = newSubscription(&configSpec)
-	} else {
-		fmt.Println("Patterns Config Map not found. Using default subscriptions values for OpenShift GitOps.")
-		spec := operatorv1alpha1.SubscriptionSpec{}
-		newSpec = newSubscription(&spec)
 	}
 
 	return *newSpec.DeepCopy(), nil
