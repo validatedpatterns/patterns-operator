@@ -23,7 +23,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.24
-    createdAt: 2023-10-05 09:38:21
+    createdAt: 2023-10-06 09:55:43
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -239,13 +239,6 @@ spec:
           - operator.openshift.io
           resources:
           - openshiftcontrollermanagers
-          verbs:
-          - get
-          - list
-        - apiGroups:
-          - operators.coreos.com
-          resources:
-          - installplans
           verbs:
           - get
           - list
