@@ -167,7 +167,6 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 			// Options allow you to specify whole app sync-SyncOptions
 			SyncOptions: []string{"Prune=true"},
 		}
-		// LRC TODO: Deleting this section since it is no longer in the CRD
 	} else if !commonSyncPolicyFromConfigMap() {
 		// SyncPolicy controls when and how a sync will be performed
 		syncPolicy = &argoapi.SyncPolicy{
