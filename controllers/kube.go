@@ -17,13 +17,25 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ghodss/yaml"
 )
+
+func haveNamespace(client client.Client, name string) bool {
+	ns := &v1.Namespace{}
+	if err := client.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
+		return true
+	}
+	return false
+}
 
 func ownedBySame(expected, object metav1.Object) bool {
 	ownerReferences := expected.GetOwnerReferences()
