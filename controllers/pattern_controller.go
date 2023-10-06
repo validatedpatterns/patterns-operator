@@ -450,7 +450,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	//r.olmClient = newOLMClient(olmclient.NewForConfigOrDie(r.config))
 	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
 		return err
 	}
