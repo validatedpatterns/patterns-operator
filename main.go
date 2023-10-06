@@ -148,6 +148,7 @@ func createGitOpsConfigMap() error {
 		"gitops.channel":             "gitops-1.8",
 		"gitops.sourceNamespace":     "openshift-marketplace",
 		"gitops.installApprovalPlan": "Automatic",
+		"gitops.ManualSync":          "false",
 	}
 
 	configMap := corev1.ConfigMap{
