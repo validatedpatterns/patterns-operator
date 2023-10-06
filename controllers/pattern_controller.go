@@ -39,14 +39,12 @@ import (
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
-	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 
 	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
@@ -63,7 +61,7 @@ type PatternReconciler struct {
 	config         *rest.Config
 	configClient   configclient.Interface
 	argoClient     argoclient.Interface
-	olmClient      *olmClient
+	olmClient      olmclient.Interface
 	fullClient     kubernetes.Interface
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
@@ -183,27 +181,30 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Deploy openshift-gitops subscription from config map
-	err = r.deployGitopsSubscription(customConfigFile)
-	if err != nil {
-		fmt.Print("Error: ", err)
-		r.logger.Info("Issue deploying openshift-gitops from configmap")
+	// -- GitOps Subscription
+	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
+	_ = controllerutil.SetOwnerReference(qualifiedInstance, &targetSub, r.Scheme)
+
+	sub, _ := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
+	if sub == nil {
+		err := createSubscription(r.olmClient, &targetSub)
+		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
+	} else if ownedBySame(&targetSub, sub) {
+		// Check version/channel etc
+		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
+		err, changed := updateSubscription(r.olmClient, &targetSub, sub)
+		if changed {
+			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
+		}
+	} else {
+		logOnce("The gitops subscription is not owned by us, leaving untouched")
 	}
 
-	// -- GitOps Subscription
-	s, err := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
-	if err != nil {
-		return r.actionPerformed(qualifiedInstance, "get gitops subscription", err)
-	}
-	if s.Status.InstallPlanRef == nil {
-		return r.actionPerformed(qualifiedInstance, "get gitops installplan", fmt.Errorf("waiting for installplan to be created"))
-	}
-	p, err := r.olmClient.getInstallPlan(s.Status.InstallPlanRef.Name)
-	if err != nil {
-		return r.actionPerformed(qualifiedInstance, "get gitops subscription phase", err)
-	}
-	if p.Status.Phase != operatorv1alpha1.InstallPlanPhaseComplete {
-		return r.actionPerformed(qualifiedInstance, "gitops subscription phase", fmt.Errorf("gitops subscription deployment is not yet complete"))
+	logOnce("subscription found")
+
+	// -- GitOps Namespace (created by the gitops operator)
+	if !haveNamespace(r.Client, applicationNamespace) {
+		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 
 	logOnce("namespace found")
@@ -454,7 +455,10 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	r.olmClient = newOLMClient(olmclient.NewForConfigOrDie(r.config))
+	//r.olmClient = newOLMClient(olmclient.NewForConfigOrDie(r.config))
+	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
+		return err
+	}
 
 	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
 		return err
@@ -472,57 +476,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
-}
-
-func (r *PatternReconciler) deployGitopsSubscription(filename string) error {
-
-	storedSubscription, _ := r.olmClient.getSubscription(gitopsSubscriptionName, subscriptionNamespace)
-	var newSpec *operatorv1alpha1.Subscription
-
-	// Check if the config map exists and read the config map values
-	if cm, err := r.fullClient.CoreV1().ConfigMaps(common.OperatorNamespace).Get(context.Background(), common.OperatorConfigFile, metav1.GetOptions{}); err == nil {
-		// Config Map exists
-		// Read config parameters
-
-		cmData := cm.Data
-
-		var installPlanApproval operatorv1alpha1.Approval
-
-		if cmData["gitops.installApprovalPlan"] == "Manual" {
-			installPlanApproval = operatorv1alpha1.ApprovalManual
-		} else {
-			installPlanApproval = operatorv1alpha1.ApprovalAutomatic
-		}
-
-		configSpec := operatorv1alpha1.SubscriptionSpec{
-			CatalogSource:          cmData["gitops.source"],
-			CatalogSourceNamespace: cmData["gitops.sourceNamespace"],
-			Package:                cmData["gitops.name"],
-			Channel:                cmData["gitops.channel"],
-			StartingCSV:            cmData["gitops.csv"],
-			InstallPlanApproval:    installPlanApproval,
-			Config:                 &operatorv1alpha1.SubscriptionConfig{},
-		}
-
-		newSpec = newSubscription(&configSpec)
-	} else {
-		spec := operatorv1alpha1.SubscriptionSpec{}
-		newSpec = newSubscription(&spec)
-		if err != nil && !kerrors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	if storedSubscription.Name == "" {
-		fmt.Println("Calling createSubscription")
-		return r.olmClient.createSubscription(newSpec)
-	} else if (storedSubscription.Spec.Channel != newSpec.Spec.Channel) ||
-		(storedSubscription.Spec.StartingCSV != newSpec.Spec.StartingCSV) {
-		fmt.Println("Calling updateSubscription")
-		_, err := r.olmClient.updateSubscription(newSpec, storedSubscription)
-		return err
-	}
-	return nil
 }
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
