@@ -1,4 +1,4 @@
-package common
+package controllers
 
 // Below are the default constants that we will
 // use throughout the patterns operator code

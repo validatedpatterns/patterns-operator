@@ -22,7 +22,6 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
@@ -56,10 +55,10 @@ func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1
 	//          value: "*"
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          common.GitOpsDefaultCatalogSource,
-		CatalogSourceNamespace: common.GitOpsDefaultCatalogSourceNamespace,
-		Channel:                common.GitOpsDefaultChannel,
-		Package:                common.GitOpsDefaultPackageName,
+		CatalogSource:          GitOpsDefaultCatalogSource,
+		CatalogSourceNamespace: GitOpsDefaultCatalogSourceNamespace,
+		Channel:                GitOpsDefaultChannel,
+		Package:                GitOpsDefaultPackageName,
 		StartingCSV:            "",
 		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
@@ -101,7 +100,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 	var newSpec *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	if cm, err := r.CoreV1().ConfigMaps(common.OperatorNamespace).Get(context.Background(), common.OperatorConfigFile, metav1.GetOptions{}); err != nil {
+	if cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigFile, metav1.GetOptions{}); err != nil {
 		fmt.Println("Patterns Config Map not found. Using default subscriptions values for OpenShift GitOps.")
 		spec := operatorv1alpha1.SubscriptionSpec{}
 		newSpec = newSubscription(&spec)
@@ -109,22 +108,22 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 		// Config Map exists
 		// Read config parameters
 
-		common.PatternsOperatorConfig = cm.Data
+		PatternsOperatorConfig = cm.Data
 
 		var installPlanApproval operatorv1alpha1.Approval
 
-		if configValueWithDefault(common.PatternsOperatorConfig, "gitops.installApprovalPlan", common.GitOpsDefaultApprovalPlan) == "Manual" {
+		if configValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan", GitOpsDefaultApprovalPlan) == "Manual" {
 			installPlanApproval = operatorv1alpha1.ApprovalManual
 		} else {
 			installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 		}
 
 		configSpec := operatorv1alpha1.SubscriptionSpec{
-			CatalogSource:          configValueWithDefault(common.PatternsOperatorConfig, "gitops-source", common.GitOpsDefaultCatalogSource),
-			CatalogSourceNamespace: configValueWithDefault(common.PatternsOperatorConfig, "gitops.sourceNamespace", common.GitOpsDefaultCatalogSourceNamespace),
-			Package:                configValueWithDefault(common.PatternsOperatorConfig, "gitops.name", common.GitOpsDefaultPackageName),
-			Channel:                configValueWithDefault(common.PatternsOperatorConfig, "gitops.channel", common.GitOpsDefaultChannel),
-			StartingCSV:            configValueWithDefault(common.PatternsOperatorConfig, "gitops.csv", ""),
+			CatalogSource:          configValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource", GitOpsDefaultCatalogSource),
+			CatalogSourceNamespace: configValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace", GitOpsDefaultCatalogSourceNamespace),
+			Package:                configValueWithDefault(PatternsOperatorConfig, "gitops.name", GitOpsDefaultPackageName),
+			Channel:                configValueWithDefault(PatternsOperatorConfig, "gitops.channel", GitOpsDefaultChannel),
+			StartingCSV:            configValueWithDefault(PatternsOperatorConfig, "gitops.csv", ""),
 			InstallPlanApproval:    installPlanApproval,
 			Config:                 &operatorv1alpha1.SubscriptionConfig{},
 		}

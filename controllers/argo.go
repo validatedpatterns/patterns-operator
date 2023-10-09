@@ -29,7 +29,6 @@ import (
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 )
 
 func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
@@ -150,7 +149,7 @@ func newApplicationValues(p api.Pattern) string {
 func commonSyncPolicyFromConfigMap() bool {
 	var value bool = true
 
-	if configValueWithDefault(common.PatternsOperatorConfig, "gitops.ManualSync", common.GitOpsDefaultManualSync) == "false" {
+	if configValueWithDefault(PatternsOperatorConfig, "gitops.ManualSync", GitOpsDefaultManualSync) == "false" {
 		value = false
 	}
 	return value

@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/common"
 	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	corev1 "k8s.io/api/core/v1"
@@ -143,7 +142,7 @@ func createGitOpsConfigMap() error {
 	config, _ := ctrl.GetConfig()
 	clientset, _ := kubernetes.NewForConfig(config)
 	configMapData := map[string]string{
-		"gitops.source":              "redhat-operators",
+		"gitops.catalogSource":       "redhat-operators",
 		"gitops.name":                "openshift-gitops-operator",
 		"gitops.channel":             "gitops-1.8",
 		"gitops.sourceNamespace":     "openshift-marketplace",
@@ -157,14 +156,14 @@ func createGitOpsConfigMap() error {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      common.OperatorConfigFile,
-			Namespace: common.OperatorNamespace,
+			Name:      controllers.OperatorConfigFile,
+			Namespace: controllers.OperatorNamespace,
 		},
 		Data: configMapData,
 	}
 
-	if _, err := clientset.CoreV1().ConfigMaps(common.OperatorNamespace).Get(context.Background(), common.OperatorConfigFile, metav1.GetOptions{}); errors.IsNotFound(err) {
-		_, err = clientset.CoreV1().ConfigMaps(common.OperatorNamespace).Create(context.Background(), &configMap, metav1.CreateOptions{})
+	if _, err := clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigFile, metav1.GetOptions{}); errors.IsNotFound(err) {
+		_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Create(context.Background(), &configMap, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

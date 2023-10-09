@@ -23,7 +23,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.24
-    createdAt: 2023-10-06 09:55:43
+    createdAt: 2023-10-09 12:59:49
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -330,11 +330,6 @@ spec:
                 runAsNonRoot: true
               serviceAccountName: patterns-operator-controller-manager
               terminationGracePeriodSeconds: 10
-              volumes:
-              - configMap:
-                  name: gitops-config
-                  optional: true
-                name: gitops-config
       permissions:
       - rules:
         - apiGroups:
