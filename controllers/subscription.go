@@ -36,31 +36,31 @@ const (
 	customConfigFile       = "/gitops-config/config.json"
 )
 
-func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1.Subscription {
-	//  apiVersion: operators.coreos.com/v1alpha1
-	//  kind: Subscription
-	//  metadata:
-	//    name: openshift-gitops-operator
-	//    namespace: openshift-operators
-	//  spec:
-	//    channel: v1.8.x
-	//    installPlanApproval: Automatic
-	//    name: openshift-gitops-operator
-	//    source: redhat-operators
-	//    sourceNamespace: openshift-marketplace
-	//    startingCSV: openshift-gitops-operator.v1.4.1
-	//    config:
-	//      env:
-	//        - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
-	//          value: "*"
+func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subscription, error) {
+	var newSubscription *operatorv1alpha1.Subscription
 
-	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          GitOpsDefaultCatalogSource,
-		CatalogSourceNamespace: GitOpsDefaultCatalogSourceNamespace,
-		Channel:                GitOpsDefaultChannel,
-		Package:                GitOpsDefaultPackageName,
-		StartingCSV:            "",
-		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
+	// Check if the config map exists and read the config map values
+	cm, _ := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigFile, metav1.GetOptions{})
+
+	if cm != nil {
+		PatternsOperatorConfig = cm.Data
+	}
+
+	var installPlanApproval operatorv1alpha1.Approval
+
+	if configValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan", GitOpsDefaultApprovalPlan) == "Manual" {
+		installPlanApproval = operatorv1alpha1.ApprovalManual
+	} else {
+		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
+	}
+
+	newSpec := operatorv1alpha1.SubscriptionSpec{
+		CatalogSource:          configValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource", GitOpsDefaultCatalogSource),
+		CatalogSourceNamespace: configValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace", GitOpsDefaultCatalogSourceNamespace),
+		Package:                configValueWithDefault(PatternsOperatorConfig, "gitops.name", GitOpsDefaultPackageName),
+		Channel:                configValueWithDefault(PatternsOperatorConfig, "gitops.channel", GitOpsDefaultChannel),
+		StartingCSV:            configValueWithDefault(PatternsOperatorConfig, "gitops.csv", ""),
+		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: []corev1.EnvVar{
 				{
@@ -71,67 +71,15 @@ func newSubscription(input *operatorv1alpha1.SubscriptionSpec) *operatorv1alpha1
 		},
 	}
 
-	if input.Channel != "" {
-		spec.Channel = input.Channel
-	}
-
-	if input.CatalogSource != "" {
-		spec.CatalogSource = input.CatalogSource
-	}
-
-	if input.StartingCSV != "" {
-		spec.StartingCSV = input.StartingCSV
-	}
-
-	if spec.InstallPlanApproval != "" {
-		spec.InstallPlanApproval = input.InstallPlanApproval
-	}
-
-	return &operatorv1alpha1.Subscription{
+	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gitopsSubscriptionName,
 			Namespace: subscriptionNamespace,
 		},
-		Spec: spec,
-	}
-}
-
-func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subscription, error) {
-	var newSpec *operatorv1alpha1.Subscription
-
-	// Check if the config map exists and read the config map values
-	if cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigFile, metav1.GetOptions{}); err != nil {
-		fmt.Println("Patterns Config Map not found. Using default subscriptions values for OpenShift GitOps.")
-		spec := operatorv1alpha1.SubscriptionSpec{}
-		newSpec = newSubscription(&spec)
-	} else {
-		// Config Map exists
-		// Read config parameters
-
-		PatternsOperatorConfig = cm.Data
-
-		var installPlanApproval operatorv1alpha1.Approval
-
-		if configValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan", GitOpsDefaultApprovalPlan) == "Manual" {
-			installPlanApproval = operatorv1alpha1.ApprovalManual
-		} else {
-			installPlanApproval = operatorv1alpha1.ApprovalAutomatic
-		}
-
-		configSpec := operatorv1alpha1.SubscriptionSpec{
-			CatalogSource:          configValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource", GitOpsDefaultCatalogSource),
-			CatalogSourceNamespace: configValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace", GitOpsDefaultCatalogSourceNamespace),
-			Package:                configValueWithDefault(PatternsOperatorConfig, "gitops.name", GitOpsDefaultPackageName),
-			Channel:                configValueWithDefault(PatternsOperatorConfig, "gitops.channel", GitOpsDefaultChannel),
-			StartingCSV:            configValueWithDefault(PatternsOperatorConfig, "gitops.csv", ""),
-			InstallPlanApproval:    installPlanApproval,
-			Config:                 &operatorv1alpha1.SubscriptionConfig{},
-		}
-
-		newSpec = newSubscription(&configSpec)
+		Spec: &newSpec,
 	}
 
-	return *newSpec.DeepCopy(), nil
+	return *newSubscription.DeepCopy(), nil
 }
 
 func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
