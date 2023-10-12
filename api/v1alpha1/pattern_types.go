@@ -82,10 +82,10 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
-	//Account              string `json:"account,omitempty"`
-	//TokenSecret          string `json:"tokenSecret,omitempty"`
-	//TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
-	//TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
+	// Account              string `json:"account,omitempty"`
+	// TokenSecret          string `json:"tokenSecret,omitempty"`
+	// TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
+	// TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
 	// Git repo containing the pattern to deploy. Must use https/http
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
