@@ -182,16 +182,16 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, &targetSub, r.Scheme)
+	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
 	sub, _ := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
 	if sub == nil {
-		err := createSubscription(r.olmClient, &targetSub)
+		err := createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if ownedBySame(&targetSub, sub) {
+	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		err, changed := updateSubscription(r.olmClient, &targetSub, sub)
+		err, changed := updateSubscription(r.olmClient, targetSub, sub)
 		if changed {
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
 		}
