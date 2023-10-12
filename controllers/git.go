@@ -121,7 +121,7 @@ func (c *gitClient) NewRemoteClient(config *config.RemoteConfig) RemoteClient {
 
 type watcher struct {
 	kClient client.Client
-	//endCh is used to notify the watch routine to exit the loop
+	// endCh is used to notify the watch routine to exit the loop
 	endCh, updateCh chan interface{}
 	repoPairs       repositoryPairs
 	mutex           *sync.Mutex

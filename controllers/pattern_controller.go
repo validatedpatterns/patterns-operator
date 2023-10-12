@@ -171,7 +171,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
-        err = r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
+		err = r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
 		}
@@ -214,14 +214,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
-
 	app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
 		err = createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
-
 	} else if ownedBySame(targetApp, app) {
 		// Check values
 		changed, err := updateApplication(r.argoClient, targetApp, app)
@@ -231,7 +228,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 			return r.actionPerformed(qualifiedInstance, "updated application", err)
 		}
-
 	} else {
 		// Someone manually removed the owner ref
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
@@ -274,9 +270,7 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 		return validGitRepoURL(gc.TargetRepo)
 	}
 	return fmt.Errorf("TargetRepo cannot be empty")
-
 	// Check the url is reachable
-
 }
 
 func (r *PatternReconciler) postValidation(input *api.Pattern) error {
@@ -284,7 +278,6 @@ func (r *PatternReconciler) postValidation(input *api.Pattern) error {
 }
 
 func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
-
 	output := input.DeepCopy()
 
 	// Cluster ID:
@@ -349,26 +342,26 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
 	}
 
-	if len(output.Spec.GitConfig.TargetRevision) == 0 {
+	if output.Spec.GitConfig.TargetRevision == "" {
 		output.Spec.GitConfig.TargetRevision = "HEAD"
 	}
 
-	if len(output.Spec.GitConfig.OriginRevision) == 0 {
+	if output.Spec.GitConfig.OriginRevision == "" {
 		output.Spec.GitConfig.OriginRevision = "HEAD"
 	}
 
-	if len(output.Spec.GitConfig.Hostname) == 0 {
+	if output.Spec.GitConfig.Hostname == "" {
 		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.ClusterGroupName) == 0 {
+	if output.Spec.ClusterGroupName == "" {
 		output.Spec.ClusterGroupName = "default"
 	}
-	if len(output.Spec.MultiSourceConfig.HelmRepoUrl) == 0 {
+	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
 		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
 	}
-	if len(output.Spec.MultiSourceConfig.ClusterGroupChartVersion) == 0 {
+	if output.Spec.MultiSourceConfig.ClusterGroupChartVersion == "" {
 		output.Spec.MultiSourceConfig.ClusterGroupChartVersion = "0.0.*"
 	}
 
@@ -477,8 +470,6 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	if err != nil {
 		p.Status.LastError = err.Error()
 		log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
-		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
-
 	} else {
 		p.Status.LastError = ""
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
@@ -493,7 +484,6 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 		log.Printf("Requeueing\n")
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
-	//	log.Printf("Reconciling with exponential duration")
 	return reconcile.Result{}, err
 }
 

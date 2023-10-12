@@ -34,7 +34,7 @@ func haveACMHub(r *PatternReconciler) bool {
 	cms, err := r.fullClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
 	})
-	if (err != nil || len(cms.Items) == 0) && len(serverNamespace) != 0 {
+	if (err != nil || len(cms.Items) == 0) && serverNamespace != "" {
 		cms, err = r.fullClient.CoreV1().ConfigMaps(serverNamespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
 		})

@@ -137,7 +137,7 @@ func newApplicationValues(p api.Pattern) string {
 	s := "extraParametersNested:\n"
 	for _, extra := range p.Spec.ExtraParameters {
 		line := fmt.Sprintf("  %s: %s\n", extra.Name, extra.Value)
-		s = s + line
+		s += line
 	}
 	return s
 }
@@ -268,7 +268,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 
 	// If we do not specify a custom repo for the clustergroup chart, let's use the default
 	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
-	if len(p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl) == 0 {
+	if p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl == "" {
 		baseSource = &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
 			Chart:          "clustergroup",
@@ -309,7 +309,6 @@ func createApplication(client argoclient.Interface, app *argoapi.Application) er
 }
 
 func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (bool, error) {
-	//	var client argoclient.Interface
 	if current == nil {
 		return false, fmt.Errorf("current application was nil")
 	} else if target == nil {
@@ -436,7 +435,7 @@ func compareHelmValueFile(goal string, actual []string) bool {
 	return false
 }
 
-func compareHelmValueFiles(goal []string, actual []string) bool {
+func compareHelmValueFiles(goal, actual []string) bool {
 	if len(goal) != len(actual) {
 		return false
 	}

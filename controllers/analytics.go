@@ -134,7 +134,7 @@ func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 	v := VpAnalytics{}
 
 	if disabled {
-		logger.Info("Analytics explicitely disabled")
+		logger.Info("Analytics explicitly disabled")
 		v.client = nil
 		v.apiKey = ""
 		return &v

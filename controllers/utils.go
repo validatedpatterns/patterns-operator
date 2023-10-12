@@ -84,7 +84,6 @@ func ParametersToMap(parameters []api.PatternParameter) map[string]interface{} {
 					current[key] = map[string]interface{}{}
 					current = current[key].(map[string]interface{})
 				}
-
 			}
 		}
 	}
