@@ -29,18 +29,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const (
-	subscriptionNamespace  = "openshift-operators"
-	applicationNamespace   = "openshift-gitops"
-	gitopsSubscriptionName = "openshift-gitops-operator"
-	customConfigFile       = "/gitops-config/config.json"
-)
-
 func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subscription, error) {
 	var newSubscription *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	cm, _ := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigFile, metav1.GetOptions{})
+	cm, _ := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
 
 	if cm != nil {
 		PatternsOperatorConfig = cm.Data
@@ -73,8 +66,8 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 
 	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      gitopsSubscriptionName,
-			Namespace: subscriptionNamespace,
+			Name:      GitOpsDefaultPackageName,
+			Namespace: SubscriptionNamespace,
 		},
 		Spec: &newSpec,
 	}
@@ -84,7 +77,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 
 func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
 
-	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	sub, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +85,7 @@ func getSubscription(client olmclient.Interface, name, namespace string) (*opera
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 
@@ -134,7 +127,7 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 		target.Spec.DeepCopyInto(current.Spec)
 
-		_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return err, changed
 	}
 

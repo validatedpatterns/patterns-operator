@@ -141,14 +141,6 @@ func createGitOpsConfigMap() error {
 
 	config, _ := ctrl.GetConfig()
 	clientset, _ := kubernetes.NewForConfig(config)
-	configMapData := map[string]string{
-		"gitops.catalogSource":       "redhat-operators",
-		"gitops.name":                "openshift-gitops-operator",
-		"gitops.channel":             "gitops-1.8",
-		"gitops.sourceNamespace":     "openshift-marketplace",
-		"gitops.installApprovalPlan": "Automatic",
-		"gitops.ManualSync":          "false",
-	}
 
 	configMap := corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -156,13 +148,13 @@ func createGitOpsConfigMap() error {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      controllers.OperatorConfigFile,
+			Name:      controllers.OperatorConfigMap,
 			Namespace: controllers.OperatorNamespace,
 		},
-		Data: configMapData,
+		Data: controllers.DefaultPatternOperatorConfig,
 	}
 
-	if _, err := clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigFile, metav1.GetOptions{}); errors.IsNotFound(err) {
+	if _, err := clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{}); errors.IsNotFound(err) {
 		_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Create(context.Background(), &configMap, metav1.CreateOptions{})
 		if err != nil {
 			return err
