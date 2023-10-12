@@ -150,7 +150,7 @@ docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
 .PHONY: golangci-lint
-golangci-lint: ## Run golangci-lint locally
+golangci-lint: apikey ## Run golangci-lint locally
 	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.54.2 golangci-lint run -v
 
 ##@ Deployment
