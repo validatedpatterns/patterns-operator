@@ -16,7 +16,7 @@ limitations under the License.
 
 package controllers
 
-//https://github.com/stolostron/cm-cli/blob/64e944330f6ca20c559abcd382d7712f10cb904f/pkg/cmd/cmd.go#L75
+// https://github.com/stolostron/cm-cli/blob/64e944330f6ca20c559abcd382d7712f10cb904f/pkg/cmd/cmd.go#L75
 import (
 	"context"
 	"fmt"
@@ -25,12 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-//func setQPS(r *rest.Config) *rest.Config {
-//	r.QPS = helpers.QPS
-//	r.Burst = helpers.Burst
-//	return r
-//}
 
 func haveACMHub(r *PatternReconciler) bool {
 	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
