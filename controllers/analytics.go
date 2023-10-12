@@ -63,7 +63,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 		return
 	}
 
-	info := map[string]interface{}{}
+	info := map[string]any{}
 	properties := analytics.NewProperties()
 	for k, v := range info {
 		properties.Set(k, v)

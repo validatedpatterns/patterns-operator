@@ -342,8 +342,6 @@ var _ = Describe("Git client", func() {
 })
 
 var _ = Describe("Drift watcher", func() {
-
-	const ()
 	var _ = Context("When watching for drifts", func() {
 		var (
 			patternFoo                         *api.Pattern
@@ -494,7 +492,7 @@ var _ = Describe("Drift watcher", func() {
 				return len(pFoo.Status.Conditions) == 0 && len(pBar.Status.Conditions) == 1
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(),
 				"expected number of conditions for foo %d and bar %d but found %d and %d respectively ", 0, len(patternFoo.Status.Conditions), 1, len(patternBar.Status.Conditions))
-			//confirm the status contains a new condition with type git in sync
+			// Confirm the status contains a new condition with type git in sync
 			var pattern api.Pattern
 			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pattern)
 			Expect(err).NotTo(HaveOccurred())
@@ -632,7 +630,7 @@ func newWatcher(gitClient GitClient) *watcher {
 	return &watcher{
 		kClient:   k8sClient,
 		repoPairs: repositoryPairs{},
-		endCh:     make(chan interface{}),
+		endCh:     make(chan any),
 		mutex:     &sync.Mutex{},
 		gitClient: gitClient,
 		logger:    logr.New(log.NullLogSink{}),

@@ -122,7 +122,7 @@ func (c *gitClient) NewRemoteClient(config *config.RemoteConfig) RemoteClient {
 type watcher struct {
 	kClient client.Client
 	// endCh is used to notify the watch routine to exit the loop
-	endCh, updateCh chan interface{}
+	endCh, updateCh chan any
 	repoPairs       repositoryPairs
 	mutex           *sync.Mutex
 	logger          logr.Logger
@@ -131,12 +131,12 @@ type watcher struct {
 	gitClient       GitClient
 }
 
-func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan interface{}) {
+func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan any) {
 	d := &watcher{
 		kClient:   kubeClient,
 		logger:    logger,
 		repoPairs: repositoryPairs{},
-		endCh:     make(chan interface{}),
+		endCh:     make(chan any),
 		mutex:     &sync.Mutex{},
 		gitClient: gitClient}
 	return d, d.watch()
@@ -146,7 +146,7 @@ type driftWatcher interface {
 	add(name, namespace string, interval int) error
 	updateInterval(name, namespace string, interval int) error
 	remove(name, namespace string) error
-	watch() chan interface{}
+	watch() chan any
 	isWatching(name, namespace string) bool
 }
 
@@ -302,12 +302,12 @@ func (d *watcher) startNewTimer() {
 
 // watch starts the process of monitoring the drifts. The call returns a channel to be used to manage
 // the closure of the monitoring routine cleanly.
-func (d *watcher) watch() chan interface{} {
+func (d *watcher) watch() chan any {
 	if d.updateCh != nil {
 		return d.endCh
 	}
 	// ready to start processing notifications
-	d.updateCh = make(chan interface{})
+	d.updateCh = make(chan any)
 	go func() {
 		for {
 			select {

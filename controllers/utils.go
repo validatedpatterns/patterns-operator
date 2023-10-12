@@ -64,8 +64,8 @@ func RemoveString(slice []string, s string) (result []string) {
 	return result
 }
 
-func ParametersToMap(parameters []api.PatternParameter) map[string]interface{} {
-	output := map[string]interface{}{}
+func ParametersToMap(parameters []api.PatternParameter) map[string]any {
+	output := map[string]any{}
 	for _, p := range parameters {
 		keys := strings.Split(p.Name, ".")
 		max := len(keys) - 1
@@ -78,11 +78,11 @@ func ParametersToMap(parameters []api.PatternParameter) map[string]interface{} {
 			} else {
 				if val, ok := current[key]; ok {
 					fmt.Printf("Using %q\n", key)
-					current = val.(map[string]interface{})
+					current = val.(map[string]any)
 				} else if i < len(key) {
 					fmt.Printf("Adding %q\n", key)
-					current[key] = map[string]interface{}{}
-					current = current[key].(map[string]interface{})
+					current[key] = map[string]any{}
+					current = current[key].(map[string]any)
 				}
 			}
 		}

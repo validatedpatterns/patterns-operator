@@ -126,10 +126,6 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 	}
 
 	if changed {
-		//		if client, err = argoclient.NewForConfig(config); err != nil {
-		//			return err, changed
-		//		}
-
 		target.Spec.DeepCopyInto(current.Spec)
 
 		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
