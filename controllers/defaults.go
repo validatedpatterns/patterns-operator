@@ -1,9 +1,5 @@
 package controllers
 
-import (
-	"fmt"
-)
-
 // Below are the default constants that we will
 // use throughout the patterns operator code
 const (
@@ -37,24 +33,24 @@ const (
 )
 
 var DefaultPatternOperatorConfig = map[string]string{
-	"gitops.catalogSource":       "redhat-operators",
-	"gitops.name":                "openshift-gitops-operator",
-	"gitops.channel":             "gitops-1.8",
-	"gitops.sourceNamespace":     "openshift-marketplace",
-	"gitops.installApprovalPlan": "Automatic",
-	"gitops.ManualSync":          "false",
+	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
+	"gitops.name":                GitOpsDefaultPackageName,
+	"gitops.channel":             GitOpsDefaultChannel,
+	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
+	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
+	"gitops.ManualSync":          GitOpsDefaultManualSync,
 }
 
 type GitOpsConfig map[string]string
 
 var PatternsOperatorConfig GitOpsConfig
 
-func (g GitOpsConfig) getValueWithDefault(k string) (string, error) {
+func (g GitOpsConfig) getValueWithDefault(k string) string {
 	if v, present := g[k]; present {
-		return v, nil
+		return v
 	}
 	if defaultValue, present := DefaultPatternOperatorConfig[k]; present {
-		return defaultValue, nil
+		return defaultValue
 	}
-	return "", fmt.Errorf("could not find neither an existing value nor a default for %s", k)
+	return ""
 }

@@ -33,7 +33,11 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 	var newSubscription *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	cm, _ := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+
+	if err != nil {
+		return *newSubscription, err
+	}
 
 	if cm != nil {
 		PatternsOperatorConfig = cm.Data
@@ -41,18 +45,18 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (operatorv1alpha1.Subs
 
 	var installPlanApproval operatorv1alpha1.Approval
 
-	if configValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan", GitOpsDefaultApprovalPlan) == "Manual" {
+	if GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan") == "Manual" {
 		installPlanApproval = operatorv1alpha1.ApprovalManual
 	} else {
 		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 	}
 
 	newSpec := operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          configValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource", GitOpsDefaultCatalogSource),
-		CatalogSourceNamespace: configValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace", GitOpsDefaultCatalogSourceNamespace),
-		Package:                configValueWithDefault(PatternsOperatorConfig, "gitops.name", GitOpsDefaultPackageName),
-		Channel:                configValueWithDefault(PatternsOperatorConfig, "gitops.channel", GitOpsDefaultChannel),
-		StartingCSV:            configValueWithDefault(PatternsOperatorConfig, "gitops.csv", ""),
+		CatalogSource:          GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource"),
+		CatalogSourceNamespace: GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace"),
+		Package:                GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.name"),
+		Channel:                GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.channel"),
+		StartingCSV:            GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.csv"),
 		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: []corev1.EnvVar{

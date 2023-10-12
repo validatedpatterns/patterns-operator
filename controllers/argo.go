@@ -149,12 +149,7 @@ func newApplicationValues(p api.Pattern) string {
 func commonSyncPolicyFromConfigMap() bool {
 	var value bool = true
 
-	v, err := GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.ManualSync")
-
-	if err != nil {
-		log.Println(err)
-		value = false
-	} else if v == "false" {
+	if GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.ManualSync") == "false" {
 		value = false
 	}
 

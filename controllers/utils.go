@@ -191,12 +191,3 @@ func validGitRepoURL(repoURL string) error {
 		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
 	}
 }
-
-// Utility to return a config values in a map
-// or return a default value passed.
-func configValueWithDefault(m map[string]string, k string, defaultValue string) string {
-	if v, present := m[k]; present {
-		return v
-	}
-	return defaultValue
-}

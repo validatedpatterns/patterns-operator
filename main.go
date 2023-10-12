@@ -79,7 +79,7 @@ func main() {
 	// Create initial config map for gitops
 	err := createGitOpsConfigMap()
 	if err != nil {
-		setupLog.Error(err, "unable to GitOps create config map")
+		setupLog.Error(err, "unable to create config map")
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
