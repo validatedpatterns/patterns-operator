@@ -62,9 +62,8 @@ func ownedBy(object metav1.Object, ref metav1.OwnerReference) bool {
 }
 
 func objectYaml(object metav1.Object) string {
-
 	if yamlString, err := yaml.Marshal(object); err != nil {
-		return fmt.Sprintf("Error marshalling object: %s\n", err.Error())
+		return fmt.Sprintf("Error marshaling object: %s\n", err.Error())
 	} else {
 		return string(yamlString)
 	}

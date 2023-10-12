@@ -84,7 +84,6 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 		return false, fmt.Errorf("unable to find %s for target %s", targetRefName, p.Spec.GitConfig.TargetRepo)
 	}
 	return originRef.Hash() != targetRef.Hash(), nil
-
 }
 
 type repositoryPairs []*repositoryPair
@@ -268,7 +267,7 @@ func (d *watcher) startNewTimer() {
 		defer d.mutex.Unlock()
 		if d.timerCancelled {
 			// timer has been stopped while the routine was waiting for hold the lock. This means that there has been a change in the order of elements in the slice while it was waiting to obtain the lock
-			// reset the timer cancelled field.
+			// reset the timer canceled field.
 			d.timerCancelled = false
 			return
 		}

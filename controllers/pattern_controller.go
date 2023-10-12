@@ -124,13 +124,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Add finalizer when object is created
 		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
 			controllerutil.AddFinalizer(instance, api.PatternFinalizer)
-			err := r.Client.Update(context.TODO(), instance)
+			err = r.Client.Update(context.TODO(), instance)
 			return r.actionPerformed(instance, "updated finalizer", err)
 		}
-
-	} else if err := r.finalizeObject(instance); err != nil {
+	} else if err = r.finalizeObject(instance); err != nil {
 		return r.actionPerformed(instance, "finalize", err)
-
 	} else {
 		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
 		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
@@ -145,12 +143,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// -- Fill in defaults (changes made to a copy and not persisted)
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
-
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 	r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance)
 
-	if err := r.preValidation(qualifiedInstance); err != nil {
+	if err = r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
@@ -160,21 +157,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
 		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 			// start monitoring drifts for this pattern
-			err := r.driftWatcher.add(qualifiedInstance.Name,
+			err = r.driftWatcher.add(qualifiedInstance.Name,
 				qualifiedInstance.Namespace,
 				gitConfig.PollInterval)
 			if err != nil {
 				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
 			}
 		} else {
-			err := r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
+			err = r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
 			if err != nil {
 				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
 			}
 		}
 	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
-		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
+        err = r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
 		}
@@ -186,7 +183,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	sub, _ := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
 	if sub == nil {
-		err := createSubscription(r.olmClient, targetSub)
+		err = createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
@@ -222,7 +219,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
-		err := createApplication(r.argoClient, targetApp)
+		err = createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 
 	} else if ownedBySame(targetApp, app) {
@@ -376,7 +373,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
-	// value of -1 effectivelly disables the watch for this pattern.
+	// value of -1 effectively disables the watch for this pattern.
 	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
 		output.Spec.GitConfig.PollInterval = 180
 	}
@@ -385,13 +382,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
-
 	// Add finalizer when object is created
 	log.Printf("Finalizing pattern object")
 
 	// The object is being deleted
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
-
 		// Prepare the app for cascaded deletion
 		err, qualifiedInstance := r.applyDefaults(instance)
 		if err != nil {

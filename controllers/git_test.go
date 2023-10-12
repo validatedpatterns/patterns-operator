@@ -402,7 +402,7 @@ var _ = Describe("Drift watcher", func() {
 			err := watch.add(foo, defaultNamespace, 1)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 				Expect(err).NotTo(HaveOccurred())
 				return len(patternFoo.Status.Conditions) == 1
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions %d but found %d", 1, len(patternFoo.Status.Conditions))
@@ -413,7 +413,7 @@ var _ = Describe("Drift watcher", func() {
 			Expect(patternFoo.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally(">", timestamp))
 			// wait for the second check to report the drift
 			Eventually(func() bool {
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 				Expect(err).NotTo(HaveOccurred())
 				return len(patternFoo.Status.Conditions) == 2
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions %d but found %d", 2, len(patternFoo.Status.Conditions))
@@ -487,13 +487,13 @@ var _ = Describe("Drift watcher", func() {
 			Expect(watch.repoPairs[1].name).To(Equal(foo))
 			Eventually(func() bool {
 				var pFoo, pBar api.Pattern
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pFoo)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pFoo)
 				Expect(err).NotTo(HaveOccurred())
 				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pBar)
 				Expect(err).NotTo(HaveOccurred())
 				return len(pFoo.Status.Conditions) == 0 && len(pBar.Status.Conditions) == 1
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(),
-				"expected number of conditions for foo %d and bar %d but found %d and %d respectivelly ", 0, len(patternFoo.Status.Conditions), 1, len(patternBar.Status.Conditions))
+				"expected number of conditions for foo %d and bar %d but found %d and %d respectively ", 0, len(patternFoo.Status.Conditions), 1, len(patternBar.Status.Conditions))
 			//confirm the status contains a new condition with type git in sync
 			var pattern api.Pattern
 			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pattern)
@@ -629,7 +629,6 @@ var _ = Describe("Drift watcher", func() {
 })
 
 func newWatcher(gitClient GitClient) *watcher {
-
 	return &watcher{
 		kClient:   k8sClient,
 		repoPairs: repositoryPairs{},
@@ -638,5 +637,4 @@ func newWatcher(gitClient GitClient) *watcher {
 		gitClient: gitClient,
 		logger:    logr.New(log.NullLogSink{}),
 	}
-
 }

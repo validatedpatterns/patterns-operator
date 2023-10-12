@@ -32,7 +32,6 @@ import (
 )
 
 func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
-
 	parameters := []argoapi.HelmParameter{
 		{
 			Name:  "global.pattern",
@@ -412,7 +411,6 @@ func compareHelmParameter(goal argoapi.HelmParameter, actual []argoapi.HelmParam
 	}
 	log.Printf("Parameter %q not found", goal.Name)
 	return false
-
 }
 
 func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
@@ -424,7 +422,6 @@ func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
 		if !compareHelmParameter(gP, actual) {
 			return false
 		}
-
 	}
 	return true
 }
@@ -437,8 +434,8 @@ func compareHelmValueFile(goal string, actual []string) bool {
 	}
 	log.Printf("Values file %q not found", goal)
 	return false
-
 }
+
 func compareHelmValueFiles(goal []string, actual []string) bool {
 	if len(goal) != len(actual) {
 		return false
