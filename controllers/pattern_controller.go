@@ -208,9 +208,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var targetApp *argoapi.Application
 	// -- ArgoCD Application
 	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
-		targetApp = newMultiSourceApplication(*qualifiedInstance)
+		targetApp = newMultiSourceApplication(qualifiedInstance)
 	} else {
-		targetApp = newApplication(*qualifiedInstance)
+		targetApp = newApplication(qualifiedInstance)
 	}
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
@@ -387,10 +387,14 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		targetApp := newApplication(*qualifiedInstance)
+		targetApp := newApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
+<<<<<<< HEAD
 		app, _ := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+=======
+		_, app := getApplication(r.argoClient, applicationName(qualifiedInstance))
+>>>>>>> 55f6d88f (Pass api.Pattern by reference)
 		if app == nil {
 			log.Printf("Application has already been removed\n")
 			return nil

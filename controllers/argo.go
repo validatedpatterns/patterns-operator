@@ -31,7 +31,7 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
-func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
+func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 	parameters := []argoapi.HelmParameter{
 		{
 			Name:  "global.pattern",
@@ -114,7 +114,7 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 	return parameters
 }
 
-func newApplicationValueFiles(p api.Pattern, prefix string) []string {
+func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
 	files := []string{
 		fmt.Sprintf("%s/values-global.yaml", prefix),
 		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Spec.ClusterGroupName),
@@ -133,7 +133,7 @@ func newApplicationValueFiles(p api.Pattern, prefix string) []string {
 	return files
 }
 
-func newApplicationValues(p api.Pattern) string {
+func newApplicationValues(p *api.Pattern) string {
 	s := "extraParametersNested:\n"
 	for _, extra := range p.Spec.ExtraParameters {
 		line := fmt.Sprintf("  %s: %s\n", extra.Name, extra.Value)
@@ -142,7 +142,7 @@ func newApplicationValues(p api.Pattern) string {
 	return s
 }
 
-func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
+func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 	var syncPolicy *argoapi.SyncPolicy
 	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
 		syncPolicy = &argoapi.SyncPolicy{
@@ -167,7 +167,7 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 	return syncPolicy
 }
 
-func commonApplicationSpec(p api.Pattern, sources []argoapi.ApplicationSource) argoapi.ApplicationSpec {
+func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) argoapi.ApplicationSpec {
 	spec := argoapi.ApplicationSpec{
 		Destination: argoapi.ApplicationDestination{
 			Name:      "in-cluster",
@@ -196,7 +196,7 @@ func commonApplicationSpec(p api.Pattern, sources []argoapi.ApplicationSource) a
 	return spec
 }
 
-func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
+func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
 	return &argoapi.ApplicationSourceHelm{
 		ValueFiles: newApplicationValueFiles(p, prefix),
 
@@ -223,7 +223,7 @@ func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.Applicat
 	}
 }
 
-func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
+func newArgoApplication(p *api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
 	labels := make(map[string]string)
 	labels["validatedpatterns.io/pattern"] = p.Name
 	app := argoapi.Application{
@@ -238,7 +238,7 @@ func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Ap
 	return &app
 }
 
-func newApplication(p api.Pattern) *argoapi.Application {
+func newApplication(p *api.Pattern) *argoapi.Application {
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
 	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
@@ -255,7 +255,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 	return newArgoApplication(p, spec)
 }
 
-func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
+func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	sources := []argoapi.ApplicationSource{}
 	var baseSource *argoapi.ApplicationSource
 
@@ -290,7 +290,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 	return newArgoApplication(p, spec)
 }
 
-func applicationName(p api.Pattern) string {
+func applicationName(p *api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
