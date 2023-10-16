@@ -317,7 +317,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if err != nil {
 		return err, output
 	} else {
-		v, version_err := getCurrentClusterVersion(*clusterVersions)
+		v, version_err := getCurrentClusterVersion(clusterVersions)
 		if version_err != nil {
 			return version_err, output
 		}
