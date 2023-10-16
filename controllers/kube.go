@@ -41,19 +41,19 @@ func ownedBySame(expected, object metav1.Object) bool {
 	ownerReferences := expected.GetOwnerReferences()
 
 	for _, r := range ownerReferences {
-		if !ownedBy(object, r) {
+		if !ownedBy(object, &r) {
 			return false
 		}
 	}
 	return true
 }
 
-func ownedBy(object metav1.Object, ref metav1.OwnerReference) bool {
+func ownedBy(object metav1.Object, ref *metav1.OwnerReference) bool {
 
 	ownerReferences := object.GetOwnerReferences()
 
 	for _, r := range ownerReferences {
-		if referSameObject(r, ref) {
+		if referSameObject(&r, ref) {
 			return true
 		}
 	}
@@ -70,7 +70,7 @@ func objectYaml(object metav1.Object) string {
 }
 
 // Returns true if a and b point to the same object.
-func referSameObject(a, b metav1.OwnerReference) bool {
+func referSameObject(a, b *metav1.OwnerReference) bool {
 	aGV, err := schema.ParseGroupVersion(a.APIVersion)
 	if err != nil {
 		return false
