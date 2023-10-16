@@ -273,7 +273,7 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 	// Check the url is reachable
 }
 
-func (r *PatternReconciler) postValidation(input *api.Pattern) error {
+func (r *PatternReconciler) postValidation(input *api.Pattern) error { //nolint:revive
 	return nil
 }
 

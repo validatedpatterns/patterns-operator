@@ -131,7 +131,7 @@ type watcher struct {
 	gitClient       GitClient
 }
 
-func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan any) {
+func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan any) { //nolint:gocritic
 	d := &watcher{
 		kClient:   kubeClient,
 		logger:    logger,
