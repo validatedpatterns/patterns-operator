@@ -167,8 +167,8 @@ func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 	return syncPolicy
 }
 
-func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) argoapi.ApplicationSpec {
-	spec := argoapi.ApplicationSpec{
+func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) *argoapi.ApplicationSpec {
+	spec := &argoapi.ApplicationSpec{
 		Destination: argoapi.ApplicationDestination{
 			Name:      "in-cluster",
 			Namespace: p.Namespace,
@@ -223,7 +223,7 @@ func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.Applica
 	}
 }
 
-func newArgoApplication(p *api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
+func newArgoApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *argoapi.Application {
 	labels := make(map[string]string)
 	labels["validatedpatterns.io/pattern"] = p.Name
 	app := argoapi.Application{
@@ -232,7 +232,7 @@ func newArgoApplication(p *api.Pattern, spec argoapi.ApplicationSpec) *argoapi.A
 			Namespace: ApplicationNamespace,
 			Labels:    labels,
 		},
-		Spec: spec,
+		Spec: *spec,
 	}
 	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
 	return &app
@@ -365,7 +365,7 @@ func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 		return false
 	}
 
-	return compareHelmSource(*goal.Helm, *actual.Helm)
+	return compareHelmSource(goal.Helm, actual.Helm)
 }
 
 func compareSources(goal, actual argoapi.ApplicationSources) bool {
@@ -388,7 +388,7 @@ func compareSources(goal, actual argoapi.ApplicationSources) bool {
 	return true
 }
 
-func compareHelmSource(goal, actual argoapi.ApplicationSourceHelm) bool {
+func compareHelmSource(goal, actual *argoapi.ApplicationSourceHelm) bool {
 	if !compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) {
 		return false
 	}

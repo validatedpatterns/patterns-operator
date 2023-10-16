@@ -221,7 +221,7 @@ var _ = Describe("Argo Pattern", func() {
 	Describe("Argo Helm Functions", func() {
 		var goal, actual []string
 		var goalHelm, actualHelm []argoapi.HelmParameter
-		var goalSourceHelm argoapi.ApplicationSourceHelm
+		var goalSourceHelm *argoapi.ApplicationSourceHelm
 		BeforeEach(func() {
 			goal = defaultValueFiles
 			actual = append(defaultValueFiles, "/values-excess.yaml")
@@ -255,7 +255,7 @@ var _ = Describe("Argo Pattern", func() {
 				Name:  "excess",
 				Value: "excessvalue",
 			})
-			goalSourceHelm = argoapi.ApplicationSourceHelm{
+			goalSourceHelm = &argoapi.ApplicationSourceHelm{
 				ValueFiles: defaultValueFiles,
 				Parameters: goalHelm,
 			}
@@ -301,7 +301,7 @@ var _ = Describe("Argo Pattern", func() {
 				Expect(updateHelmParameter(existantParam, actualHelm)).To(Equal(true))
 			})
 			It("Test different compareHelmSource", func() {
-				actualSourceHelm := argoapi.ApplicationSourceHelm{
+				actualSourceHelm := &argoapi.ApplicationSourceHelm{
 					ValueFiles: defaultValueFiles,
 					Parameters: actualHelm,
 				}
