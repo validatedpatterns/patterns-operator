@@ -80,8 +80,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	return newSubscription, nil
 }
 
-func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
-
+func getSubscription(client olmclient.Interface, name string) (*operatorv1alpha1.Subscription, error) {
 	sub, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
