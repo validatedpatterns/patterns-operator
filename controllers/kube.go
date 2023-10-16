@@ -40,8 +40,8 @@ func haveNamespace(controllerClient client.Client, name string) bool {
 func ownedBySame(expected, object metav1.Object) bool {
 	ownerReferences := expected.GetOwnerReferences()
 
-	for _, r := range ownerReferences {
-		if !ownedBy(object, &r) {
+	for r := range ownerReferences {
+		if !ownedBy(object, &ownerReferences[r]) {
 			return false
 		}
 	}
@@ -52,8 +52,8 @@ func ownedBy(object metav1.Object, ref *metav1.OwnerReference) bool {
 
 	ownerReferences := object.GetOwnerReferences()
 
-	for _, r := range ownerReferences {
-		if referSameObject(&r, ref) {
+	for r := range ownerReferences {
+		if referSameObject(&ownerReferences[r], ref) {
 			return true
 		}
 	}
