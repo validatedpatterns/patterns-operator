@@ -29,9 +29,9 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func haveNamespace(client client.Client, name string) bool {
+func haveNamespace(controllerClient client.Client, name string) bool {
 	ns := &v1.Namespace{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
+	if err := controllerClient.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
 		return true
 	}
 	return false
