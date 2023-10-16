@@ -601,10 +601,10 @@ var _ = Describe("Drift watcher", func() {
 			go func() {
 				for i := 0; i < 1000; i++ {
 					// set interval between 1-2 seconds to force the trigger of the timer function during the test
-					interval := rand.Intn(2) + 1
-					name := fmt.Sprintf("load-%d", rand.Intn(1000))
+					interval := rand.Intn(2) + 1                    //nolint:gosec
+					name := fmt.Sprintf("load-%d", rand.Intn(1000)) //nolint:gosec
 					for watch.isWatching(name, defaultNamespace) {
-						name = fmt.Sprintf("load-%d", rand.Intn(1000))
+						name = fmt.Sprintf("load-%d", rand.Intn(1000)) //nolint:gosec
 					}
 					Expect(watch.add(name, defaultNamespace, interval)).NotTo(HaveOccurred())
 				}
@@ -613,7 +613,7 @@ var _ = Describe("Drift watcher", func() {
 			go func() {
 				var deleted int
 				for deleted < 1000 {
-					name := fmt.Sprintf("load-%d", rand.Intn(1000))
+					name := fmt.Sprintf("load-%d", rand.Intn(1000)) //nolint:gosec
 					if watch.isWatching(name, defaultNamespace) {
 						Expect(watch.remove(name, defaultNamespace)).NotTo(HaveOccurred())
 						deleted++
