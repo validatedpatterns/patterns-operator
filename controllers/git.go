@@ -115,8 +115,8 @@ func newGitClient() GitClient {
 	return &gitClient{}
 }
 
-func (c *gitClient) NewRemoteClient(config *config.RemoteConfig) RemoteClient {
-	return git.NewRemote(nil, config)
+func (c *gitClient) NewRemoteClient(conf *config.RemoteConfig) RemoteClient {
+	return git.NewRemote(nil, conf)
 }
 
 type watcher struct {
