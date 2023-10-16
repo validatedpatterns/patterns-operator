@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"fmt"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,27 +33,33 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-func TestParameterUnpacking(t *testing.T) {
-	RegisterFailHandler(Fail)
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+var _ = Describe("Parameter Unpacking", func() {
+	var parameters []gitopsv1alpha1.PatternParameter
 
-	logf.Log.Info("Running util test")
-	parameters := []gitopsv1alpha1.PatternParameter{
-		{
-			Name:  "global.git.repo",
-			Value: "https://github.com/some/place",
-		},
-		{
-			Name:  "global.git.server",
-			Value: "github.com",
-		},
-	}
-	fmt.Printf("Converting values\n")
-	out := ParametersToMap(parameters)
-	out_s, err := yaml.Marshal(out)
-	Expect(err).NotTo(HaveOccurred())
-	fmt.Printf("Converted values:\n%s\n", out_s)
-}
+	BeforeEach(func() {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+		logf.Log.Info("Running util test")
+
+		parameters = []gitopsv1alpha1.PatternParameter{
+			{
+				Name:  "global.git.repo",
+				Value: "https://github.com/some/place",
+			},
+			{
+				Name:  "global.git.server",
+				Value: "github.com",
+			},
+		}
+	})
+
+	It("should convert values", func() {
+		fmt.Printf("Converting values\n")
+		out := ParametersToMap(parameters)
+		out_s, err := yaml.Marshal(out)
+		Expect(err).NotTo(HaveOccurred())
+		fmt.Printf("Converted values:\n%s\n", out_s)
+	})
+})
 
 var _ = Describe("ExtractRepositoryName", func() {
 	It("should extract the repository name from various URL formats", func() {
