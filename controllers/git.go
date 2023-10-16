@@ -34,7 +34,7 @@ type repositoryPair struct {
 	lastCheck, nextCheck time.Time
 }
 
-func (r repositoryPair) hasDrifted() (bool, error) {
+func (r *repositoryPair) hasDrifted() (bool, error) {
 	p := &api.Pattern{}
 	err := r.kClient.Get(context.Background(), types.NamespacedName{Name: r.name, Namespace: r.namespace}, p)
 	if err != nil {
