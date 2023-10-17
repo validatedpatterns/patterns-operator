@@ -135,10 +135,6 @@ func printVersion() {
 // This will include configuration parameters that
 // will allow operator configuration
 func createGitOpsConfigMap() error {
-	// LRC - Declared as global const
-	// operatorConfigFile := "patterns-operator-config"
-	// operatorNamespace := "openshift-operators"
-
 	config, _ := ctrl.GetConfig()
 	clientset, _ := kubernetes.NewForConfig(config)
 
@@ -151,7 +147,6 @@ func createGitOpsConfigMap() error {
 			Name:      controllers.OperatorConfigMap,
 			Namespace: controllers.OperatorNamespace,
 		},
-		Data: controllers.DefaultPatternOperatorConfig,
 	}
 
 	if _, err := clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{}); errors.IsNotFound(err) {

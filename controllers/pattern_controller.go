@@ -348,6 +348,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	output.Status.AppClusterDomain = clusterIngress.Spec.Domain
 	output.Status.ClusterDomain = strings.Join(ss[1:], ".")
 
+	if output.Spec.GitOpsConfig == nil {
+		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
+	}
+
 	if len(output.Spec.GitConfig.TargetRevision) == 0 {
 		output.Spec.GitConfig.TargetRevision = "HEAD"
 	}

@@ -62,6 +62,9 @@ type PatternSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=5
 	MultiSourceConfig MultiSourceConfig `json:"multiSourceConfig,omitempty"`
 
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	GitOpsConfig *GitOpsConfig `json:"gitOpsSpec,omitempty"`
+
 	// .Name is dot separated per the helm --set syntax, such as:
 	//   global.something.field
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=6
@@ -72,7 +75,7 @@ type PatternSpec struct {
 	ExtraValueFiles []string `json:"extraValueFiles,omitempty"`
 
 	// Analytics UUID. Leave empty to autogenerate a random one. Not PII information
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`

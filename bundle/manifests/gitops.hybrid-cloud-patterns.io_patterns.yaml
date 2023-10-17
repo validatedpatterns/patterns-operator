@@ -70,6 +70,13 @@ spec:
                 items:
                   type: string
                 type: array
+              gitOpsSpec:
+                properties:
+                  manualSync:
+                    description: 'Require manual intervention before Argo will sync
+                      new content. Default: False'
+                    type: boolean
+                type: object
               gitSpec:
                 properties:
                   hostname:

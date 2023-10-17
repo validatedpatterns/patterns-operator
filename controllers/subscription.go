@@ -52,7 +52,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 	}
 
-	newSpec := operatorv1alpha1.SubscriptionSpec{
+	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource"),
 		CatalogSourceNamespace: GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace"),
 		Package:                GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.name"),
@@ -74,10 +74,10 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 			Name:      GitOpsDefaultPackageName,
 			Namespace: SubscriptionNamespace,
 		},
-		Spec: &newSpec,
+		Spec: spec,
 	}
 
-	return newSubscription.DeepCopy(), nil
+	return newSubscription, nil
 }
 
 func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {

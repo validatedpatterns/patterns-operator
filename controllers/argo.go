@@ -143,19 +143,6 @@ func newApplicationValues(p api.Pattern) string {
 	return s
 }
 
-// This function looks at the map entries read
-// from the patterns config map for the ManualSync
-// entry.
-func commonSyncPolicyFromConfigMap() bool {
-	var value bool = true
-
-	if GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.ManualSync") == "false" {
-		value = false
-	}
-
-	return value
-}
-
 func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 	var syncPolicy *argoapi.SyncPolicy
 	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -167,7 +154,7 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 			// Options allow you to specify whole app sync-SyncOptions
 			SyncOptions: []string{"Prune=true"},
 		}
-	} else if !commonSyncPolicyFromConfigMap() {
+	} else if !p.Spec.GitOpsConfig.ManualSync {
 		// SyncPolicy controls when and how a sync will be performed
 		syncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision
