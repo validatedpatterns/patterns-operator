@@ -28,7 +28,6 @@ import (
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
-
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
@@ -155,7 +154,6 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 			// Options allow you to specify whole app sync-SyncOptions
 			SyncOptions: []string{"Prune=true"},
 		}
-
 	} else if !p.Spec.GitOpsConfig.ManualSync {
 		// SyncPolicy controls when and how a sync will be performed
 		syncPolicy = &argoapi.SyncPolicy{
@@ -232,7 +230,7 @@ func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Ap
 	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      applicationName(p),
-			Namespace: applicationNamespace,
+			Namespace: ApplicationNamespace,
 			Labels:    labels,
 		},
 		Spec: spec,
@@ -298,7 +296,7 @@ func applicationName(p api.Pattern) string {
 }
 
 func getApplication(client argoclient.Interface, name string) (error, *argoapi.Application) {
-	if app, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+	if app, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
 		return err, nil
 	} else {
 		//			log.Printf("Retrieved: %s\n", objectYaml(app))
@@ -307,7 +305,7 @@ func getApplication(client argoclient.Interface, name string) (error, *argoapi.A
 }
 
 func createApplication(client argoclient.Interface, app *argoapi.Application) error {
-	saved, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
+	saved, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
 	log.Printf("Created: %s\n", objectYaml(saved))
 	return err
 }
@@ -333,12 +331,12 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	target.Spec.DeepCopyInto(spec)
 	current.Spec = *spec
 
-	_, err := client.ArgoprojV1alpha1().Applications(applicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+	_, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
 	return err, true
 }
 
 func removeApplication(client argoclient.Interface, name string) error {
-	return client.ArgoprojV1alpha1().Applications(applicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+	return client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
 func compareSource(goal, actual *argoapi.ApplicationSource) bool {

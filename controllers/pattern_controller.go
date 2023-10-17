@@ -181,10 +181,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub := newSubscription(*qualifiedInstance)
+	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	_, sub := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
+	sub, _ := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
 	if sub == nil {
 		err := createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
@@ -202,13 +202,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("subscription found")
 
 	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.Client, applicationNamespace) {
+	if !haveNamespace(r.Client, ApplicationNamespace) {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 
 	logOnce("namespace found")
 
-	targetApp := &argoapi.Application{}
+	var targetApp *argoapi.Application
 	// -- ArgoCD Application
 	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
 		targetApp = newMultiSourceApplication(*qualifiedInstance)
@@ -365,16 +365,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.GitOpsConfig.OperatorChannel) == 0 {
-		output.Spec.GitOpsConfig.OperatorChannel = "gitops-1.8"
-	}
-
-	if len(output.Spec.GitOpsConfig.OperatorSource) == 0 {
-		output.Spec.GitOpsConfig.OperatorSource = "redhat-operators"
-	}
-	if len(output.Spec.GitOpsConfig.OperatorCSV) == 0 {
-		output.Spec.GitOpsConfig.OperatorCSV = "v1.4.0"
-	}
 	if len(output.Spec.ClusterGroupName) == 0 {
 		output.Spec.ClusterGroupName = "default"
 	}
@@ -480,6 +470,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)

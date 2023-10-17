@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -27,6 +28,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,6 +39,9 @@ import (
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -70,6 +75,12 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
+
+	// Create initial config map for gitops
+	err := createGitOpsConfigMap()
+	if err != nil {
+		setupLog.Error(err, "unable to create config map")
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -118,4 +129,31 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Operator Version: %s", version.Version))
 	setupLog.Info(fmt.Sprintf("Git Commit: %s", version.GitCommit))
 	setupLog.Info(fmt.Sprintf("Build Date: %s", version.BuildDate))
+}
+
+// Creates the patterns operator configmap
+// This will include configuration parameters that
+// will allow operator configuration
+func createGitOpsConfigMap() error {
+	config, _ := ctrl.GetConfig()
+	clientset, _ := kubernetes.NewForConfig(config)
+
+	configMap := corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      controllers.OperatorConfigMap,
+			Namespace: controllers.OperatorNamespace,
+		},
+	}
+
+	if _, err := clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{}); errors.IsNotFound(err) {
+		_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Create(context.Background(), &configMap, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

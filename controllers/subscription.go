@@ -22,44 +22,43 @@ import (
 	"log"
 	"reflect"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
-
-	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
-const (
-	subscriptionNamespace = "openshift-operators"
-	applicationNamespace  = "openshift-gitops"
-)
+func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Subscription, error) {
+	var newSubscription *operatorv1alpha1.Subscription
 
-func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
-	//  apiVersion: operators.coreos.com/v1alpha1
-	//  kind: Subscription
-	//  metadata:
-	//    name: openshift-gitops-operator
-	//    namespace: openshift-operators
-	//  spec:
-	//    channel: v1.8.x
-	//    installPlanApproval: Automatic
-	//    name: openshift-gitops-operator
-	//    source: redhat-operators
-	//    sourceNamespace: openshift-marketplace
-	//    startingCSV: openshift-gitops-operator.v1.4.1
-	//    config:
-	//      env:
-	//        - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
-	//          value: "*"
+	// Check if the config map exists and read the config map values
+	cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	// If we hit an error that is not related to the configmap not existing bubble it up
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if cm != nil {
+		PatternsOperatorConfig = cm.Data
+	}
+
+	var installPlanApproval operatorv1alpha1.Approval
+
+	if GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan") == "Manual" {
+		installPlanApproval = operatorv1alpha1.ApprovalManual
+	} else {
+		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
+	}
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          p.Spec.GitOpsConfig.OperatorSource,
-		CatalogSourceNamespace: "openshift-marketplace",
-		Channel:                p.Spec.GitOpsConfig.OperatorChannel,
-		Package:                "openshift-gitops-operator",
-		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
+		CatalogSource:          GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.catalogSource"),
+		CatalogSourceNamespace: GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.sourceNamespace"),
+		Package:                GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.name"),
+		Channel:                GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.channel"),
+		StartingCSV:            GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.csv"),
+		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: []corev1.EnvVar{
 				{
@@ -70,34 +69,28 @@ func newSubscription(p api.Pattern) *operatorv1alpha1.Subscription {
 		},
 	}
 
-	if p.Spec.GitOpsConfig.UseCSV {
-		spec.StartingCSV = p.Spec.GitOpsConfig.OperatorCSV
-	}
-
-	if p.Spec.GitOpsConfig.ManualApproval {
-		spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
-	}
-
-	return &operatorv1alpha1.Subscription{
+	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "openshift-gitops-operator",
-			Namespace: subscriptionNamespace,
+			Name:      GitOpsDefaultPackageName,
+			Namespace: SubscriptionNamespace,
 		},
 		Spec: spec,
 	}
+
+	return newSubscription, nil
 }
 
-func getSubscription(client olmclient.Interface, name, namespace string) (error, *operatorv1alpha1.Subscription) {
+func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
 
-	sub, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	sub, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, sub
+	return sub, nil
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 
@@ -139,7 +132,7 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 		target.Spec.DeepCopyInto(current.Spec)
 
-		_, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return err, changed
 	}
 
