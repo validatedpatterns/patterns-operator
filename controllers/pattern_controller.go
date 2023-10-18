@@ -214,7 +214,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-	app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance))
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
 		err = createApplication(r.argoClient, targetApp)
@@ -390,11 +390,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		targetApp := newApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-<<<<<<< HEAD
-		app, _ := getApplication(r.argoClient, applicationName(*qualifiedInstance))
-=======
-		_, app := getApplication(r.argoClient, applicationName(qualifiedInstance))
->>>>>>> 55f6d88f (Pass api.Pattern by reference)
+		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance))
 		if app == nil {
 			log.Printf("Application has already been removed\n")
 			return nil
