@@ -221,12 +221,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		changed, err := updateApplication(r.argoClient, targetApp, app)
+		changed, errApp := updateApplication(r.argoClient, targetApp, app)
 		if changed {
-			if err != nil {
+			if errApp != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
 			}
-			return r.actionPerformed(qualifiedInstance, "updated application", err)
+			return r.actionPerformed(qualifiedInstance, "updated application", errApp)
 		}
 	} else {
 		// Someone manually removed the owner ref
