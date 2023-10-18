@@ -227,7 +227,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		err, changed := updateApplication(r.argoClient, targetApp, app)
+		changed, err := updateApplication(r.argoClient, targetApp, app)
 		if changed {
 			if err != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
@@ -419,7 +419,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 		}
-		if _, changed := updateApplication(r.argoClient, targetApp, app); changed {
+		if changed, _ := updateApplication(r.argoClient, targetApp, app); changed {
 			return fmt.Errorf("updated application %q for removal\n", app.Name)
 		}
 
