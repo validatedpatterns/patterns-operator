@@ -310,20 +310,20 @@ func createApplication(client argoclient.Interface, app *argoapi.Application) er
 	return err
 }
 
-func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (error, bool) {
+func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (bool, error) {
 	//	var client argoclient.Interface
 	if current == nil {
-		return fmt.Errorf("current application was nil"), false
+		return false, fmt.Errorf("current application was nil")
 	} else if target == nil {
-		return fmt.Errorf("target application was nil"), false
+		return false, fmt.Errorf("target application was nil")
 	}
 	if current.Spec.Sources == nil {
 		if compareSource(target.Spec.Source, current.Spec.Source) {
-			return nil, false
+			return false, nil
 		}
 	} else {
 		if compareSources(target.Spec.Sources, current.Spec.Sources) {
-			return nil, false
+			return false, nil
 		}
 	}
 
@@ -332,7 +332,7 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	current.Spec = *spec
 
 	_, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-	return err, true
+	return true, err
 }
 
 func removeApplication(client argoclient.Interface, name string) error {
