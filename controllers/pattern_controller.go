@@ -234,7 +234,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Perform validation of the site values file(s)
-	if err := r.postValidation(qualifiedInstance); err != nil {
+	if err = r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
 
