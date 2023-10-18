@@ -131,6 +131,7 @@ type watcher struct {
 	gitClient       GitClient
 }
 
+//nolint:gocritic
 func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan any) {
 	d := &watcher{
 		kClient:   kubeClient,
@@ -139,7 +140,7 @@ func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient Git
 		endCh:     make(chan any),
 		mutex:     &sync.Mutex{},
 		gitClient: gitClient}
-	return d, d.watch() //nolint:gocritic
+	return d, d.watch()
 }
 
 type driftWatcher interface {
@@ -216,6 +217,8 @@ func (d *watcher) updateInterval(name, namespace string, interval int) error {
 }
 
 // remove instructs the client to stop monitoring for drifts for the given resource name and namespace
+//
+//nolint:gocritic
 func (d *watcher) remove(name, namespace string) error {
 	if d.updateCh == nil {
 		return fmt.Errorf("unable to remove %s in %s when watch has not yet started", name, namespace)
