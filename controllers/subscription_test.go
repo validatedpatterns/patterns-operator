@@ -14,10 +14,11 @@ import (
 
 var defaultTestSubscription = operatorv1alpha1.Subscription{
 	Spec: &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:       "foosource",
-		Package:             "foooperator",
-		Channel:             "foochannel",
-		InstallPlanApproval: operatorv1alpha1.ApprovalAutomatic,
+		CatalogSource:          "foosource",
+		CatalogSourceNamespace: "foosourcenamespace",
+		Package:                "foooperator",
+		Channel:                "foochannel",
+		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: []corev1.EnvVar{
 				{
@@ -68,9 +69,15 @@ var _ = Describe("Subscription Functions", func() {
 		It("should return a proper Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
 			Expect(err).To(BeNil())
-			s, err := getSubscription(fakeOlmClientSet, "foosubscription", OperatorNamespace)
+			sub, err := getSubscription(fakeOlmClientSet, "foosubscription", OperatorNamespace)
 			Expect(err).To(BeNil())
-			Expect(s.Spec.Channel).To(Equal("foochannel"))
+			Expect(sub.Spec.Channel).To(Equal("foochannel"))
+			Expect(sub.Spec.CatalogSource).To(Equal("foosource"))
+			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foosourcenamespace"))
+			Expect(sub.Spec.Package).To(Equal("foooperator"))
+			Expect(sub.Spec.Channel).To(Equal("foochannel"))
+			Expect(sub.Spec.StartingCSV).To(BeEmpty())
+			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalAutomatic))
 		})
 	})
 
@@ -104,6 +111,7 @@ var _ = Describe("Subscription Functions", func() {
 			fakeClientSet = kubeclient.NewSimpleClientset()
 			testConfigMap = defaultTestSubConfigMap.DeepCopy()
 		})
+
 		It("should handle the absence of the ConfigMap gracefully", func() {
 			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
 			Expect(err).To(BeNil())
@@ -129,6 +137,5 @@ var _ = Describe("Subscription Functions", func() {
 			Expect(sub.Spec.StartingCSV).To(Equal("1.2.3"))
 			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
 		})
-
 	})
 })
