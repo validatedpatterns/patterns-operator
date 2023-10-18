@@ -97,7 +97,7 @@ var _ = Describe("Subscription Functions", func() {
 		It("should update a Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, currentSubscription)
 			Expect(err).To(BeNil())
-			err, changed := updateSubscription(fakeOlmClientSet, targetSubscription, currentSubscription)
+			changed, err := updateSubscription(fakeOlmClientSet, targetSubscription, currentSubscription)
 			Expect(err).To(BeNil())
 			Expect(changed).To(BeTrue())
 		})

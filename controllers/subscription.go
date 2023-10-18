@@ -94,12 +94,12 @@ func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscr
 	return err
 }
 
-func updateSubscription(client olmclient.Interface, target, current *operatorv1alpha1.Subscription) (error, bool) {
+func updateSubscription(client olmclient.Interface, target, current *operatorv1alpha1.Subscription) (bool, error) {
 	changed := false
 	if current == nil || current.Spec == nil {
-		return fmt.Errorf("current subscription was nil"), false
+		return false, fmt.Errorf("current subscription was nil")
 	} else if target == nil || target.Spec == nil {
-		return fmt.Errorf("target subscription was nil"), false
+		return false, fmt.Errorf("target subscription was nil")
 	}
 
 	if target.Spec.CatalogSourceNamespace != current.Spec.CatalogSourceNamespace {
@@ -133,8 +133,8 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 		target.Spec.DeepCopyInto(current.Spec)
 
 		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
-		return err, changed
+		return changed, err
 	}
 
-	return nil, changed
+	return changed, nil
 }
