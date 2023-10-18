@@ -295,12 +295,11 @@ func applicationName(p api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
-func getApplication(client argoclient.Interface, name string) (error, *argoapi.Application) {
+func getApplication(client argoclient.Interface, name string) (*argoapi.Application, error) {
 	if app, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
-		return err, nil
+		return nil, err
 	} else {
-		//			log.Printf("Retrieved: %s\n", objectYaml(app))
-		return nil, app
+		return app, nil
 	}
 }
 
