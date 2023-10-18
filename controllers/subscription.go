@@ -46,7 +46,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 
 	var installPlanApproval operatorv1alpha1.Approval
 
-	if GitOpsConfig.getValueWithDefault(PatternsOperatorConfig, "gitops.installApprovalPlan") == "Manual" {
+	if PatternsOperatorConfig.getValueWithDefault("gitops.installApprovalPlan") == "Manual" {
 		installPlanApproval = operatorv1alpha1.ApprovalManual
 	} else {
 		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
