@@ -135,8 +135,14 @@ func printVersion() {
 // This will include configuration parameters that
 // will allow operator configuration
 func createGitOpsConfigMap() error {
-	config, _ := ctrl.GetConfig()
-	clientset, _ := kubernetes.NewForConfig(config)
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return fmt.Errorf("Failed to get config: %s", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("Failed to call NewForConfig: %s", err)
+	}
 
 	configMap := corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
