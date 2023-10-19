@@ -77,6 +77,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 			SetName("VP User").
 			Set("platform", p.Status.ClusterPlatform).
 			Set("ocpversion", p.Status.ClusterVersion).
+			Set("domain", p.Status.ClusterDomain).
 			Set("operatorversion", version.Version).
 			Set("repobasename", baseGitRepo).
 			Set("pattern", p.Name),
