@@ -71,6 +71,11 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	properties.Set("pattern", p.Name)
 	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 
+	internalUser := false
+	if strings.HasPrefix(p.Status.AnalyticsUUID, "vp-team-") {
+		internalUser = true
+	}
+
 	err := v.client.Enqueue(analytics.Identify{
 		UserId: getNewUUID(p),
 		Traits: analytics.NewTraits().
@@ -81,6 +86,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 			Set("operatorversion", version.Version).
 			Set("repobasename", baseGitRepo).
 			Set("pattern", p.Name),
+			Set("internal", internalUser),
 	})
 	if err != nil {
 		v.logger.Info("Sending Installation info failed:", "info", err)
