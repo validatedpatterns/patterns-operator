@@ -29,9 +29,9 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func haveNamespace(client client.Client, name string) bool {
+func haveNamespace(controllerClient client.Client, name string) bool {
 	ns := &v1.Namespace{}
-	if err := client.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
+	if err := controllerClient.Get(context.Background(), types.NamespacedName{Name: name}, ns); err == nil {
 		return true
 	}
 	return false
@@ -40,20 +40,19 @@ func haveNamespace(client client.Client, name string) bool {
 func ownedBySame(expected, object metav1.Object) bool {
 	ownerReferences := expected.GetOwnerReferences()
 
-	for _, r := range ownerReferences {
-		if !ownedBy(object, r) {
+	for r := range ownerReferences {
+		if !ownedBy(object, &ownerReferences[r]) {
 			return false
 		}
 	}
 	return true
 }
 
-func ownedBy(object metav1.Object, ref metav1.OwnerReference) bool {
-
+func ownedBy(object metav1.Object, ref *metav1.OwnerReference) bool {
 	ownerReferences := object.GetOwnerReferences()
 
-	for _, r := range ownerReferences {
-		if referSameObject(r, ref) {
+	for r := range ownerReferences {
+		if referSameObject(&ownerReferences[r], ref) {
 			return true
 		}
 	}
@@ -62,16 +61,15 @@ func ownedBy(object metav1.Object, ref metav1.OwnerReference) bool {
 }
 
 func objectYaml(object metav1.Object) string {
-
 	if yamlString, err := yaml.Marshal(object); err != nil {
-		return fmt.Sprintf("Error marshalling object: %s\n", err.Error())
+		return fmt.Sprintf("Error marshaling object: %s\n", err.Error())
 	} else {
 		return string(yamlString)
 	}
 }
 
 // Returns true if a and b point to the same object.
-func referSameObject(a, b metav1.OwnerReference) bool {
+func referSameObject(a, b *metav1.OwnerReference) bool {
 	aGV, err := schema.ParseGroupVersion(a.APIVersion)
 	if err != nil {
 		return false

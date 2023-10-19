@@ -342,8 +342,6 @@ var _ = Describe("Git client", func() {
 })
 
 var _ = Describe("Drift watcher", func() {
-
-	const ()
 	var _ = Context("When watching for drifts", func() {
 		var (
 			patternFoo                         *api.Pattern
@@ -402,7 +400,7 @@ var _ = Describe("Drift watcher", func() {
 			err := watch.add(foo, defaultNamespace, 1)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 				Expect(err).NotTo(HaveOccurred())
 				return len(patternFoo.Status.Conditions) == 1
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions %d but found %d", 1, len(patternFoo.Status.Conditions))
@@ -413,7 +411,7 @@ var _ = Describe("Drift watcher", func() {
 			Expect(patternFoo.Status.Conditions[0].LastTransitionTime.Time).To(BeTemporally(">", timestamp))
 			// wait for the second check to report the drift
 			Eventually(func() bool {
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, patternFoo)
 				Expect(err).NotTo(HaveOccurred())
 				return len(patternFoo.Status.Conditions) == 2
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(), "expected number of conditions %d but found %d", 2, len(patternFoo.Status.Conditions))
@@ -487,14 +485,14 @@ var _ = Describe("Drift watcher", func() {
 			Expect(watch.repoPairs[1].name).To(Equal(foo))
 			Eventually(func() bool {
 				var pFoo, pBar api.Pattern
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pFoo)
+				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &pFoo)
 				Expect(err).NotTo(HaveOccurred())
 				err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pBar)
 				Expect(err).NotTo(HaveOccurred())
 				return len(pFoo.Status.Conditions) == 0 && len(pBar.Status.Conditions) == 1
 			}).WithPolling(time.Second).WithTimeout(10*time.Second).Should(BeTrue(),
-				"expected number of conditions for foo %d and bar %d but found %d and %d respectivelly ", 0, len(patternFoo.Status.Conditions), 1, len(patternBar.Status.Conditions))
-			//confirm the status contains a new condition with type git in sync
+				"expected number of conditions for foo %d and bar %d but found %d and %d respectively ", 0, len(patternFoo.Status.Conditions), 1, len(patternBar.Status.Conditions))
+			// Confirm the status contains a new condition with type git in sync
 			var pattern api.Pattern
 			err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: bar, Namespace: defaultNamespace}, &pattern)
 			Expect(err).NotTo(HaveOccurred())
@@ -603,10 +601,10 @@ var _ = Describe("Drift watcher", func() {
 			go func() {
 				for i := 0; i < 1000; i++ {
 					// set interval between 1-2 seconds to force the trigger of the timer function during the test
-					interval := rand.Intn(2) + 1
-					name := fmt.Sprintf("load-%d", rand.Intn(1000))
+					interval := rand.Intn(2) + 1                    //nolint:gosec
+					name := fmt.Sprintf("load-%d", rand.Intn(1000)) //nolint:gosec
 					for watch.isWatching(name, defaultNamespace) {
-						name = fmt.Sprintf("load-%d", rand.Intn(1000))
+						name = fmt.Sprintf("load-%d", rand.Intn(1000)) //nolint:gosec
 					}
 					Expect(watch.add(name, defaultNamespace, interval)).NotTo(HaveOccurred())
 				}
@@ -615,7 +613,7 @@ var _ = Describe("Drift watcher", func() {
 			go func() {
 				var deleted int
 				for deleted < 1000 {
-					name := fmt.Sprintf("load-%d", rand.Intn(1000))
+					name := fmt.Sprintf("load-%d", rand.Intn(1000)) //nolint:gosec
 					if watch.isWatching(name, defaultNamespace) {
 						Expect(watch.remove(name, defaultNamespace)).NotTo(HaveOccurred())
 						deleted++
@@ -629,14 +627,12 @@ var _ = Describe("Drift watcher", func() {
 })
 
 func newWatcher(gitClient GitClient) *watcher {
-
 	return &watcher{
 		kClient:   k8sClient,
 		repoPairs: repositoryPairs{},
-		endCh:     make(chan interface{}),
+		endCh:     make(chan any),
 		mutex:     &sync.Mutex{},
 		gitClient: gitClient,
 		logger:    logr.New(log.NullLogSink{}),
 	}
-
 }

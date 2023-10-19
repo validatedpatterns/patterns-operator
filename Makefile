@@ -149,6 +149,10 @@ docker-build: apikey ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
+.PHONY: golangci-lint
+golangci-lint: apikey ## Run golangci-lint locally
+	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.54.2 golangci-lint run -v
+
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -300,7 +304,3 @@ catalog-install: config/samples/pattern-catalog-$(VERSION).yaml ## Install the O
 config/samples/pattern-catalog-$(VERSION).yaml:
 	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
 	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
-
-.PHONY: golangci-lint
-golangci-lint: ## Run golangci-lint locally
-	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.54.2 golangci-lint run -v

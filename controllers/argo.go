@@ -31,8 +31,7 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
 
-func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
-
+func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 	parameters := []argoapi.HelmParameter{
 		{
 			Name:  "global.pattern",
@@ -115,7 +114,7 @@ func newApplicationParameters(p api.Pattern) []argoapi.HelmParameter {
 	return parameters
 }
 
-func newApplicationValueFiles(p api.Pattern, prefix string) []string {
+func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
 	files := []string{
 		fmt.Sprintf("%s/values-global.yaml", prefix),
 		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Spec.ClusterGroupName),
@@ -134,16 +133,16 @@ func newApplicationValueFiles(p api.Pattern, prefix string) []string {
 	return files
 }
 
-func newApplicationValues(p api.Pattern) string {
+func newApplicationValues(p *api.Pattern) string {
 	s := "extraParametersNested:\n"
 	for _, extra := range p.Spec.ExtraParameters {
 		line := fmt.Sprintf("  %s: %s\n", extra.Name, extra.Value)
-		s = s + line
+		s += line
 	}
 	return s
 }
 
-func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
+func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 	var syncPolicy *argoapi.SyncPolicy
 	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
 		syncPolicy = &argoapi.SyncPolicy{
@@ -168,8 +167,8 @@ func commonSyncPolicy(p api.Pattern) *argoapi.SyncPolicy {
 	return syncPolicy
 }
 
-func commonApplicationSpec(p api.Pattern, sources []argoapi.ApplicationSource) argoapi.ApplicationSpec {
-	spec := argoapi.ApplicationSpec{
+func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) *argoapi.ApplicationSpec {
+	spec := &argoapi.ApplicationSpec{
 		Destination: argoapi.ApplicationDestination{
 			Name:      "in-cluster",
 			Namespace: p.Namespace,
@@ -197,7 +196,7 @@ func commonApplicationSpec(p api.Pattern, sources []argoapi.ApplicationSource) a
 	return spec
 }
 
-func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
+func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
 	return &argoapi.ApplicationSourceHelm{
 		ValueFiles: newApplicationValueFiles(p, prefix),
 
@@ -224,7 +223,7 @@ func commonApplicationSourceHelm(p api.Pattern, prefix string) *argoapi.Applicat
 	}
 }
 
-func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Application {
+func newArgoApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *argoapi.Application {
 	labels := make(map[string]string)
 	labels["validatedpatterns.io/pattern"] = p.Name
 	app := argoapi.Application{
@@ -233,13 +232,13 @@ func newArgoApplication(p api.Pattern, spec argoapi.ApplicationSpec) *argoapi.Ap
 			Namespace: ApplicationNamespace,
 			Labels:    labels,
 		},
-		Spec: spec,
+		Spec: *spec,
 	}
 	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
 	return &app
 }
 
-func newApplication(p api.Pattern) *argoapi.Application {
+func newApplication(p *api.Pattern) *argoapi.Application {
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
 	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
@@ -256,7 +255,7 @@ func newApplication(p api.Pattern) *argoapi.Application {
 	return newArgoApplication(p, spec)
 }
 
-func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
+func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	sources := []argoapi.ApplicationSource{}
 	var baseSource *argoapi.ApplicationSource
 
@@ -269,7 +268,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 
 	// If we do not specify a custom repo for the clustergroup chart, let's use the default
 	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
-	if len(p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl) == 0 {
+	if p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl == "" {
 		baseSource = &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
 			Chart:          "clustergroup",
@@ -291,7 +290,7 @@ func newMultiSourceApplication(p api.Pattern) *argoapi.Application {
 	return newArgoApplication(p, spec)
 }
 
-func applicationName(p api.Pattern) string {
+func applicationName(p *api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
@@ -310,7 +309,6 @@ func createApplication(client argoclient.Interface, app *argoapi.Application) er
 }
 
 func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (bool, error) {
-	//	var client argoclient.Interface
 	if current == nil {
 		return false, fmt.Errorf("current application was nil")
 	} else if target == nil {
@@ -367,7 +365,7 @@ func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 		return false
 	}
 
-	return compareHelmSource(*goal.Helm, *actual.Helm)
+	return compareHelmSource(goal.Helm, actual.Helm)
 }
 
 func compareSources(goal, actual argoapi.ApplicationSources) bool {
@@ -390,7 +388,7 @@ func compareSources(goal, actual argoapi.ApplicationSources) bool {
 	return true
 }
 
-func compareHelmSource(goal, actual argoapi.ApplicationSourceHelm) bool {
+func compareHelmSource(goal, actual *argoapi.ApplicationSourceHelm) bool {
 	if !compareHelmValueFiles(goal.ValueFiles, actual.ValueFiles) {
 		return false
 	}
@@ -412,7 +410,6 @@ func compareHelmParameter(goal argoapi.HelmParameter, actual []argoapi.HelmParam
 	}
 	log.Printf("Parameter %q not found", goal.Name)
 	return false
-
 }
 
 func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
@@ -424,7 +421,6 @@ func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
 		if !compareHelmParameter(gP, actual) {
 			return false
 		}
-
 	}
 	return true
 }
@@ -437,9 +433,9 @@ func compareHelmValueFile(goal string, actual []string) bool {
 	}
 	log.Printf("Values file %q not found", goal)
 	return false
-
 }
-func compareHelmValueFiles(goal []string, actual []string) bool {
+
+func compareHelmValueFiles(goal, actual []string) bool {
 	if len(goal) != len(actual) {
 		return false
 	}

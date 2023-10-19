@@ -16,7 +16,7 @@ limitations under the License.
 
 package controllers
 
-//https://github.com/stolostron/cm-cli/blob/64e944330f6ca20c559abcd382d7712f10cb904f/pkg/cmd/cmd.go#L75
+// https://github.com/stolostron/cm-cli/blob/64e944330f6ca20c559abcd382d7712f10cb904f/pkg/cmd/cmd.go#L75
 import (
 	"context"
 	"fmt"
@@ -26,12 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-//func setQPS(r *rest.Config) *rest.Config {
-//	r.QPS = helpers.QPS
-//	r.Burst = helpers.Burst
-//	return r
-//}
-
 func haveACMHub(r *PatternReconciler) bool {
 	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
@@ -40,7 +34,7 @@ func haveACMHub(r *PatternReconciler) bool {
 	cms, err := r.fullClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
 	})
-	if (err != nil || len(cms.Items) == 0) && len(serverNamespace) != 0 {
+	if (err != nil || len(cms.Items) == 0) && serverNamespace != "" {
 		cms, err = r.fullClient.CoreV1().ConfigMaps(serverNamespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
 		})

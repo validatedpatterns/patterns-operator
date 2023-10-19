@@ -124,13 +124,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Add finalizer when object is created
 		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
 			controllerutil.AddFinalizer(instance, api.PatternFinalizer)
-			err := r.Client.Update(context.TODO(), instance)
+			err = r.Client.Update(context.TODO(), instance)
 			return r.actionPerformed(instance, "updated finalizer", err)
 		}
-
-	} else if err := r.finalizeObject(instance); err != nil {
+	} else if err = r.finalizeObject(instance); err != nil {
 		return r.actionPerformed(instance, "finalize", err)
-
 	} else {
 		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
 		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
@@ -145,12 +143,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// -- Fill in defaults (changes made to a copy and not persisted)
 	err, qualifiedInstance := r.applyDefaults(instance)
 	if err != nil {
-
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 	r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance)
 
-	if err := r.preValidation(qualifiedInstance); err != nil {
+	if err = r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
 
@@ -160,21 +157,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
 		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 			// start monitoring drifts for this pattern
-			err := r.driftWatcher.add(qualifiedInstance.Name,
+			err = r.driftWatcher.add(qualifiedInstance.Name,
 				qualifiedInstance.Namespace,
 				gitConfig.PollInterval)
 			if err != nil {
 				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
 			}
 		} else {
-			err := r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
+			err = r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
 			if err != nil {
 				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
 			}
 		}
 	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
 		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
-		err := r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
+		err = r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
 		}
@@ -184,16 +181,16 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	sub, _ := getSubscription(r.olmClient, targetSub.Name, targetSub.Namespace)
+	sub, _ := getSubscription(r.olmClient, targetSub.Name)
 	if sub == nil {
-		err := createSubscription(r.olmClient, targetSub)
+		err = createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		changed, err := updateSubscription(r.olmClient, targetSub, sub)
+		changed, errSub := updateSubscription(r.olmClient, targetSub, sub)
 		if changed {
-			return r.actionPerformed(qualifiedInstance, "update gitops subscription", err)
+			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
 		}
 	} else {
 		logOnce("The gitops subscription is not owned by us, leaving untouched")
@@ -211,37 +208,33 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var targetApp *argoapi.Application
 	// -- ArgoCD Application
 	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
-		targetApp = newMultiSourceApplication(*qualifiedInstance)
+		targetApp = newMultiSourceApplication(qualifiedInstance)
 	} else {
-		targetApp = newApplication(*qualifiedInstance)
+		targetApp = newApplication(qualifiedInstance)
 	}
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-	//log.Printf("Targeting: %s\n", objectYaml(targetApp))
-
-	app, err := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance))
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
-		err := createApplication(r.argoClient, targetApp)
+		err = createApplication(r.argoClient, targetApp)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
-
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		changed, err := updateApplication(r.argoClient, targetApp, app)
+		changed, errApp := updateApplication(r.argoClient, targetApp, app)
 		if changed {
-			if err != nil {
+			if errApp != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
 			}
-			return r.actionPerformed(qualifiedInstance, "updated application", err)
+			return r.actionPerformed(qualifiedInstance, "updated application", errApp)
 		}
-
 	} else {
 		// Someone manually removed the owner ref
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
 	}
 
 	// Perform validation of the site values file(s)
-	if err := r.postValidation(qualifiedInstance); err != nil {
+	if err = r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
 	}
 
@@ -277,17 +270,14 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 		return validGitRepoURL(gc.TargetRepo)
 	}
 	return fmt.Errorf("TargetRepo cannot be empty")
-
 	// Check the url is reachable
-
 }
 
-func (r *PatternReconciler) postValidation(input *api.Pattern) error {
+func (r *PatternReconciler) postValidation(input *api.Pattern) error { //nolint:revive
 	return nil
 }
 
 func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
-
 	output := input.DeepCopy()
 
 	// Cluster ID:
@@ -327,7 +317,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	if err != nil {
 		return err, output
 	} else {
-		v, version_err := getCurrentClusterVersion(*clusterVersions)
+		v, version_err := getCurrentClusterVersion(clusterVersions)
 		if version_err != nil {
 			return version_err, output
 		}
@@ -352,31 +342,31 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitOpsConfig = &api.GitOpsConfig{}
 	}
 
-	if len(output.Spec.GitConfig.TargetRevision) == 0 {
+	if output.Spec.GitConfig.TargetRevision == "" {
 		output.Spec.GitConfig.TargetRevision = "HEAD"
 	}
 
-	if len(output.Spec.GitConfig.OriginRevision) == 0 {
+	if output.Spec.GitConfig.OriginRevision == "" {
 		output.Spec.GitConfig.OriginRevision = "HEAD"
 	}
 
-	if len(output.Spec.GitConfig.Hostname) == 0 {
+	if output.Spec.GitConfig.Hostname == "" {
 		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
-	if len(output.Spec.ClusterGroupName) == 0 {
+	if output.Spec.ClusterGroupName == "" {
 		output.Spec.ClusterGroupName = "default"
 	}
-	if len(output.Spec.MultiSourceConfig.HelmRepoUrl) == 0 {
+	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
 		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
 	}
-	if len(output.Spec.MultiSourceConfig.ClusterGroupChartVersion) == 0 {
+	if output.Spec.MultiSourceConfig.ClusterGroupChartVersion == "" {
 		output.Spec.MultiSourceConfig.ClusterGroupChartVersion = "0.0.*"
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
-	// value of -1 effectivelly disables the watch for this pattern.
+	// value of -1 effectively disables the watch for this pattern.
 	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
 		output.Spec.GitConfig.PollInterval = 180
 	}
@@ -385,13 +375,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
-
 	// Add finalizer when object is created
 	log.Printf("Finalizing pattern object")
 
 	// The object is being deleted
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
-
 		// Prepare the app for cascaded deletion
 		err, qualifiedInstance := r.applyDefaults(instance)
 		if err != nil {
@@ -399,10 +387,10 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		targetApp := newApplication(*qualifiedInstance)
+		targetApp := newApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-		app, _ := getApplication(r.argoClient, applicationName(*qualifiedInstance))
+		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance))
 		if app == nil {
 			log.Printf("Application has already been removed\n")
 			return nil
@@ -482,8 +470,6 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	if err != nil {
 		p.Status.LastError = err.Error()
 		log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", reason, err.Error())
-		//r.logger.Error(fmt.Errorf("Reconcile step failed"), reason)
-
 	} else {
 		p.Status.LastError = ""
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", reason)
@@ -498,7 +484,6 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 		log.Printf("Requeueing\n")
 		return reconcile.Result{RequeueAfter: *duration}, err
 	}
-	//	log.Printf("Reconciling with exponential duration")
 	return reconcile.Result{}, err
 }
 
@@ -542,7 +527,7 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 
 	// Loop through the Pattern Applications and append the details to the Applications array
 	// into input
-	for _, app := range applications.Items {
+	for _, app := range applications.Items { //nolint:gocritic // rangeValCopy: each iteration copies 936 bytes
 		// Add Application information to ApplicationInfo struct
 		var applicationInfo api.PatternApplicationInfo = api.PatternApplicationInfo{
 			Name:             app.Name,

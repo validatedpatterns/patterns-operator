@@ -34,7 +34,7 @@ type repositoryPair struct {
 	lastCheck, nextCheck time.Time
 }
 
-func (r repositoryPair) hasDrifted() (bool, error) {
+func (r *repositoryPair) hasDrifted() (bool, error) {
 	p := &api.Pattern{}
 	err := r.kClient.Get(context.Background(), types.NamespacedName{Name: r.name, Namespace: r.namespace}, p)
 	if err != nil {
@@ -84,7 +84,6 @@ func (r repositoryPair) hasDrifted() (bool, error) {
 		return false, fmt.Errorf("unable to find %s for target %s", targetRefName, p.Spec.GitConfig.TargetRepo)
 	}
 	return originRef.Hash() != targetRef.Hash(), nil
-
 }
 
 type repositoryPairs []*repositoryPair
@@ -116,14 +115,14 @@ func newGitClient() GitClient {
 	return &gitClient{}
 }
 
-func (c *gitClient) NewRemoteClient(config *config.RemoteConfig) RemoteClient {
-	return git.NewRemote(nil, config)
+func (c *gitClient) NewRemoteClient(conf *config.RemoteConfig) RemoteClient {
+	return git.NewRemote(nil, conf)
 }
 
 type watcher struct {
 	kClient client.Client
-	//endCh is used to notify the watch routine to exit the loop
-	endCh, updateCh chan interface{}
+	// endCh is used to notify the watch routine to exit the loop
+	endCh, updateCh chan any
 	repoPairs       repositoryPairs
 	mutex           *sync.Mutex
 	logger          logr.Logger
@@ -132,12 +131,13 @@ type watcher struct {
 	gitClient       GitClient
 }
 
-func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan interface{}) {
+//nolint:gocritic
+func newDriftWatcher(kubeClient client.Client, logger logr.Logger, gitClient GitClient) (driftWatcher, chan any) {
 	d := &watcher{
 		kClient:   kubeClient,
 		logger:    logger,
 		repoPairs: repositoryPairs{},
-		endCh:     make(chan interface{}),
+		endCh:     make(chan any),
 		mutex:     &sync.Mutex{},
 		gitClient: gitClient}
 	return d, d.watch()
@@ -147,7 +147,7 @@ type driftWatcher interface {
 	add(name, namespace string, interval int) error
 	updateInterval(name, namespace string, interval int) error
 	remove(name, namespace string) error
-	watch() chan interface{}
+	watch() chan any
 	isWatching(name, namespace string) bool
 }
 
@@ -217,6 +217,8 @@ func (d *watcher) updateInterval(name, namespace string, interval int) error {
 }
 
 // remove instructs the client to stop monitoring for drifts for the given resource name and namespace
+//
+//nolint:gocritic
 func (d *watcher) remove(name, namespace string) error {
 	if d.updateCh == nil {
 		return fmt.Errorf("unable to remove %s in %s when watch has not yet started", name, namespace)
@@ -268,7 +270,7 @@ func (d *watcher) startNewTimer() {
 		defer d.mutex.Unlock()
 		if d.timerCancelled {
 			// timer has been stopped while the routine was waiting for hold the lock. This means that there has been a change in the order of elements in the slice while it was waiting to obtain the lock
-			// reset the timer cancelled field.
+			// reset the timer canceled field.
 			d.timerCancelled = false
 			return
 		}
@@ -303,12 +305,12 @@ func (d *watcher) startNewTimer() {
 
 // watch starts the process of monitoring the drifts. The call returns a channel to be used to manage
 // the closure of the monitoring routine cleanly.
-func (d *watcher) watch() chan interface{} {
+func (d *watcher) watch() chan any {
 	if d.updateCh != nil {
 		return d.endCh
 	}
 	// ready to start processing notifications
-	d.updateCh = make(chan interface{})
+	d.updateCh = make(chan any)
 	go func() {
 		for {
 			select {
