@@ -155,11 +155,16 @@ func createGitOpsConfigMap() error {
 		},
 	}
 
-	if _, err := clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{}); errors.IsNotFound(err) {
+	_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		// if the configmap does not exist we create an empty one
 		_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Create(context.Background(), &configMap, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
+	} else {
+		// if we had an error that is not IsNotFound we need to return it
+		return err
 	}
 	return nil
 }
