@@ -100,14 +100,18 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 		return
 	}
 
-	base, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
+	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
+
 	err := v.client.Enqueue(analytics.Track{
 		UserId: getNewUUID(p),
 		Event:  UpdateEvent,
 		Properties: analytics.NewProperties().
-			Set("pattern", p.Name).
+			Set("platform", p.Status.ClusterPlatform).
 			Set("ocpversion", p.Status.ClusterVersion).
-			Set("gitbase", base),
+			Set("domain", p.Status.ClusterDomain).
+			Set("operatorversion", version.Version).
+			Set("repobasename", baseGitRepo).
+			Set("pattern", p.Name),
 	})
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
