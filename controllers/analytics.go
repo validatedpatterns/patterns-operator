@@ -71,13 +71,16 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	properties.Set("pattern", p.Name)
 	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 
+	parts := strings.Split(p.Status.ClusterDomain, ".")
+	simpleDomain := strings.Join(parts[len(parts)-2:], ".")
+
 	err := v.client.Enqueue(analytics.Identify{
 		UserId: getNewUUID(p),
 		Traits: analytics.NewTraits().
 			SetName("VP User").
 			Set("platform", p.Status.ClusterPlatform).
 			Set("ocpversion", p.Status.ClusterVersion).
-			Set("domain", p.Status.ClusterDomain).
+			Set("domain", simpleDomain).
 			Set("operatorversion", version.Version).
 			Set("repobasename", baseGitRepo).
 			Set("pattern", p.Name),
@@ -100,14 +103,21 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 		return
 	}
 
-	base, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
+	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
+
+	parts := strings.Split(p.Status.ClusterDomain, ".")
+	simpleDomain := strings.Join(parts[len(parts)-2:], ".")
+
 	err := v.client.Enqueue(analytics.Track{
 		UserId: getNewUUID(p),
 		Event:  UpdateEvent,
 		Properties: analytics.NewProperties().
-			Set("pattern", p.Name).
+			Set("platform", p.Status.ClusterPlatform).
 			Set("ocpversion", p.Status.ClusterVersion).
-			Set("gitbase", base),
+			Set("domain", simpleDomain).
+			Set("operatorversion", version.Version).
+			Set("repobasename", baseGitRepo).
+			Set("pattern", p.Name),
 	})
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
