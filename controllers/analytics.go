@@ -15,8 +15,8 @@ import (
 )
 
 type VpAnalyticsInterface interface {
-	SendPatternInstallationInfo(p *api.Pattern)
-	SendPatternUpdateInfo(p *api.Pattern)
+	SendPatternInstallationInfo(p *api.Pattern) bool
+	SendPatternUpdateInfo(p *api.Pattern) bool
 }
 
 //go:embed apikey.txt
@@ -56,10 +56,11 @@ func getNewUUID(p *api.Pattern) string {
 }
 
 // This called at the beginning of the reconciliation loop and only once
-func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
+// returns true if the status object in the crd should be updated
+func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 	// If we already sent this event skip it
 	if v.apiKey == "" || v.sentInstallInfo || p.Status.AnalyticsSent {
-		return
+		return false
 	}
 
 	info := map[string]any{}
@@ -87,20 +88,22 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) {
 	})
 	if err != nil {
 		v.logger.Info("Sending Installation info failed:", "info", err)
-		return
+		return false
 	}
 	v.logger.Info("Sent Identify Event")
 	p.Status.AnalyticsSent = true
 	v.sentInstallInfo = true
+	return true
 }
 
-func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
+// returns true if the status object in the crd should be updated
+func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) bool {
 	if v.apiKey == "" {
-		return
+		return false
 	}
 
 	if !hasIntervalPassed(v.lastUpdate) {
-		return
+		return false
 	}
 
 	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
@@ -123,10 +126,11 @@ func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) {
 	})
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
-		return
+		return false
 	}
 	v.logger.Info("Sent an update Info event")
 	v.lastUpdate = time.Now()
+	return true
 }
 
 func hasIntervalPassed(lastUpdate time.Time) bool {
