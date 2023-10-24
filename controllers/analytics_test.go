@@ -86,7 +86,7 @@ var _ = Describe("VpAnalytics", func() {
 	})
 
 	It("should not send pattern update info as disabled is true", func() {
-		vpAnalytics.SendPatternUpdateInfo(pattern)
+		vpAnalytics.SendPatternStartEventInfo(pattern)
 
 		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
 	})

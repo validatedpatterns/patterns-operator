@@ -16,7 +16,8 @@ import (
 
 type VpAnalyticsInterface interface {
 	SendPatternInstallationInfo(p *api.Pattern) bool
-	SendPatternUpdateInfo(p *api.Pattern) bool
+	SendPatternStartEventInfo(p *api.Pattern) bool
+	SendPatternEndEventInfo(p *api.Pattern) bool
 }
 
 //go:embed apikey.txt
@@ -24,7 +25,8 @@ var api_key string
 
 const (
 	// UpdateEvent is the name of the update event
-	UpdateEvent = "Update"
+	PatternStartEvent = "Pattern started"
+	PatternEndEvent   = "Pattern completed"
 
 	// RefreshIntervalMinutes is the minimum time between updates (4h)
 	RefreshIntervalMinutes float64 = 240
@@ -33,8 +35,9 @@ const (
 type VpAnalytics struct {
 	apiKey          string
 	logger          logr.Logger
-	lastUpdate      time.Time
+	lastEndEvent    time.Time
 	sentInstallInfo bool
+	sentStartEvent  bool
 }
 
 func getNewUUID(p *api.Pattern) string {
@@ -55,6 +58,51 @@ func getNewUUID(p *api.Pattern) string {
 	return newuuid
 }
 
+func getSimpleDomain(p *api.Pattern) string {
+	parts := strings.Split(p.Status.ClusterDomain, ".")
+	simpleDomain := strings.Join(parts[len(parts)-2:], ".")
+	return simpleDomain
+}
+
+func getBaseGitRepo(p *api.Pattern) string {
+	s, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
+	return s
+}
+
+func getAnalyticsContext(p *api.Pattern) *analytics.Context {
+	ctx := &analytics.Context{
+		Extra: map[string]any{
+			"Pattern":         p.Name,
+			"Domain":          getSimpleDomain(p),
+			"OperatorVersion": version.Version,
+			"RepoBaseName":    getBaseGitRepo(p),
+			"OCPVersion":      p.Status.ClusterVersion,
+			"Platform":        p.Status.ClusterPlatform,
+		},
+	}
+	return ctx
+}
+
+func getAnalyticsProperties(p *api.Pattern) analytics.Properties {
+	properties := analytics.NewProperties().
+		Set("platform", p.Status.ClusterPlatform).
+		Set("ocpversion", p.Status.ClusterVersion).
+		Set("domain", getSimpleDomain(p)).
+		Set("operatorversion", version.Version).
+		Set("repobasename", getBaseGitRepo(p)).
+		Set("pattern", p.Name)
+	return properties
+}
+
+func getAnalyticsTrack(p *api.Pattern) analytics.Track {
+	return analytics.Track{
+		UserId:     getNewUUID(p),
+		Event:      PatternStartEvent,
+		Context:    getAnalyticsContext(p),
+		Properties: getAnalyticsProperties(p),
+	}
+}
+
 // This called at the beginning of the reconciliation loop and only once
 // returns true if the status object in the crd should be updated
 func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
@@ -69,21 +117,19 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 		properties.Set(k, v)
 	}
 	properties.Set("pattern", p.Name)
-	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 
-	parts := strings.Split(p.Status.ClusterDomain, ".")
-	simpleDomain := strings.Join(parts[len(parts)-2:], ".")
 	client := analytics.New(v.apiKey)
 	defer client.Close()
 	err := client.Enqueue(analytics.Identify{
-		UserId: getNewUUID(p),
+		UserId:  getNewUUID(p),
+		Context: getAnalyticsContext(p),
 		Traits: analytics.NewTraits().
 			SetName("VP User").
 			Set("platform", p.Status.ClusterPlatform).
 			Set("ocpversion", p.Status.ClusterVersion).
-			Set("domain", simpleDomain).
+			Set("domain", getSimpleDomain(p)).
 			Set("operatorversion", version.Version).
-			Set("repobasename", baseGitRepo).
+			Set("repobasename", getBaseGitRepo(p)).
 			Set("pattern", p.Name),
 	})
 	if err != nil {
@@ -97,39 +143,38 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 }
 
 // returns true if the status object in the crd should be updated
-func (v *VpAnalytics) SendPatternUpdateInfo(p *api.Pattern) bool {
-	if v.apiKey == "" {
+func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
+	if v.apiKey == "" || v.sentStartEvent {
 		return false
 	}
-
-	if !hasIntervalPassed(v.lastUpdate) {
-		return false
-	}
-
-	baseGitRepo, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
-
-	parts := strings.Split(p.Status.ClusterDomain, ".")
-	simpleDomain := strings.Join(parts[len(parts)-2:], ".")
 
 	client := analytics.New(v.apiKey)
 	defer client.Close()
-	err := client.Enqueue(analytics.Track{
-		UserId: getNewUUID(p),
-		Event:  UpdateEvent,
-		Properties: analytics.NewProperties().
-			Set("platform", p.Status.ClusterPlatform).
-			Set("ocpversion", p.Status.ClusterVersion).
-			Set("domain", simpleDomain).
-			Set("operatorversion", version.Version).
-			Set("repobasename", baseGitRepo).
-			Set("pattern", p.Name),
-	})
+	err := client.Enqueue(getAnalyticsTrack(p))
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
 	}
-	v.logger.Info("Sent an update Info event")
-	v.lastUpdate = time.Now()
+	v.logger.Info("Sent an update Info event:", "event", PatternStartEvent)
+	v.sentStartEvent = true
+	return true
+}
+
+// returns true if the status object in the crd should be updated
+func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
+	if v.apiKey == "" || !hasIntervalPassed(v.lastEndEvent) {
+		return false
+	}
+
+	client := analytics.New(v.apiKey)
+	defer client.Close()
+	err := client.Enqueue(getAnalyticsTrack(p))
+	if err != nil {
+		v.logger.Info("Sending update info failed:", "info", err)
+		return false
+	}
+	v.logger.Info("Sent an update Info event:", "event", PatternEndEvent)
+	v.lastEndEvent = time.Now()
 	return true
 }
 
@@ -162,7 +207,8 @@ func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 		logger.Info("Analytics enabled")
 		v.apiKey = s
 		v.sentInstallInfo = false
-		v.lastUpdate = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+		v.sentStartEvent = false
+		v.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
 	} else {
 		logger.Info("Analytics enabled but no API key present")
 		v.apiKey = ""
