@@ -141,7 +141,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- Fill in defaults (changes made to a copy and not persisted)
-	err, qualifiedInstance := r.applyDefaults(instance)
+	qualifiedInstance, err := r.applyDefaults(instance)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
@@ -282,14 +282,14 @@ func (r *PatternReconciler) postValidation(input *api.Pattern) error { //nolint:
 	return nil
 }
 
-func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Pattern) {
+func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, error) {
 	output := input.DeepCopy()
 
 	// Cluster ID:
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
 	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
 	if cv, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{}); err != nil {
-		return err, output
+		return output, err
 	} else {
 		output.Status.ClusterID = string(cv.Spec.ClusterID)
 	}
@@ -298,7 +298,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get Infrastructure.config.openshift.io/cluster  -o jsonpath='{.spec.platformSpec.type}'
 	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), "cluster", metav1.GetOptions{})
 	if err != nil {
-		return err, output
+		return output, err
 	} else {
 		//   status:
 		//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
@@ -320,11 +320,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get clusterversion/version -o yaml
 	clusterVersions, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
 	if err != nil {
-		return err, output
+		return output, err
 	} else {
 		v, version_err := getCurrentClusterVersion(clusterVersions)
 		if version_err != nil {
-			return version_err, output
+			return output, version_err
 		}
 		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 	}
@@ -333,7 +333,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
 	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
 	if err != nil {
-		return err, output
+		return output, err
 	}
 
 	// "apps.mycluster.blueprints.rhecoeng.com"
@@ -376,7 +376,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (error, *api.Patte
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
-	return nil, output
+	return output, nil
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
@@ -386,7 +386,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	// The object is being deleted
 	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
 		// Prepare the app for cascaded deletion
-		err, qualifiedInstance := r.applyDefaults(instance)
+		qualifiedInstance, err := r.applyDefaults(instance)
 		if err != nil {
 			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
 			return nil
