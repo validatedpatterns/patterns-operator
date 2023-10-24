@@ -147,7 +147,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance) {
-		return r.actionPerformed(qualifiedInstance, "Updated status with identity sent", fmt.Errorf("Identity sent and status updated"))
+		return r.actionPerformed(qualifiedInstance, "Updated status with identity sent", nil)
 	}
 
 	if err = r.preValidation(qualifiedInstance); err != nil {
@@ -251,7 +251,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Report statistics
 	if r.AnalyticsClient.SendPatternUpdateInfo(qualifiedInstance) {
-		return r.actionPerformed(qualifiedInstance, "Updated status with update sent", fmt.Errorf("Update sent and status updated"))
+		return r.actionPerformed(qualifiedInstance, "Updated status with update sent", nil)
 	}
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
