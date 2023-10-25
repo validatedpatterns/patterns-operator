@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"crypto/sha256"
 	_ "embed"
 	"encoding/base64"
+	"encoding/hex"
 	"strings"
 	"time"
 
@@ -64,6 +66,14 @@ func getSimpleDomain(p *api.Pattern) string {
 	return simpleDomain
 }
 
+func getDeviceHash(p *api.Pattern) string {
+	d := p.Status.ClusterDomain
+	h := sha256.New()
+	h.Write([]byte(d))
+	hash := hex.EncodeToString(h.Sum(nil))
+	return hash
+}
+
 func getBaseGitRepo(p *api.Pattern) string {
 	s, _ := extractRepositoryName(p.Spec.GitConfig.TargetRepo)
 	return s
@@ -78,6 +88,14 @@ func getAnalyticsContext(p *api.Pattern) *analytics.Context {
 			"RepoBaseName":    getBaseGitRepo(p),
 			"OCPVersion":      p.Status.ClusterVersion,
 			"Platform":        p.Status.ClusterPlatform,
+			"DeviceHash":      getDeviceHash(p),
+		},
+		OS: analytics.OSInfo{
+			Name:    p.Status.ClusterPlatform,
+			Version: p.Status.ClusterVersion,
+		},
+		Device: analytics.DeviceInfo{
+			Name: getDeviceHash(p),
 		},
 	}
 	return ctx
@@ -94,10 +112,10 @@ func getAnalyticsProperties(p *api.Pattern) analytics.Properties {
 	return properties
 }
 
-func getAnalyticsTrack(p *api.Pattern) analytics.Track {
+func getAnalyticsTrack(p *api.Pattern, event string) analytics.Track {
 	return analytics.Track{
 		UserId:     getNewUUID(p),
-		Event:      PatternStartEvent,
+		Event:      event,
 		Context:    getAnalyticsContext(p),
 		Properties: getAnalyticsProperties(p),
 	}
@@ -150,7 +168,7 @@ func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
 
 	client := analytics.New(v.apiKey)
 	defer client.Close()
-	err := client.Enqueue(getAnalyticsTrack(p))
+	err := client.Enqueue(getAnalyticsTrack(p, PatternStartEvent))
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
@@ -168,7 +186,7 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 
 	client := analytics.New(v.apiKey)
 	defer client.Close()
-	err := client.Enqueue(getAnalyticsTrack(p))
+	err := client.Enqueue(getAnalyticsTrack(p, PatternEndEvent))
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
