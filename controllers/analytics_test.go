@@ -142,7 +142,7 @@ var _ = Describe("getDeviceHash", func() {
 
 	Context("with valid input", func() {
 		It("should return the expected hash", func() {
-			expectedHash := "a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce1947"
+			expectedHash := "a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce1947" //nolint:gosec
 			actualHash := getDeviceHash(pattern)
 			Expect(actualHash).To(Equal(expectedHash))
 		})
@@ -151,7 +151,7 @@ var _ = Describe("getDeviceHash", func() {
 	Context("with empty input", func() {
 		It("should return a default hash", func() {
 			pattern.Status.ClusterDomain = ""
-			expectedHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			expectedHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" //nolint:gosec
 			actualHash := getDeviceHash(pattern)
 			Expect(actualHash).To(Equal(expectedHash))
 		})
