@@ -171,3 +171,47 @@ var _ = Describe("getSimpleDomain", func() {
 		})
 	})
 })
+
+var _ = Describe("getNewUUID", func() {
+	var (
+		pattern *api.Pattern
+	)
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Spec: api.PatternSpec{
+				AnalyticsUUID: "user-specified-uuid",
+			},
+			Status: api.PatternStatus{
+				AnalyticsUUID: "status-saved-uuid",
+			},
+		}
+	})
+
+	Context("when user specifies an AnalyticsUUID", func() {
+		It("should return the user-specified UUID", func() {
+			expectedUUID := "user-specified-uuid"
+			actualUUID := getNewUUID(pattern)
+			Expect(actualUUID).To(Equal(expectedUUID))
+		})
+	})
+
+	Context("when user doesn't specify an AnalyticsUUID and status contains a saved UUID", func() {
+		It("should return the status-saved UUID", func() {
+			pattern.Spec.AnalyticsUUID = ""
+			expectedUUID := "status-saved-uuid"
+			actualUUID := getNewUUID(pattern)
+			Expect(actualUUID).To(Equal(expectedUUID))
+		})
+	})
+
+	Context("when both user-specified and status-saved UUIDs are empty", func() {
+		It("should generate a new UUID and save it in the status", func() {
+			pattern.Spec.AnalyticsUUID = ""
+			pattern.Status.AnalyticsUUID = ""
+			actualUUID := getNewUUID(pattern)
+			Expect(actualUUID).NotTo(BeEmpty())
+			Expect(pattern.Status.AnalyticsUUID).To(Equal(actualUUID))
+		})
+	})
+})
