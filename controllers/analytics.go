@@ -215,6 +215,7 @@ func decodeApiKey(k string) string {
 
 func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 	v := VpAnalytics{}
+	v.logger = logger
 
 	if disabled {
 		logger.Info("Analytics explicitly disabled")
@@ -222,7 +223,6 @@ func AnalyticsInit(disabled bool, logger logr.Logger) *VpAnalytics {
 		return &v
 	}
 
-	v.logger = logger
 	s := decodeApiKey(api_key)
 	if s != "" {
 		logger.Info("Analytics enabled")
