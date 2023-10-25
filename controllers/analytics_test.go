@@ -20,7 +20,7 @@ var _ = Describe("hasIntervalPassed", func() {
 	})
 
 	It("should return false when interval has not passed", func() {
-		// Set the last update time to yesterday
+		// Set the last update time to five minutes ago
 		lastUpdate := time.Now().Add(-time.Minute * 5)
 		result := hasIntervalPassed(lastUpdate)
 		Expect(result).To(BeFalse())
@@ -79,23 +79,41 @@ var _ = Describe("VpAnalytics", func() {
 		pattern = &api.Pattern{}
 	})
 
-	It("should not send pattern installation info as disabled is true", func() {
-		vpAnalytics.SendPatternInstallationInfo(pattern)
-
-		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
+	Context("when apiKey is empty SendPatternStartEventInfo()", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.apiKey = ""
+			result := vpAnalytics.SendPatternStartEventInfo(pattern)
+			Expect(result).To(BeFalse())
+		})
 	})
 
-	It("should not send pattern update info as disabled is true", func() {
-		vpAnalytics.SendPatternStartEventInfo(pattern)
+	Context("when the start event has already been sent", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.sentStartEvent = true
+			result := vpAnalytics.SendPatternStartEventInfo(pattern)
+			Expect(result).To(BeFalse())
+		})
+	})
 
-		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
+	Context("when apiKey is empty SendPatternEndEventInfo", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.apiKey = ""
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeFalse())
+		})
+	})
+
+	Context("when the the interval has not passed", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.lastEndEvent = time.Now().Add(-time.Minute * 5)
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeFalse())
+		})
 	})
 })
 
 var _ = Describe("getDeviceHash", func() {
-	var (
-		pattern *api.Pattern
-	)
+	var pattern *api.Pattern
 
 	BeforeEach(func() {
 		pattern = &api.Pattern{
@@ -124,9 +142,7 @@ var _ = Describe("getDeviceHash", func() {
 })
 
 var _ = Describe("getSimpleDomain", func() {
-	var (
-		pattern *api.Pattern
-	)
+	var pattern *api.Pattern
 
 	BeforeEach(func() {
 		pattern = &api.Pattern{
@@ -173,9 +189,7 @@ var _ = Describe("getSimpleDomain", func() {
 })
 
 var _ = Describe("getNewUUID", func() {
-	var (
-		pattern *api.Pattern
-	)
+	var pattern *api.Pattern
 
 	BeforeEach(func() {
 		pattern = &api.Pattern{
