@@ -32,6 +32,11 @@ const (
 
 	// RefreshIntervalMinutes is the minimum time between updates (4h)
 	RefreshIntervalMinutes float64 = 240
+
+	// AnalyticsSent is an int bit-field that stores which info has already been sent
+	AnalyticsSentIdentify = 0x0
+	AnalyticsSentStart    = 0x1
+	AnalyticsSentEnd      = 0x2
 )
 
 type VpAnalytics struct {
@@ -124,11 +129,21 @@ func getAnalyticsTrack(p *api.Pattern, event string) analytics.Track {
 	}
 }
 
+func setBit(n int, pos uint) int {
+	n |= (1 << pos)
+	return n
+}
+
+func hasBit(n int, pos uint) bool {
+	val := n & (1 << pos)
+	return (val > 0)
+}
+
 // This called at the beginning of the reconciliation loop and only once
 // returns true if the status object in the crd should be updated
 func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 	// If we already sent this event skip it
-	if v.apiKey == "" || v.sentInstallInfo || p.Status.AnalyticsSent {
+	if v.apiKey == "" || v.sentInstallInfo || hasBit(p.Status.AnalyticsSent, AnalyticsSentIdentify) {
 		return false
 	}
 
@@ -158,14 +173,14 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 		return false
 	}
 	v.logger.Info("Sent Identify Event")
-	p.Status.AnalyticsSent = true
+	p.Status.AnalyticsSent = setBit(p.Status.AnalyticsSent, AnalyticsSentIdentify)
 	v.sentInstallInfo = true
 	return true
 }
 
 // returns true if the status object in the crd should be updated
 func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
-	if v.apiKey == "" || v.sentStartEvent {
+	if v.apiKey == "" || v.sentStartEvent || hasBit(p.Status.AnalyticsSent, AnalyticsSentStart) {
 		return false
 	}
 
@@ -177,6 +192,7 @@ func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
 		return false
 	}
 	v.logger.Info("Sent an update Info event:", "event", PatternStartEvent)
+	p.Status.AnalyticsSent = setBit(p.Status.AnalyticsSent, AnalyticsSentStart)
 	v.sentStartEvent = true
 	return true
 }
@@ -196,6 +212,7 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	}
 	v.logger.Info("Sent an update Info event:", "event", PatternEndEvent)
 	v.lastEndEvent = time.Now()
+	p.Status.AnalyticsSent = setBit(p.Status.AnalyticsSent, AnalyticsSentEnd) // We just store it in the status but do not act upon it
 	return true
 }
 

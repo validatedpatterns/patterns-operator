@@ -84,14 +84,18 @@ var _ = Describe("VpAnalytics", func() {
 			vpAnalytics.apiKey = ""
 			result := vpAnalytics.SendPatternStartEventInfo(pattern)
 			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentStart)
+			Expect(sent).To(BeFalse())
 		})
 	})
 
 	Context("when the start event has not already been sent", func() {
-		It("should return true and  send the event", func() {
+		It("should return true and send the event", func() {
 			vpAnalytics.sentStartEvent = false
 			result := vpAnalytics.SendPatternStartEventInfo(pattern)
 			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentStart)
+			Expect(sent).To(BeTrue())
 		})
 	})
 
@@ -100,6 +104,8 @@ var _ = Describe("VpAnalytics", func() {
 			vpAnalytics.sentStartEvent = true
 			result := vpAnalytics.SendPatternStartEventInfo(pattern)
 			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentStart)
+			Expect(sent).To(BeFalse())
 		})
 	})
 
@@ -108,25 +114,49 @@ var _ = Describe("VpAnalytics", func() {
 			vpAnalytics.apiKey = ""
 			result := vpAnalytics.SendPatternEndEventInfo(pattern)
 			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeFalse())
 		})
 	})
 
-	Context("when the the interval has not passed", func() {
+	Context("when the the interval has not passed SendPatternEndEventInfo", func() {
 		It("should return false and not send the event", func() {
 			vpAnalytics.lastEndEvent = time.Now().Add(-time.Minute * 5)
 			result := vpAnalytics.SendPatternEndEventInfo(pattern)
 			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeFalse())
 		})
 	})
 
-	Context("when the the interval has passed", func() {
+	Context("when the the interval has passed SendPatternEndEventInfo", func() {
 		It("should return true and send the event", func() {
 			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
 			result := vpAnalytics.SendPatternEndEventInfo(pattern)
 			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeTrue())
 		})
 	})
 
+	Context("when apiKey is empty SendPatternInstallationInfo", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.apiKey = ""
+			result := vpAnalytics.SendPatternInstallationInfo(pattern)
+			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentIdentify)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when SendPatternInstallationInfo is called the first time", func() {
+		It("should return true and not send the event", func() {
+			result := vpAnalytics.SendPatternInstallationInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentIdentify)
+			Expect(sent).To(BeTrue())
+		})
+	})
 })
 
 var _ = Describe("getDeviceHash", func() {
