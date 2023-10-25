@@ -91,3 +91,83 @@ var _ = Describe("VpAnalytics", func() {
 		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
 	})
 })
+
+var _ = Describe("getDeviceHash", func() {
+	var (
+		pattern *api.Pattern
+	)
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Status: api.PatternStatus{
+				ClusterDomain: "example.com",
+			},
+		}
+	})
+
+	Context("with valid input", func() {
+		It("should return the expected hash", func() {
+			expectedHash := "a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce1947"
+			actualHash := getDeviceHash(pattern)
+			Expect(actualHash).To(Equal(expectedHash))
+		})
+	})
+
+	Context("with empty input", func() {
+		It("should return a default hash", func() {
+			pattern.Status.ClusterDomain = ""
+			expectedHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			actualHash := getDeviceHash(pattern)
+			Expect(actualHash).To(Equal(expectedHash))
+		})
+	})
+})
+
+var _ = Describe("getSimpleDomain", func() {
+	var (
+		pattern *api.Pattern
+	)
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Status: api.PatternStatus{
+				ClusterDomain: "example.com",
+			},
+		}
+	})
+
+	Context("with valid input", func() {
+		It("should return the simple domain", func() {
+			expectedSimpleDomain := "example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with subdomains", func() {
+		It("should return the simple domain for subdomains", func() {
+			pattern.Status.ClusterDomain = "subdomain.example.com"
+			expectedSimpleDomain := "example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with single part domain", func() {
+		It("should return the input domain", func() {
+			pattern.Status.ClusterDomain = "localhost"
+			expectedSimpleDomain := "localhost"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with empty input", func() {
+		It("should return an empty string", func() {
+			pattern.Status.ClusterDomain = ""
+			expectedSimpleDomain := ""
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+})

@@ -62,6 +62,9 @@ func getNewUUID(p *api.Pattern) string {
 
 func getSimpleDomain(p *api.Pattern) string {
 	parts := strings.Split(p.Status.ClusterDomain, ".")
+	if len(parts) < 3 {
+		return p.Status.ClusterDomain
+	}
 	simpleDomain := strings.Join(parts[len(parts)-2:], ".")
 	return simpleDomain
 }
