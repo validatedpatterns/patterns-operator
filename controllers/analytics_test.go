@@ -6,7 +6,6 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
@@ -75,7 +74,8 @@ var _ = Describe("VpAnalytics", func() {
 	)
 
 	BeforeEach(func() {
-		vpAnalytics = AnalyticsInit(true, logr.New(log.NullLogSink{}))
+		vpAnalytics = AnalyticsInit(true, logr.Discard())
+		vpAnalytics.apiKey = "123"
 		pattern = &api.Pattern{}
 	})
 
@@ -84,6 +84,14 @@ var _ = Describe("VpAnalytics", func() {
 			vpAnalytics.apiKey = ""
 			result := vpAnalytics.SendPatternStartEventInfo(pattern)
 			Expect(result).To(BeFalse())
+		})
+	})
+
+	Context("when the start event has not already been sent", func() {
+		It("should return true and  send the event", func() {
+			vpAnalytics.sentStartEvent = false
+			result := vpAnalytics.SendPatternStartEventInfo(pattern)
+			Expect(result).To(BeTrue())
 		})
 	})
 
@@ -110,6 +118,15 @@ var _ = Describe("VpAnalytics", func() {
 			Expect(result).To(BeFalse())
 		})
 	})
+
+	Context("when the the interval has passed", func() {
+		It("should return true and send the event", func() {
+			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeTrue())
+		})
+	})
+
 })
 
 var _ = Describe("getDeviceHash", func() {
