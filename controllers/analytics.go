@@ -27,8 +27,9 @@ var api_key string
 
 const (
 	// UpdateEvent is the name of the update event
-	PatternStartEvent = "Pattern started"
-	PatternEndEvent   = "Pattern completed"
+	PatternStartEvent   = "Pattern started"
+	PatternEndEvent     = "Pattern completed"
+	PatternRefreshEvent = "Pattern refreshed"
 
 	// RefreshIntervalMinutes is the minimum time between updates (4h)
 	RefreshIntervalMinutes float64 = 240
@@ -37,6 +38,9 @@ const (
 	AnalyticsSentIdentify = 0x0
 	AnalyticsSentStart    = 0x1
 	AnalyticsSentEnd      = 0x2
+	AnalyticsSentRefresh  = 0x3
+
+	MinSubDomainParts = 3
 )
 
 type VpAnalytics struct {
@@ -67,7 +71,7 @@ func getNewUUID(p *api.Pattern) string {
 
 func getSimpleDomain(p *api.Pattern) string {
 	parts := strings.Split(p.Status.ClusterDomain, ".")
-	if len(parts) < 4 {
+	if len(parts) <= MinSubDomainParts {
 		return p.Status.ClusterDomain
 	}
 	simpleDomain := strings.Join(parts[len(parts)-3:], ".")
@@ -98,12 +102,16 @@ func getAnalyticsContext(p *api.Pattern) *analytics.Context {
 			"Platform":        p.Status.ClusterPlatform,
 			"DeviceHash":      getDeviceHash(p),
 		},
+		App: analytics.AppInfo{
+			Version: version.Version,
+		},
 		OS: analytics.OSInfo{
-			Name:    p.Status.ClusterPlatform,
+			Name:    "OpenShift",
 			Version: p.Status.ClusterVersion,
 		},
 		Device: analytics.DeviceInfo{
 			Name: getDeviceHash(p),
+			Type: p.Status.ClusterPlatform,
 		},
 	}
 	return ctx
@@ -197,22 +205,35 @@ func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
 	return true
 }
 
+// Sends an EndEvent the first time it is invoked. Subsequent invokations
+// will send a Refresh event
 // returns true if the status object in the crd should be updated
 func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	if v.apiKey == "" || !hasIntervalPassed(v.lastEndEvent) {
 		return false
 	}
-
+	var event string
 	client := analytics.New(v.apiKey)
 	defer client.Close()
-	err := client.Enqueue(getAnalyticsTrack(p, PatternEndEvent))
+
+	// If we already sent the end event once, let's now call it refresh event from now on
+	if hasBit(p.Status.AnalyticsSent, AnalyticsSentEnd) {
+		event = PatternRefreshEvent
+	} else {
+		event = PatternEndEvent
+	}
+	err := client.Enqueue(getAnalyticsTrack(p, event))
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
 	}
-	v.logger.Info("Sent an update Info event:", "event", PatternEndEvent)
+	v.logger.Info("Sent an update Info event:", "event", event)
 	v.lastEndEvent = time.Now()
-	p.Status.AnalyticsSent = setBit(p.Status.AnalyticsSent, AnalyticsSentEnd) // We just store it in the status but do not act upon it
+
+	p.Status.AnalyticsSent = setBit(p.Status.AnalyticsSent, AnalyticsSentEnd)
+	if event == PatternRefreshEvent {
+		p.Status.AnalyticsSent = setBit(p.Status.AnalyticsSent, AnalyticsSentRefresh)
+	}
 	return true
 }
 

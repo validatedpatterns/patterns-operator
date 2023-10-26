@@ -126,16 +126,40 @@ var _ = Describe("VpAnalytics", func() {
 			Expect(result).To(BeFalse())
 			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
 			Expect(sent).To(BeFalse())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeFalse())
 		})
 	})
 
 	Context("when the the interval has passed SendPatternEndEventInfo", func() {
-		It("should return true and send the event", func() {
+		It("should return true and send the event and refresh event should be unset", func() {
 			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
 			result := vpAnalytics.SendPatternEndEventInfo(pattern)
 			Expect(result).To(BeTrue())
 			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
 			Expect(sent).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when the the interval has passed twice SendPatternEndEventInfo", func() {
+		It("should return true and send the event and refresh event should be unset", func() {
+			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeFalse())
+
+			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+			result = vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeTrue()) // Second time the refresh sent bit is true
 		})
 	})
 
