@@ -210,7 +210,7 @@ var _ = Describe("getSimpleDomain", func() {
 	Context("with subdomains", func() {
 		It("should return the simple domain for subdomains", func() {
 			pattern.Status.ClusterDomain = "subdomain.example.com"
-			expectedSimpleDomain := "example.com"
+			expectedSimpleDomain := "subdomain.example.com"
 			actualSimpleDomain := getSimpleDomain(pattern)
 			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
 		})
