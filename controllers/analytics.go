@@ -110,7 +110,7 @@ func getAnalyticsContext(p *api.Pattern) *analytics.Context {
 			Version: p.Status.ClusterVersion,
 		},
 		Device: analytics.DeviceInfo{
-			Name: getDeviceHash(p),
+			Id:   getDeviceHash(p),
 			Type: p.Status.ClusterPlatform,
 		},
 	}
