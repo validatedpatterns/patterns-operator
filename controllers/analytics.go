@@ -205,7 +205,7 @@ func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
 	return true
 }
 
-// Sends an EndEvent the first time it is invoked. Subsequent invokations
+// Sends an EndEvent the first time it is invoked. Subsequent invocations
 // will send a Refresh event
 // returns true if the status object in the crd should be updated
 func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
