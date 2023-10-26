@@ -149,6 +149,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance) {
 		return r.actionPerformed(qualifiedInstance, "Updated status with identity sent", nil)
 	}
+	// Report loop completion statistics
+	if r.AnalyticsClient.SendPatternStartEventInfo(qualifiedInstance) {
+		return r.actionPerformed(qualifiedInstance, "Updated status with start event sent", nil)
+	}
 
 	if err = r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
@@ -249,9 +253,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.logger.Info("Pattern CR Updated")
 	}
 
-	// Report statistics
-	if r.AnalyticsClient.SendPatternUpdateInfo(qualifiedInstance) {
-		return r.actionPerformed(qualifiedInstance, "Updated status with update sent", nil)
+	// Report loop completion statistics
+	if r.AnalyticsClient.SendPatternEndEventInfo(qualifiedInstance) {
+		return r.actionPerformed(qualifiedInstance, "Updated status with end event sent", nil)
 	}
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 

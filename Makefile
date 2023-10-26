@@ -120,7 +120,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: apikey manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./... -coverprofile cover.out
 
 ##@ Build
 
@@ -151,7 +151,7 @@ docker-push: ## Push docker image with the manager.
 
 .PHONY: golangci-lint
 golangci-lint: apikey ## Run golangci-lint locally
-	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.54.2 golangci-lint run -v
+	podman run --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.55.1 golangci-lint run -v
 
 ##@ Deployment
 

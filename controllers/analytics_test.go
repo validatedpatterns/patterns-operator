@@ -6,7 +6,6 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
@@ -20,7 +19,7 @@ var _ = Describe("hasIntervalPassed", func() {
 	})
 
 	It("should return false when interval has not passed", func() {
-		// Set the last update time to yesterday
+		// Set the last update time to five minutes ago
 		lastUpdate := time.Now().Add(-time.Minute * 5)
 		result := hasIntervalPassed(lastUpdate)
 		Expect(result).To(BeFalse())
@@ -75,19 +74,229 @@ var _ = Describe("VpAnalytics", func() {
 	)
 
 	BeforeEach(func() {
-		vpAnalytics = AnalyticsInit(true, logr.New(log.NullLogSink{}))
+		vpAnalytics = AnalyticsInit(true, logr.Discard())
+		vpAnalytics.apiKey = "123"
 		pattern = &api.Pattern{}
 	})
 
-	It("should not send pattern installation info as disabled is true", func() {
-		vpAnalytics.SendPatternInstallationInfo(pattern)
-
-		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
+	Context("when apiKey is empty SendPatternStartEventInfo()", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.apiKey = ""
+			result := vpAnalytics.SendPatternStartEventInfo(pattern)
+			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentStart)
+			Expect(sent).To(BeFalse())
+		})
 	})
 
-	It("should not send pattern update info as disabled is true", func() {
-		vpAnalytics.SendPatternUpdateInfo(pattern)
+	Context("when the start event has not already been sent", func() {
+		It("should return true and send the event", func() {
+			vpAnalytics.sentStartEvent = false
+			result := vpAnalytics.SendPatternStartEventInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentStart)
+			Expect(sent).To(BeTrue())
+		})
+	})
 
-		Expect(pattern.Status.AnalyticsSent).To(BeFalse())
+	Context("when the start event has already been sent", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.sentStartEvent = true
+			result := vpAnalytics.SendPatternStartEventInfo(pattern)
+			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentStart)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when apiKey is empty SendPatternEndEventInfo", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.apiKey = ""
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when the the interval has not passed SendPatternEndEventInfo", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.lastEndEvent = time.Now().Add(-time.Minute * 5)
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeFalse())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when the the interval has passed SendPatternEndEventInfo", func() {
+		It("should return true and send the event and refresh event should be unset", func() {
+			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when the the interval has passed twice SendPatternEndEventInfo", func() {
+		It("should return true and send the event and refresh event should be unset", func() {
+			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+			result := vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeFalse())
+
+			vpAnalytics.lastEndEvent = time.Date(1980, time.Month(1), 1, 0, 0, 0, 0, time.UTC)
+			result = vpAnalytics.SendPatternEndEventInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentEnd)
+			Expect(sent).To(BeTrue())
+			sent = hasBit(pattern.Status.AnalyticsSent, AnalyticsSentRefresh)
+			Expect(sent).To(BeTrue()) // Second time the refresh sent bit is true
+		})
+	})
+
+	Context("when apiKey is empty SendPatternInstallationInfo", func() {
+		It("should return false and not send the event", func() {
+			vpAnalytics.apiKey = ""
+			result := vpAnalytics.SendPatternInstallationInfo(pattern)
+			Expect(result).To(BeFalse())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentIdentify)
+			Expect(sent).To(BeFalse())
+		})
+	})
+
+	Context("when SendPatternInstallationInfo is called the first time", func() {
+		It("should return true and not send the event", func() {
+			result := vpAnalytics.SendPatternInstallationInfo(pattern)
+			Expect(result).To(BeTrue())
+			sent := hasBit(pattern.Status.AnalyticsSent, AnalyticsSentIdentify)
+			Expect(sent).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("getDeviceHash", func() {
+	var pattern *api.Pattern
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Status: api.PatternStatus{
+				ClusterDomain: "example.com",
+			},
+		}
+	})
+
+	Context("with valid input", func() {
+		It("should return the expected hash", func() {
+			expectedHash := "a379a6f6eeafb9a55e378c118034e2751e682fab9f2d30ab13d2125586ce1947" //nolint:gosec
+			actualHash := getDeviceHash(pattern)
+			Expect(actualHash).To(Equal(expectedHash))
+		})
+	})
+
+	Context("with empty input", func() {
+		It("should return a default hash", func() {
+			pattern.Status.ClusterDomain = ""
+			expectedHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" //nolint:gosec
+			actualHash := getDeviceHash(pattern)
+			Expect(actualHash).To(Equal(expectedHash))
+		})
+	})
+})
+
+var _ = Describe("getSimpleDomain", func() {
+	var pattern *api.Pattern
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Status: api.PatternStatus{
+				ClusterDomain: "example.com",
+			},
+		}
+	})
+
+	Context("with valid input", func() {
+		It("should return the simple domain", func() {
+			expectedSimpleDomain := "example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with subdomains", func() {
+		It("should return the simple domain for subdomains", func() {
+			pattern.Status.ClusterDomain = "subdomain.example.com"
+			expectedSimpleDomain := "subdomain.example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with single part domain", func() {
+		It("should return the input domain", func() {
+			pattern.Status.ClusterDomain = "localhost"
+			expectedSimpleDomain := "localhost"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with empty input", func() {
+		It("should return an empty string", func() {
+			pattern.Status.ClusterDomain = ""
+			expectedSimpleDomain := ""
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+})
+
+var _ = Describe("getNewUUID", func() {
+	var pattern *api.Pattern
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Spec: api.PatternSpec{
+				AnalyticsUUID: "user-specified-uuid",
+			},
+			Status: api.PatternStatus{
+				AnalyticsUUID: "status-saved-uuid",
+			},
+		}
+	})
+
+	Context("when user specifies an AnalyticsUUID", func() {
+		It("should return the user-specified UUID", func() {
+			expectedUUID := "user-specified-uuid"
+			actualUUID := getNewUUID(pattern)
+			Expect(actualUUID).To(Equal(expectedUUID))
+		})
+	})
+
+	Context("when user doesn't specify an AnalyticsUUID and status contains a saved UUID", func() {
+		It("should return the status-saved UUID", func() {
+			pattern.Spec.AnalyticsUUID = ""
+			expectedUUID := "status-saved-uuid"
+			actualUUID := getNewUUID(pattern)
+			Expect(actualUUID).To(Equal(expectedUUID))
+		})
+	})
+
+	Context("when both user-specified and status-saved UUIDs are empty", func() {
+		It("should generate a new UUID and save it in the status", func() {
+			pattern.Spec.AnalyticsUUID = ""
+			pattern.Status.AnalyticsUUID = ""
+			actualUUID := getNewUUID(pattern)
+			Expect(actualUUID).NotTo(BeEmpty())
+			Expect(pattern.Status.AnalyticsUUID).To(Equal(actualUUID))
+		})
 	})
 })

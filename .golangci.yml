@@ -64,7 +64,8 @@ linters-settings:
   misspell:
     locale: US
   nolintlint:
-    allow-unused: false # report any unused nolint directives
+    # https://www.github.com/golangci/golangci-lint/issues/3228
+    allow-unused: true # report any unused nolint directives
     require-explanation: false # don't require an explanation for nolint directives
     require-specific: false # don't require nolint directives to be specific about which linter is being skipped
   revive:
