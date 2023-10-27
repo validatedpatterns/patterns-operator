@@ -116,7 +116,7 @@ type GitConfig struct {
 type MultiSourceConfig struct {
 	// (EXPERIMENTAL) Enable multi-source support when deploying the clustergroup argo application
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Enabled bool `json:"enabled,omitempty"`
 
 	// The helm chart url to fetch the helm charts from in order to deploy the pattern

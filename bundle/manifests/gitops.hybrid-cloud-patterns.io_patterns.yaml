@@ -126,7 +126,7 @@ spec:
                       (Only used when developing the clustergroup helm chart)
                     type: string
                   enabled:
-                    default: false
+                    default: true
                     description: (EXPERIMENTAL) Enable multi-source support when deploying
                       the clustergroup argo application
                     type: boolean
