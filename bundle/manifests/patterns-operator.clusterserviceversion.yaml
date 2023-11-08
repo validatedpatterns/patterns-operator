@@ -14,7 +14,7 @@ metadata:
             "clusterGroupName": "hub",
             "gitSpec": {
               "multiSourceSupport": false,
-              "targetRepo": "https://github.com/hybrid-cloud-patterns/multicloud-gitops",
+              "targetRepo": "https://github.com/validatedpatterns/multicloud-gitops",
               "targetRevision": "main"
             }
           }
