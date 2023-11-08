@@ -13,7 +13,7 @@ var _ = Describe("Git Functions", func() {
 
 	Context("checkoutRevision", func() {
 		It("should checkout a specific commit", func() {
-			err := checkoutRevision(tempDir, "", "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4") //some older existing commit hash
+			err := checkoutRevision(tempDir, "", "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4") // some older existing commit hash
 			Expect(err).To(BeNil())
 		})
 	})

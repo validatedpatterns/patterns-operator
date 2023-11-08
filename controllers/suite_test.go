@@ -41,7 +41,7 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
-var tempLocalGitCopy, tempDir, tempDir2 string
+var tempLocalGitCopy, tempDir string
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -54,8 +54,8 @@ func copyFolder(srcFolder, destFolder string) error {
 	if err != nil {
 		return err
 	}
-
-	if err := os.MkdirAll(destFolder, srcInfo.Mode()); err != nil {
+	err = os.MkdirAll(destFolder, srcInfo.Mode())
+	if err != nil {
 		return err
 	}
 
@@ -77,13 +77,13 @@ func copyFolder(srcFolder, destFolder string) error {
 			if err != nil {
 				return err
 			}
-			defer srcFile.Close()
+			defer srcFile.Close() //nolint:gocritic
 
 			destFile, err := os.Create(destPath)
 			if err != nil {
 				return err
 			}
-			defer destFile.Close()
+			defer destFile.Close() //nolint:gocritic
 
 			_, err = io.Copy(destFile, srcFile)
 			if err != nil {
@@ -96,9 +96,9 @@ func copyFolder(srcFolder, destFolder string) error {
 }
 
 func createTempDir(base string) string {
-	tempDir, err := os.MkdirTemp("", base)
+	td, err := os.MkdirTemp("", base)
 	Expect(err).ToNot(HaveOccurred())
-	return tempDir
+	return td
 }
 
 func cleanupTempDir(tempDir string) {
@@ -107,7 +107,7 @@ func cleanupTempDir(tempDir string) {
 }
 
 func getSourceCodeFolder() string {
-	_, filename, _, _ := runtime.Caller(0)
+	_, filename, _, _ := runtime.Caller(0) //nolint:dogsled
 	return filepath.Dir(filepath.Dir(filename))
 }
 
@@ -136,10 +136,10 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	tempDir = createTempDir("vp-test")
-	tempDir2 = createTempDir("vp-test")
 	tempLocalGitCopy = createTempDir("vp-checkout-test")
 	cwd := getSourceCodeFolder()
-	copyFolder(cwd, tempLocalGitCopy)
+	err = copyFolder(cwd, tempLocalGitCopy)
+	Expect(err).To(BeNil())
 	err = cloneRepo(tempLocalGitCopy, tempDir, "")
 	Expect(err).To(BeNil())
 })
@@ -149,6 +149,5 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 	cleanupTempDir(tempDir)
-	cleanupTempDir(tempDir2)
 	cleanupTempDir(tempLocalGitCopy)
 })

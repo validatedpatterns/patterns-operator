@@ -30,7 +30,6 @@ import (
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
 func checkout(url, directory, token, commit string) error {
-
 	if err := cloneRepo(url, directory, token); err != nil {
 		return err
 	}
