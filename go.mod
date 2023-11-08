@@ -9,7 +9,6 @@ require (
 	github.com/go-errors/errors v1.4.2
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-logr/logr v1.2.3
-	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo/v2 v2.5.1
 	github.com/onsi/gomega v1.24.0
@@ -18,6 +17,7 @@ require (
 	github.com/operator-framework/api v0.13.0
 	github.com/operator-framework/operator-lifecycle-manager v0.20.0
 	github.com/segmentio/analytics-go/v3 v3.2.1
+	go.uber.org/mock v0.3.0
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2

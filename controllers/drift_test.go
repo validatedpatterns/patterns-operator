@@ -12,9 +12,9 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-logr/logr"
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	gomock "go.uber.org/mock/gomock"
 	v1core "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -77,14 +77,14 @@ var _ = Describe("Git client", func() {
 
 	var _ = Context("when interacting with Git", func() {
 		var (
-			mockGitClient                                  *MockClient
+			mockGitClient                                  *MockGitClient
 			mockRemoteClientOrigin, mockRemoteClientTarget *MockRemoteClient
 			pattern                                        api.Pattern
 		)
 
 		BeforeEach(func() {
 			ctrl := gomock.NewController(GinkgoT())
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemoteClientOrigin = NewMockRemoteClient(ctrl)
 			mockRemoteClientTarget = NewMockRemoteClient(ctrl)
 		})
@@ -346,14 +346,14 @@ var _ = Describe("Drift watcher", func() {
 		var (
 			patternFoo                         *api.Pattern
 			ctrl                               *gomock.Controller
-			mockGitClient                      *MockClient
+			mockGitClient                      *MockGitClient
 			mockRemoteOrigin, mockRemoteTarget *MockRemoteClient
 		)
 
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
 
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemoteOrigin = NewMockRemoteClient(ctrl)
 			mockRemoteTarget = NewMockRemoteClient(ctrl)
 			// Add the pattern in etcd
@@ -436,7 +436,7 @@ var _ = Describe("Drift watcher", func() {
 	})
 	var _ = Context("when evaluating the processing order", func() {
 		var (
-			mockGitClient          *MockClient
+			mockGitClient          *MockGitClient
 			mockRemote             *MockRemoteClient
 			patternBar, patternFoo *api.Pattern
 			ctrl                   *gomock.Controller
@@ -444,7 +444,7 @@ var _ = Describe("Drift watcher", func() {
 
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
 
 			patternFoo = &api.Pattern{
@@ -561,13 +561,13 @@ var _ = Describe("Drift watcher", func() {
 			defaultNamespace = "default"
 		)
 		var (
-			mockGitClient *MockClient
+			mockGitClient *MockGitClient
 			mockRemote    *MockRemoteClient
 			ctrl          *gomock.Controller
 		)
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
-			mockGitClient = NewMockClient(ctrl)
+			mockGitClient = NewMockGitClient(ctrl)
 			mockRemote = NewMockRemoteClient(ctrl)
 			// add references
 			for i := 0; i < 1000; i++ {
