@@ -41,7 +41,7 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
-var tempLocalGitCopy, tempDir string
+var tempLocalGitCopy, tempDir, tempDir2 string
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -136,6 +136,7 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	tempDir = createTempDir("vp-test")
+	tempDir2 = createTempDir("vp-test")
 	tempLocalGitCopy = createTempDir("vp-checkout-test")
 	cwd := getSourceCodeFolder()
 	copyFolder(cwd, tempLocalGitCopy)
@@ -148,5 +149,6 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 	cleanupTempDir(tempDir)
+	cleanupTempDir(tempDir2)
 	cleanupTempDir(tempLocalGitCopy)
 })
