@@ -17,7 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	"io"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -38,11 +41,74 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var tempLocalGitCopy, tempDir string
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
+}
+
+func copyFolder(srcFolder, destFolder string) error {
+	srcInfo, err := os.Stat(srcFolder)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(destFolder, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(srcFolder)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(srcFolder, entry.Name())
+		destPath := filepath.Join(destFolder, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyFolder(srcPath, destPath); err != nil {
+				return err
+			}
+		} else {
+			srcFile, err := os.Open(srcPath)
+			if err != nil {
+				return err
+			}
+			defer srcFile.Close()
+
+			destFile, err := os.Create(destPath)
+			if err != nil {
+				return err
+			}
+			defer destFile.Close()
+
+			_, err = io.Copy(destFile, srcFile)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func createTempDir(base string) string {
+	tempDir, err := os.MkdirTemp("", base)
+	Expect(err).ToNot(HaveOccurred())
+	return tempDir
+}
+
+func cleanupTempDir(tempDir string) {
+	err := os.RemoveAll(tempDir)
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func getSourceCodeFolder() string {
+	_, filename, _, _ := runtime.Caller(0)
+	return filepath.Dir(filepath.Dir(filename))
 }
 
 var _ = BeforeSuite(func() {
@@ -69,10 +135,18 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	tempDir = createTempDir("vp-test")
+	tempLocalGitCopy = createTempDir("vp-checkout-test")
+	cwd := getSourceCodeFolder()
+	copyFolder(cwd, tempLocalGitCopy)
+	err = cloneRepo(tempLocalGitCopy, tempDir, "")
+	Expect(err).To(BeNil())
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+	cleanupTempDir(tempDir)
+	cleanupTempDir(tempLocalGitCopy)
 })
