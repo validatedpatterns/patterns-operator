@@ -76,7 +76,7 @@ var _ = Describe("Helm Values", func() {
 			Expect(mergedValues).To(HaveLen(4))
 			Expect(mergedValues).To(HaveKeyWithValue("key2", "overridden"))
 			Expect(mergedValues).To(HaveKeyWithValue("key3", "value3"))
-			Expect(mergedValues).To(HaveKeyWithValue("key1", map[interface{}]interface{}{"value1": "nested1"}))
+			Expect(mergedValues).To(HaveKeyWithValue("key1", map[string]interface{}{"value1": "nested1"}))
 		})
 	})
 })
