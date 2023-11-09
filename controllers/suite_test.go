@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -54,7 +55,7 @@ func copyFolder(srcFolder, destFolder string) error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(destFolder, srcInfo.Mode())
+	err = os.MkdirAll(destFolder, srcInfo.Mode()|fs.FileMode(os.O_RDWR)|fs.FileMode(os.O_EXCL))
 	if err != nil {
 		return err
 	}
