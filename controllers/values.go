@@ -6,8 +6,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func mergeHelmValues(files ...string) (map[string]interface{}, error) {
-	mergedValues := make(map[string]interface{})
+func mergeHelmValues(files ...string) (map[string]any, error) {
+	mergedValues := make(map[string]any)
 
 	for _, file := range files {
 		content, err := os.ReadFile(file)
@@ -15,7 +15,7 @@ func mergeHelmValues(files ...string) (map[string]interface{}, error) {
 			return nil, err
 		}
 
-		var values map[string]interface{}
+		var values map[string]any
 		if err := yaml.Unmarshal(content, &values); err != nil {
 			return nil, err
 		}
@@ -26,8 +26,8 @@ func mergeHelmValues(files ...string) (map[string]interface{}, error) {
 	return mergedValues, nil
 }
 
-func mergeMaps(map1, map2 map[string]interface{}) map[string]interface{} {
-	merged := make(map[string]interface{})
+func mergeMaps(map1, map2 map[string]any) map[string]any {
+	merged := make(map[string]any)
 
 	for k, v := range map1 {
 		merged[k] = v
@@ -36,8 +36,8 @@ func mergeMaps(map1, map2 map[string]interface{}) map[string]interface{} {
 	for k, v := range map2 {
 		if existing, ok := merged[k]; ok {
 			switch existingValue := existing.(type) {
-			case map[string]interface{}:
-				if newValue, ok := v.(map[string]interface{}); ok {
+			case map[string]any:
+				if newValue, ok := v.(map[string]any); ok {
 					merged[k] = mergeMaps(existingValue, newValue)
 				} else {
 					// If types are not compatible, overwrite with the new value
