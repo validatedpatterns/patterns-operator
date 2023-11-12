@@ -66,6 +66,7 @@ type PatternReconciler struct {
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
 	driftWatcher   driftWatcher
+	gitOperations  GitOperations
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete

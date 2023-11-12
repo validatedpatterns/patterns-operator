@@ -104,6 +104,19 @@ spec:
                     description: 'Branch, tag, or commit to deploy.  Does not support
                       short-sha''s. Default: HEAD'
                     type: string
+                  tokenSecret:
+                    description: 'FIXME(bandini): extend this to be able to connect
+                      via ssh keys? Optional. K8s secret name where the token for
+                      connecting to git can be found'
+                    type: string
+                  tokenSecretKey:
+                    description: Optional. Key inside the K8s secret where the token
+                      for connecting to git can be found
+                    type: string
+                  tokenSecretNamespace:
+                    description: Optional. K8s secret namespace where the token for
+                      connecting to git can be found
+                    type: string
                 required:
                 - targetRepo
                 type: object
@@ -210,6 +223,8 @@ spec:
                 type: string
               lastStep:
                 description: Last action related to the pattern
+                type: string
+              path:
                 type: string
               version:
                 description: Number of updates to the pattern

@@ -129,6 +129,8 @@ spec:
       - description: Last action related to the pattern
         displayName: Last Step
         path: lastStep
+      - displayName: Local Checkout Path
+        path: path
       - description: Number of updates to the pattern
         displayName: Version
         path: version

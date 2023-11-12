@@ -43,6 +43,7 @@ import (
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var tempLocalGitCopy, tempDir string
+var gitOpsImpl *GitOperationsImpl
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -141,7 +142,8 @@ var _ = BeforeSuite(func() {
 	cwd := getSourceCodeFolder()
 	err = copyFolder(cwd, tempLocalGitCopy)
 	Expect(err).To(BeNil())
-	err = cloneRepo(tempLocalGitCopy, tempDir, "")
+	gitOpsImpl = &GitOperationsImpl{}
+	err = cloneRepo(gitOpsImpl, tempLocalGitCopy, tempDir, "")
 	Expect(err).To(BeNil())
 })
 

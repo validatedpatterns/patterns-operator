@@ -28,9 +28,31 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
+// GitOperations interface defines the methods used from the go-git package.
+type GitOperations interface {
+	OpenRepository(directory string) (*git.Repository, error)
+	CloneRepository(directory string, isBare bool, options *git.CloneOptions) (*git.Repository, error)
+}
+
+// GitOperationsImpl implements the GitOperations interface using the actual go-git package.
+type GitOperationsImpl struct{}
+
+// OpenRepository opens a git repository.
+func (g *GitOperationsImpl) OpenRepository(directory string) (*git.Repository, error) {
+	return git.PlainOpen(directory)
+}
+
+func (g *GitOperationsImpl) CloneRepository(directory string, isBare bool, options *git.CloneOptions) (*git.Repository, error) {
+	repo, err := git.PlainClone(directory, isBare, options)
+	if err != nil {
+		return nil, err
+	}
+	return repo, nil
+}
+
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
-func checkout(url, directory, token, commit string) error {
-	if err := cloneRepo(url, directory, token); err != nil {
+func checkout(gitOps GitOperations, url, directory, token, commit string) error {
+	if err := cloneRepo(gitOps, url, directory, token); err != nil {
 		return err
 	}
 
@@ -39,7 +61,7 @@ func checkout(url, directory, token, commit string) error {
 		return nil
 	}
 
-	if err := checkoutRevision(directory, token, commit); err != nil {
+	if err := checkoutRevision(gitOps, directory, token, commit); err != nil {
 		return err
 	}
 
@@ -103,8 +125,8 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
 }
 
-func checkoutRevision(directory, token, commit string) error {
-	repo, err := git.PlainOpen(directory)
+func checkoutRevision(gitOps GitOperations, directory, token, commit string) error {
+	repo, err := gitOps.OpenRepository(directory)
 	if err != nil {
 		return err
 	}
@@ -166,7 +188,7 @@ func checkoutRevision(directory, token, commit string) error {
 	return err
 }
 
-func cloneRepo(url, directory, token string) error {
+func cloneRepo(gitOps GitOperations, url, directory, token string) error {
 	gitDir := filepath.Join(directory, ".git")
 	if _, err := os.Stat(gitDir); err == nil {
 		fmt.Printf("%s already exists\n", gitDir)
@@ -196,7 +218,7 @@ func cloneRepo(url, directory, token string) error {
 		return err
 	}
 
-	repo, err := git.PlainClone(directory, false, options)
+	repo, err := gitOps.CloneRepository(directory, false, options)
 	if err != nil {
 		return err
 	}

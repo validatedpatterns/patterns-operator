@@ -29,6 +29,7 @@ import (
 	configclient "github.com/openshift/client-go/config/clientset/versioned/fake"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
+	gomock "go.uber.org/mock/gomock"
 
 	kubeclient "k8s.io/client-go/kubernetes/fake"
 
@@ -62,8 +63,8 @@ var _ = Describe("pattern controller", func() {
 			nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			reconciler = newFakeReconciler(nsOperators, buildPatternManifest(10))
 			watch = reconciler.driftWatcher.(*watcher)
-
 		})
+
 		It("adding a pattern with origin, target and interval >-1", func() {
 			By("adding the pattern to the watch")
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
@@ -98,6 +99,7 @@ var _ = Describe("pattern controller", func() {
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(0))
 		})
+
 		It("validates changes to the poll interval in the manifest", func() {
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
@@ -135,6 +137,7 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].namespace).To(Equal(namespace))
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
+
 		It("removes an existing pattern from the drift watcher by changing the originRepository to empty", func() {
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
@@ -160,6 +163,7 @@ var _ = Describe("pattern controller", func() {
 			Expect(watch.repoPairs[0].namespace).To(Equal(namespace))
 			Expect(watch.repoPairs[0].interval).To(Equal(defaultInterval))
 		})
+
 		It("adding a pattern with application status", func() {
 			p = &api.Pattern{}
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
@@ -176,6 +180,10 @@ var _ = Describe("pattern controller", func() {
 })
 
 func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
+	mockctrl := gomock.NewController(GinkgoT())
+	defer mockctrl.Finish()
+	mockGitOps := NewMockGitOperations(mockctrl)
+
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
 	clusterVersion := &v1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{Name: "version"},
@@ -205,6 +213,7 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		configClient:    configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
+		gitOperations:   mockGitOps,
 	}
 }
 

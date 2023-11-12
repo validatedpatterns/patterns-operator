@@ -13,7 +13,7 @@ var _ = Describe("Git Functions", func() {
 
 	Context("checkoutRevision", func() {
 		It("should checkout a specific commit", func() {
-			err := checkoutRevision(tempDir, "", "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4") // some older existing commit hash
+			err := checkoutRevision(gitOpsImpl, tempDir, "", "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4") // some older existing commit hash
 			Expect(err).To(BeNil())
 		})
 	})
@@ -46,7 +46,7 @@ var _ = Describe("Git Functions", func() {
 			token := "your_token"
 			commit := "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4"
 
-			err := checkout(tempLocalGitCopy, tempDir2, token, commit)
+			err := checkout(gitOpsImpl, tempLocalGitCopy, tempDir2, token, commit)
 			Expect(err).To(BeNil())
 		})
 
@@ -54,7 +54,7 @@ var _ = Describe("Git Functions", func() {
 			token := "your_token"
 			commit := ""
 
-			err := checkout(tempLocalGitCopy, tempDir2, token, commit)
+			err := checkout(gitOpsImpl, tempLocalGitCopy, tempDir2, token, commit)
 			Expect(err).To(BeNil())
 		})
 	})

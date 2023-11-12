@@ -111,6 +111,14 @@ type GitConfig struct {
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=6
 	Hostname string `json:"hostname,omitempty"`
+
+	// FIXME(bandini): extend this to be able to connect via ssh keys?
+	// Optional. K8s secret name where the token for connecting to git can be found
+	TokenSecret string `json:"tokenSecret,omitempty"`
+	// Optional. K8s secret namespace where the token for connecting to git can be found
+	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
+	// Optional. Key inside the K8s secret where the token for connecting to git can be found
+	TokenSecretKey string `json:"tokenSecretKey,omitempty"`
 }
 
 type MultiSourceConfig struct {
@@ -194,6 +202,8 @@ type PatternStatus struct {
 	AnalyticsSent int `json:"analyticsSent,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	LocalCheckoutPath string `json:"path,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
