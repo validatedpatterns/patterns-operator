@@ -43,6 +43,10 @@ func (g *GitOperationsImpl) OpenRepository(directory string) (*git.Repository, e
 }
 
 func (g *GitOperationsImpl) CloneRepository(directory string, isBare bool, options *git.CloneOptions) (*git.Repository, error) {
+	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+		return nil, err
+	}
+
 	repo, err := git.PlainClone(directory, isBare, options)
 	if err != nil {
 		return nil, err
@@ -130,6 +134,9 @@ func checkoutRevision(gitOps GitOperations, directory, token, commit string) err
 	if err != nil {
 		return err
 	}
+	if repo == nil { // we mocked the above OpenRepository
+		return nil
+	}
 
 	var foptions = &git.FetchOptions{
 		Force:           true,
@@ -214,13 +221,12 @@ func cloneRepo(gitOps GitOperations, url, directory, token string) error {
 		}
 	}
 
-	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
-		return err
-	}
-
 	repo, err := gitOps.CloneRepository(directory, false, options)
 	if err != nil {
 		return err
+	}
+	if repo == nil { // We mocked the above CloneRepository()
+		return nil
 	}
 
 	// ... retrieving the commit being pointed by HEAD
