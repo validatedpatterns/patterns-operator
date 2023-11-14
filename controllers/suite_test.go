@@ -17,8 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
