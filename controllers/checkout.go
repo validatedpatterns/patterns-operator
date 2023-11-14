@@ -19,13 +19,25 @@ package controllers
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"path/filepath"
+
+	stdssh "golang.org/x/crypto/ssh"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+)
+
+type GitAuthenticationBackend uint
+
+const (
+	GitAuthNone     GitAuthenticationBackend = 0
+	GitAuthPassword GitAuthenticationBackend = 1
+	GitAuthSsh      GitAuthenticationBackend = 2
 )
 
 // GitOperations interface defines the methods used from the go-git package.
@@ -55,8 +67,8 @@ func (g *GitOperationsImpl) CloneRepository(directory string, isBare bool, optio
 }
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
-func checkout(gitOps GitOperations, url, directory, token, commit string) error {
-	if err := cloneRepo(gitOps, url, directory, token); err != nil {
+func checkout(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+	if err := cloneRepo(gitOps, url, directory, secret); err != nil {
 		return err
 	}
 
@@ -65,7 +77,7 @@ func checkout(gitOps GitOperations, url, directory, token, commit string) error 
 		return nil
 	}
 
-	if err := checkoutRevision(gitOps, directory, token, commit); err != nil {
+	if err := checkoutRevision(gitOps, url, directory, commit, secret); err != nil {
 		return err
 	}
 
@@ -129,7 +141,7 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
 }
 
-func checkoutRevision(gitOps GitOperations, directory, token, commit string) error {
+func checkoutRevision(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
 	repo, err := gitOps.OpenRepository(directory)
 	if err != nil {
 		return err
@@ -137,23 +149,10 @@ func checkoutRevision(gitOps GitOperations, directory, token, commit string) err
 	if repo == nil { // we mocked the above OpenRepository
 		return nil
 	}
-
-	var foptions = &git.FetchOptions{
-		Force:           true,
-		InsecureSkipTLS: true,
-		Tags:            git.AllTags,
+	foptions, err := getFetchOptions(url, secret)
+	if err != nil {
+		return err
 	}
-
-	if token != "" {
-		// The intended use of a GitHub personal access token is in replace of your password
-		// because access tokens can easily be revoked.
-		// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
-		foptions.Auth = &http.BasicAuth{
-			Username: "abc123", // yes, this can be anything except an empty string
-			Password: token,
-		}
-	}
-
 	if err = repo.Fetch(foptions); err != nil && err != git.NoErrAlreadyUpToDate {
 		fmt.Println("Error fetching")
 		return err
@@ -195,30 +194,16 @@ func checkoutRevision(gitOps GitOperations, directory, token, commit string) err
 	return err
 }
 
-func cloneRepo(gitOps GitOperations, url, directory, token string) error {
+func cloneRepo(gitOps GitOperations, directory, url string, secret map[string][]byte) error {
 	gitDir := filepath.Join(directory, ".git")
 	if _, err := os.Stat(gitDir); err == nil {
 		fmt.Printf("%s already exists\n", gitDir)
 		return nil
 	}
 	fmt.Printf("git clone %s into %s\n", url, directory)
-
-	// Clone the given repository to the given directory
-	var options = &git.CloneOptions{
-		URL:      url,
-		Progress: os.Stdout,
-		Depth:    0,
-		// ReferenceName: plumbing.ReferenceName,
-	}
-
-	if token != "" {
-		// The intended use of a GitHub personal access token is in replace of your password
-		// because access tokens can easily be revoked.
-		// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
-		options.Auth = &http.BasicAuth{
-			Username: "abc123", // yes, this can be anything except an empty string
-			Password: token,
-		}
+	options, err := getCloneOptions(url, secret)
+	if err != nil {
+		return err
 	}
 
 	repo, err := gitOps.CloneRepository(directory, false, options)
@@ -238,6 +223,90 @@ func cloneRepo(gitOps GitOperations, url, directory, token string) error {
 	}
 	return nil
 }
+func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, error) {
+	var foptions = &git.FetchOptions{
+		Force:           true,
+		InsecureSkipTLS: true,
+		Tags:            git.AllTags,
+	}
+	authType := detectGitAuthType(secret)
+	if authType == GitAuthNone {
+		return nil, fmt.Errorf("Could not parse the bootstrap secret")
+	}
+
+	if authType == GitAuthPassword {
+		foptions.Auth = getHttpAuth(url, secret)
+	} else if authType == GitAuthSsh {
+		publicKey, err := getSshPublicKey(url, secret)
+		if err != nil {
+			return nil, err
+		}
+		foptions.Auth = publicKey
+	}
+	return foptions, nil
+}
+
+func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, error) {
+	// Clone the given repository to the given directory
+	var options = &git.CloneOptions{
+		URL:      url,
+		Progress: os.Stdout,
+		Depth:    0,
+		// ReferenceName: plumbing.ReferenceName,
+	}
+
+	authType := detectGitAuthType(secret)
+	if authType == GitAuthNone {
+		return nil, fmt.Errorf("Could not parse the bootstrap secret")
+	}
+
+	if authType == GitAuthPassword {
+		options.Auth = getHttpAuth(url, secret)
+	} else if authType == GitAuthSsh {
+		publicKey, err := getSshPublicKey(url, secret)
+		if err != nil {
+			return nil, err
+		}
+		options.Auth = publicKey
+	}
+	return options, nil
+}
+
+func getHttpAuth(url string, secret map[string][]byte) *http.BasicAuth {
+	// The intended use of a GitHub personal access token is in replace of your password
+	// because access tokens can easily be revoked.
+	// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
+	auth := &http.BasicAuth{
+		Username: string(getField(secret, "username")),
+		Password: string(getField(secret, "password")),
+	}
+	return auth
+}
+
+func getSshPublicKey(url string, secret map[string][]byte) (*ssh.PublicKeys, error) {
+	sshKey := getField(secret, "sshPrivateKey")
+	if sshKey == nil {
+		return nil, fmt.Errorf("Could not get sshPrivateKey")
+	}
+
+	user := getUserFromURL(url)
+	publicKey, keyError := ssh.NewPublicKeys(user, sshKey, "")
+	if keyError != nil {
+		return nil, fmt.Errorf("Could not get publicKey: %s", keyError)
+	}
+	publicKey.HostKeyCallback = stdssh.InsecureIgnoreHostKey()
+	return publicKey, nil
+}
+
+// This returns the user prefix in git urls like:
+// git@github.com:/foo/bar or "" when not found
+func getUserFromURL(url string) string {
+	tokens := strings.Split(url, "@")
+	if len(tokens) > 1 {
+		return tokens[0]
+	}
+	return ""
+}
 
 func repoHash(directory string) (string, error) {
 	repo, err := git.PlainOpen(directory)
@@ -252,4 +321,27 @@ func repoHash(directory string) (string, error) {
 	}
 
 	return ref.Hash().String(), nil
+}
+
+// Developed after https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories
+// if a secret has
+// returns "" if a secret could not be parse, "ssh" if it is an ssh auth, and "password" if a username + pass auth
+func detectGitAuthType(secret map[string][]byte) GitAuthenticationBackend {
+	if _, ok := secret["sshPrivateKey"]; ok {
+		return GitAuthSsh
+	}
+	_, hasUser := secret["username"]
+	_, hasPassword := secret["password"]
+	if hasUser && hasPassword {
+		return GitAuthPassword
+	}
+	return GitAuthNone
+}
+
+func getField(secret map[string][]byte, field string) []byte {
+	value, hasField := secret[field]
+	if hasField {
+		return value
+	}
+	return nil
 }

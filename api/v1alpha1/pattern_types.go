@@ -112,13 +112,12 @@ type GitConfig struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=6
 	Hostname string `json:"hostname,omitempty"`
 
-	// FIXME(bandini): extend this to be able to connect via ssh keys?
-	// Optional. K8s secret name where the token for connecting to git can be found
+	// Optional. K8s secret name where the info for connecting to git can be found. The supported secrets are modeled after the
+	// private repositories in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
+	// currently ssh and username+password are supported
 	TokenSecret string `json:"tokenSecret,omitempty"`
 	// Optional. K8s secret namespace where the token for connecting to git can be found
 	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
-	// Optional. Key inside the K8s secret where the token for connecting to git can be found
-	TokenSecretKey string `json:"tokenSecretKey,omitempty"`
 }
 
 type MultiSourceConfig struct {

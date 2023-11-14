@@ -143,7 +143,7 @@ var _ = BeforeSuite(func() {
 	err = copyFolder(cwd, tempLocalGitCopy)
 	Expect(err).To(BeNil())
 	gitOpsImpl = &GitOperationsImpl{}
-	err = cloneRepo(gitOpsImpl, tempLocalGitCopy, tempDir, "")
+	err = cloneRepo(gitOpsImpl, tempLocalGitCopy, tempDir, nil)
 	Expect(err).To(BeNil())
 })
 

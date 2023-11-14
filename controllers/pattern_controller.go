@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -159,24 +158,24 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if r.AnalyticsClient.SendPatternStartEventInfo(qualifiedInstance) {
 		return r.actionPerformed(qualifiedInstance, "Updated status with start event sent", nil)
 	}
-	var token = ""
+	var gitAuthSecret map[string][]byte
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
-		if token, err = r.authTokenFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret, qualifiedInstance.Spec.GitConfig.TokenSecretKey); err != nil {
-			return r.actionPerformed(qualifiedInstance, "obtaining git auth token", err)
+		if gitAuthSecret, err = r.authGitFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret); err != nil {
+			return r.actionPerformed(qualifiedInstance, "obtaining git auth info from secret", err)
 		}
 	}
 
 	gitDir := filepath.Join(qualifiedInstance.Status.LocalCheckoutPath, ".git")
 	if _, err = os.Stat(gitDir); os.IsNotExist(err) {
-		err = cloneRepo(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, token)
+		err = cloneRepo(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, gitAuthSecret)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 		}
 	}
-
-	if err = checkoutRevision(r.gitOperations, qualifiedInstance.Status.LocalCheckoutPath, token, qualifiedInstance.Spec.GitConfig.TargetRevision); err != nil {
+	if err = checkoutRevision(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, qualifiedInstance.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
 		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
 	}
+
 	if err = r.preValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
 	}
@@ -616,21 +615,12 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	return false, nil
 }
 
-func (r *PatternReconciler) authTokenFromSecret(namespace, secret, key string) (string, error) {
-	if key == "" {
-		return "", nil
-	}
+func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {
 	tokenSecret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
-		//      if tokenSecret, err = r.Client.Core().Secrets(namespace).Get(secret); err != nil {
 		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", secret, namespace))
-		return "", err
+		return nil, err
 	}
-
-	if val, ok := tokenSecret.Data[key]; ok {
-		// See also https://github.com/kubernetes/client-go/issues/198
-		return string(val), nil
-	}
-	return "", errors.New(fmt.Errorf("No key '%s' found in %s/%s", key, secret, namespace))
+	return tokenSecret.Data, nil
 }
