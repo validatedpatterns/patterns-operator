@@ -19,7 +19,6 @@ package controllers
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -58,11 +57,6 @@ func createTempDir(base string) string {
 func cleanupTempDir(tempDir string) {
 	err := os.RemoveAll(tempDir)
 	Expect(err).ToNot(HaveOccurred())
-}
-
-func getSourceCodeFolder() string {
-	_, filename, _, _ := runtime.Caller(0) //nolint:dogsled
-	return filepath.Dir(filepath.Dir(filename))
 }
 
 var _ = BeforeSuite(func() {
