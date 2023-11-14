@@ -42,59 +42,13 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
-var tempLocalGitCopy, tempDir string
+var tempDir string
 var gitOpsImpl *GitOperationsImpl
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
-}
-
-func copyFolder(srcFolder, destFolder string) error {
-	srcInfo, err := os.Stat(srcFolder)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(destFolder, srcInfo.Mode()|fs.FileMode(os.O_RDWR)|fs.FileMode(os.O_EXCL))
-	if err != nil {
-		return err
-	}
-
-	entries, err := os.ReadDir(srcFolder)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		srcPath := filepath.Join(srcFolder, entry.Name())
-		destPath := filepath.Join(destFolder, entry.Name())
-
-		if entry.IsDir() {
-			if err := copyFolder(srcPath, destPath); err != nil {
-				return err
-			}
-		} else {
-			srcFile, err := os.Open(srcPath)
-			if err != nil {
-				return err
-			}
-			defer srcFile.Close() //nolint:gocritic
-
-			destFile, err := os.Create(destPath)
-			if err != nil {
-				return err
-			}
-			defer destFile.Close() //nolint:gocritic
-
-			_, err = io.Copy(destFile, srcFile)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func createTempDir(base string) string {
@@ -138,13 +92,6 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	tempDir = createTempDir("vp-test")
-	tempLocalGitCopy = createTempDir("vp-checkout-test")
-	cwd := getSourceCodeFolder()
-	err = copyFolder(cwd, tempLocalGitCopy)
-	Expect(err).To(BeNil())
-	gitOpsImpl = &GitOperationsImpl{}
-	err = cloneRepo(gitOpsImpl, tempLocalGitCopy, tempDir, nil)
-	Expect(err).To(BeNil())
 })
 
 var _ = AfterSuite(func() {
@@ -152,5 +99,4 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 	cleanupTempDir(tempDir)
-	cleanupTempDir(tempLocalGitCopy)
 })

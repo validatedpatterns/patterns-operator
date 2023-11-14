@@ -153,8 +153,9 @@ func checkoutRevision(gitOps GitOperations, url, directory, commit string, secre
 	if err != nil {
 		return err
 	}
+
 	if err = repo.Fetch(foptions); err != nil && err != git.NoErrAlreadyUpToDate {
-		fmt.Println("Error fetching")
+		fmt.Printf("Error fetching: %v\n", err)
 		return err
 	}
 
@@ -194,7 +195,7 @@ func checkoutRevision(gitOps GitOperations, url, directory, commit string, secre
 	return err
 }
 
-func cloneRepo(gitOps GitOperations, directory, url string, secret map[string][]byte) error {
+func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]byte) error {
 	gitDir := filepath.Join(directory, ".git")
 	if _, err := os.Stat(gitDir); err == nil {
 		fmt.Printf("%s already exists\n", gitDir)
@@ -223,6 +224,7 @@ func cloneRepo(gitOps GitOperations, directory, url string, secret map[string][]
 	}
 	return nil
 }
+
 func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, error) {
 	var foptions = &git.FetchOptions{
 		Force:           true,
@@ -230,10 +232,6 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 		Tags:            git.AllTags,
 	}
 	authType := detectGitAuthType(secret)
-	if authType == GitAuthNone {
-		return nil, fmt.Errorf("Could not parse the bootstrap secret")
-	}
-
 	if authType == GitAuthPassword {
 		foptions.Auth = getHttpAuth(secret)
 	} else if authType == GitAuthSsh {
@@ -252,14 +250,9 @@ func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, e
 		URL:      url,
 		Progress: os.Stdout,
 		Depth:    0,
-		// ReferenceName: plumbing.ReferenceName,
 	}
 
 	authType := detectGitAuthType(secret)
-	if authType == GitAuthNone {
-		return nil, fmt.Errorf("Could not parse the bootstrap secret")
-	}
-
 	if authType == GitAuthPassword {
 		options.Auth = getHttpAuth(secret)
 	} else if authType == GitAuthSsh {

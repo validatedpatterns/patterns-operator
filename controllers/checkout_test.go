@@ -9,20 +9,24 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+var gitRepoURL = "https://github.com/validatedpatterns/.github"
+var gitCommitHash = "d0f3fb283cfb17189cba89aa5ff57fd8dcb2a7fd"
+
 var _ = Describe("Git Functions", func() {
-
-	Context("checkoutRevision", func() {
-		It("should checkout a specific commit", func() {
-			err := checkoutRevision(gitOpsImpl, tempDir, tempDir, "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4", nil) // some older existing commit hash
-			Expect(err).To(BeNil())
-		})
-	})
-
 	Context("cloneRepo", func() {
 		It("should clone a repository and get the HEAD", func() {
+			err := cloneRepo(gitOpsImpl, gitRepoURL, tempDir, nil)
+			Expect(err).To(BeNil())
 			refHash, err := repoHash(tempDir)
 			Expect(err).To(BeNil())
 			Expect(refHash).ToNot(BeNil())
+		})
+	})
+
+	Context("checkoutRevision", func() {
+		It("should checkout a specific commit", func() {
+			err := checkoutRevision(gitOpsImpl, gitRepoURL, tempDir, gitCommitHash, nil) // some older existing commit hash
+			Expect(err).To(BeNil())
 		})
 	})
 
@@ -43,16 +47,12 @@ var _ = Describe("Git Functions", func() {
 			cleanupTempDir(tempDir2)
 		})
 		It("should clone repository and checkout a specific commit", func() {
-			commit := "3086ab9e72e9f9ea369813c76f35772a3c8ea2a4"
-
-			err := checkout(gitOpsImpl, tempLocalGitCopy, tempDir2, commit, nil)
+			err := checkout(gitOpsImpl, gitRepoURL, tempDir2, gitCommitHash, nil)
 			Expect(err).To(BeNil())
 		})
 
-		It("should clone repository without checking out if commit is empty", func() {
-			commit := ""
-
-			err := checkout(gitOpsImpl, tempLocalGitCopy, tempDir2, commit, nil)
+		It("should checkout repository without checking out if commit is empty", func() {
+			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "", nil)
 			Expect(err).To(BeNil())
 		})
 	})

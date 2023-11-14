@@ -105,13 +105,10 @@ spec:
                       short-sha''s. Default: HEAD'
                     type: string
                   tokenSecret:
-                    description: 'FIXME(bandini): extend this to be able to connect
-                      via ssh keys? Optional. K8s secret name where the token for
-                      connecting to git can be found'
-                    type: string
-                  tokenSecretKey:
-                    description: Optional. Key inside the K8s secret where the token
-                      for connecting to git can be found
+                    description: Optional. K8s secret name where the info for connecting
+                      to git can be found. The supported secrets are modeled after
+                      the private repositories in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
+                      currently ssh and username+password are supported
                     type: string
                   tokenSecretNamespace:
                     description: Optional. K8s secret namespace where the token for
