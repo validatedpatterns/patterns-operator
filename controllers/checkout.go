@@ -235,7 +235,7 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 	}
 
 	if authType == GitAuthPassword {
-		foptions.Auth = getHttpAuth(url, secret)
+		foptions.Auth = getHttpAuth(secret)
 	} else if authType == GitAuthSsh {
 		publicKey, err := getSshPublicKey(url, secret)
 		if err != nil {
@@ -261,7 +261,7 @@ func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, e
 	}
 
 	if authType == GitAuthPassword {
-		options.Auth = getHttpAuth(url, secret)
+		options.Auth = getHttpAuth(secret)
 	} else if authType == GitAuthSsh {
 		publicKey, err := getSshPublicKey(url, secret)
 		if err != nil {
@@ -272,7 +272,7 @@ func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, e
 	return options, nil
 }
 
-func getHttpAuth(url string, secret map[string][]byte) *http.BasicAuth {
+func getHttpAuth(secret map[string][]byte) *http.BasicAuth {
 	// The intended use of a GitHub personal access token is in replace of your password
 	// because access tokens can easily be revoked.
 	// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
@@ -294,7 +294,8 @@ func getSshPublicKey(url string, secret map[string][]byte) (*ssh.PublicKeys, err
 	if keyError != nil {
 		return nil, fmt.Errorf("Could not get publicKey: %s", keyError)
 	}
-	publicKey.HostKeyCallback = stdssh.InsecureIgnoreHostKey()
+	// FIXME(bandini): in the future we might want to support passing some known hosts
+	publicKey.HostKeyCallback = stdssh.InsecureIgnoreHostKey() //nolint:gosec
 	return publicKey, nil
 }
 
