@@ -497,6 +497,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
+	r.gitOperations = &GitOperationsImpl{}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
