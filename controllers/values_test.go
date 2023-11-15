@@ -80,6 +80,44 @@ var _ = Describe("Helm Values", func() {
 			Expect(mergedValues).To(HaveKeyWithValue("key1", map[string]any{"value1": "nested1"}))
 		})
 	})
+
+	Describe("getClusterGroupValue", func() {
+		var values map[string]any
+
+		BeforeEach(func() {
+			values = make(map[string]any)
+		})
+
+		Context("when clusterGroup key exists and has the desired key", func() {
+			It("should return the correct value", func() {
+				values["clusterGroup"] = map[string]any{"desiredKey": "desiredValue"}
+				result := getClusterGroupValue("desiredKey", values)
+				Expect(result).To(Equal("desiredValue"))
+			})
+		})
+
+		Context("when clusterGroup key exists but does not have the desired key", func() {
+			It("should return nil", func() {
+				values["clusterGroup"] = map[string]any{"otherKey": "otherValue"}
+				result := getClusterGroupValue("desiredKey", values)
+				Expect(result).To(BeNil())
+			})
+		})
+
+		Context("when clusterGroup key does not exist", func() {
+			It("should return nil", func() {
+				result := getClusterGroupValue("desiredKey", values)
+				Expect(result).To(BeNil())
+			})
+		})
+
+		Context("when clusterGroup is not a map", func() {
+			It("should panic", func() {
+				values["clusterGroup"] = "notAMap"
+				Expect(func() { getClusterGroupValue("desiredKey", values) }).To(Panic())
+			})
+		})
+	})
 })
 
 func createTempValueFile(name string, content any) string {
