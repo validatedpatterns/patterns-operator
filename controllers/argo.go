@@ -219,7 +219,10 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 
 func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
 	valueFiles := newApplicationValueFiles(p, prefix)
-	sharedValueFiles, _ := getSharedValueFiles(p)
+	sharedValueFiles, err := getSharedValueFiles(p)
+	if err != nil {
+		fmt.Printf("Could not fetch sharedValueFiles: %s", err)
+	}
 	valueFiles = append(valueFiles, sharedValueFiles...)
 	return &argoapi.ApplicationSourceHelm{
 		ValueFiles: valueFiles,

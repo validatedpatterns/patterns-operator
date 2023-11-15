@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -12,6 +13,11 @@ func mergeHelmValues(files ...string) (map[string]any, error) {
 	for _, file := range files {
 		content, err := os.ReadFile(file)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				// Skip this file as it does not exist
+				continue
+			}
+			// For all other errors, return the error
 			return nil, err
 		}
 
