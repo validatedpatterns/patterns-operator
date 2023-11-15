@@ -148,10 +148,24 @@ func getSharedValueFiles(p *api.Pattern) ([]string, error) {
 		return nil, fmt.Errorf("Could not fetch value files: %s", err)
 	}
 	sharedValueFiles := getClusterGroupValue("sharedValueFiles", helmValues)
-	if strSlice, ok := sharedValueFiles.([]string); ok {
-		return strSlice, nil
+
+	// Check if s is of type []interface{}
+	val, ok := sharedValueFiles.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("Could not make a list out of sharedValueFiles: %v", sharedValueFiles)
 	}
-	return nil, nil
+
+	// Convert each element of slice to a string
+	stringSlice := make([]string, len(val))
+	for i, v := range val {
+		str, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("Type assertion failed at index %d: Not a string", i)
+		}
+		stringSlice[i] = str
+	}
+
+	return stringSlice, nil
 }
 
 func newApplicationValues(p *api.Pattern) string {
@@ -224,6 +238,7 @@ func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.Applica
 		fmt.Printf("Could not fetch sharedValueFiles: %s", err)
 	}
 	valueFiles = append(valueFiles, sharedValueFiles...)
+
 	return &argoapi.ApplicationSourceHelm{
 		ValueFiles: valueFiles,
 
