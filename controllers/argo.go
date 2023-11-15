@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -133,6 +134,26 @@ func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
 	return files
 }
 
+// Fetches the clusterGroup.sharedValueFiles values from a checked out git repo
+func getSharedValueFiles(p *api.Pattern) ([]string, error) {
+	gitDir := p.Status.LocalCheckoutPath
+	if _, err := os.Stat(gitDir); err != nil {
+		return nil, fmt.Errorf("%s path does not exist", gitDir)
+	}
+
+	valueFiles := newApplicationValueFiles(p, gitDir)
+
+	helmValues, err := mergeHelmValues(valueFiles...)
+	if err != nil {
+		return nil, fmt.Errorf("Could not fetch value files: %s", err)
+	}
+	sharedValueFiles := getClusterGroupValue("sharedValueFiles", helmValues)
+	if strSlice, ok := sharedValueFiles.([]string); ok {
+		return strSlice, nil
+	}
+	return nil, nil
+}
+
 func newApplicationValues(p *api.Pattern) string {
 	s := "extraParametersNested:\n"
 	for _, extra := range p.Spec.ExtraParameters {
@@ -197,8 +218,11 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 }
 
 func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
+	valueFiles := newApplicationValueFiles(p, prefix)
+	sharedValueFiles, _ := getSharedValueFiles(p)
+	valueFiles = append(valueFiles, sharedValueFiles...)
 	return &argoapi.ApplicationSourceHelm{
-		ValueFiles: newApplicationValueFiles(p, prefix),
+		ValueFiles: valueFiles,
 
 		// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
 		Parameters: newApplicationParameters(p),

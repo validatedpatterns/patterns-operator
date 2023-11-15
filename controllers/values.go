@@ -55,3 +55,17 @@ func mergeMaps(map1, map2 map[string]any) map[string]any {
 
 	return merged
 }
+
+func getClusterGroupValue(key string, values map[string]any) any {
+	clusterGroup, hasClusterGroup := values["clusterGroup"]
+	if !hasClusterGroup {
+		return nil
+	}
+
+	clusterGroupMap := clusterGroup.(map[string]any)
+	v, hasKey := clusterGroupMap[key]
+	if hasKey {
+		return v
+	}
+	return nil
+}
