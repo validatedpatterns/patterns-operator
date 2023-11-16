@@ -18,6 +18,7 @@ require (
 	github.com/operator-framework/operator-lifecycle-manager v0.20.0
 	github.com/segmentio/analytics-go/v3 v3.2.1
 	go.uber.org/mock v0.3.0
+	golang.org/x/crypto v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.28.4
 	k8s.io/apimachinery v0.28.4
@@ -128,7 +129,6 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
-	golang.org/x/crypto v0.16.0 // indirect
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
