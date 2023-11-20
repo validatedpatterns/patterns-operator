@@ -116,7 +116,7 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 }
 
 func convertArgoHelmParametersToMap(params []argoapi.HelmParameter) map[string]any {
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 
 	for _, p := range params {
 		keys := strings.Split(p.Name, ".")
@@ -128,9 +128,9 @@ func convertArgoHelmParametersToMap(params []argoapi.HelmParameter) map[string]a
 				currentMap[key] = p.Value
 			} else {
 				if _, ok := currentMap[key]; !ok {
-					currentMap[key] = make(map[string]interface{})
+					currentMap[key] = make(map[string]any)
 				}
-				currentMap = currentMap[key].(map[string]interface{})
+				currentMap = currentMap[key].(map[string]any)
 			}
 		}
 	}
@@ -181,7 +181,7 @@ func getSharedValueFiles(p *api.Pattern) ([]string, error) {
 	sharedValueFiles := getClusterGroupValue("sharedValueFiles", helmValues)
 
 	// Check if s is of type []interface{}
-	val, ok := sharedValueFiles.([]interface{})
+	val, ok := sharedValueFiles.([]any)
 	if !ok {
 		return nil, fmt.Errorf("Could not make a list out of sharedValueFiles: %v", sharedValueFiles)
 	}

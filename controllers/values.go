@@ -87,7 +87,7 @@ func reverseStrings(s []string) {
 	}
 }
 
-func helmTpl(templateString string, valueFiles []string, values map[string]interface{}) (string, error) {
+func helmTpl(templateString string, valueFiles []string, values map[string]any) (string, error) {
 	// Create a fake chart with the template.
 	fakeChart := &chart.Chart{
 		Metadata: &chart.Metadata{
@@ -105,7 +105,7 @@ func helmTpl(templateString string, valueFiles []string, values map[string]inter
 
 	// Load and merge values from the specified value files. Note that the ordering is a bit
 	// unexpected. The first values added are the more specific ones that will win
-	mergedValues := make(map[string]interface{})
+	mergedValues := make(map[string]any)
 	mergedValues = chartutil.CoalesceTables(mergedValues, values)
 	reverseStrings(valueFiles) // When using CoalesceTables the first values take precedence
 	for _, fileName := range valueFiles {
