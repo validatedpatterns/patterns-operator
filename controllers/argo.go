@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -531,4 +532,15 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 		}
 	}
 	return false
+}
+
+func newNamespacedGitSecret(p *api.Pattern, secret map[string][]byte) *v1.Secret {
+	k8sSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "private-repo-credentials",
+			Namespace: applicationName(p),
+		},
+		Data: secret,
+	}
+	return k8sSecret
 }

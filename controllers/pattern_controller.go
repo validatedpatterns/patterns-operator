@@ -265,6 +265,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
 	}
 
+	// Copy the bootstrap secret to the namespaced argo namespace
+	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
+		if err = r.copyAuthGitSecret(qualifiedInstance, qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret); err != nil {
+			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
+		}
+	}
 	// Perform validation of the site values file(s)
 	if err = r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
@@ -627,4 +633,18 @@ func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[str
 		return nil, err
 	}
 	return tokenSecret.Data, nil
+}
+
+func (r *PatternReconciler) copyAuthGitSecret(p *api.Pattern, namespace, secret string) error {
+	clusterWideGitSecret, err := r.authGitFromSecret(namespace, secret)
+	if err != nil {
+		return err
+	}
+	newSecret := newNamespacedGitSecret(p, clusterWideGitSecret)
+	ns := applicationName(p)
+	newSecret, err = r.fullClient.CoreV1().Secrets(ns).Create(context.TODO(), newSecret, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
