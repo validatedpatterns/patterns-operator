@@ -81,6 +81,12 @@ func getClusterGroupValue(key string, values map[string]any) any {
 	return nil
 }
 
+func reverseStrings(s []string) {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+}
+
 func helmTpl(templateString string, valueFiles []string, values map[string]interface{}) (string, error) {
 	// Create a fake chart with the template.
 	fakeChart := &chart.Chart{
@@ -97,10 +103,18 @@ func helmTpl(templateString string, valueFiles []string, values map[string]inter
 		},
 	}
 
-	// Load and merge values from the specified value files.
+	// Load and merge values from the specified value files. Note that the ordering is a bit
+	// unexpected. The first values added are the more specific ones that will win
 	mergedValues := make(map[string]interface{})
+	mergedValues = chartutil.CoalesceTables(mergedValues, values)
+	reverseStrings(valueFiles) // When using CoalesceTables the first values take precedence
 	for _, fileName := range valueFiles {
-		fileValues, err := chartutil.ReadValuesFile(filepath.Clean(fileName))
+		fname := filepath.Clean(fileName)
+		// If the file does not exist we simply skip it
+		if _, err := os.Stat(fname); os.IsNotExist(err) {
+			continue
+		}
+		fileValues, err := chartutil.ReadValuesFile(fname)
 		if err != nil {
 			return "", fmt.Errorf("error reading values file %s: %w", fileName, err)
 		}
