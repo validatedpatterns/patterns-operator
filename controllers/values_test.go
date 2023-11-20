@@ -10,42 +10,6 @@ import (
 )
 
 var _ = Describe("Helm Values", func() {
-	Describe("mergeMaps", func() {
-		It("should merge two maps", func() {
-			map1 := map[string]any{"key1": "value1", "key2": "value2"}
-			map2 := map[string]any{"key2": "newvalue2", "key3": "value3"}
-
-			merged := mergeMaps(map1, map2)
-
-			Expect(merged).To(HaveLen(3))
-			Expect(merged).To(HaveKeyWithValue("key1", "value1"))
-			Expect(merged).To(HaveKeyWithValue("key2", "newvalue2"))
-			Expect(merged).To(HaveKeyWithValue("key3", "value3"))
-		})
-
-		It("should handle nested maps", func() {
-			map1 := map[string]any{
-				"key1": "value1",
-				"key2": map[string]any{"nestedKey1": "nestedValue1"},
-			}
-			map2 := map[string]any{
-				"key2": map[string]any{"nestedKey2": "nestedValue2"},
-				"key3": "value3",
-			}
-
-			merged := mergeMaps(map1, map2)
-
-			Expect(merged).To(HaveLen(3))
-			Expect(merged).To(HaveKeyWithValue("key1", "value1"))
-
-			nestedMap := merged["key2"].(map[string]any)
-			Expect(nestedMap).To(HaveKeyWithValue("nestedKey1", "nestedValue1"))
-			Expect(nestedMap).To(HaveKeyWithValue("nestedKey2", "nestedValue2"))
-
-			Expect(merged).To(HaveKeyWithValue("key3", "value3"))
-		})
-	})
-
 	Describe("mergeHelmValues", func() {
 		It("should merge Helm flat values", func() {
 			filePaths := []string{

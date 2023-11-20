@@ -193,13 +193,8 @@ func getSharedValueFiles(p *api.Pattern) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("Type assertion failed at index %d: Not a string", i)
 		}
-		log.Printf("BANDO1 working on %s", v)
 		valueMap := convertArgoHelmParametersToMap(newApplicationParameters(p))
-		log.Printf("BANDO2 valueMap %v", valueMap)
-		log.Printf("BANDO3 valuesiles %v", valueFiles)
-		log.Printf("BANDO4 string %s", str)
 		templatedString, err := helmTpl(str, valueFiles, valueMap)
-		log.Printf("BANDO5 templatedString %s - %v", templatedString, err)
 
 		// we only log an error, but try to keep going
 		if err != nil {
