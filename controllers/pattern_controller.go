@@ -172,6 +172,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 		}
 	}
+	// FIXME(bandini): checkout needs to run a fetch all when it fails with failed: unknown target
+	// Use case is that a user might change branch after installation and that branch is not present
+	// in the locally checked out repo
 	if err = checkoutRevision(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, qualifiedInstance.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
 		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
 	}

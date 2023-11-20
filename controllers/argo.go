@@ -115,6 +115,28 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 	return parameters
 }
 
+func convertArgoHelmParametersToMap(params []argoapi.HelmParameter) map[string]any {
+	result := make(map[string]interface{})
+
+	for _, p := range params {
+		keys := strings.Split(p.Name, ".")
+		lastKeyIndex := len(keys) - 1
+
+		currentMap := result
+		for i, key := range keys {
+			if i == lastKeyIndex {
+				currentMap[key] = p.Value
+			} else {
+				if _, ok := currentMap[key]; !ok {
+					currentMap[key] = make(map[string]interface{})
+				}
+				currentMap = currentMap[key].(map[string]interface{})
+			}
+		}
+	}
+	return result
+}
+
 func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
 	files := []string{
 		fmt.Sprintf("%s/values-global.yaml", prefix),
