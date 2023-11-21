@@ -642,7 +642,7 @@ func (r *PatternReconciler) copyAuthGitSecret(p *api.Pattern, namespace, secret 
 	}
 	newSecret := newNamespacedGitSecret(p, clusterWideGitSecret)
 	ns := applicationName(p)
-	newSecret, err = r.fullClient.CoreV1().Secrets(ns).Create(context.TODO(), newSecret, metav1.CreateOptions{})
+	_, err = r.fullClient.CoreV1().Secrets(ns).Create(context.TODO(), newSecret, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
