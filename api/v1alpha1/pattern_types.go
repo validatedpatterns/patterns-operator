@@ -126,9 +126,9 @@ type MultiSourceConfig struct {
 	HelmRepoUrl string `json:"helmRepoUrl,omitempty"`
 
 	// Which chart version for the clustergroup helm chart
-	// Defaults to "0.0.*"
+	// Defaults to "0.8.*"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
-	// +kubebuilder:default:="0.0.*"
+	// +kubebuilder:default:="0.8.*"
 	ClusterGroupChartVersion string `json:"clusterGroupChartVersion,omitempty"`
 
 	// The url when deploying the clustergroup helm chart directly from a git repo
