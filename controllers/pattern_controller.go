@@ -371,7 +371,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
 	}
 	if output.Spec.MultiSourceConfig.ClusterGroupChartVersion == "" {
-		output.Spec.MultiSourceConfig.ClusterGroupChartVersion = "0.0.*"
+		output.Spec.MultiSourceConfig.ClusterGroupChartVersion = "0.8.*"
 	}
 
 	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
