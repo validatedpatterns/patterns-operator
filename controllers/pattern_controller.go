@@ -630,7 +630,7 @@ func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[str
 	tokenSecret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
-		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", secret, namespace))
+		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", namespace, secret))
 		return nil, err
 	}
 	return tokenSecret.Data, nil
