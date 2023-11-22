@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal AS builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS builder
 RUN microdnf install git-core golang -y && microdnf clean all
 
 # ubi8 now has golang 1.19 so we use that.
@@ -38,7 +38,7 @@ RUN --mount=type=secret,id=apikey hack/build.sh
 # FROM gcr.io/distroless/static:nonroot
 
 # UBI is larger (158Mb vs. 56Mb) but approved by RH
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi9/ubi-minimal
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
