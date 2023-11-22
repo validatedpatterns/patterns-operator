@@ -64,14 +64,28 @@ spec:
       - description: URLs to additional Helm parameter files
         displayName: Extra Value Files
         path: extraValueFiles
+      - description: Optional. K8s secret name where the info for connecting to git
+          can be found. The supported secrets are modeled after the private repositories
+          in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
+          currently ssh and username+password are supported
+        displayName: Token Secret
+        path: gitSpec.tokenSecret
+      - displayName: Git Ops Config
+        path: gitOpsSpec
+      - description: Optional. K8s secret namespace where the token for connecting
+          to git can be found
+        displayName: Token Secret Namespace
+        path: gitSpec.tokenSecretNamespace
+      - description: Analytics UUID. Leave empty to autogenerate a random one. Not
+          PII information
+        displayName: Analytics UUID
+        path: analyticsUUID
       - description: (EXPERIMENTAL) Enable multi-source support when deploying the
           clustergroup argo application
         displayName: Enabled
         path: multiSourceConfig.enabled
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - displayName: Git Ops Config
-        path: gitOpsSpec
       - description: The helm chart url to fetch the helm charts from in order to
           deploy the pattern. Defaults to https://charts.validatedpatterns.io/
         displayName: Helm Repo Url

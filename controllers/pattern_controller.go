@@ -85,6 +85,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=list;get;create;update;patch
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
