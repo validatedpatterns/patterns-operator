@@ -222,6 +222,7 @@ func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]
 	} else {
 		fmt.Printf("%s\n", ref.Hash())
 	}
+
 	return nil
 }
 
@@ -262,6 +263,7 @@ func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, e
 		}
 		options.Auth = publicKey
 	}
+
 	return options, nil
 }
 

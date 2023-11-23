@@ -237,6 +237,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	logOnce("namespace found")
+	// Copy the bootstrap secret to the namespaced argo namespace
+	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
+		if err = r.copyAuthGitSecret(qualifiedInstance, qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+			qualifiedInstance.Spec.GitConfig.TokenSecret, ApplicationNamespace, "private-repo-credentials"); err != nil {
+			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
+		}
+	}
 
 	var targetApp *argoapi.Application
 	// -- ArgoCD Application
@@ -268,7 +275,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
-		if err = r.copyAuthGitSecret(qualifiedInstance, qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret); err != nil {
+		if err = r.copyAuthGitSecret(qualifiedInstance, qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+			qualifiedInstance.Spec.GitConfig.TokenSecret, applicationName(qualifiedInstance), "private-repo-credentials"); err != nil {
 			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
 		}
 	}
@@ -636,14 +644,24 @@ func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[str
 	return tokenSecret.Data, nil
 }
 
-func (r *PatternReconciler) copyAuthGitSecret(p *api.Pattern, namespace, secret string) error {
-	clusterWideGitSecret, err := r.authGitFromSecret(namespace, secret)
+func newSecret(name, namespace string, secret map[string][]byte) *corev1.Secret {
+	k8sSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: secret,
+	}
+	return k8sSecret
+}
+
+func (r *PatternReconciler) copyAuthGitSecret(p *api.Pattern, secretNamespace, secretName, destNamespace, destSecretName string) error {
+	clusterWideGitSecret, err := r.authGitFromSecret(secretNamespace, secretName)
 	if err != nil {
 		return err
 	}
-	newSecret := newNamespacedGitSecret(p, clusterWideGitSecret)
-	ns := applicationName(p)
-	_, err = r.fullClient.CoreV1().Secrets(ns).Create(context.TODO(), newSecret, metav1.CreateOptions{})
+	newSecretCopy := newSecret(destSecretName, destNamespace, clusterWideGitSecret)
+	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Create(context.TODO(), newSecretCopy, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

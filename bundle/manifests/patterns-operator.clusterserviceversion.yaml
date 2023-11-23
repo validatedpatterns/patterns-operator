@@ -197,8 +197,11 @@ spec:
           resources:
           - secrets
           verbs:
+          - create
           - get
           - list
+          - patch
+          - update
         - apiGroups:
           - argoproj.io
           resources:
