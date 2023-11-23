@@ -239,7 +239,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
-		if err = r.copyAuthGitSecret(qualifiedInstance, qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
 			qualifiedInstance.Spec.GitConfig.TokenSecret, ApplicationNamespace, "private-repo-credentials"); err != nil {
 			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
 		}
@@ -275,7 +275,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
-		if err = r.copyAuthGitSecret(qualifiedInstance, qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
 			qualifiedInstance.Spec.GitConfig.TokenSecret, applicationName(qualifiedInstance), "private-repo-credentials"); err != nil {
 			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
 		}
@@ -649,21 +649,31 @@ func newSecret(name, namespace string, secret map[string][]byte) *corev1.Secret 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"argocd.argoproj.io/secret-type": "repository",
+			},
 		},
 		Data: secret,
 	}
 	return k8sSecret
 }
 
-func (r *PatternReconciler) copyAuthGitSecret(p *api.Pattern, secretNamespace, secretName, destNamespace, destSecretName string) error {
+func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destNamespace, destSecretName string) error {
 	clusterWideGitSecret, err := r.authGitFromSecret(secretNamespace, secretName)
 	if err != nil {
 		return err
 	}
 	newSecretCopy := newSecret(destSecretName, destNamespace, clusterWideGitSecret)
-	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Create(context.TODO(), newSecretCopy, metav1.CreateOptions{})
+	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Get(context.TODO(), destSecretName, metav1.GetOptions{})
 	if err != nil {
+		if kerrors.IsNotFound(err) {
+			// Resource does not exist, create it
+			_, err = r.fullClient.CoreV1().Secrets(destNamespace).Create(context.TODO(), newSecretCopy, metav1.CreateOptions{})
+			return err
+		}
 		return err
 	}
-	return nil
+
+	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
+	return err
 }
