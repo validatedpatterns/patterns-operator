@@ -55,6 +55,11 @@ var _ = Describe("Git Functions", func() {
 			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "", nil)
 			Expect(err).To(BeNil())
 		})
+
+		It("should checkout a repository and switch to its remote branch", func() {
+			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "test-do-not-use", nil)
+			Expect(err).To(BeNil())
+		})
 	})
 
 	Context("getHashFromReference", func() {

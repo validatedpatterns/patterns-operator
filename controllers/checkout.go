@@ -137,6 +137,9 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	if h, err := getHashFromReference(repo, plumbing.NewRemoteHEADReferenceName(name)); err == nil {
 		return h, nil
 	}
+	if h, err := getHashFromReference(repo, plumbing.NewRemoteReferenceName("origin", name)); err == nil {
+		return h, nil
+	}
 
 	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
 }
@@ -228,7 +231,7 @@ func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]
 
 func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, error) {
 	var foptions = &git.FetchOptions{
-		//RemoteName:      "origin",
+		RemoteName:      "origin",
 		Force:           true,
 		InsecureSkipTLS: true,
 		Tags:            git.AllTags,
@@ -249,8 +252,8 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, error) {
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
-		URL: url,
-		//RemoteName:   "origin",
+		URL:          url,
+		RemoteName:   "origin",
 		Progress:     os.Stdout,
 		Depth:        0,
 		SingleBranch: false,

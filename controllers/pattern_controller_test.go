@@ -72,6 +72,7 @@ var _ = Describe("pattern controller", func() {
 				Progress: os.Stdout,
 				Depth:    0,
 				// ReferenceName: plumbing.ReferenceName,
+				RemoteName:   "origin",
 				SingleBranch: false,
 				Tags:         git.AllTags,
 			}
