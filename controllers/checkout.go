@@ -181,7 +181,6 @@ func checkoutRevision(gitOps GitOperations, url, directory, commit string, secre
 		fmt.Printf("Error during checkout")
 		return err
 	}
-
 	// ... retrieving the commit being pointed by HEAD, it shows that the
 	// repository is pointing to the giving commit in detached mode
 	fmt.Println("git show-ref --head HEAD")
@@ -202,6 +201,7 @@ func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]
 		return nil
 	}
 	fmt.Printf("git clone %s into %s\n", url, directory)
+
 	options, err := getCloneOptions(url, secret)
 	if err != nil {
 		return err
@@ -228,6 +228,7 @@ func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]
 
 func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, error) {
 	var foptions = &git.FetchOptions{
+		//RemoteName:      "origin",
 		Force:           true,
 		InsecureSkipTLS: true,
 		Tags:            git.AllTags,
@@ -248,9 +249,12 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, error) {
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
-		URL:      url,
-		Progress: os.Stdout,
-		Depth:    0,
+		URL: url,
+		//RemoteName:   "origin",
+		Progress:     os.Stdout,
+		Depth:        0,
+		SingleBranch: false,
+		Tags:         git.AllTags,
 	}
 
 	authType := detectGitAuthType(secret)

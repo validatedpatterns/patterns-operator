@@ -400,8 +400,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	}
 
 	if output.Spec.GitConfig.Hostname == "" {
-		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
-		output.Spec.GitConfig.Hostname = ss[2]
+		hostname, err := extractGitFQDNHostname(output.Spec.GitConfig.TargetRepo)
+		if err != nil {
+			hostname = ""
+		}
+		output.Spec.GitConfig.Hostname = hostname
 	}
 
 	if output.Spec.MultiSourceConfig.Enabled == nil {

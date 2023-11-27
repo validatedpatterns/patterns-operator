@@ -98,7 +98,7 @@ spec:
                     type: integer
                   targetRepo:
                     description: Git repo containing the pattern to deploy. Must use
-                      https/http
+                      https/http or, for ssh, git@server:foo/bar.git
                     type: string
                   targetRevision:
                     description: 'Branch, tag, or commit to deploy.  Does not support

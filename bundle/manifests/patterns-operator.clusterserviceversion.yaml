@@ -46,6 +46,7 @@ spec:
       - displayName: Name
         path: extraParameters[0].name
       - description: Git repo containing the pattern to deploy. Must use https/http
+          or, for ssh, git@server:foo/bar.git
         displayName: Target Repo
         path: gitSpec.targetRepo
       - displayName: Value

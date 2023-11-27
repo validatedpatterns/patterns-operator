@@ -179,6 +179,9 @@ func getSharedValueFiles(p *api.Pattern) ([]string, error) {
 		return nil, fmt.Errorf("Could not fetch value files: %s", err)
 	}
 	sharedValueFiles := getClusterGroupValue("sharedValueFiles", helmValues)
+	if sharedValueFiles == nil {
+		return nil, nil
+	}
 
 	// Check if s is of type []interface{}
 	val, ok := sharedValueFiles.([]any)
