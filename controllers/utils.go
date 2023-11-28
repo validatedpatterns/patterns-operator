@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/url"
@@ -218,4 +219,20 @@ func validGitRepoURL(repoURL string) error {
 	default:
 		return errors.New(fmt.Errorf("repository URL must be either http/https or start with git@ when using ssh authentication: %s", repoURL))
 	}
+}
+
+// compareMaps compares two map[string][]byte and returns true if they are equal.
+func compareMaps(m1, m2 map[string][]byte) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+
+	for key, val1 := range m1 {
+		val2, ok := m2[key]
+		if !ok || !bytes.Equal(val1, val2) {
+			return false
+		}
+	}
+
+	return true
 }

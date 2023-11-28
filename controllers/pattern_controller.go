@@ -85,7 +85,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=list;get;create;update;patch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=list;get;create;update;patch;watch
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -173,9 +173,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
 		}
 	}
-	// FIXME(bandini): checkout needs to run a fetch all when it fails with failed: unknown target
-	// Use case is that a user might change branch after installation and that branch is not present
-	// in the locally checked out repo
 	if err = checkoutRevision(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, qualifiedInstance.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
 		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
 	}
@@ -662,11 +659,11 @@ func newSecret(name, namespace string, secret map[string][]byte) *corev1.Secret 
 }
 
 func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destNamespace, destSecretName string) error {
-	clusterWideGitSecret, err := r.authGitFromSecret(secretNamespace, secretName)
+	sourceSecret, err := r.authGitFromSecret(secretNamespace, secretName)
 	if err != nil {
 		return err
 	}
-	newSecretCopy := newSecret(destSecretName, destNamespace, clusterWideGitSecret)
+	newSecretCopy := newSecret(destSecretName, destNamespace, sourceSecret)
 	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Get(context.TODO(), destSecretName, metav1.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -677,6 +674,10 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 		return err
 	}
 
-	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
+	// The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
+	updatedSecret, err := r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
+	if err == nil && !compareMaps(newSecretCopy.Data, updatedSecret.Data) {
+		return fmt.Errorf("The secret at %s/%s has been updated", destNamespace, destSecretName)
+	}
 	return err
 }
