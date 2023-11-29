@@ -203,6 +203,7 @@ spec:
           - list
           - patch
           - update
+          - watch
         - apiGroups:
           - argoproj.io
           resources:
