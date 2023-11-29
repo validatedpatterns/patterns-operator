@@ -80,6 +80,16 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		},
 	}
 
+	if len(p.Status.ExtraClusterInfo) > 0 {
+		for k, v := range p.Status.ExtraClusterInfo {
+			h := argoapi.HelmParameter{
+				Name:  fmt.Sprintf("global.extraClusterInfo.%s", k),
+				Value: v,
+			}
+			parameters = append(parameters, h)
+		}
+	}
+
 	if p.Spec.MultiSourceConfig.Enabled {
 		multiSourceParameters := []argoapi.HelmParameter{
 			{
