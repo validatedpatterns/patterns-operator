@@ -76,6 +76,10 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Value: p.Status.ClusterName,
 		},
 		{
+			Name:  "global.privateRepo",
+			Value: strconv.FormatBool(p.Spec.GitConfig.TokenSecret != ""),
+		},
+		{
 			Name:  "global.multiSourceSupport",
 			Value: strconv.FormatBool(*p.Spec.MultiSourceConfig.Enabled),
 		},
