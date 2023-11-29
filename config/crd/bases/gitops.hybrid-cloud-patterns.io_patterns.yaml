@@ -207,6 +207,10 @@ spec:
                   - type
                   type: object
                 type: array
+              extraClusterInfo:
+                additionalProperties:
+                  type: string
+                type: object
               lastError:
                 description: Last error encountered by the pattern
                 type: string

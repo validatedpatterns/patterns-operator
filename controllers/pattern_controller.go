@@ -318,6 +318,24 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		//      type: AWS
 
 		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
+		clusterPlatformStatusType := strings.ToLower(string(clusterInfra.Status.PlatformStatus.Type))
+		var extraClusterInfo map[string]string
+		switch clusterPlatformStatusType {
+		case "aws":
+			for _, v := range clusterInfra.Status.PlatformStatus.AWS.ResourceTags {
+				extraClusterInfo[v.Key] = v.Value
+			}
+		case "azure":
+			extraClusterInfo["ResourceGroupName"] = clusterInfra.Status.PlatformStatus.Azure.ResourceGroupName
+			extraClusterInfo["NetworkResourceGroupName"] = clusterInfra.Status.PlatformStatus.Azure.NetworkResourceGroupName
+		case "ibmcloud":
+			// no particular useful info?
+		case "baremetal":
+			extraClusterInfo["APIServerInternalIP"] = clusterInfra.Status.PlatformStatus.BareMetal.APIServerInternalIP
+			extraClusterInfo["IngressIP"] = clusterInfra.Status.PlatformStatus.BareMetal.IngressIP
+			extraClusterInfo["NodeDNSIP"] = clusterInfra.Status.PlatformStatus.BareMetal.NodeDNSIP
+		}
+		output.Status.ExtraClusterInfo = extraClusterInfo
 	}
 
 	// Cluster Version
