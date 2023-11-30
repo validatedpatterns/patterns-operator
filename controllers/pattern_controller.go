@@ -31,7 +31,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -85,7 +84,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=list;get;create;update;patch;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -635,8 +634,7 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 }
 
 func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {
-	tokenSecret := &corev1.Secret{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
+	tokenSecret, err := r.fullClient.CoreV1().Secrets(namespace).Get(context.TODO(), secret, metav1.GetOptions{})
 	if err != nil {
 		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", namespace, secret))
 		return nil, err
