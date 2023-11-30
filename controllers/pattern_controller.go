@@ -158,26 +158,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if r.AnalyticsClient.SendPatternStartEventInfo(qualifiedInstance) {
 		return r.actionPerformed(qualifiedInstance, "Updated status with start event sent", nil)
 	}
-	var gitAuthSecret map[string][]byte
-	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
-		if gitAuthSecret, err = r.authGitFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret); err != nil {
-			return r.actionPerformed(qualifiedInstance, "obtaining git auth info from secret", err)
-		}
-	}
 
-	gitDir := filepath.Join(qualifiedInstance.Status.LocalCheckoutPath, ".git")
-	if _, err = os.Stat(gitDir); os.IsNotExist(err) {
-		err = cloneRepo(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, gitAuthSecret)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "cloning pattern repo", err)
-		}
-	}
-	if err = checkoutRevision(r.gitOperations, qualifiedInstance.Spec.GitConfig.TargetRepo, qualifiedInstance.Status.LocalCheckoutPath, qualifiedInstance.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
-		return r.actionPerformed(qualifiedInstance, "checkout target revision", err)
-	}
-
-	if err = r.preValidation(qualifiedInstance); err != nil {
-		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
+	ret, err := r.getLocalGit(qualifiedInstance)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, ret, err)
 	}
 
 	// -- Git Drift monitoring
@@ -678,4 +662,31 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 		return fmt.Errorf("The secret at %s/%s has been updated", destNamespace, destSecretName)
 	}
 	return err
+}
+
+func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
+	var gitAuthSecret map[string][]byte
+	var err error
+	if p.Spec.GitConfig.TokenSecret != "" {
+		if gitAuthSecret, err = r.authGitFromSecret(p.Spec.GitConfig.TokenSecretNamespace, p.Spec.GitConfig.TokenSecret); err != nil {
+			return "obtaining git auth info from secret", err
+		}
+	}
+
+	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+		if err != nil {
+			return "cloning pattern repo", err
+		}
+	}
+	if err := checkoutRevision(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
+		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
+		return "checkout target revision", err
+	}
+
+	if err := r.preValidation(p); err != nil {
+		return "prerequisite validation", err
+	}
+	return "", nil
 }
