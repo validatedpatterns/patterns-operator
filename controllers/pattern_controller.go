@@ -319,7 +319,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 
 		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
 		clusterPlatformStatusType := strings.ToLower(string(clusterInfra.Status.PlatformStatus.Type))
-		var extraClusterInfo map[string]string
+		var extraClusterInfo = make(map[string]string)
 		switch clusterPlatformStatusType {
 		case "aws":
 			for _, v := range clusterInfra.Status.PlatformStatus.AWS.ResourceTags {
