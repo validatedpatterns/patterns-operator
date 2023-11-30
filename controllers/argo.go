@@ -170,6 +170,12 @@ func newApplicationValues(p *api.Pattern) string {
 }
 
 // Fetches the clusterGroup.sharedValueFiles values from a checked out git repo
+//  1. We get all the valueFiles from the pattern
+//  2. We parse them and merge them in order
+//  3. Then for each element of the sharedValueFiles list we template it via the helm
+//     libraries. E.g. a string '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+//     will be converted to '/overrides/values-AWS.yaml'
+//  4. We return the list of templated strings back as an array
 func getSharedValueFiles(p *api.Pattern) ([]string, error) {
 	gitDir := p.Status.LocalCheckoutPath
 	if _, err := os.Stat(gitDir); err != nil {
