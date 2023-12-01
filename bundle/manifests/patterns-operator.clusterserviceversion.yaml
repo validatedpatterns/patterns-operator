@@ -143,6 +143,8 @@ spec:
         path: clusterPlatform
       - displayName: Cluster Version
         path: clusterVersion
+      - displayName: Extra Cluster Info
+        path: extraClusterInfo
       - description: Last error encountered by the pattern
         displayName: Last Error
         path: lastError

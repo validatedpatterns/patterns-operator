@@ -198,6 +198,8 @@ type PatternStatus struct {
 	AnalyticsSent int `json:"analyticsSent,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	ExtraClusterInfo map[string]string `json:"extraClusterInfo,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html

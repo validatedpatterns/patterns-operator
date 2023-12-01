@@ -318,6 +318,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		//      type: AWS
 
 		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
+		output.Status.ExtraClusterInfo = getExtraClusterInfo(clusterInfra.Status.PlatformStatus)
 	}
 
 	// Cluster Version
