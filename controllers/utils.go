@@ -190,3 +190,37 @@ func validGitRepoURL(repoURL string) error {
 		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
 	}
 }
+
+func getExtraClusterInfo(platformStatus *configv1.PlatformStatus) map[string]string {
+	if platformStatus == nil {
+		return nil
+	}
+	clusterPlatformStatusType := strings.ToLower(string(platformStatus.Type))
+	var extraClusterInfo = make(map[string]string)
+	switch clusterPlatformStatusType {
+	case "aws":
+		extraClusterInfo["Region"] = platformStatus.AWS.Region
+		for _, v := range platformStatus.AWS.ResourceTags {
+			extraClusterInfo[v.Key] = v.Value
+		}
+	case "azure":
+		extraClusterInfo["CloudName"] = string(platformStatus.Azure.CloudName)
+		extraClusterInfo["ResourceGroupName"] = platformStatus.Azure.ResourceGroupName
+		extraClusterInfo["NetworkResourceGroupName"] = platformStatus.Azure.NetworkResourceGroupName
+		for _, v := range platformStatus.AWS.ResourceTags {
+			extraClusterInfo[v.Key] = v.Value
+		}
+	case "gcp":
+		extraClusterInfo["Region"] = platformStatus.GCP.Region
+		for _, v := range platformStatus.GCP.ResourceTags {
+			extraClusterInfo[v.Key] = v.Value
+		}
+	case "ibmcloud":
+		extraClusterInfo["Location"] = platformStatus.IBMCloud.Location
+	case "baremetal":
+		extraClusterInfo["NodeDNSIP"] = platformStatus.BareMetal.NodeDNSIP
+	default:
+		return nil
+	}
+	return extraClusterInfo
+}
