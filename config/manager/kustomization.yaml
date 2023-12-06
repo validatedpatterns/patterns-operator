@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/hybridcloudpatterns/patterns-operator
-  newTag: 0.0.33
+  newTag: 0.0.34
