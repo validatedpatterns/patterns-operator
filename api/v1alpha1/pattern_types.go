@@ -119,16 +119,12 @@ type MultiSourceConfig struct {
 	// +kubebuilder:default:=true
 	Enabled bool `json:"enabled,omitempty"`
 
-	// The helm chart url to fetch the helm charts from in order to deploy the pattern
-	// Defaults to https://charts.validatedpatterns.io/
+	// The helm chart url to fetch the helm charts from in order to deploy the pattern. Defaults to https://charts.validatedpatterns.io/
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
-	// +kubebuilder:default:="https://charts.validatedpatterns.io/"
 	HelmRepoUrl string `json:"helmRepoUrl,omitempty"`
 
-	// Which chart version for the clustergroup helm chart
-	// Defaults to "0.8.*"
+	// Which chart version for the clustergroup helm chart. Defaults to "0.8.*"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
-	// +kubebuilder:default:="0.8.*"
 	ClusterGroupChartVersion string `json:"clusterGroupChartVersion,omitempty"`
 
 	// The url when deploying the clustergroup helm chart directly from a git repo

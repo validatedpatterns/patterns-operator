@@ -93,7 +93,7 @@ spec:
       - displayName: Git Ops Config
         path: gitOpsSpec
       - description: The helm chart url to fetch the helm charts from in order to
-          deploy the pattern Defaults to https://charts.validatedpatterns.io/
+          deploy the pattern. Defaults to https://charts.validatedpatterns.io/
         displayName: Helm Repo Url
         path: multiSourceConfig.helmRepoUrl
         x-descriptors:
@@ -102,7 +102,7 @@ spec:
           PII information
         displayName: Analytics UUID
         path: analyticsUUID
-      - description: Which chart version for the clustergroup helm chart Defaults
+      - description: Which chart version for the clustergroup helm chart. Defaults
           to "0.8.*"
         displayName: Cluster Group Chart Version
         path: multiSourceConfig.clusterGroupChartVersion
