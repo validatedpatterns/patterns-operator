@@ -27,6 +27,7 @@ var _ = Describe("Argo Pattern", func() {
 	var argoApp, multiSourceArgoApp *argoapi.Application
 	var appSource *argoapi.ApplicationSource
 	BeforeEach(func() {
+		tmpFalse := false
 		pattern = &api.Pattern{
 			ObjectMeta: v1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
 			TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
@@ -37,6 +38,7 @@ var _ = Describe("Argo Pattern", func() {
 					TargetRevision: "main",
 				},
 				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled:                  &tmpFalse,
 					HelmRepoUrl:              "https://charts.validatedpatterns.io/",
 					ClusterGroupChartVersion: "0.0.*",
 				},
@@ -405,7 +407,8 @@ var _ = Describe("Argo Pattern", func() {
 					})))
 			})
 			It("Test newApplicationParameters with multiSource", func() {
-				pattern.Spec.MultiSourceConfig.Enabled = true
+				tmpBool := true
+				pattern.Spec.MultiSourceConfig.Enabled = &tmpBool
 				Expect(newApplicationParameters(pattern)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
