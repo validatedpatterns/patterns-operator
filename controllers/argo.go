@@ -76,11 +76,11 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		},
 		{
 			Name:  "global.multiSourceSupport",
-			Value: strconv.FormatBool(p.Spec.MultiSourceConfig.Enabled),
+			Value: strconv.FormatBool(*p.Spec.MultiSourceConfig.Enabled),
 		},
 	}
 
-	if p.Spec.MultiSourceConfig.Enabled {
+	if *p.Spec.MultiSourceConfig.Enabled {
 		multiSourceParameters := []argoapi.HelmParameter{
 			{
 				Name:  "global.multiSourceRepoUrl",

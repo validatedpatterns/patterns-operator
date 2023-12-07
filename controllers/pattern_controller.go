@@ -214,7 +214,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var targetApp *argoapi.Application
 	// -- ArgoCD Application
-	if qualifiedInstance.Spec.MultiSourceConfig.Enabled {
+	if *qualifiedInstance.Spec.MultiSourceConfig.Enabled {
 		targetApp = newMultiSourceApplication(qualifiedInstance)
 	} else {
 		targetApp = newApplication(qualifiedInstance)
@@ -364,6 +364,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.GitConfig.Hostname = ss[2]
 	}
 
+	if output.Spec.MultiSourceConfig.Enabled == nil {
+		multiSourceBool := true
+		output.Spec.MultiSourceConfig.Enabled = &multiSourceBool
+	}
 	if output.Spec.ClusterGroupName == "" {
 		output.Spec.ClusterGroupName = "default"
 	}
