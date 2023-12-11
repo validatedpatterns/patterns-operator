@@ -348,3 +348,24 @@ func getField(secret map[string][]byte, field string) []byte {
 	}
 	return nil
 }
+
+func getGitRemoteURL(repoPath, remoteName string) (string, error) {
+	// Open the given repository
+	r, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Retrieve the remote configuration
+	remote, err := r.Remote(remoteName)
+	if err != nil {
+		return "", err
+	}
+
+	// Get the first URL from the remote config (remotes can have multiple URLs)
+	if len(remote.Config().URLs) == 0 {
+		return "", fmt.Errorf("remote %s has no URLs", remoteName)
+	}
+
+	return remote.Config().URLs[0], nil
+}
