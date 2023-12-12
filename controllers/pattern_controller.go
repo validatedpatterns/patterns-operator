@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +69,7 @@ type PatternReconciler struct {
 	dynamicClient  dynamic.Interface
 	operatorClient operatorclient.OperatorV1Interface
 	driftWatcher   driftWatcher
+	gitOperations  GitOperations
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -80,6 +84,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
 //
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -154,8 +159,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "Updated status with start event sent", nil)
 	}
 
-	if err = r.preValidation(qualifiedInstance); err != nil {
-		return r.actionPerformed(qualifiedInstance, "prerequisite validation", err)
+	ret, err := r.getLocalGit(qualifiedInstance)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, ret, err)
 	}
 
 	// -- Git Drift monitoring
@@ -211,6 +217,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	logOnce("namespace found")
+	// Copy the bootstrap secret to the namespaced argo namespace
+	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
+		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+			qualifiedInstance.Spec.GitConfig.TokenSecret, ApplicationNamespace, "vp-private-repo-credentials"); err != nil {
+			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
+		}
+	}
 
 	var targetApp *argoapi.Application
 	// -- ArgoCD Application
@@ -240,6 +253,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
 	}
 
+	// Copy the bootstrap secret to the namespaced argo namespace
+	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
+		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+			qualifiedInstance.Spec.GitConfig.TokenSecret, applicationName(qualifiedInstance), "vp-private-repo-credentials"); err != nil {
+			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
+		}
+	}
 	// Perform validation of the site values file(s)
 	if err = r.postValidation(qualifiedInstance); err != nil {
 		return r.actionPerformed(qualifiedInstance, "validation", err)
@@ -360,8 +380,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	}
 
 	if output.Spec.GitConfig.Hostname == "" {
-		ss := strings.Split(output.Spec.GitConfig.TargetRepo, "/")
-		output.Spec.GitConfig.Hostname = ss[2]
+		hostname, err := extractGitFQDNHostname(output.Spec.GitConfig.TargetRepo)
+		if err != nil {
+			hostname = ""
+		}
+		output.Spec.GitConfig.Hostname = hostname
 	}
 
 	if output.Spec.MultiSourceConfig.Enabled == nil {
@@ -382,6 +405,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	// value of -1 effectively disables the watch for this pattern.
 	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
 		output.Spec.GitConfig.PollInterval = 180
+	}
+
+	if output.Status.LocalCheckoutPath == "" {
+		output.Status.LocalCheckoutPath = filepath.Join(os.TempDir(), output.Namespace, output.Name)
 	}
 
 	return output, nil
@@ -471,6 +498,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
+	r.gitOperations = &GitOperationsImpl{}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
@@ -587,4 +615,94 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	}
 
 	return false, nil
+}
+
+func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {
+	tokenSecret, err := r.fullClient.CoreV1().Secrets(namespace).Get(context.TODO(), secret, metav1.GetOptions{})
+	if err != nil {
+		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", namespace, secret))
+		return nil, err
+	}
+	return tokenSecret.Data, nil
+}
+
+func newSecret(name, namespace string, secret map[string][]byte) *corev1.Secret {
+	k8sSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"argocd.argoproj.io/secret-type": "repository",
+			},
+		},
+		Data: secret,
+	}
+	return k8sSecret
+}
+
+func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destNamespace, destSecretName string) error {
+	sourceSecret, err := r.authGitFromSecret(secretNamespace, secretName)
+	if err != nil {
+		return err
+	}
+	newSecretCopy := newSecret(destSecretName, destNamespace, sourceSecret)
+	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Get(context.TODO(), destSecretName, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			// Resource does not exist, create it
+			_, err = r.fullClient.CoreV1().Secrets(destNamespace).Create(context.TODO(), newSecretCopy, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	// The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
+	updatedSecret, err := r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
+	if err == nil && !compareMaps(newSecretCopy.Data, updatedSecret.Data) {
+		return fmt.Errorf("The secret at %s/%s has been updated", destNamespace, destSecretName)
+	}
+	return err
+}
+
+func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
+	var gitAuthSecret map[string][]byte
+	var err error
+	if p.Spec.GitConfig.TokenSecret != "" {
+		if gitAuthSecret, err = r.authGitFromSecret(p.Spec.GitConfig.TokenSecretNamespace, p.Spec.GitConfig.TokenSecret); err != nil {
+			return "obtaining git auth info from secret", err
+		}
+	}
+
+	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+		if err != nil {
+			return "cloning pattern repo", err
+		}
+	} else { // If the cloned repository directory already existed we check if the URL changed
+		localURL, err := getGitRemoteURL(gitDir, "origin")
+		if err != nil {
+			return "getting remote URL pattern repo", err
+		}
+		if localURL != p.Spec.GitConfig.TargetRepo {
+			fmt.Printf("Locally cloned URL is different from what is in the Spec, blowing away the folder and recloning")
+			err = os.RemoveAll(gitDir)
+			if err != nil {
+				return "failed to remove locally cloned folder", err
+			}
+			err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+			if err != nil {
+				return "cloning pattern repo after removal", err
+			}
+		}
+	}
+	if err := checkoutRevision(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
+		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
+		return "checkout target revision", err
+	}
+
+	if err := r.preValidation(p); err != nil {
+		return "prerequisite validation", err
+	}
+	return "", nil
 }

@@ -19,6 +19,15 @@ rules:
   - get
   - list
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - update
+  - watch
+- apiGroups:
   - argoproj.io
   resources:
   - applications

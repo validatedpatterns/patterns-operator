@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -75,6 +76,10 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Value: p.Status.ClusterName,
 		},
 		{
+			Name:  "global.privateRepo",
+			Value: strconv.FormatBool(p.Spec.GitConfig.TokenSecret != ""),
+		},
+		{
 			Name:  "global.multiSourceSupport",
 			Value: strconv.FormatBool(*p.Spec.MultiSourceConfig.Enabled),
 		},
@@ -114,6 +119,28 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 	return parameters
 }
 
+func convertArgoHelmParametersToMap(params []argoapi.HelmParameter) map[string]any {
+	result := make(map[string]any)
+
+	for _, p := range params {
+		keys := strings.Split(p.Name, ".")
+		lastKeyIndex := len(keys) - 1
+
+		currentMap := result
+		for i, key := range keys {
+			if i == lastKeyIndex {
+				currentMap[key] = p.Value
+			} else {
+				if _, ok := currentMap[key]; !ok {
+					currentMap[key] = make(map[string]any)
+				}
+				currentMap = currentMap[key].(map[string]any)
+			}
+		}
+	}
+	return result
+}
+
 func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
 	files := []string{
 		fmt.Sprintf("%s/values-global.yaml", prefix),
@@ -140,6 +167,57 @@ func newApplicationValues(p *api.Pattern) string {
 		s += line
 	}
 	return s
+}
+
+// Fetches the clusterGroup.sharedValueFiles values from a checked out git repo
+//  1. We get all the valueFiles from the pattern
+//  2. We parse them and merge them in order
+//  3. Then for each element of the sharedValueFiles list we template it via the helm
+//     libraries. E.g. a string '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+//     will be converted to '/overrides/values-AWS.yaml'
+//  4. We return the list of templated strings back as an array
+func getSharedValueFiles(p *api.Pattern) ([]string, error) {
+	gitDir := p.Status.LocalCheckoutPath
+	if _, err := os.Stat(gitDir); err != nil {
+		return nil, fmt.Errorf("%s path does not exist", gitDir)
+	}
+
+	valueFiles := newApplicationValueFiles(p, gitDir)
+
+	helmValues, err := mergeHelmValues(valueFiles...)
+	if err != nil {
+		return nil, fmt.Errorf("Could not fetch value files: %s", err)
+	}
+	sharedValueFiles := getClusterGroupValue("sharedValueFiles", helmValues)
+	if sharedValueFiles == nil {
+		return nil, nil
+	}
+
+	// Check if s is of type []interface{}
+	val, ok := sharedValueFiles.([]any)
+	if !ok {
+		return nil, fmt.Errorf("Could not make a list out of sharedValueFiles: %v", sharedValueFiles)
+	}
+
+	// Convert each element of slice to a string
+	stringSlice := make([]string, len(val))
+	for i, v := range val {
+		str, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("Type assertion failed at index %d: Not a string", i)
+		}
+		valueMap := convertArgoHelmParametersToMap(newApplicationParameters(p))
+		templatedString, err := helmTpl(str, valueFiles, valueMap)
+
+		// we only log an error, but try to keep going
+		if err != nil {
+			log.Printf("Failed to render templated string %s: %v", str, err)
+		} else {
+			stringSlice[i] = templatedString
+		}
+	}
+
+	return stringSlice, nil
 }
 
 func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
@@ -197,8 +275,15 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 }
 
 func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
+	valueFiles := newApplicationValueFiles(p, prefix)
+	sharedValueFiles, err := getSharedValueFiles(p)
+	if err != nil {
+		fmt.Printf("Could not fetch sharedValueFiles: %s", err)
+	}
+	valueFiles = append(valueFiles, sharedValueFiles...)
+
 	return &argoapi.ApplicationSourceHelm{
-		ValueFiles: newApplicationValueFiles(p, prefix),
+		ValueFiles: valueFiles,
 
 		// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
 		Parameters: newApplicationParameters(p),

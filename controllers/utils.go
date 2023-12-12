@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/url"
@@ -161,6 +162,14 @@ func parseAndReturnVersion(versionStr string) (*semver.Version, error) {
 
 // Extract the last part of a git repo url
 func extractRepositoryName(gitURL string) (string, error) {
+	if strings.HasPrefix(gitURL, "git@") {
+		parts := strings.Split(gitURL, ":")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid ssh git URL")
+		}
+		s := strings.TrimSuffix(parts[1], "/") // remove trailing slash for repos like git@github.com:mbaldessari/common.git/
+		return path.Base(strings.TrimSuffix(s, ".git")), nil
+	}
 	// We use ParseRequestURI because the URL is assument to be absolute
 	// and we want to error out if that is not the case
 	parsedURL, err := url.ParseRequestURI(gitURL)
@@ -179,14 +188,51 @@ func extractRepositoryName(gitURL string) (string, error) {
 	return repoName, nil
 }
 
+func extractGitFQDNHostname(gitURL string) (string, error) {
+	if strings.HasPrefix(gitURL, "git@") {
+		parts := strings.Split(gitURL, "@")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid SSH git URL")
+		}
+		domainParts := strings.Split(parts[1], ":")
+		return domainParts[0], nil
+	}
+
+	// Parse the URL for HTTP/HTTPS
+	parsedURL, err := url.ParseRequestURI(gitURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing URL: %w", err)
+	}
+	if parsedURL.Hostname() == "" {
+		return "", fmt.Errorf("error parsing URL (empty hostname): %s", gitURL)
+	}
+	return parsedURL.Hostname(), nil
+}
+
 func validGitRepoURL(repoURL string) error {
 	switch {
 	case strings.HasPrefix(repoURL, "git@"):
-		return errors.New(fmt.Errorf("invalid repository URL: %s", repoURL))
+		return nil
 	case strings.HasPrefix(repoURL, "https://"),
 		strings.HasPrefix(repoURL, "http://"):
 		return nil
 	default:
-		return errors.New(fmt.Errorf("repository URL must be either http/https: %s", repoURL))
+		return errors.New(fmt.Errorf("repository URL must be either http/https or start with git@ when using ssh authentication: %s", repoURL))
 	}
+}
+
+// compareMaps compares two map[string][]byte and returns true if they are equal.
+func compareMaps(m1, m2 map[string][]byte) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+
+	for key, val1 := range m1 {
+		val2, ok := m2[key]
+		if !ok || !bytes.Equal(val1, val2) {
+			return false
+		}
+	}
+
+	return true
 }

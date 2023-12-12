@@ -369,6 +369,11 @@ var _ = Describe("Argo Pattern", func() {
 						Value:       "barcluster",
 						ForceString: false,
 					},
+					{
+						Name:        "global.privateRepo",
+						Value:       "false",
+						ForceString: false,
+					},
 				}
 			})
 			It("Test default newApplicationParameters", func() {

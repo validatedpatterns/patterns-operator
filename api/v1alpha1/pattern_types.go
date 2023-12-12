@@ -83,11 +83,8 @@ type PatternSpec struct {
 
 type GitConfig struct {
 	// Account              string `json:"account,omitempty"`
-	// TokenSecret          string `json:"tokenSecret,omitempty"`
-	// TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
-	// TokenSecretKey       string `json:"tokenSecretKey,omitempty"`
 
-	// Git repo containing the pattern to deploy. Must use https/http
+	// Git repo containing the pattern to deploy. Must use https/http or, for ssh, git@server:foo/bar.git
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	TargetRepo string `json:"targetRepo"`
 
@@ -111,11 +108,21 @@ type GitConfig struct {
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=6
 	Hostname string `json:"hostname,omitempty"`
+
+	// Optional. K8s secret name where the info for connecting to git can be found. The supported secrets are modeled after the
+	// private repositories in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
+	// currently ssh and username+password are supported
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7
+	TokenSecret string `json:"tokenSecret,omitempty"`
+
+	// Optional. K8s secret namespace where the token for connecting to git can be found
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 }
 
 type MultiSourceConfig struct {
 	// (EXPERIMENTAL) Enable multi-source support when deploying the clustergroup argo application
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
 
@@ -129,12 +136,12 @@ type MultiSourceConfig struct {
 
 	// The url when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to '' which means not used (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=12,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	ClusterGroupGitRepoUrl string `json:"clusterGroupGitRepoUrl,omitempty"`
 
 	// The git reference when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to 'main'. (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=13,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	// +kubebuilder:default:="main"
 	ClusterGroupChartGitRevision string `json:"clusterGroupChartGitRevision,omitempty"`
 }
@@ -194,6 +201,8 @@ type PatternStatus struct {
 	AnalyticsSent int `json:"analyticsSent,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	LocalCheckoutPath string `json:"path,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html

@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -38,11 +39,24 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var tempDir string
+var gitOpsImpl *GitOperationsImpl
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
+}
+
+func createTempDir(base string) string {
+	td, err := os.MkdirTemp("", base)
+	Expect(err).ToNot(HaveOccurred())
+	return td
+}
+
+func cleanupTempDir(tempDir string) {
+	err := os.RemoveAll(tempDir)
+	Expect(err).ToNot(HaveOccurred())
 }
 
 var _ = BeforeSuite(func() {
@@ -69,10 +83,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	tempDir = createTempDir("vp-test")
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+	cleanupTempDir(tempDir)
 })
