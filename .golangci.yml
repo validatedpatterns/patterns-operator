@@ -99,10 +99,12 @@ linters:
     - gofmt
     - goimports
     - gomnd
+    - gomodguard
     - goprintffuncname
     - gosec
     - gosimple
     - govet
+    - importas
     - ineffassign
     - lll
     - misspell
@@ -110,6 +112,7 @@ linters:
     - noctx
     - nolintlint
     - revive
+    - sloglint
     - staticcheck
     # - stylecheck
     - typecheck
