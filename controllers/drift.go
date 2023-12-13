@@ -243,8 +243,12 @@ func (d *watcher) stopTimer() {
 	if d.timer != nil {
 		// ...stop the timer. Any ongoing timer is no longer valid as there are going to be changes to the slice
 		if d.timer.Stop() {
-			// if the timer function is in progress, at this point is waiting to get the lock. Flag timerCancelled as true to notify the routine to exit as soon as it gets the lock and ensure
-			// that the function does not continue executing, as the order of the slice has changed since the function was triggered and got blocked waiting to get the lock
+			// if the timer function is in progress, at this point is waiting
+			// to get the lock. Flag timerCancelled as true to notify the
+			// routine to exit as soon as it gets the lock and ensure that the
+			// function does not continue executing, as the order of the slice
+			// has changed since the function was triggered and got blocked
+			// waiting to get the lock
 			d.timerCancelled = true
 		}
 	}
@@ -269,7 +273,9 @@ func (d *watcher) startNewTimer() {
 		d.mutex.Lock()
 		defer d.mutex.Unlock()
 		if d.timerCancelled {
-			// timer has been stopped while the routine was waiting for hold the lock. This means that there has been a change in the order of elements in the slice while it was waiting to obtain the lock
+			// timer has been stopped while the routine was waiting for hold
+			// the lock. This means that there has been a change in the order
+			// of elements in the slice while it was waiting to obtain the lock
 			// reset the timer canceled field.
 			d.timerCancelled = false
 			return

@@ -259,7 +259,9 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 		// IgnoreDifferences []ResourceIgnoreDifferences `json:"ignoreDifferences,omitempty" protobuf:"bytes,5,name=ignoreDifferences"`
 		// Info contains a list of information (URLs, email addresses, and plain text) that relates to the application
 		// Info []Info `json:"info,omitempty" protobuf:"bytes,6,name=info"`
-		// RevisionHistoryLimit limits the number of items kept in the application's revision history, which is used for informational purposes as well as for rollbacks to previous versions.
+		// RevisionHistoryLimit limits the number of items kept in the
+		// application's revision history, which is used for informational
+		// purposes as well as for rollbacks to previous versions.
 		// This should only be changed in exceptional circumstances.
 		// Setting to zero will store no history. This will reduce storage used.
 		// Increasing will increase the space used to store the history, so we do not recommend increasing it.
