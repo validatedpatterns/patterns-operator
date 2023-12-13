@@ -265,53 +265,53 @@ var _ = Describe("Argo Pattern", func() {
 
 		Context("Compare Helm Values", func() {
 			It("Compare different Helm Value Files", func() {
-				Expect(compareHelmValueFiles(goal, actual)).To(Equal(false))
+				Expect(compareHelmValueFiles(goal, actual)).To(BeFalse())
 			})
 			It("Compare same Helm Value Files", func() {
 				sameGoal := goal
-				Expect(compareHelmValueFiles(goal, sameGoal)).To(Equal(true))
+				Expect(compareHelmValueFiles(goal, sameGoal)).To(BeTrue())
 			})
 		})
 
 		Context("Compare Helm Parameters", func() {
 			It("Compare different Helm Parameters", func() {
-				Expect(compareHelmParameters(goalHelm, actualHelm)).To(Equal(false))
+				Expect(compareHelmParameters(goalHelm, actualHelm)).To(BeFalse())
 			})
 			It("Compare same Helm Parameters", func() {
 				sameGoalHelm := goalHelm
-				Expect(compareHelmParameters(goalHelm, sameGoalHelm)).To(Equal(true))
+				Expect(compareHelmParameters(goalHelm, sameGoalHelm)).To(BeTrue())
 			})
 			It("Test updateHelmParameter non existing Parameter", func() {
 				nonexistantParam := api.PatternParameter{
 					Name:  "Nonexistant",
 					Value: "nonexistantvalue",
 				}
-				Expect(updateHelmParameter(nonexistantParam, actualHelm)).To(Equal(false))
+				Expect(updateHelmParameter(nonexistantParam, actualHelm)).To(BeFalse())
 			})
 			It("Test updateHelmParameter with existing Parameter with same value", func() {
 				existantParam := api.PatternParameter{
 					Name:  "foo",
 					Value: "foovalue",
 				}
-				Expect(updateHelmParameter(existantParam, actualHelm)).To(Equal(true))
+				Expect(updateHelmParameter(existantParam, actualHelm)).To(BeTrue())
 			})
 			It("Test updateHelmParameter with existing Parameter with different value", func() {
 				existantParam := api.PatternParameter{
 					Name:  "foo",
 					Value: "foovaluedifferent",
 				}
-				Expect(updateHelmParameter(existantParam, actualHelm)).To(Equal(true))
+				Expect(updateHelmParameter(existantParam, actualHelm)).To(BeTrue())
 			})
 			It("Test different compareHelmSource", func() {
 				actualSourceHelm := &argoapi.ApplicationSourceHelm{
 					ValueFiles: defaultValueFiles,
 					Parameters: actualHelm,
 				}
-				Expect(compareHelmSource(goalSourceHelm, actualSourceHelm)).To(Equal(false))
+				Expect(compareHelmSource(goalSourceHelm, actualSourceHelm)).To(BeFalse())
 			})
 			It("Test same compareHelmSource", func() {
 				sameSourceHelm := goalSourceHelm
-				Expect(compareHelmSource(goalSourceHelm, sameSourceHelm)).To(Equal(true))
+				Expect(compareHelmSource(goalSourceHelm, sameSourceHelm)).To(BeTrue())
 			})
 		})
 
@@ -440,27 +440,27 @@ var _ = Describe("Argo Pattern", func() {
 				sources = multiSourceArgoApp.Spec.Sources
 			})
 			It("compareSource() function identical", func() {
-				Expect(compareSource(appSource, appSource)).To(Equal(true))
+				Expect(compareSource(appSource, appSource)).To(BeTrue())
 			})
 			It("compareSource() function differing", func() {
 				appSourceChanged := appSource.DeepCopy()
 				appSourceChanged.Path = "different"
-				Expect(compareSource(appSource, appSourceChanged)).To(Equal(false))
+				Expect(compareSource(appSource, appSourceChanged)).To(BeFalse())
 			})
 			It("compareSources() function with nil arg1", func() {
-				Expect(compareSources(sources, nil)).To(Equal(false))
+				Expect(compareSources(sources, nil)).To(BeFalse())
 			})
 			It("compareSources() function with nil arg2", func() {
-				Expect(compareSources(nil, sources)).To(Equal(false))
+				Expect(compareSources(nil, sources)).To(BeFalse())
 			})
 			It("compareSources() function different length", func() {
-				Expect(compareSources(sources, append(sources, *appSource))).To(Equal(false))
+				Expect(compareSources(sources, append(sources, *appSource))).To(BeFalse())
 			})
 			It("compareSources() function one length 0 argument", func() {
-				Expect(compareSources(sources, []argoapi.ApplicationSource{})).To(Equal(false))
+				Expect(compareSources(sources, []argoapi.ApplicationSource{})).To(BeFalse())
 			})
 			It("compareSources() function identical", func() {
-				Expect(compareSources(sources, sources)).To(Equal(true))
+				Expect(compareSources(sources, sources)).To(BeTrue())
 			})
 
 		})

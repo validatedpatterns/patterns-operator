@@ -101,7 +101,7 @@ var _ = Describe("pattern controller", func() {
 
 			By("validating the watch slice is empty")
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
-			Expect(watch.repoPairs).To(HaveLen(0))
+			Expect(watch.repoPairs).To(BeEmpty())
 		})
 
 		It("adding a pattern with interval == -1", func() {
@@ -116,7 +116,7 @@ var _ = Describe("pattern controller", func() {
 
 			By("validating the watch slice is empty")
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
-			Expect(watch.repoPairs).To(HaveLen(0))
+			Expect(watch.repoPairs).To(BeEmpty())
 		})
 
 		It("validates changes to the poll interval in the manifest", func() {
@@ -145,7 +145,7 @@ var _ = Describe("pattern controller", func() {
 			err = reconciler.Client.Update(context.Background(), p)
 			Expect(err).NotTo(HaveOccurred())
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
-			Expect(watch.repoPairs).To(HaveLen(0))
+			Expect(watch.repoPairs).To(BeEmpty())
 			By("reenabling the watch by setting the interval to a value greater than 0 but below the minimum interval of 180 seconds")
 			err = reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
@@ -173,7 +173,7 @@ var _ = Describe("pattern controller", func() {
 			err = reconciler.Client.Update(context.Background(), p)
 			Expect(err).NotTo(HaveOccurred())
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
-			Expect(watch.repoPairs).To(HaveLen(0))
+			Expect(watch.repoPairs).To(BeEmpty())
 			By("reenabling the watch by resetting the originRepository value")
 			err = reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
@@ -191,7 +191,7 @@ var _ = Describe("pattern controller", func() {
 			p = &api.Pattern{}
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(p.Status.Applications).To(HaveLen(0))
+			Expect(p.Status.Applications).To(BeEmpty())
 			p.Status.Applications = buildTestApplicationInfoArray()
 			err = reconciler.Client.Update(context.Background(), p)
 			Expect(err).NotTo(HaveOccurred())

@@ -234,7 +234,7 @@ var _ = Describe("Git client", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: foo, Namespace: defaultNamespace}, &p)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(p).NotTo(BeNil())
-			Expect(p.Status.Conditions).To(HaveLen(0))
+			Expect(p.Status.Conditions).To(BeEmpty())
 			By("calling the update pattern conditions to add a new condition")
 			e := updatePatternConditions(k8sClient, api.GitInSync, foo, defaultNamespace, timestamp)
 			Expect(e).NotTo(HaveOccurred())

@@ -48,7 +48,7 @@ var _ = Describe("ExtractRepositoryName", func() {
 	It("should extract the repository name from various URL formats", func() {
 		for _, testCase := range testCases {
 			repoName, err := extractRepositoryName(testCase.inputURL)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(repoName).To(Equal(testCase.expectedName))
 		}
 	})
@@ -56,7 +56,7 @@ var _ = Describe("ExtractRepositoryName", func() {
 	It("should return an error for an invalid URL", func() {
 		invalidURL := "invalid-url"
 		_, err := extractRepositoryName(invalidURL)
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })
 
@@ -64,7 +64,7 @@ var _ = Describe("extractGitFQDNHostname", func() {
 	It("should extract the fqdn name from various URL formats", func() {
 		for _, testCase := range testCases {
 			repoName, err := extractGitFQDNHostname(testCase.inputURL)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(repoName).To(Equal(testCase.expectedFQDN))
 		}
 	})
@@ -72,14 +72,14 @@ var _ = Describe("extractGitFQDNHostname", func() {
 	It("should return an error for an invalid URL", func() {
 		invalidURL := "lwn:///invalid-url"
 		_, err := extractGitFQDNHostname(invalidURL)
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })
 var _ = Describe("validGitRepoURL", func() {
 	It("should accept a 'git@' URL", func() {
 		repoURL := "git@example.com:username/repo.git"
 		err := validGitRepoURL(repoURL)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should return nil for 'http://' and 'https://' URLs", func() {

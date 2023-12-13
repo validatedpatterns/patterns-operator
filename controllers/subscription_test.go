@@ -61,16 +61,16 @@ var _ = Describe("Subscription Functions", func() {
 
 		It("should error out with a non existing a Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			_, err = getSubscription(fakeOlmClientSet, "foo")
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(HaveOccurred())
 		})
 
 		It("should return a proper Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			sub, err := getSubscription(fakeOlmClientSet, "foosubscription")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(sub.Spec.Channel).To(Equal("foochannel"))
 			Expect(sub.Spec.CatalogSource).To(Equal("foosource"))
 			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foosourcenamespace"))
@@ -96,9 +96,9 @@ var _ = Describe("Subscription Functions", func() {
 
 		It("should update a Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, currentSubscription)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			changed, err := updateSubscription(fakeOlmClientSet, targetSubscription, currentSubscription)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(changed).To(BeTrue())
 		})
 	})
@@ -114,7 +114,7 @@ var _ = Describe("Subscription Functions", func() {
 
 		It("should handle the absence of the ConfigMap gracefully", func() {
 			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))
 			Expect(sub.Spec.CatalogSourceNamespace).To(Equal(GitOpsDefaultCatalogSourceNamespace))
@@ -126,9 +126,9 @@ var _ = Describe("Subscription Functions", func() {
 
 		It("should create a Subscription from a configmap", func() {
 			_, err := fakeClientSet.CoreV1().ConfigMaps(OperatorNamespace).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
 			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foo-source-namespace"))
