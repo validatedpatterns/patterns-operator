@@ -17,16 +17,8 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/ghodss/yaml"
-
-	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -51,37 +43,6 @@ var testCases = []struct {
 	{"git@github.com:mbaldessari/common.git/", "common", "github.com"},
 	{"git@github.com:mbaldessari/common", "common", "github.com"},
 }
-
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-var _ = Describe("Parameter Unpacking", func() {
-	var parameters []gitopsv1alpha1.PatternParameter
-
-	BeforeEach(func() {
-		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-		logf.Log.Info("Running util test")
-
-		parameters = []gitopsv1alpha1.PatternParameter{
-			{
-				Name:  "global.git.repo",
-				Value: "https://github.com/some/place",
-			},
-			{
-				Name:  "global.git.server",
-				Value: "github.com",
-			},
-		}
-	})
-
-	It("should convert values", func() {
-		fmt.Printf("Converting values\n")
-		out := ParametersToMap(parameters)
-		out_s, err := yaml.Marshal(out)
-		Expect(err).NotTo(HaveOccurred())
-		fmt.Printf("Converted values:\n%s\n", out_s)
-	})
-})
 
 var _ = Describe("ExtractRepositoryName", func() {
 	It("should extract the repository name from various URL formats", func() {

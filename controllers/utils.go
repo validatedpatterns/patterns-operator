@@ -44,54 +44,6 @@ func logOnce(message string) {
 	log.Println(message)
 }
 
-// ContainsString checks if the string array contains the given string.
-func ContainsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-// RemoveString removes the given string from the string array if exists.
-func RemoveString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return result
-}
-
-func ParametersToMap(parameters []api.PatternParameter) map[string]any {
-	output := map[string]any{}
-	for _, p := range parameters {
-		keys := strings.Split(p.Name, ".")
-		max := len(keys) - 1
-		current := output
-
-		for i, key := range keys {
-			fmt.Printf("Step %d %s\n", i, key)
-			if i == max {
-				current[key] = p.Value
-			} else {
-				if val, ok := current[key]; ok {
-					fmt.Printf("Using %q\n", key)
-					current = val.(map[string]any)
-				} else if i < len(key) {
-					fmt.Printf("Adding %q\n", key)
-					current[key] = map[string]any{}
-					current = current[key].(map[string]any)
-				}
-			}
-		}
-	}
-
-	return output
-}
-
 // getPatternConditionByStatus returns a copy of the pattern condition defined by the status and the index in the slice if it exists, otherwise -1 and nil
 func getPatternConditionByStatus(conditions []api.PatternCondition, conditionStatus v1.ConditionStatus) (int, *api.PatternCondition) {
 	if conditions == nil {
