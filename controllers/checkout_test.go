@@ -16,9 +16,9 @@ var _ = Describe("Git Functions", func() {
 	Context("cloneRepo", func() {
 		It("should clone a repository and get the HEAD", func() {
 			err := cloneRepo(gitOpsImpl, gitRepoURL, tempDir, nil)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			refHash, err := repoHash(tempDir)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(refHash).ToNot(BeNil())
 		})
 	})
@@ -26,14 +26,14 @@ var _ = Describe("Git Functions", func() {
 	Context("checkoutRevision", func() {
 		It("should checkout a specific commit", func() {
 			err := checkoutRevision(gitOpsImpl, gitRepoURL, tempDir, gitCommitHash, nil) // some older existing commit hash
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	Context("repoHash", func() {
 		It("should get the repository hash", func() {
 			refHash, err := repoHash(tempDir)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(refHash).ToNot(BeNil())
 		})
 	})
@@ -48,17 +48,17 @@ var _ = Describe("Git Functions", func() {
 		})
 		It("should clone repository and checkout a specific commit", func() {
 			err := checkout(gitOpsImpl, gitRepoURL, tempDir2, gitCommitHash, nil)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should checkout repository without checking out if commit is empty", func() {
 			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "", nil)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should checkout a repository and switch to its remote branch", func() {
 			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "test-do-not-use", nil)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
@@ -73,35 +73,35 @@ var _ = Describe("Git Functions", func() {
 		It("should get hash from branch reference", func() {
 			// Set up a test repository with a branch reference.
 			repo, err := git.PlainInit(tempDir2, false)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Create a commit to have a valid branch reference.
 			commitHash, err := createTestCommit(repo, "test-branch", "Test commit on branch")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Get hash from the branch reference.
 			hash, err := getHashFromReference(repo, plumbing.NewBranchReferenceName("test-branch"))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(hash).To(Equal(commitHash))
 		})
 
 		It("should get hash from tag reference", func() {
 			// Set up a test repository with a tag reference.
 			repo, err := git.PlainInit(tempDir2, false)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Create a commit to tag.
 			commitHash, err := createTestCommit(repo, "main", "Test commit for tagging")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Tag the commit.
 			tagName := "v1.0.0"
 			err = createTestTag(repo, commitHash, tagName)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Get hash from the tag reference.
 			hash, err := getHashFromReference(repo, plumbing.NewTagReferenceName(tagName))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(hash).To(Equal(commitHash))
 		})
 	})

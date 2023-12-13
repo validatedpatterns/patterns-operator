@@ -77,13 +77,20 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
+    - containedctx
+    #- contextcheck
     - depguard
     - dogsled
     - dupl
+    - durationcheck
     - errcheck
     - exportloopref
     - funlen
+    - ginkgolinter
     - gocheckcompilerdirectives
     # - gochecknoinits
     - goconst
@@ -110,6 +117,8 @@ linters:
     - unparam
     - unused
     - whitespace
+    #- wsl
+    - zerologlint
 
   # don't enable:
   # - asciicheck
