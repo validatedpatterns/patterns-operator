@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/ghodss/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func haveNamespace(controllerClient client.Client, name string) bool {
@@ -60,12 +60,12 @@ func ownedBy(object metav1.Object, ref *metav1.OwnerReference) bool {
 	return false
 }
 
-func objectYaml(object metav1.Object) string {
-	if yamlString, err := yaml.Marshal(object); err != nil {
-		return fmt.Sprintf("Error marshaling object: %s\n", err.Error())
-	} else {
-		return string(yamlString)
+func objectYaml(object any) (string, error) {
+	yamlBytes, err := yaml.Marshal(object)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling object: %w", err)
 	}
+	return string(yamlBytes), nil
 }
 
 // Returns true if a and b point to the same object.

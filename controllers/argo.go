@@ -391,7 +391,8 @@ func getApplication(client argoclient.Interface, name string) (*argoapi.Applicat
 
 func createApplication(client argoclient.Interface, app *argoapi.Application) error {
 	saved, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
-	log.Printf("Created: %s\n", objectYaml(saved))
+	yamlOutput, _ := objectYaml(saved)
+	log.Printf("Created: %s\n", yamlOutput)
 	return err
 }
 
