@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj/argo-cd/v2 v2.6.8
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.10.1
+	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-logr/logr v1.4.0
 	github.com/google/uuid v1.5.0
 	github.com/onsi/ginkgo/v2 v2.11.0
