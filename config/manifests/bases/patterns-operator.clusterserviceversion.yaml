@@ -176,6 +176,7 @@ spec:
   - email: hybrid-cloud-patterns@googlegroups.com
     name: patterns-team
   maturity: alpha
+  minKubeVersion: 1.23.0
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
