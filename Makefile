@@ -227,6 +227,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-fixes bundle-date
+	./hack/set_openshift_minimum_version.sh
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build

@@ -8,6 +8,7 @@ metadata:
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.1
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     repository: https://github.com/validatedpatterns/patterns-operator
+    support: validatedpatterns@googlegroups.com
   name: patterns-operator.v0.0.0
   namespace: placeholder
 spec:
@@ -173,7 +174,7 @@ spec:
   - name: Hybrid Cloud Patterns
     url: https://validatedpatterns.io
   maintainers:
-  - email: hybrid-cloud-patterns@googlegroups.com
+  - email: validatedpatterns@googlegroups.com
     name: patterns-team
   maturity: alpha
   minKubeVersion: 1.23.0
