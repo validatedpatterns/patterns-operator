@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj/argo-cd/v2 v2.6.8
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.10.1
+	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-logr/logr v1.4.0
 	github.com/google/uuid v1.5.0
 	github.com/onsi/ginkgo/v2 v2.11.0
@@ -181,8 +181,6 @@ require (
 )
 
 replace (
-	github.com/go-check/check => github.com/go-check/check v0.0.0-20180628173108-788fd7840127
-	//	github.com/bombsimon/logrusr => github.com/bombsimon/logrusr v2.0.1
 	// Caused by Argo importing 'k8s.io/api'
 	// Override all the v0.0.0 entries
 	k8s.io/api => k8s.io/api v0.24.2
@@ -210,5 +208,4 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.24.2
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.2
-
 )
