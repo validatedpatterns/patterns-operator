@@ -173,7 +173,7 @@ spec:
   - name: Hybrid Cloud Patterns
     url: https://validatedpatterns.io
   maintainers:
-  - email: hybrid-cloud-patterns@googlegroups.com
+  - email: validatedpatterns@googlegroups.com
     name: patterns-team
   maturity: alpha
   minKubeVersion: 1.23.0
