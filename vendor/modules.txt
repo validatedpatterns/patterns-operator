@@ -1502,7 +1502,6 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
-# github.com/go-check/check => github.com/go-check/check v0.0.0-20180628173108-788fd7840127
 # k8s.io/api => k8s.io/api v0.24.2
 # k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.24.2
 # k8s.io/apimachinery => k8s.io/apimachinery v0.24.2

@@ -181,8 +181,6 @@ require (
 )
 
 replace (
-	github.com/go-check/check => github.com/go-check/check v0.0.0-20180628173108-788fd7840127
-	//	github.com/bombsimon/logrusr => github.com/bombsimon/logrusr v2.0.1
 	// Caused by Argo importing 'k8s.io/api'
 	// Override all the v0.0.0 entries
 	k8s.io/api => k8s.io/api v0.24.2
@@ -210,5 +208,4 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.24.2
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.2
-
 )
