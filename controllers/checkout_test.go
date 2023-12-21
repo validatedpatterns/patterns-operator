@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"time"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -118,7 +120,10 @@ func createTestCommit(repo *git.Repository, branchName, commitMessage string) (p
 		Author: &object.Signature{
 			Name:  "Test Author",
 			Email: "test@example.com",
+			When:  time.Now(),
 		},
+		All:               true,
+		AllowEmptyCommits: true,
 	})
 	if err != nil {
 		return plumbing.ZeroHash, err
