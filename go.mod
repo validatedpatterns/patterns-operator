@@ -3,7 +3,7 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 go 1.19
 
 require (
-	github.com/Masterminds/semver/v3 v3.2.0
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj/argo-cd/v2 v2.6.8
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors v1.5.1
