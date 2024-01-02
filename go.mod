@@ -17,7 +17,7 @@ require (
 	github.com/operator-framework/operator-lifecycle-manager v0.20.0
 	github.com/segmentio/analytics-go/v3 v3.3.0
 	go.uber.org/mock v0.4.0
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.9.4
 	k8s.io/api v0.28.4
