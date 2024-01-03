@@ -18,10 +18,8 @@ package controllers
 
 import (
 	"context"
-	"os"
 	"time"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -61,27 +59,16 @@ var _ = Describe("pattern controller", func() {
 			p          *api.Pattern
 			reconciler *PatternReconciler
 			watch      *watcher
-			gitOptions *git.CloneOptions
 		)
 		BeforeEach(func() {
 			nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			reconciler = newFakeReconciler(nsOperators, buildPatternManifest(10))
 			watch = reconciler.driftWatcher.(*watcher)
-			gitOptions = &git.CloneOptions{
-				URL:      "https://target.url",
-				Progress: os.Stdout,
-				Depth:    0,
-				// ReferenceName: plumbing.ReferenceName,
-				RemoteName:   "origin",
-				SingleBranch: false,
-				Tags:         git.AllTags,
-			}
 		})
 
 		It("adding a pattern with origin, target and interval >-1", func() {
 			By("adding the pattern to the watch")
-			mockGitOps.EXPECT().CloneRepository("/tmp/openshift-operators/foo", false, gitOptions).Return(nil, nil)
-			mockGitOps.EXPECT().OpenRepository("/tmp/openshift-operators/foo").Return(nil, nil)
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil)
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
 			Expect(watch.repoPairs[0].name).To(Equal(foo))
@@ -91,8 +78,7 @@ var _ = Describe("pattern controller", func() {
 
 		It("adding a pattern without origin Repository", func() {
 			p = &api.Pattern{}
-			mockGitOps.EXPECT().CloneRepository("/tmp/openshift-operators/foo", false, gitOptions).Return(nil, nil)
-			mockGitOps.EXPECT().OpenRepository("/tmp/openshift-operators/foo").Return(nil, nil)
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil)
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
 			p.Spec.GitConfig.OriginRepo = ""
@@ -106,8 +92,7 @@ var _ = Describe("pattern controller", func() {
 
 		It("adding a pattern with interval == -1", func() {
 			p = &api.Pattern{}
-			mockGitOps.EXPECT().CloneRepository("/tmp/openshift-operators/foo", false, gitOptions).Return(nil, nil)
-			mockGitOps.EXPECT().OpenRepository("/tmp/openshift-operators/foo").Return(nil, nil)
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil)
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
 			p.Spec.GitConfig.PollInterval = -1
@@ -120,13 +105,14 @@ var _ = Describe("pattern controller", func() {
 		})
 
 		It("validates changes to the poll interval in the manifest", func() {
-			mockGitOps.EXPECT().CloneRepository("/tmp/openshift-operators/foo", false, gitOptions).Return(nil, nil).AnyTimes()
-			mockGitOps.EXPECT().OpenRepository("/tmp/openshift-operators/foo").Return(nil, nil).AnyTimes()
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil).AnyTimes()
+
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
 
 			By("updating the pattern's interval")
 			p = &api.Pattern{}
+
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
 			p.Spec.GitConfig.PollInterval = 200
@@ -160,8 +146,8 @@ var _ = Describe("pattern controller", func() {
 		})
 
 		It("removes an existing pattern from the drift watcher by changing the originRepository to empty", func() {
-			mockGitOps.EXPECT().CloneRepository("/tmp/openshift-operators/foo", false, gitOptions).Return(nil, nil).AnyTimes()
-			mockGitOps.EXPECT().OpenRepository("/tmp/openshift-operators/foo").Return(nil, nil).AnyTimes()
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil).AnyTimes()
+
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
 

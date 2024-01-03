@@ -177,8 +177,11 @@ func newApplicationValues(p *api.Pattern) string {
 //     will be converted to '/overrides/values-AWS.yaml'
 //  4. We return the list of templated strings back as an array
 func getSharedValueFiles(p *api.Pattern) ([]string, error) {
-	gitDir := p.Status.LocalCheckoutPath
-	if _, err := os.Stat(gitDir); err != nil {
+	gitDir, err := getLocalGitPath(p.Spec.GitConfig.TargetRepo)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get local git path: %w", err)
+	}
+	if _, err = os.Stat(gitDir); err != nil {
 		return nil, fmt.Errorf("%s path does not exist", gitDir)
 	}
 
