@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -408,7 +406,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	}
 
 	if output.Status.LocalCheckoutPath == "" {
-		output.Status.LocalCheckoutPath = filepath.Join(os.TempDir(), output.Namespace, output.Name)
+		output.Status.LocalCheckoutPath, _ = getLocalGitPath(output.Spec.GitConfig.TargetRepo)
 	}
 
 	return output, nil
@@ -499,7 +497,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
@@ -673,32 +670,9 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 		}
 	}
 
-	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
-		if err != nil {
-			return "cloning pattern repo", err
-		}
-	} else { // If the cloned repository directory already existed we check if the URL changed
-		localURL, err := getGitRemoteURL(gitDir, "origin")
-		if err != nil {
-			return "getting remote URL pattern repo", err
-		}
-		if localURL != p.Spec.GitConfig.TargetRepo {
-			fmt.Printf("Locally cloned URL is different from what is in the Spec, blowing away the folder and recloning")
-			err = os.RemoveAll(gitDir)
-			if err != nil {
-				return "failed to remove locally cloned folder", err
-			}
-			err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
-			if err != nil {
-				return "cloning pattern repo after removal", err
-			}
-		}
-	}
-	if err := checkoutRevision(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
-		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
-		return "checkout target revision", err
+	err = GetGit(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Spec.GitConfig.TargetRevision, p.Status.LocalCheckoutPath, gitAuthSecret)
+	if err != nil {
+		return "cloning pattern repo", err
 	}
 
 	if err := r.preValidation(p); err != nil {

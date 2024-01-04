@@ -40,6 +40,7 @@ RUN --mount=type=secret,id=apikey hack/build.sh
 # UBI is larger (158Mb vs. 56Mb) but approved by RH
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 WORKDIR /
+RUN microdnf install git-core -y && microdnf clean all
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 
