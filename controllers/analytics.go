@@ -164,7 +164,7 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 
 	client := analytics.New(v.apiKey)
 	defer client.Close()
-	err := client.Enqueue(analytics.Identify{
+	id := analytics.Identify{
 		UserId:  getNewUUID(p),
 		Context: getAnalyticsContext(p),
 		Traits: analytics.NewTraits().
@@ -175,7 +175,8 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 			Set("operatorversion", version.Version).
 			Set("repobasename", getBaseGitRepo(p)).
 			Set("pattern", p.Name),
-	})
+	}
+	err := retryAnalytics(v.logger, 2, 1, id, client.Enqueue)
 	if err != nil {
 		v.logger.Info("Sending Installation info failed:", "info", err)
 		return false
@@ -194,7 +195,7 @@ func (v *VpAnalytics) SendPatternStartEventInfo(p *api.Pattern) bool {
 
 	client := analytics.New(v.apiKey)
 	defer client.Close()
-	err := client.Enqueue(getAnalyticsTrack(p, PatternStartEvent))
+	err := retryAnalytics(v.logger, 2, 1, getAnalyticsTrack(p, PatternStartEvent), client.Enqueue)
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
@@ -222,7 +223,7 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	} else {
 		event = PatternEndEvent
 	}
-	err := client.Enqueue(getAnalyticsTrack(p, event))
+	err := retryAnalytics(v.logger, 2, 1, getAnalyticsTrack(p, event), client.Enqueue)
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
@@ -237,6 +238,19 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	return true
 }
 
+func retryAnalytics(logger logr.Logger, attempts int, sleep time.Duration, m analytics.Message, f func(analytics.Message) error) (err error) {
+	for i := 0; i < attempts; i++ {
+		err = f(m)
+		if err != nil {
+			logger.Info("error occurred after attempt number %d: %s. Sleep for: %s", i+1, err.Error(), sleep.String())
+			time.Sleep(sleep)
+			sleep *= 2
+			continue
+		}
+		break
+	}
+	return err
+}
 func hasIntervalPassed(lastUpdate time.Time) bool {
 	now := time.Now()
 	return now.Sub(lastUpdate).Minutes() >= RefreshIntervalMinutes
