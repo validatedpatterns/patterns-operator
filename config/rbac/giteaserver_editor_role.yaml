@@ -1,0 +1,31 @@
+# permissions for end users to edit giteaservers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: giteaserver-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: patterns-operator
+    app.kubernetes.io/part-of: patterns-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: giteaserver-editor-role
+rules:
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - giteaservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - giteaservers/status
+  verbs:
+  - get

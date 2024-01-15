@@ -6,6 +6,21 @@ metadata:
       [
         {
           "apiVersion": "gitops.hybrid-cloud-patterns.io/v1alpha1",
+          "kind": "GiteaServer",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "patterns-operator",
+              "app.kubernetes.io/instance": "giteaserver-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "giteaserver",
+              "app.kubernetes.io/part-of": "patterns-operator"
+            },
+            "name": "giteaserver-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "gitops.hybrid-cloud-patterns.io/v1alpha1",
           "kind": "Pattern",
           "metadata": {
             "name": "pattern-sample"
@@ -22,19 +37,24 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.38
-    createdAt: 2024-01-04 11:51:10
+    containerImage: quay.io/claudiol/patterns-operator:6.6.13
+    createdAt: 2024-01-15 09:38:54
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
-    operators.operatorframework.io/builder: operator-sdk-v1.30.0
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
-  name: patterns-operator.v0.0.38
+  name: patterns-operator.v6.6.13
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: GiteaServer is the Schema for the giteaservers API
+      displayName: Gitea Server
+      kind: GiteaServer
+      name: giteaservers.gitops.hybrid-cloud-patterns.io
+      version: v1alpha1
     - description: Pattern is the Schema for the patterns API
       displayName: Pattern
       kind: Pattern
@@ -234,6 +254,32 @@ spec:
         - apiGroups:
           - gitops.hybrid-cloud-patterns.io
           resources:
+          - giteaservers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - gitops.hybrid-cloud-patterns.io
+          resources:
+          - giteaservers/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - gitops.hybrid-cloud-patterns.io
+          resources:
+          - giteaservers/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - gitops.hybrid-cloud-patterns.io
+          resources:
           - patterns
           verbs:
           - create
@@ -342,7 +388,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.38
+                image: quay.io/claudiol/patterns-operator:6.6.13
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -430,4 +476,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.38
+  version: 6.6.13

@@ -62,6 +62,32 @@ rules:
 - apiGroups:
   - gitops.hybrid-cloud-patterns.io
   resources:
+  - giteaservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - giteaservers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - giteaservers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
   - patterns
   verbs:
   - create

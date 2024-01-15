@@ -36,12 +36,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
-	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
+	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -103,6 +104,13 @@ func main() {
 		AnalyticsClient: controllers.AnalyticsInit(isAnalyticsDisabled, setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pattern")
+		os.Exit(1)
+	}
+	if err = (&controllers.GiteaServerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GiteaServer")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

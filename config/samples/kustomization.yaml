@@ -1,4 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - gitops_v1alpha1_pattern.yaml
+- gitops_v1alpha1_giteaserver.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

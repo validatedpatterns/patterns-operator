@@ -1,0 +1,27 @@
+# permissions for end users to view giteaservers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: giteaserver-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: patterns-operator
+    app.kubernetes.io/part-of: patterns-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: giteaserver-viewer-role
+rules:
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - giteaservers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - gitops.hybrid-cloud-patterns.io
+  resources:
+  - giteaservers/status
+  verbs:
+  - get

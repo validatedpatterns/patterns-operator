@@ -15,6 +15,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: GiteaServer is the Schema for the giteaservers API
+      displayName: Gitea Server
+      kind: GiteaServer
+      name: giteaservers.gitops.hybrid-cloud-patterns.io
+      version: v1alpha1
     - description: Pattern is the Schema for the patterns API
       displayName: Pattern
       kind: Pattern
