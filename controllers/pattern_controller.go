@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -244,6 +246,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if errApp != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
 			}
+			_ = DropLocalGitPaths()
+
 			return r.actionPerformed(qualifiedInstance, "updated application", errApp)
 		}
 	} else {
@@ -405,9 +409,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
-	if output.Status.LocalCheckoutPath == "" {
-		output.Status.LocalCheckoutPath, _ = getLocalGitPath(output.Spec.GitConfig.TargetRepo)
+	localCheckoutPath, _ := getLocalGitPath(output.Spec.GitConfig.TargetRepo)
+	if localCheckoutPath != output.Status.LocalCheckoutPath {
+		_ = DropLocalGitPaths()
 	}
+	output.Status.LocalCheckoutPath = localCheckoutPath
 
 	return output, nil
 }
@@ -669,7 +675,6 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 			return "obtaining git auth info from secret", err
 		}
 	}
-
 	err = GetGit(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Spec.GitConfig.TargetRevision, p.Status.LocalCheckoutPath, gitAuthSecret)
 	if err != nil {
 		return "cloning pattern repo", err
@@ -679,4 +684,14 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 		return "prerequisite validation", err
 	}
 	return "", nil
+}
+
+func DropLocalGitPaths() error {
+	// If there is a completely new local folder, let's remove the old one
+	// User changed the target repo
+	err := os.RemoveAll(filepath.Join(os.TempDir(), VPTmpFolder))
+	if err != nil {
+		return err
+	}
+	return nil
 }
