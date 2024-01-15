@@ -33,6 +33,8 @@ const (
 	GitAuthSsh      GitAuthenticationBackend = 2
 )
 
+const VPTmpFolder = "vp"
+
 type GitOperations interface {
 	CloneAndCheckout(repoURL, revision, localFolder string, gitAuth map[string][]byte) error
 }
@@ -100,7 +102,7 @@ func getLocalGitPath(repoURL string) (string, error) {
 	if normalizedGitURL == "" {
 		return "", fmt.Errorf("repository %q cannot be initialized: %w", repoURL, git.ErrInvalidRepoURL)
 	}
-	root := filepath.Join(os.TempDir(), r.ReplaceAllString(normalizedGitURL, "_"))
+	root := filepath.Join(os.TempDir(), VPTmpFolder, r.ReplaceAllString(normalizedGitURL, "_"))
 	if root == os.TempDir() {
 		return "", fmt.Errorf("repository %q cannot be initialized, because its root would be system temp at %s", repoURL, root)
 	}

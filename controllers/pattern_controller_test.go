@@ -68,7 +68,7 @@ var _ = Describe("pattern controller", func() {
 
 		It("adding a pattern with origin, target and interval >-1", func() {
 			By("adding the pattern to the watch")
-			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil)
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/vp/https___target.url", nil).Return(nil)
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
 			Expect(watch.repoPairs[0].name).To(Equal(foo))
@@ -78,7 +78,7 @@ var _ = Describe("pattern controller", func() {
 
 		It("adding a pattern without origin Repository", func() {
 			p = &api.Pattern{}
-			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil)
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/vp/https___target.url", nil).Return(nil)
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
 			p.Spec.GitConfig.OriginRepo = ""
@@ -92,7 +92,7 @@ var _ = Describe("pattern controller", func() {
 
 		It("adding a pattern with interval == -1", func() {
 			p = &api.Pattern{}
-			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil)
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/vp/https___target.url", nil).Return(nil)
 			err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
 			Expect(err).NotTo(HaveOccurred())
 			p.Spec.GitConfig.PollInterval = -1
@@ -105,7 +105,7 @@ var _ = Describe("pattern controller", func() {
 		})
 
 		It("validates changes to the poll interval in the manifest", func() {
-			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil).AnyTimes()
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/vp/https___target.url", nil).Return(nil).AnyTimes()
 
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
@@ -146,7 +146,7 @@ var _ = Describe("pattern controller", func() {
 		})
 
 		It("removes an existing pattern from the drift watcher by changing the originRepository to empty", func() {
-			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/https___target.url", nil).Return(nil).AnyTimes()
+			mockGitOps.EXPECT().CloneAndCheckout("https://target.url", "HEAD", "/tmp/vp/https___target.url", nil).Return(nil).AnyTimes()
 
 			_, _ = reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: patternNamespaced})
 			Expect(watch.repoPairs).To(HaveLen(1))
