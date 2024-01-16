@@ -41,6 +41,7 @@ RUN --mount=type=secret,id=apikey hack/build.sh
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 WORKDIR /
 RUN microdnf install git-core -y && microdnf clean all
+RUN mkdir -p /.config/helm && mkdir /.cache && chmod 770 /.config/helm && chmod 770 /.cache
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 

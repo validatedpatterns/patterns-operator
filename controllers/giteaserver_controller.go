@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,9 +34,30 @@ type GiteaServerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+var (
+	gitea_url       = "https://charts.validatedpatterns.io/"
+	repoName        = "helm-charts"
+	chartName       = "gitea-chart"
+	releaseName     = "gitea"
+	gitea_namespace = "gitea"
+	args            = map[string]string{}
+	//args        = map[string]string{
+	// comma seperated values to set
+	//"set": "mysqlRootPassword=admin@123,persistence.enabled=false,imagePullPolicy=Always",
+	//}
+)
+
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=persistentvolume,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims/status,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=services,verbs=*
+//+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=*
+//+kubebuilder:rbac:groups=apps.openshift.io,resources=deploymentconfigs,verbs=*
+//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -50,7 +72,14 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
-
+	os.Setenv("HELM_NAMESPACE", gitea_namespace)
+	Init()
+	// Add helm repo
+	RepoAdd(repoName, gitea_url)
+	// Update charts from the helm repo
+	RepoUpdate()
+	// Install charts
+	InstallChart(releaseName, repoName, chartName, args)
 	return ctrl.Result{}, nil
 }
 
