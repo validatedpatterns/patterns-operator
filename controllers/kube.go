@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +36,23 @@ func haveNamespace(controllerClient client.Client, name string) bool {
 		return true
 	}
 	return false
+}
+
+// Create namespace resource obj
+func createNamespace(controllerClient client.Client, name string) (bool, error) {
+	nsObj := &v1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if err := controllerClient.Create(context.Background(), nsObj); err != nil && !errors.IsAlreadyExists(err) {
+		return false, err
+	}
+	return true, nil
 }
 
 func ownedBySame(expected, object metav1.Object) bool {

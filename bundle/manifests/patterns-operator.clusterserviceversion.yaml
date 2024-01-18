@@ -37,14 +37,14 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.40
-    createdAt: 2024-01-15 15:12:05
+    containerImage: quay.io/claudiol/patterns-operator:6.6.17
+    createdAt: 2024-01-18 10:44:15
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
-  name: patterns-operator.v0.0.40
+  name: patterns-operator.v6.6.17
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -54,6 +54,13 @@ spec:
       displayName: Gitea Server
       kind: GiteaServer
       name: giteaservers.gitops.hybrid-cloud-patterns.io
+      statusDescriptors:
+      - description: Last error encountered by the pattern
+        displayName: Last Error
+        path: lastError
+      - description: Last action related to the Gitea deployment
+        displayName: Last Step
+        path: lastStep
       version: v1alpha1
     - description: Pattern is the Schema for the patterns API
       displayName: Pattern
@@ -213,12 +220,72 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - persistentvolume
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims/status
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+        - apiGroups:
+          - ""
+          resources:
           - secrets
           verbs:
           - create
           - get
           - update
           - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - apps.openshift.io
+          resources:
+          - deploymentconfigs
+          verbs:
+          - '*'
         - apiGroups:
           - argoproj.io
           resources:
@@ -329,6 +396,19 @@ spec:
           - patch
           - update
         - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          - routes/custom-host
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews
@@ -388,7 +468,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.40
+                image: quay.io/claudiol/patterns-operator:6.6.17
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -476,4 +556,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.40
+  version: 6.6.17

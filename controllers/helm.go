@@ -201,6 +201,33 @@ func InstallChart(name, repo, chart string, args map[string]string) {
 	fmt.Println(release.Manifest)
 }
 
+func isChartDeployed(name string, namespace string) (bool, error) {
+	actionConfig := new(action.Configuration)
+	// You can pass an empty string instead of settings.Namespace() to list
+	// all namespaces
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
+		log.Printf("%+v", err)
+		return false, err
+	}
+
+	status := action.NewList(actionConfig)
+
+	// We are only interested in deployed charts
+	status.Deployed = true
+	releases, err := status.Run()
+
+	if err == nil {
+		// Let's go through the deployed Helm Charts
+		for _, rel := range releases {
+			if rel.Name == name {
+				log.Printf("Helm Chart %s found. Deployed in %s namespace\n", rel.Name, rel.Namespace)
+				return true, nil
+			}
+		}
+	}
+	return false, err
+}
+
 func isChartInstallable(ch *chart.Chart) (bool, error) {
 	switch ch.Metadata.Type {
 	case "", "application":

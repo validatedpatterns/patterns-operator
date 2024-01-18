@@ -28,14 +28,26 @@ type GiteaServerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of GiteaServer. Edit giteaserver_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	HelmChartUrl string `json:"helmChartUrl,omitempty"`
+	Namespace    string `json:"namespace,omitempty"`
+	RepoName     string `json:"repoName,omitempty"`
+	ChartName    string `json:"chartName,omitempty"`
+	ReleaseName  string `json:"releaseName,omitempty"`
+	//args            = map[string]string{}
 }
 
 // GiteaServerStatus defines the observed state of GiteaServer
 type GiteaServerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Last action related to the Gitea deployment
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	LastStep string `json:"lastStep,omitempty"`
+
+	// Last error encountered by the pattern
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	LastError string `json:"lastError,omitempty"`
 }
 
 //+kubebuilder:object:root=true

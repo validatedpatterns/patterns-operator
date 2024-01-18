@@ -34,13 +34,26 @@ spec:
           spec:
             description: GiteaServerSpec defines the desired state of GiteaServer
             properties:
-              foo:
-                description: Foo is an example field of GiteaServer. Edit giteaserver_types.go
-                  to remove/update
+              chartName:
+                type: string
+              helmChartUrl:
+                type: string
+              namespace:
+                type: string
+              releaseName:
+                type: string
+              repoName:
                 type: string
             type: object
           status:
             description: GiteaServerStatus defines the observed state of GiteaServer
+            properties:
+              lastError:
+                description: Last error encountered by the pattern
+                type: string
+              lastStep:
+                description: Last action related to the Gitea deployment
+                type: string
             type: object
         type: object
     served: true
