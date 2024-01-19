@@ -67,6 +67,8 @@ type GiteaServerReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=*
 //+kubebuilder:rbac:groups=apps.openshift.io,resources=deploymentconfigs,verbs=*
 //+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;create
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -94,16 +96,16 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.Client, req.Namespace) {
-		fCreated, err := createNamespace(r.Client, req.Namespace)
+	if !haveNamespace(r.Client, instance.Spec.Namespace) {
+		fCreated, err := createNamespace(r.Client, instance.Spec.Namespace)
 		if !fCreated {
-			r.logger.Error(err, "Namespace not created.")
+			r.logger.Error(err, "GiteaServer Namespace not created.")
 			return r.actionPerformed(instance, "check namespace", err)
 		}
-		return r.actionPerformed(instance, "check application namespace", fmt.Errorf("waiting for creation"))
+		return r.actionPerformed(instance, "check GiteaServer namespace", fmt.Errorf("waiting for creation"))
 	}
 
-	fmt.Println("Target namespace ", instance.Spec.Namespace)
+	fmt.Println("Target namespace: ", instance.Spec.Namespace)
 
 	os.Setenv("HELM_NAMESPACE", instance.Spec.Namespace)
 	Init()
@@ -122,9 +124,20 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	} else if fDeployed && err != nil {
 		return r.actionPerformed(instance, "GiteaServer deployment", err)
 	} else {
+		fmt.Println("isChartDeployed returned: ", fDeployed, " and err: ", err)
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "GiteaServer Deploy")
 	}
-	return ctrl.Result{}, nil
+	var fUpdate bool
+	fUpdate, err = r.updateGiteaServerCRDetails(instance)
+
+	if err == nil && fUpdate {
+		r.logger.Info("GiteaServer CR Updated")
+	}
+	result := ctrl.Result{
+		Requeue:      false,
+		RequeueAfter: ReconcileLoopRequeueTime,
+	}
+	return result, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -166,4 +179,30 @@ func (r *GiteaServerReconciler) actionPerformed(p *gitopsv1alpha1.GiteaServer, r
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
 	return r.onReconcileErrorWithRequeue(p, reason, err, nil)
+}
+
+// updateGiteaCRDetails updates the current GiteaServer CR Status.
+// Returns true if the CR was updated else it returns false
+func (r *GiteaServerReconciler) updateGiteaServerCRDetails(input *gitopsv1alpha1.GiteaServer) (bool, error) {
+	rel, err := getChartRelease(input.Spec.ReleaseName, input.Spec.Namespace)
+
+	// Return the err
+	if err != nil {
+		input.Status.LastStep = `update GiteaServer application status`
+		input.Status.LastError = string(err.Error())
+		return false, err
+	}
+
+	if input.Status.ChartStatus != string(rel.Info.Status) {
+		input.Status.ChartStatus = string(rel.Info.Status)
+		// Update the GiteaServer CR if difference was found
+		input.Status.LastStep = `update GiteaServer application status`
+		// Now let's update the CR with the application status data.
+		err := r.Client.Status().Update(context.Background(), input)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
 }

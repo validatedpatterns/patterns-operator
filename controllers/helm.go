@@ -22,6 +22,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/downloader"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/strvals"
 )
@@ -216,16 +217,48 @@ func isChartDeployed(name string, namespace string) (bool, error) {
 	status.Deployed = true
 	releases, err := status.Run()
 
+	if err != nil {
+		fmt.Println("Error from helm list:", err)
+		return false, err
+	}
+
+	// Let's go through the deployed Helm Charts
+	for _, rel := range releases {
+		if rel.Name == name {
+			log.Printf("Helm Chart %s found. Deployed in %s namespace\n", rel.Name, rel.Namespace)
+			return true, nil
+		}
+	}
+
+	fmt.Println("Helm chart [", name, "] is not deployed")
+	return false, nil
+}
+
+func getChartRelease(name string, namespace string) (*release.Release, error) {
+	actionConfig := new(action.Configuration)
+	// You can pass an empty string instead of settings.Namespace() to list
+	// all namespaces
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
+		log.Printf("%+v", err)
+		return nil, err
+	}
+
+	status := action.NewList(actionConfig)
+
+	// We are only interested in deployed charts
+	status.Deployed = true
+	releases, err := status.Run()
+
 	if err == nil {
 		// Let's go through the deployed Helm Charts
 		for _, rel := range releases {
 			if rel.Name == name {
 				log.Printf("Helm Chart %s found. Deployed in %s namespace\n", rel.Name, rel.Namespace)
-				return true, nil
+				return rel, nil
 			}
 		}
 	}
-	return false, err
+	return nil, err
 }
 
 func isChartInstallable(ch *chart.Chart) (bool, error) {

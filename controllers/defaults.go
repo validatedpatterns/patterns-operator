@@ -1,5 +1,10 @@
 package controllers
 
+import "time"
+
+// Reconcile look requeue time
+const ReconcileLoopRequeueTime = 180 * time.Second
+
 // Below are the default constants that we will
 // use throughout the patterns operator code
 const (

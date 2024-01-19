@@ -41,6 +41,8 @@ type GiteaServerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	ChartStatus string `json:"chartStatus,omitempty"`
+
 	// Last action related to the Gitea deployment
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	LastStep string `json:"lastStep,omitempty"`

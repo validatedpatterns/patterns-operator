@@ -51,8 +51,6 @@ import (
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
-const ReconcileLoopRequeueTime = 180 * time.Second
-
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
 	client.Client
