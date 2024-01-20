@@ -105,11 +105,8 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return r.actionPerformed(instance, "check GiteaServer namespace", fmt.Errorf("waiting for creation"))
 	}
 
-	fmt.Println("Target namespace: ", instance.Spec.Namespace)
-
 	os.Setenv("HELM_NAMESPACE", instance.Spec.Namespace)
 	Init()
-	fmt.Println("Calling isChartDeployed: ", instance.Spec.ReleaseName, " , ", instance.Spec.Namespace)
 	if fDeployed, err := isChartDeployed(instance.Spec.ReleaseName, instance.Spec.Namespace); !fDeployed && err == nil {
 		// Add helm repo
 		RepoAdd(instance.Spec.RepoName, instance.Spec.HelmChartUrl)
@@ -124,12 +121,10 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	} else if fDeployed && err != nil {
 		return r.actionPerformed(instance, "GiteaServer deployment", err)
 	} else {
-		fmt.Println("isChartDeployed returned: ", fDeployed, " and err: ", err)
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "GiteaServer Deploy")
 	}
 	var fUpdate bool
 	fUpdate, err = r.updateGiteaServerCRDetails(instance)
-
 	if err == nil && fUpdate {
 		r.logger.Info("GiteaServer CR Updated")
 	}
@@ -184,25 +179,35 @@ func (r *GiteaServerReconciler) actionPerformed(p *gitopsv1alpha1.GiteaServer, r
 // updateGiteaCRDetails updates the current GiteaServer CR Status.
 // Returns true if the CR was updated else it returns false
 func (r *GiteaServerReconciler) updateGiteaServerCRDetails(input *gitopsv1alpha1.GiteaServer) (bool, error) {
+	fUpdateCR := false
 	rel, err := getChartRelease(input.Spec.ReleaseName, input.Spec.Namespace)
+	input.Status.LastStep = `update GiteaServer CR status`
 
 	// Return the err
 	if err != nil {
-		input.Status.LastStep = `update GiteaServer application status`
 		input.Status.LastError = string(err.Error())
 		return false, err
 	}
 
+	// Compare the helm release info. Change status info if needed.
 	if input.Status.ChartStatus != string(rel.Info.Status) {
 		input.Status.ChartStatus = string(rel.Info.Status)
-		// Update the GiteaServer CR if difference was found
-		input.Status.LastStep = `update GiteaServer application status`
-		// Now let's update the CR with the application status data.
-		err := r.Client.Status().Update(context.Background(), input)
+		fUpdateCR = true
+	}
+
+	url, err := getRoute(r.Client, "gitea-route", input.Spec.Namespace)
+	if err == nil && input.Status.Route != url {
+		input.Status.Route = url
+		fUpdateCR = true
+	}
+
+	if fUpdateCR {
+		// Now let's update the CR with the status data.
+		err = r.Client.Status().Update(context.Background(), input)
 		if err != nil {
 			return false, err
 		}
-		return true, nil
+		return fUpdateCR, nil
 	}
-	return false, nil
+	return fUpdateCR, nil
 }

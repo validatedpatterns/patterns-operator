@@ -49,12 +49,16 @@ spec:
             description: GiteaServerStatus defines the observed state of GiteaServer
             properties:
               chartStatus:
+                description: Status of the chart
                 type: string
               lastError:
                 description: Last error encountered by the pattern
                 type: string
               lastStep:
                 description: Last action related to the Gitea deployment
+                type: string
+              route:
+                description: Route for the service
                 type: string
             type: object
         type: object

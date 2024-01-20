@@ -230,7 +230,7 @@ func isChartDeployed(name string, namespace string) (bool, error) {
 		}
 	}
 
-	fmt.Println("Helm chart [", name, "] is not deployed")
+	log.Printf("Helm chart %s is not deployed", name)
 	return false, nil
 }
 

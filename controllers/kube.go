@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	routev1 "github.com/openshift/api/route/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,4 +100,19 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	}
 
 	return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+}
+
+func getRoute(controllerClient client.Client, name string, ns string) (string, error) {
+	route := &routev1.Route{}
+	err := controllerClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: ns}, route)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", err
+		}
+		return "", err
+	}
+
+	giteaURL := fmt.Sprintf("https://%s", route.Status.Ingress[0].Host)
+
+	return giteaURL, nil
 }
