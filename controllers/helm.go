@@ -202,6 +202,28 @@ func InstallChart(name, repo, chart string, args map[string]string) {
 	fmt.Println(release.Manifest)
 }
 
+// UnInstallChart
+func UnInstallChart(name string, namespace string) (bool, error) {
+	actionConfig := new(action.Configuration)
+	fmt.Println("Chart: ", name, " Namespace: ", namespace)
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
+		log.Fatal(err)
+	}
+
+	client := action.NewUninstall(actionConfig)
+
+	// Wait for chart to be uninstalled
+	client.Wait = true
+
+	release, err := client.Run(name)
+	if err != nil {
+		return false, err
+	}
+	fmt.Println("Uninstalled Helm Chart [", release.Release.Name, "] in Namespace [", release.Release.Namespace, "]")
+	return true, nil
+
+}
+
 func isChartDeployed(name string, namespace string) (bool, error) {
 	actionConfig := new(action.Configuration)
 	// You can pass an empty string instead of settings.Namespace() to list

@@ -31,8 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // GiteaServerReconciler reconciles a GiteaServer object
@@ -43,19 +46,7 @@ type GiteaServerReconciler struct {
 	logger logr.Logger
 }
 
-// var (
-// 	gitea_url       = "https://charts.validatedpatterns.io/"
-// 	repoName        = "helm-charts"
-// 	chartName       = "gitea-chart"
-// 	releaseName     = "gitea"
-// 	gitea_namespace = "gitea"
-// 	args            = map[string]string{}
-// 	//args        = map[string]string{
-// 	// comma seperated values to set
-// 	//"set": "mysqlRootPassword=admin@123,persistence.enabled=false,imagePullPolicy=Always",
-// 	//}
-// )
-
+// RBAC rules for the Gitea controller
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers/finalizers,verbs=update
@@ -82,7 +73,7 @@ type GiteaServerReconciler struct {
 func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = k8slog.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Get a GiteaServer instance if exists
 	instance := &gitopsv1alpha1.GiteaServer{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
@@ -94,8 +85,47 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, nil
 		}
 	}
+	// Fill in the defaults if needed
+	if len(instance.Spec.ReleaseName) == 0 {
+		instance.Spec.ReleaseName = ReleaseName
+	}
+	if len(instance.Spec.RepoName) == 0 {
+		instance.Spec.RepoName = RepoName
+	}
+	if len(instance.Spec.ChartName) == 0 {
+		instance.Spec.ChartName = ChartName
+	}
+	if len(instance.Spec.Namespace) == 0 {
+		instance.Spec.Namespace = Gitea_Namespace
+	}
+	if len(instance.Spec.HelmChartUrl) == 0 {
+		instance.Spec.HelmChartUrl = Helm_Chart_Repo_URL
+	}
 
-	// -- GitOps Namespace (created by the gitops operator)
+	fmt.Println("Instance: ", instance)
+
+	// Remove the Chart on deletion
+	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Add finalizer when object is created
+		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
+			controllerutil.AddFinalizer(instance, api.PatternFinalizer)
+			err = r.Client.Update(context.TODO(), instance)
+			return r.actionPerformed(instance, "updated finalizer", err)
+		}
+	} else if err = r.finalizeObject(instance); err != nil {
+		return r.actionPerformed(instance, "finalize", err)
+	} else {
+		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
+		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
+		if err = r.Client.Update(context.TODO(), instance); err != nil {
+			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
+			return reconcile.Result{}, err
+		}
+		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
+		return reconcile.Result{}, nil
+	}
+
+	// -- Gitea Namespace (created if it is not found)
 	if !haveNamespace(r.Client, instance.Spec.Namespace) {
 		fCreated, err := createNamespace(r.Client, instance.Spec.Namespace)
 		if !fCreated {
@@ -106,7 +136,10 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	os.Setenv("HELM_NAMESPACE", instance.Spec.Namespace)
+	// Initialiaze Helm settings
 	Init()
+
+	// See if chart has been deployed.
 	if fDeployed, err := isChartDeployed(instance.Spec.ReleaseName, instance.Spec.Namespace); !fDeployed && err == nil {
 		// Add helm repo
 		RepoAdd(instance.Spec.RepoName, instance.Spec.HelmChartUrl)
@@ -123,11 +156,14 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	} else {
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "GiteaServer Deploy")
 	}
+
+	// Updated the GiteaServer CR if necessary
 	var fUpdate bool
-	fUpdate, err = r.updateGiteaServerCRDetails(instance)
-	if err == nil && fUpdate {
+	if fUpdate, err = r.updateGiteaServerCRDetails(instance); err == nil && fUpdate {
 		r.logger.Info("GiteaServer CR Updated")
 	}
+
+	// Reset the reconcile loop to get called in 180 seconds
 	result := ctrl.Result{
 		Requeue:      false,
 		RequeueAfter: ReconcileLoopRequeueTime,
@@ -210,4 +246,19 @@ func (r *GiteaServerReconciler) updateGiteaServerCRDetails(input *gitopsv1alpha1
 		return fUpdateCR, nil
 	}
 	return fUpdateCR, nil
+}
+
+func (r *GiteaServerReconciler) finalizeObject(instance *gitopsv1alpha1.GiteaServer) error {
+	// Add finalizer when object is created
+	log.Printf("Finalizing GiteaServer object")
+
+	// The object is being deleted
+	if controllerutil.ContainsFinalizer(instance, gitopsv1alpha1.GiteaServerFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
+		if fUninstalled, err := UnInstallChart(instance.Spec.ReleaseName, instance.Spec.Namespace); !fUninstalled {
+			log.Println("Chart [", instance.Spec.ReleaseName, "] could not uninstalled")
+			log.Println("Error: ", err)
+			return err
+		}
+	}
+	return nil
 }

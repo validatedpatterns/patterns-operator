@@ -37,14 +37,14 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/claudiol/patterns-operator:0.0.40
-    createdAt: 2024-01-20 12:31:05
+    containerImage: quay.io/claudiol/patterns-operator:6.6.34
+    createdAt: 2024-01-22 15:01:58
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
-  name: patterns-operator.v0.0.40
+  name: patterns-operator.v6.6.34
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -487,7 +487,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/claudiol/patterns-operator:0.0.40
+                image: quay.io/claudiol/patterns-operator:6.6.34
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -575,4 +575,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.40
+  version: 6.6.34

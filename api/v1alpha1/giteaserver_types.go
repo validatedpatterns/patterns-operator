@@ -36,6 +36,10 @@ type GiteaServerSpec struct {
 	//args            = map[string]string{}
 }
 
+const (
+	GiteaServerFinalizer string = "foregroundDeletePattern"
+)
+
 // GiteaServerStatus defines the observed state of GiteaServer
 type GiteaServerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
