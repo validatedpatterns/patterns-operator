@@ -56,6 +56,22 @@ func createNamespace(controllerClient client.Client, name string) (bool, error) 
 	return true, nil
 }
 
+func deleteNamespace(controllerClient client.Client, name string) (bool, error) {
+	nsObj := &v1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if err := controllerClient.Delete(context.Background(), nsObj); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func ownedBySame(expected, object metav1.Object) bool {
 	ownerReferences := expected.GetOwnerReferences()
 

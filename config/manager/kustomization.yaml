@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/claudiol/patterns-operator
-  newTag: 6.6.34
+  newTag: 6.6.38

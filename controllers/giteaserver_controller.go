@@ -33,6 +33,7 @@ import (
 	"github.com/go-logr/logr"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -50,15 +51,15 @@ type GiteaServerReconciler struct {
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=giteaservers/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=persistentvolume,verbs=list;get;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=list;get;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims/status,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolume,verbs=watch;list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=watch;list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims/status,verbs=watch;list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=*
 //+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=*
 //+kubebuilder:rbac:groups=apps.openshift.io,resources=deploymentconfigs,verbs=*
 //+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;create
+//+kubebuilder:rbac:groups=core,resources=namespaces,verbs=list;watch;delete;update;get;create;patch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -254,11 +255,45 @@ func (r *GiteaServerReconciler) finalizeObject(instance *gitopsv1alpha1.GiteaSer
 
 	// The object is being deleted
 	if controllerutil.ContainsFinalizer(instance, gitopsv1alpha1.GiteaServerFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
+		// Let's uninstall the Gitea Chart first
 		if fUninstalled, err := UnInstallChart(instance.Spec.ReleaseName, instance.Spec.Namespace); !fUninstalled {
 			log.Println("Chart [", instance.Spec.ReleaseName, "] could not uninstalled")
 			log.Println("Error: ", err)
 			return err
 		}
+		// List of PVCs
+		pvcInfo := corev1.PersistentVolumeClaimList{
+			TypeMeta: metav1.TypeMeta{},
+			ListMeta: metav1.ListMeta{},
+			Items:    []corev1.PersistentVolumeClaim{},
+		}
+		// We want the list from gitea namespace
+		options := client.ListOptions{
+			Namespace: Gitea_Namespace,
+		}
+
+		// List the pvcs
+		// oc get pvc -n gitea
+		if err := r.Client.List(context.Background(), &pvcInfo, &options); err == nil {
+			if pvcInfo.Items != nil {
+				deleteOptions := client.DeleteOptions{}
+				for _, pvc := range pvcInfo.Items {
+					err = r.Client.Delete(context.Background(), &pvc, &deleteOptions)
+					if err != nil {
+						log.Println("Could not delete pvc [", pvc.Name, "]")
+						return err
+					}
+					log.Println("PVC [", pvc.Name, "] deleted successfully!")
+				}
+			}
+		}
+		// Finally we delete the gitea namespace
+		if fDeleted, err := deleteNamespace(r.Client, Gitea_Namespace); !fDeleted && err != nil {
+			log.Println("Namespace [", Gitea_Namespace, "] could not be deleted!")
+			log.Println("Error: ", err)
+			return err
+		}
+		log.Println("Namespace [", Gitea_Namespace, "] has been deleted!")
 	}
 	return nil
 }
