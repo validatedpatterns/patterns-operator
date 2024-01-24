@@ -37,7 +37,7 @@ type GiteaServerSpec struct {
 }
 
 const (
-	GiteaServerFinalizer string = "foregroundDeletePattern"
+	GiteaServerFinalizer string = "foregroundDeleteGiteaServer"
 )
 
 // GiteaServerStatus defines the observed state of GiteaServer

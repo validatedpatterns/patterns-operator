@@ -123,6 +123,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Remove the ArgoCD application on deletion
+	//nolint:dupl
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
 		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
@@ -506,6 +507,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+//nolint:dupl
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
 	// err is logged by the reconcileHandler
 	p.Status.LastStep = reason

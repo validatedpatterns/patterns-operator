@@ -50,6 +50,7 @@ type GitOpsConfig map[string]string
 
 var PatternsOperatorConfig GitOpsConfig
 
+// Gitea chart defaults
 const (
 	// URL to the Validated Patterns Helm chart repo
 	Helm_Chart_Repo_URL = "https://charts.validatedpatterns.io/"
@@ -62,6 +63,12 @@ const (
 	// Namespace for the Gitea resources
 	Gitea_Namespace = "gitea"
 	// args            = map[string]string{}
+)
+
+// Default constants
+const (
+	FilePerms = 0644
+	TimeOut   = 30 * time.Second
 )
 
 func (g GitOpsConfig) getValueWithDefault(k string) string {

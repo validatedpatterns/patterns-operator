@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
-	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -107,6 +106,8 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	fmt.Println("Instance: ", instance)
 
 	// Remove the Chart on deletion
+	// TODO: Make this a util function?
+	//nolint:dupl
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
 		if !controllerutil.ContainsFinalizer(instance, gitopsv1alpha1.GiteaServerFinalizer) {
@@ -118,7 +119,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return r.actionPerformed(instance, "finalize", err)
 	} else {
 		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
-		controllerutil.RemoveFinalizer(instance, api.GiteaServerFinalizer)
+		controllerutil.RemoveFinalizer(instance, gitopsv1alpha1.GiteaServerFinalizer)
 		if err = r.Client.Update(context.TODO(), instance); err != nil {
 			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
 			return reconcile.Result{}, err
@@ -129,7 +130,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// -- Gitea Namespace (created if it is not found)
 	if !haveNamespace(r.Client, instance.Spec.Namespace) {
-		var fCreated, err = createNamespace(r.Client, instance.Spec.Namespace)
+		fCreated, err := createNamespace(r.Client, instance.Spec.Namespace) //nolint:govet
 		if !fCreated {
 			r.logger.Error(err, "GiteaServer Namespace not created.")
 			return r.actionPerformed(instance, "check namespace", err)
@@ -145,15 +146,24 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	var fDeployed bool
 	if fDeployed, err = isChartDeployed(instance.Spec.ReleaseName, instance.Spec.Namespace); !fDeployed && err == nil {
 		// Add helm repo
-		RepoAdd(instance.Spec.RepoName, instance.Spec.HelmChartUrl)
+		_, err = RepoAdd(instance.Spec.RepoName, instance.Spec.HelmChartUrl)
+		if err != nil {
+			return r.actionPerformed(instance, "add helm repo", err)
+		}
 		// Update charts from the helm repo
-		RepoUpdate()
+		_, err = RepoUpdate()
+		if err != nil {
+			return r.actionPerformed(instance, "update helm repo", err)
+		}
 		// Install charts
 		// TODO: The args are overrides for the chart
 		// We need to figure out how we would pass these
 		// and if we want them as part of the CRD
 		args := map[string]string{}
-		InstallChart(instance.Spec.ReleaseName, instance.Spec.RepoName, instance.Spec.ChartName, args)
+		_, err = InstallChart(instance.Spec.ReleaseName, instance.Spec.RepoName, instance.Spec.ChartName, args)
+		if err != nil {
+			return r.actionPerformed(instance, "install helm chart", err)
+		}
 	} else if fDeployed && err != nil {
 		return r.actionPerformed(instance, "GiteaServer deployment", err)
 	} else {
@@ -181,6 +191,7 @@ func (r *GiteaServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+//nolint:dupl
 func (r *GiteaServerReconciler) onReconcileErrorWithRequeue(p *gitopsv1alpha1.GiteaServer, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
 	// err is logged by the reconcileHandler
 	p.Status.LastStep = reason
@@ -204,6 +215,7 @@ func (r *GiteaServerReconciler) onReconcileErrorWithRequeue(p *gitopsv1alpha1.Gi
 	return reconcile.Result{}, err
 }
 
+//nolint:dupl
 func (r *GiteaServerReconciler) actionPerformed(p *gitopsv1alpha1.GiteaServer, reason string, err error) (reconcile.Result, error) {
 	if err != nil {
 		delay := time.Minute * 1
@@ -251,6 +263,7 @@ func (r *GiteaServerReconciler) updateGiteaServerCRDetails(input *gitopsv1alpha1
 	return fUpdateCR, nil
 }
 
+//nolint:dupl
 func (r *GiteaServerReconciler) finalizeObject(instance *gitopsv1alpha1.GiteaServer) error {
 	// Add finalizer when object is created
 	log.Printf("Finalizing GiteaServer object")
