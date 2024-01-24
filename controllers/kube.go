@@ -118,7 +118,7 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
 }
 
-func getRoute(controllerClient client.Client, name string, ns string) (string, error) {
+func getRoute(controllerClient client.Client, name, ns string) (string, error) {
 	route := &routev1.Route{}
 	err := controllerClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: ns}, route)
 	if err != nil {

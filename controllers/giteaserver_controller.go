@@ -87,19 +87,20 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 	// Fill in the defaults if needed
-	if len(instance.Spec.ReleaseName) == 0 {
+	// TODO: Follow example in patterns_controller
+	if instance.Spec.ReleaseName == "" {
 		instance.Spec.ReleaseName = ReleaseName
 	}
-	if len(instance.Spec.RepoName) == 0 {
+	if instance.Spec.RepoName == "" {
 		instance.Spec.RepoName = RepoName
 	}
-	if len(instance.Spec.ChartName) == 0 {
+	if instance.Spec.ChartName == "" {
 		instance.Spec.ChartName = ChartName
 	}
-	if len(instance.Spec.Namespace) == 0 {
+	if instance.Spec.Namespace == "" {
 		instance.Spec.Namespace = Gitea_Namespace
 	}
-	if len(instance.Spec.HelmChartUrl) == 0 {
+	if instance.Spec.HelmChartUrl == "" {
 		instance.Spec.HelmChartUrl = Helm_Chart_Repo_URL
 	}
 
@@ -108,8 +109,8 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Remove the Chart on deletion
 	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
-		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
-			controllerutil.AddFinalizer(instance, api.PatternFinalizer)
+		if !controllerutil.ContainsFinalizer(instance, gitopsv1alpha1.GiteaServerFinalizer) {
+			controllerutil.AddFinalizer(instance, gitopsv1alpha1.GiteaServerFinalizer)
 			err = r.Client.Update(context.TODO(), instance)
 			return r.actionPerformed(instance, "updated finalizer", err)
 		}
@@ -117,7 +118,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return r.actionPerformed(instance, "finalize", err)
 	} else {
 		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
-		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
+		controllerutil.RemoveFinalizer(instance, api.GiteaServerFinalizer)
 		if err = r.Client.Update(context.TODO(), instance); err != nil {
 			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
 			return reconcile.Result{}, err
@@ -128,7 +129,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// -- Gitea Namespace (created if it is not found)
 	if !haveNamespace(r.Client, instance.Spec.Namespace) {
-		fCreated, err := createNamespace(r.Client, instance.Spec.Namespace)
+		var fCreated, err = createNamespace(r.Client, instance.Spec.Namespace)
 		if !fCreated {
 			r.logger.Error(err, "GiteaServer Namespace not created.")
 			return r.actionPerformed(instance, "check namespace", err)
@@ -141,7 +142,8 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	Init()
 
 	// See if chart has been deployed.
-	if fDeployed, err := isChartDeployed(instance.Spec.ReleaseName, instance.Spec.Namespace); !fDeployed && err == nil {
+	var fDeployed bool
+	if fDeployed, err = isChartDeployed(instance.Spec.ReleaseName, instance.Spec.Namespace); !fDeployed && err == nil {
 		// Add helm repo
 		RepoAdd(instance.Spec.RepoName, instance.Spec.HelmChartUrl)
 		// Update charts from the helm repo
@@ -222,7 +224,7 @@ func (r *GiteaServerReconciler) updateGiteaServerCRDetails(input *gitopsv1alpha1
 
 	// Return the err
 	if err != nil {
-		input.Status.LastError = string(err.Error())
+		input.Status.LastError = err.Error()
 		return false, err
 	}
 
@@ -277,13 +279,13 @@ func (r *GiteaServerReconciler) finalizeObject(instance *gitopsv1alpha1.GiteaSer
 		if err := r.Client.List(context.Background(), &pvcInfo, &options); err == nil {
 			if pvcInfo.Items != nil {
 				deleteOptions := client.DeleteOptions{}
-				for _, pvc := range pvcInfo.Items {
-					err = r.Client.Delete(context.Background(), &pvc, &deleteOptions)
+				for i := range pvcInfo.Items {
+					err = r.Client.Delete(context.Background(), &pvcInfo.Items[i], &deleteOptions)
 					if err != nil {
-						log.Println("Could not delete pvc [", pvc.Name, "]")
+						log.Println("Could not delete pvc [", pvcInfo.Items[i].Name, "]")
 						return err
 					}
-					log.Println("PVC [", pvc.Name, "] deleted successfully!")
+					log.Println("PVC [", pvcInfo.Items[i].Name, "] deleted successfully!")
 				}
 			}
 		}

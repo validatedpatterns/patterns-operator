@@ -37,7 +37,7 @@ func Init() {
 func RepoAdd(name, url string) {
 	repoFile := settings.RepositoryConfig
 
-	//Ensure the file directory exists as it is required for file locking
+	// Ensure the file directory exists as it is required for file locking
 	err := os.MkdirAll(filepath.Dir(repoFile), os.ModePerm)
 	if err != nil && !os.IsExist(err) {
 		log.Fatal(err)
@@ -61,7 +61,7 @@ func RepoAdd(name, url string) {
 	}
 
 	var f repo.File
-	if err := yaml.Unmarshal(b, &f); err != nil {
+	if err = yaml.Unmarshal(b, &f); err != nil {
 		log.Fatal(err)
 	}
 
@@ -80,14 +80,9 @@ func RepoAdd(name, url string) {
 		log.Fatal(err)
 	}
 
-	//if _, err := r.DownloadIndexFile(); err != nil {
-	//	err := errors.Wrapf(err, "looks like %q is not a valid chart repository or cannot be reached", url)
-	//	log.Fatal(err)
-	//}
-
 	f.Update(&c)
 
-	if err := f.WriteFile(repoFile, 0644); err != nil {
+	if err = f.WriteFile(repoFile, 0644); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("%q has been added to your repositories\n", name)
@@ -138,7 +133,7 @@ func InstallChart(name, repo, chart string, args map[string]string) {
 	if client.Version == "" && client.Devel {
 		client.Version = ">0.0.0-0"
 	}
-	//name, chart, err := client.NameAndChart(args)
+
 	client.ReleaseName = name
 	cp, err := client.ChartPathOptions.LocateChart(fmt.Sprintf("%s/%s", repo, chart), settings)
 	if err != nil {
@@ -155,7 +150,7 @@ func InstallChart(name, repo, chart string, args map[string]string) {
 	}
 
 	// Add args
-	if err := strvals.ParseInto(args["set"], vals); err != nil {
+	if err = strvals.ParseInto(args["set"], vals); err != nil {
 		log.Fatal(errors.Wrap(err, "failed parsing --set data"))
 	}
 
@@ -185,7 +180,7 @@ func InstallChart(name, repo, chart string, args map[string]string) {
 					RepositoryConfig: settings.RepositoryConfig,
 					RepositoryCache:  settings.RepositoryCache,
 				}
-				if err := man.Update(); err != nil {
+				if err = man.Update(); err != nil {
 					log.Fatal(err)
 				}
 			} else {
@@ -195,15 +190,14 @@ func InstallChart(name, repo, chart string, args map[string]string) {
 	}
 
 	client.Namespace = settings.Namespace()
-	release, err := client.Run(chartRequested, vals)
+	_, err = client.Run(chartRequested, vals)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(release.Manifest)
 }
 
 // UnInstallChart
-func UnInstallChart(name string, namespace string) (bool, error) {
+func UnInstallChart(name, namespace string) (bool, error) {
 	actionConfig := new(action.Configuration)
 	fmt.Println("Chart: ", name, " Namespace: ", namespace)
 	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debug); err != nil {
@@ -215,20 +209,20 @@ func UnInstallChart(name string, namespace string) (bool, error) {
 	// Wait for chart to be uninstalled
 	client.Wait = true
 
-	release, err := client.Run(name)
+	releaseInfo, err := client.Run(name)
 	if err != nil {
 		return false, err
 	}
-	fmt.Println("Uninstalled Helm Chart [", release.Release.Name, "] in Namespace [", release.Release.Namespace, "]")
+	fmt.Println("Uninstalled Helm Chart [", releaseInfo.Release.Name, "] in Namespace [", releaseInfo.Release.Namespace, "]")
 	return true, nil
 
 }
 
-func isChartDeployed(name string, namespace string) (bool, error) {
+func isChartDeployed(name, namespace string) (bool, error) {
 	actionConfig := new(action.Configuration)
 	// You can pass an empty string instead of settings.Namespace() to list
 	// all namespaces
-	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
+	if err := actionConfig.Init(settings.RESTClientGetter(), namespace, os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
 		log.Printf("%+v", err)
 		return false, err
 	}
@@ -256,7 +250,7 @@ func isChartDeployed(name string, namespace string) (bool, error) {
 	return false, nil
 }
 
-func getChartRelease(name string, namespace string) (*release.Release, error) {
+func getChartRelease(name, namespace string) (*release.Release, error) {
 	actionConfig := new(action.Configuration)
 	// You can pass an empty string instead of settings.Namespace() to list
 	// all namespaces

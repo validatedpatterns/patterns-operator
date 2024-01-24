@@ -33,7 +33,7 @@ type GiteaServerSpec struct {
 	RepoName     string `json:"repoName,omitempty"`
 	ChartName    string `json:"chartName,omitempty"`
 	ReleaseName  string `json:"releaseName,omitempty"`
-	//args            = map[string]string{}
+	// args            = map[string]string{}
 }
 
 const (
