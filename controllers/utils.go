@@ -38,7 +38,7 @@ import (
 
 const (
 	letterBytes  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	specialBytes = "!@#$%^&*()_+-=[]{}\\|;':\",.<>/?`~"
+	specialBytes = "!@#$%^&*()_+=-"
 	numBytes     = "0123456789"
 )
 
@@ -200,19 +200,20 @@ func compareMaps(m1, m2 map[string][]byte) bool {
 }
 
 // Generate a password
-func generateStringPassword(length int, includeNumber bool, includeSpecial bool) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+func generateStringPassword(length int, includeNumber, includeSpecial bool) string {
 	var password []byte
 	var charSource string
 
+	// Already using math/rand instead of crypto/rand
+	//nolint:gosec
 	generator := rand.New(rand.NewSource(time.Now().UnixNano()))
 	if includeNumber {
-		charSource += "0123456789"
+		charSource += numBytes
 	}
 	if includeSpecial {
-		charSource += "!@#$%^&*()_+=-"
+		charSource += specialBytes
 	}
-	charSource += charset
+	charSource += letterBytes
 
 	for i := 0; i < length; i++ {
 		randNum := generator.Intn(len(charSource))

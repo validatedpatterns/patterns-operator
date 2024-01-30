@@ -87,7 +87,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	// Fill in the defaults if needed
 	// TODO: Follow example in patterns_controller with function to
-	// get defaults for the GiteaServer Config
+	// get defaults for the GiteaServer Config Map?
 	if instance.Spec.ReleaseName == "" {
 		instance.Spec.ReleaseName = ReleaseName
 	}
@@ -104,10 +104,8 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		instance.Spec.HelmChartUrl = Helm_Chart_Repo_URL
 	}
 	if instance.Spec.Version == "" {
-		instance.Spec.Version = "0.0.3"
+		instance.Spec.Version = Gitea_Default_Version
 	}
-
-	fmt.Println("Instance: ", instance)
 
 	// Remove the Chart on deletion
 	// TODO: Make this a util function?
@@ -164,7 +162,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// the values.yaml file gitea.admin.password
 
 		// Generate a random password for the gitea_admin user
-		gitea_admin_password := generateStringPassword(15, true, true)
+		gitea_admin_password := generateStringPassword(DefaultPasswordLen, true, true)
 
 		// Create the overrides
 		// They should be comma separated
@@ -184,7 +182,6 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		args := map[string]string{
 			"set": gitea_overrides,
 		}
-		fmt.Println("Args: ", args)
 
 		// Now let's install the chart passing our overrides.
 		_, err = InstallChart(instance.Spec.ReleaseName,
@@ -200,10 +197,11 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		gitea_admin_secret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "gitea-admin-secret",
-				Namespace: Gitea_Namespace,
+				Namespace: instance.Spec.Namespace,
 			},
 			Data: map[string][]byte{
-				"gitea_admin": []byte(gitea_admin_password),
+				"admin_username": []byte(Gitea_Admin_User),
+				"admin_password": []byte(gitea_admin_password),
 			},
 		}
 		err = r.Client.Create(context.Background(), &gitea_admin_secret)
@@ -292,6 +290,7 @@ func (r *GiteaServerReconciler) updateGiteaServerCRDetails(input *gitopsv1alpha1
 		fUpdateCR = true
 	}
 
+	// Retrieve the route for the gitea server and add it to the Status spec
 	url, err := getRoute(r.Client, "gitea-route", input.Spec.Namespace)
 	if err == nil && input.Status.Route != url {
 		input.Status.Route = url
@@ -330,13 +329,15 @@ func (r *GiteaServerReconciler) finalizeObject(instance *gitopsv1alpha1.GiteaSer
 		}
 		// We want the list from gitea namespace
 		options := client.ListOptions{
-			Namespace: Gitea_Namespace,
+			Namespace: instance.Spec.Namespace,
 		}
 
 		// List the pvcs
 		// oc get pvc -n gitea
 		if err := r.Client.List(context.Background(), &pvcInfo, &options); err == nil {
 			if pvcInfo.Items != nil {
+				// Found the PVCs so let delete them and clean up
+				// oc delete pvc/<pvcname> -n gitea
 				deleteOptions := client.DeleteOptions{}
 				for i := range pvcInfo.Items {
 					err = r.Client.Delete(context.Background(), &pvcInfo.Items[i], &deleteOptions)
@@ -349,12 +350,12 @@ func (r *GiteaServerReconciler) finalizeObject(instance *gitopsv1alpha1.GiteaSer
 			}
 		}
 		// Finally we delete the gitea namespace
-		if fDeleted, err := deleteNamespace(r.Client, Gitea_Namespace); !fDeleted && err != nil {
-			log.Println("Namespace [", Gitea_Namespace, "] could not be deleted!")
+		if fDeleted, err := deleteNamespace(r.Client, instance.Spec.Namespace); !fDeleted && err != nil {
+			log.Println("Namespace [", instance.Spec.Namespace, "] could not be deleted!")
 			log.Println("Error: ", err)
 			return err
 		}
-		log.Println("Namespace [", Gitea_Namespace, "] has been deleted!")
+		log.Println("Namespace [", instance.Spec.Namespace, "] has been deleted!")
 	}
 	return nil
 }

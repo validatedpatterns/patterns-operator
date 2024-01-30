@@ -62,12 +62,17 @@ const (
 	ReleaseName = "gitea"
 	// Namespace for the Gitea resources
 	Gitea_Namespace = "gitea"
+	// Our gitea-chart default version
+	Gitea_Default_Version = "0.0.3"
+	// Default Gitea Admin user
+	Gitea_Admin_User = "gitea_admin"
 )
 
 // Default constants
 const (
-	FilePerms = 0644
-	TimeOut   = 30 * time.Second
+	FilePerms          = 0644
+	TimeOut            = 30 * time.Second
+	DefaultPasswordLen = 15
 )
 
 func (g GitOpsConfig) getValueWithDefault(k string) string {

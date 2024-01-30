@@ -143,8 +143,6 @@ func InstallChart(releaseName, repoName, chartName, version string, args map[str
 		return false, err
 	}
 
-	debugf("CHART PATH: %s\n", cp)
-
 	p := getter.All(settings)
 	valueOpts := &values.Options{}
 	vals, err := valueOpts.MergeValues(p)
@@ -197,9 +195,8 @@ func InstallChart(releaseName, repoName, chartName, version string, args map[str
 	if err != nil {
 		return false, err
 	}
-	fmt.Println("============== ReleaseInfo ============")
-	fmt.Println(releaseInfo)
-	fmt.Println("============== ReleaseInfo ============")
+
+	fmt.Println("Installed Helm Chart [", releaseInfo.Name, "] in Namespace [", releaseInfo.Namespace, "]")
 
 	return true, nil
 }
@@ -217,6 +214,7 @@ func UnInstallChart(name, namespace string) (bool, error) {
 	// Wait for chart to be uninstalled
 	client.Wait = true
 
+	// Uninstall the Helm chart
 	releaseInfo, err := client.Run(name)
 	if err != nil {
 		return false, err
