@@ -24,12 +24,22 @@ import (
 	"path"
 	"strings"
 
+	// Added to support generatePassword
+	"math/rand"
+	"time"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
+)
+
+const (
+	letterBytes  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	specialBytes = "!@#$%^&*()_+-=[]{}\\|;':\",.<>/?`~"
+	numBytes     = "0123456789"
 )
 
 var (
@@ -187,4 +197,27 @@ func compareMaps(m1, m2 map[string][]byte) bool {
 	}
 
 	return true
+}
+
+// Generate a password
+func generateStringPassword(length int, includeNumber bool, includeSpecial bool) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var password []byte
+	var charSource string
+
+	generator := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if includeNumber {
+		charSource += "0123456789"
+	}
+	if includeSpecial {
+		charSource += "!@#$%^&*()_+=-"
+	}
+	charSource += charset
+
+	for i := 0; i < length; i++ {
+		randNum := generator.Intn(len(charSource))
+		password = append(password, charSource[randNum])
+	}
+
+	return string(password)
 }

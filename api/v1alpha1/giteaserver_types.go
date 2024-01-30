@@ -28,12 +28,24 @@ type GiteaServerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Helm Chart URL. Default value: https://charts.validatedpatterns.io
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
 	HelmChartUrl string `json:"helmChartUrl,omitempty"`
-	Namespace    string `json:"namespace,omitempty"`
-	RepoName     string `json:"repoName,omitempty"`
-	ChartName    string `json:"chartName,omitempty"`
-	ReleaseName  string `json:"releaseName,omitempty"`
-	// args            = map[string]string{}
+	// Namespace where helm chart will be deployed to. Default: gitea
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=2
+	Namespace string `json:"namespace,omitempty"`
+	// Helm Repo name. Default: helm-charts
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=3
+	RepoName string `json:"repoName,omitempty"`
+	// Chart Name that we will deploy. Default: gitea-chart
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=4
+	ChartName string `json:"chartName,omitempty"`
+	// Version for the chart. Default: 0.0.3
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=5
+	Version string `json:"version,omitempty"`
+	// Release name used to deploy the chart.  Default: gitea
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=6
+	ReleaseName string `json:"releaseName,omitempty"`
 }
 
 const (

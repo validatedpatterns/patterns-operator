@@ -86,7 +86,8 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 	// Fill in the defaults if needed
-	// TODO: Follow example in patterns_controller
+	// TODO: Follow example in patterns_controller with function to
+	// get defaults for the GiteaServer Config
 	if instance.Spec.ReleaseName == "" {
 		instance.Spec.ReleaseName = ReleaseName
 	}
@@ -101,6 +102,9 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	if instance.Spec.HelmChartUrl == "" {
 		instance.Spec.HelmChartUrl = Helm_Chart_Repo_URL
+	}
+	if instance.Spec.Version == "" {
+		instance.Spec.Version = "0.0.3"
 	}
 
 	fmt.Println("Instance: ", instance)
@@ -139,7 +143,7 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	os.Setenv("HELM_NAMESPACE", instance.Spec.Namespace)
-	// Initialiaze Helm settings
+	// Initialize Helm settings
 	Init()
 
 	// See if chart has been deployed.
@@ -155,14 +159,56 @@ func (r *GiteaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if err != nil {
 			return r.actionPerformed(instance, "update helm repo", err)
 		}
+		// We are going to generate a base64 password for the gitea_admin
+		// user and pass it to the gitea-chart as an argument to override
+		// the values.yaml file gitea.admin.password
+
+		// Generate a random password for the gitea_admin user
+		gitea_admin_password := generateStringPassword(15, true, true)
+
+		// Create the overrides
+		// They should be comma separated
+		// e.g. user=me,password=123, etc etc
+		// Since the gitea-chart has gitea as a subchart
+		// you need to have the subschart name first
+		// e.g. gitea.gitea.admin.password="password"
+
+		gitea_overrides := "gitea.gitea.admin.password="
+		gitea_overrides += gitea_admin_password
+		gitea_overrides += ","
+
 		// Install charts
 		// TODO: The args are overrides for the chart
-		// We need to figure out how we would pass these
-		// and if we want them as part of the CRD
-		args := map[string]string{}
-		_, err = InstallChart(instance.Spec.ReleaseName, instance.Spec.RepoName, instance.Spec.ChartName, args)
+		// The chart currently has a default password that we
+		// need to remove from values.yaml.
+		args := map[string]string{
+			"set": gitea_overrides,
+		}
+		fmt.Println("Args: ", args)
+
+		// Now let's install the chart passing our overrides.
+		_, err = InstallChart(instance.Spec.ReleaseName,
+			instance.Spec.RepoName,
+			instance.Spec.ChartName,
+			instance.Spec.Version, args)
 		if err != nil {
 			return r.actionPerformed(instance, "install helm chart", err)
+		}
+
+		// Let's create a secret for the gitea_admin user in OpenShift
+		// in the gitea namespace
+		gitea_admin_secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "gitea-admin-secret",
+				Namespace: Gitea_Namespace,
+			},
+			Data: map[string][]byte{
+				"gitea_admin": []byte(gitea_admin_password),
+			},
+		}
+		err = r.Client.Create(context.Background(), &gitea_admin_secret)
+		if err != nil {
+			r.logger.Info("Could not create Gitea Admin Secret")
 		}
 	} else if fDeployed && err != nil {
 		return r.actionPerformed(instance, "GiteaServer deployment", err)

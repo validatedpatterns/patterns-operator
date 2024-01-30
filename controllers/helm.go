@@ -125,7 +125,7 @@ func RepoUpdate() (bool, error) {
 }
 
 // InstallChart
-func InstallChart(name, repoName, chartName string, args map[string]string) (bool, error) {
+func InstallChart(releaseName, repoName, chartName, version string, args map[string]string) (bool, error) {
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv("HELM_DRIVER"), debugf); err != nil {
 		return false, err
@@ -136,7 +136,8 @@ func InstallChart(name, repoName, chartName string, args map[string]string) (boo
 		client.Version = ">0.0.0-0"
 	}
 
-	client.ReleaseName = name
+	client.ReleaseName = releaseName
+	client.Version = version
 	cp, err := client.ChartPathOptions.LocateChart(fmt.Sprintf("%s/%s", repoName, chartName), settings)
 	if err != nil {
 		return false, err
@@ -192,10 +193,14 @@ func InstallChart(name, repoName, chartName string, args map[string]string) (boo
 	}
 
 	client.Namespace = settings.Namespace()
-	_, err = client.Run(chartRequested, vals)
+	releaseInfo, err := client.Run(chartRequested, vals)
 	if err != nil {
 		return false, err
 	}
+	fmt.Println("============== ReleaseInfo ============")
+	fmt.Println(releaseInfo)
+	fmt.Println("============== ReleaseInfo ============")
+
 	return true, nil
 }
 
