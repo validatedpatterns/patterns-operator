@@ -176,7 +176,7 @@ func newApplicationValues(p *api.Pattern) string {
 //     libraries. E.g. a string '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
 //     will be converted to '/overrides/values-AWS.yaml'
 //  4. We return the list of templated strings back as an array
-func getSharedValueFiles(p *api.Pattern) ([]string, error) {
+func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 	gitDir, err := getLocalGitPath(p.Spec.GitConfig.TargetRepo)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get local git path: %w", err)
@@ -215,8 +215,12 @@ func getSharedValueFiles(p *api.Pattern) ([]string, error) {
 		// we only log an error, but try to keep going
 		if err != nil {
 			log.Printf("Failed to render templated string %s: %v", str, err)
+			continue
+		}
+		if strings.HasPrefix(templatedString, "/") {
+			stringSlice[i] = fmt.Sprintf("%s%s", prefix, templatedString)
 		} else {
-			stringSlice[i] = templatedString
+			stringSlice[i] = fmt.Sprintf("%s/%s", prefix, templatedString)
 		}
 	}
 
@@ -281,7 +285,7 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 
 func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
 	valueFiles := newApplicationValueFiles(p, prefix)
-	sharedValueFiles, err := getSharedValueFiles(p)
+	sharedValueFiles, err := getSharedValueFiles(p, prefix)
 	if err != nil {
 		fmt.Printf("Could not fetch sharedValueFiles: %s", err)
 	}
