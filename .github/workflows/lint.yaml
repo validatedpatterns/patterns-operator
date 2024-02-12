@@ -22,7 +22,7 @@ jobs:
           echo '' > "${APIFILE}"
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           version: latest
           args: --timeout 5m -v
