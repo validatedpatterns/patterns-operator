@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	routev1 "github.com/openshift/api/route/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +37,39 @@ func haveNamespace(controllerClient client.Client, name string) bool {
 		return true
 	}
 	return false
+}
+
+// Create namespace resource obj
+func createNamespace(controllerClient client.Client, name string) (bool, error) {
+	nsObj := &v1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if err := controllerClient.Create(context.Background(), nsObj); err != nil && !errors.IsAlreadyExists(err) {
+		return false, err
+	}
+	return true, nil
+}
+
+func deleteNamespace(controllerClient client.Client, name string) (bool, error) {
+	nsObj := &v1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if err := controllerClient.Delete(context.Background(), nsObj); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func ownedBySame(expected, object metav1.Object) bool {
@@ -81,4 +116,19 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	}
 
 	return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+}
+
+func getRoute(controllerClient client.Client, name, ns string) (string, error) {
+	route := &routev1.Route{}
+	err := controllerClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: ns}, route)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return "", err
+		}
+		return "", err
+	}
+
+	giteaURL := fmt.Sprintf("https://%s", route.Status.Ingress[0].Host)
+
+	return giteaURL, nil
 }

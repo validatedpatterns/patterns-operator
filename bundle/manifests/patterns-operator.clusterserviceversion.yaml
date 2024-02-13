@@ -6,6 +6,21 @@ metadata:
       [
         {
           "apiVersion": "gitops.hybrid-cloud-patterns.io/v1alpha1",
+          "kind": "GiteaServer",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "patterns-operator",
+              "app.kubernetes.io/instance": "giteaserver-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "giteaserver",
+              "app.kubernetes.io/part-of": "patterns-operator"
+            },
+            "name": "giteaserver-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "gitops.hybrid-cloud-patterns.io/v1alpha1",
           "kind": "Pattern",
           "metadata": {
             "name": "pattern-sample"
@@ -25,7 +40,7 @@ metadata:
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.42
     createdAt: 2024-02-07 16:56:29
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
-    operators.operatorframework.io/builder: operator-sdk-v1.30.0
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
@@ -35,6 +50,18 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: GiteaServer is the Schema for the giteaservers API
+      displayName: Gitea Server
+      kind: GiteaServer
+      name: giteaservers.gitops.hybrid-cloud-patterns.io
+      statusDescriptors:
+      - description: Last error encountered by the pattern
+        displayName: Last Error
+        path: lastError
+      - description: Last action related to the Gitea deployment
+        displayName: Last Step
+        path: lastStep
+      version: v1alpha1
     - description: Pattern is the Schema for the patterns API
       displayName: Pattern
       kind: Pattern
@@ -193,12 +220,75 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - persistentvolume
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims/status
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
           - secrets
           verbs:
           - create
           - get
           - update
           - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          - deployments
+          - replicasets
+          - statefulsets
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - apps.openshift.io
+          resources:
+          - deploymentconfigs
+          verbs:
+          - '*'
         - apiGroups:
           - argoproj.io
           resources:
@@ -231,6 +321,56 @@ spec:
           verbs:
           - get
           - list
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - gitops.hybrid-cloud-patterns.io
+          resources:
+          - giteaservers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - gitops.hybrid-cloud-patterns.io
+          resources:
+          - giteaservers/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - gitops.hybrid-cloud-patterns.io
+          resources:
+          - giteaservers/status
+          verbs:
+          - get
+          - patch
+          - update
         - apiGroups:
           - gitops.hybrid-cloud-patterns.io
           resources:
@@ -282,6 +422,19 @@ spec:
           - list
           - patch
           - update
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          - routes/custom-host
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - authentication.k8s.io
           resources:

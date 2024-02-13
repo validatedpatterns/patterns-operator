@@ -36,12 +36,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
-	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
+	"github.com/hybrid-cloud-patterns/patterns-operator/version"
+	routev1 "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -105,6 +107,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Pattern")
 		os.Exit(1)
 	}
+	if err = (&controllers.GiteaServerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GiteaServer")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -113,6 +122,11 @@ func main() {
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+	// Setup Scheme for OpenShift Routes if available.
+	if err := routev1.Install(mgr.GetScheme()); err != nil {
+		setupLog.Error(err, "")
 		os.Exit(1)
 	}
 
