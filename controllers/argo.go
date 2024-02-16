@@ -24,13 +24,306 @@ import (
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
+
+func newArgoCD(name, namespace string) *argooperator.ArgoCD {
+	argoPolicy := `g, system:cluster-admins, role:admin
+g, cluster-admins, role:admin`
+	defaultPolicy := ""
+	argoScopes := "[groups]"
+	trueBool := true
+	initVolumes := []v1.Volume{
+		{
+			Name: "kube-root-ca",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "kube-root-ca.crt",
+					},
+				},
+			},
+		},
+		{
+			Name: "trusted-ca-bundle",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "trusted-ca-bundle",
+					},
+					Optional: &trueBool,
+				},
+			},
+		},
+		{
+			Name: "ca-bundles",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+	initVolumeMounts := []v1.VolumeMount{
+		{
+			Name:      "ca-bundles",
+			MountPath: "/etc/pki/tls/certs",
+		},
+	}
+
+	initContainers := []v1.Container{
+		{
+			Name:  "fetch-ca",
+			Image: "registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel9:latest",
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "kube-root-ca",
+					MountPath: "/var/run/kube-root-ca", // ca.crt field
+				},
+				{
+					Name:      "trusted-ca-bundle",
+					MountPath: "/var/run/trusted-ca", // ca-bundle.crt field
+				},
+				{
+					Name:      "ca-bundles",
+					MountPath: "/tmp/ca-bundles",
+				},
+			},
+			Command: []string{
+				"bash",
+				"-c",
+				"cat /var/run/kube-root-ca/ca.crt /var/run/trusted-ca/ca-bundle.crt > /tmp/ca-bundles/ca-bundle.crt || true",
+			},
+		},
+	}
+
+	s := argooperator.ArgoCD{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ArgoCD",
+			APIVersion: "argoproj.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  namespace,
+			Finalizers: []string{"argoproj.io/finalizer"},
+		},
+		Spec: argooperator.ArgoCDSpec{
+			ApplicationSet: &argooperator.ArgoCDApplicationSet{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("250m"),
+						v1.ResourceMemory: resource.MustParse("512Mi"),
+					},
+				},
+				WebhookServer: argooperator.WebhookServerSpec{
+					Ingress: argooperator.ArgoCDIngressSpec{
+						Enabled: false,
+					},
+					Route: argooperator.ArgoCDRouteSpec{
+						Enabled: false,
+					},
+				},
+			},
+
+			Controller: argooperator.ArgoCDApplicationControllerSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("250m"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			Grafana: argooperator.ArgoCDGrafanaSpec{
+				Enabled: false,
+				Ingress: argooperator.ArgoCDIngressSpec{
+					Enabled: false,
+				},
+				Route: argooperator.ArgoCDRouteSpec{
+					Enabled: false,
+				},
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("250m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				},
+			},
+			HA: argooperator.ArgoCDHASpec{
+				Enabled: false,
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("250m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				},
+			},
+			Monitoring: argooperator.ArgoCDMonitoringSpec{
+				Enabled: false,
+			},
+			Notifications: argooperator.ArgoCDNotifications{
+				Enabled: false,
+			},
+			Prometheus: argooperator.ArgoCDPrometheusSpec{
+				Enabled: false,
+				Ingress: argooperator.ArgoCDIngressSpec{
+					Enabled: false,
+				},
+				Route: argooperator.ArgoCDRouteSpec{
+					Enabled: false,
+				},
+			},
+			RBAC: argooperator.ArgoCDRBACSpec{
+				DefaultPolicy: &defaultPolicy,
+				Policy:        &argoPolicy,
+				Scopes:        &argoScopes,
+			},
+			Redis: argooperator.ArgoCDRedisSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("250m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				},
+			},
+			Repo: argooperator.ArgoCDRepoSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("250m"),
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				},
+				InitContainers: initContainers,
+				VolumeMounts:   initVolumeMounts,
+				Volumes:        initVolumes,
+			},
+			ResourceExclusions: `- apiGroups:
+  - tekton.dev
+  clusters:
+  - '*'
+  kinds:
+  - TaskRun
+  - PipelineRun`,
+			Server: argooperator.ArgoCDServerSpec{
+				Autoscale: argooperator.ArgoCDServerAutoscaleSpec{
+					Enabled: false,
+				},
+				GRPC: argooperator.ArgoCDServerGRPCSpec{
+					Ingress: argooperator.ArgoCDIngressSpec{
+						Enabled: false,
+					},
+				},
+				Ingress: argooperator.ArgoCDIngressSpec{
+					Enabled: false,
+				},
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("125m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				},
+				Route: argooperator.ArgoCDRouteSpec{
+					Enabled: true,
+				},
+				Service: argooperator.ArgoCDServerServiceSpec{
+					Type: "",
+				},
+			},
+			SSO: &argooperator.ArgoCDSSOSpec{
+				Dex: &argooperator.ArgoCDDexSpec{
+					OpenShiftOAuth: true,
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("250m"),
+							v1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+				},
+				Provider: argooperator.SSOProviderTypeDex,
+			},
+		},
+	}
+	return &s
+}
+
+func haveArgo(client dynamic.Interface, name, namespace string) bool {
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+	_, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return err == nil
+}
+
+func createOrUpdateArgoCD(client dynamic.Interface, name, namespace string) error {
+	argo := newArgoCD(name, namespace)
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+
+	var err error
+	if !haveArgo(client, name, namespace) {
+		// create it
+		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		newArgo := &unstructured.Unstructured{Object: obj}
+		_, err = client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
+	} else { // update it
+		oldArgo, _ := getArgoCD(client, name, namespace)
+		argo.SetResourceVersion(oldArgo.GetResourceVersion())
+		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		newArgo := &unstructured.Unstructured{Object: obj}
+
+		_, err = client.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
+	}
+	return err
+}
+
+func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, error) {
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+	argo := &argooperator.ArgoCD{}
+	unstructuredArgo, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredArgo.UnstructuredContent(), argo)
+	return argo, err
+}
 
 func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 	parameters := []argoapi.HelmParameter{
@@ -45,7 +338,6 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		{
 			Name:  "global.repoURL",
 			Value: p.Spec.GitConfig.TargetRepo,
-			//						ForceString true,
 		},
 		{
 			Name:  "global.targetRevision",
@@ -99,6 +391,11 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 
 		parameters = append(parameters, multiSourceParameters...)
 	}
+
+	parameters = append(parameters, argoapi.HelmParameter{
+		Name:  "global.experimentalCapabilities",
+		Value: p.Spec.ExperimentalCapabilities,
+	})
 
 	for _, extra := range p.Spec.ExtraParameters {
 		if !updateHelmParameter(extra, parameters) {
@@ -314,13 +611,13 @@ func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.Applica
 	}
 }
 
-func newArgoApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *argoapi.Application {
+func newArgoOperatorApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *argoapi.Application {
 	labels := make(map[string]string)
 	labels["validatedpatterns.io/pattern"] = p.Name
 	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      applicationName(p),
-			Namespace: ApplicationNamespace,
+			Namespace: getClusterWideArgoNamespace(p),
 			Labels:    labels,
 		},
 		Spec: *spec,
@@ -343,7 +640,7 @@ func newApplication(p *api.Pattern) *argoapi.Application {
 	spec := commonApplicationSpec(p, []argoapi.ApplicationSource{source})
 
 	spec.SyncPolicy = commonSyncPolicy(p)
-	return newArgoApplication(p, spec)
+	return newArgoOperatorApplication(p, spec)
 }
 
 func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
@@ -378,29 +675,29 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 
 	spec := commonApplicationSpec(p, sources)
 	spec.SyncPolicy = commonSyncPolicy(p)
-	return newArgoApplication(p, spec)
+	return newArgoOperatorApplication(p, spec)
 }
 
 func applicationName(p *api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
-func getApplication(client argoclient.Interface, name string) (*argoapi.Application, error) {
-	if app, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+func getApplication(client argoclient.Interface, name, namespace string) (*argoapi.Application, error) {
+	if app, err := client.ArgoprojV1alpha1().Applications(namespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
 		return nil, err
 	} else {
 		return app, nil
 	}
 }
 
-func createApplication(client argoclient.Interface, app *argoapi.Application) error {
-	saved, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Create(context.Background(), app, metav1.CreateOptions{})
+func createApplication(client argoclient.Interface, app *argoapi.Application, namespace string) error {
+	saved, err := client.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
 	yamlOutput, _ := objectYaml(saved)
 	log.Printf("Created: %s\n", yamlOutput)
 	return err
 }
 
-func updateApplication(client argoclient.Interface, target, current *argoapi.Application) (bool, error) {
+func updateApplication(client argoclient.Interface, target, current *argoapi.Application, namespace string) (bool, error) {
 	if current == nil {
 		return false, fmt.Errorf("current application was nil")
 	} else if target == nil {
@@ -420,12 +717,12 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	target.Spec.DeepCopyInto(spec)
 	current.Spec = *spec
 
-	_, err := client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+	_, err := client.ArgoprojV1alpha1().Applications(namespace).Update(context.Background(), current, metav1.UpdateOptions{})
 	return true, err
 }
 
-func removeApplication(client argoclient.Interface, name string) error {
-	return client.ArgoprojV1alpha1().Applications(ApplicationNamespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+func removeApplication(client argoclient.Interface, name, namespace string) error {
+	return client.ArgoprojV1alpha1().Applications(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
 func compareSource(goal, actual *argoapi.ApplicationSource) bool {

@@ -120,6 +120,9 @@ spec:
         path: multiSourceConfig.enabled
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Comma separated capabilities to enable certain experimental features
+        displayName: Experimental Capabilities
+        path: experimentalCapabilities
       - description: The url when deploying the clustergroup helm chart directly from
           a git repo Defaults to '' which means not used (Only used when developing
           the clustergroup helm chart)
@@ -203,6 +206,17 @@ spec:
           - argoproj.io
           resources:
           - applications
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+        - apiGroups:
+          - argoproj.io
+          resources:
+          - argocds
           verbs:
           - create
           - delete

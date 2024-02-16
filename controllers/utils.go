@@ -29,7 +29,9 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -192,6 +194,74 @@ func compareMaps(m1, m2 map[string][]byte) bool {
 
 	return true
 }
+func newSecret(name, namespace string, secret map[string][]byte, labels map[string]string) *corev1.Secret {
+	k8sSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Data: secret,
+	}
+	return k8sSecret
+}
+
+func createSecret(fullClient kubernetes.Interface, secret *corev1.Secret) error {
+	namespace := secret.ObjectMeta.Namespace
+	name := secret.ObjectMeta.Name
+	_, err := fullClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			// Resource does not exist, create it
+			_, err = fullClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+	return nil
+}
+
+func createTrustedBundleCM(p *api.Pattern, fullClient kubernetes.Interface) error {
+	ns := getClusterWideArgoNamespace(p)
+	name := "trusted-ca-bundle"
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels: map[string]string{
+				"config.openshift.io/inject-trusted-cabundle": "true",
+			},
+		},
+	}
+	_, err := fullClient.CoreV1().ConfigMaps(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			_, err = fullClient.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+	return nil
+}
+
+func getClusterWideArgoNamespace(p *api.Pattern) string {
+	// Uncomment this once we add support for running the cluster-wide argo instance
+	// in a different namespace
+	//if *p.Spec.Experimental {
+	//	return VPApplicationNamespace
+	//}
+	return ApplicationNamespace
+}
+
+func createNamespace(fullclient kubernetes.Interface, namespace string) error {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}
+	_, err := fullclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+	return err
+}
 
 // writeConfigMapKeyToFile writes the value of a specified key from a ConfigMap to a file.
 // `configMapName` is the name of the ConfigMap.
@@ -229,4 +299,17 @@ func writeConfigMapKeyToFile(fullClient kubernetes.Interface, namespace, configM
 	}
 
 	return nil
+}
+
+func hasExperimentalCapability(capabilities, name string) bool {
+	s := strings.Split(capabilities, ",")
+	if len(s) == 0 {
+		return false
+	}
+	for _, element := range s {
+		if strings.TrimSpace(element) == name {
+			return true
+		}
+	}
+	return false
 }
