@@ -302,6 +302,7 @@ catalog-install: config/samples/pattern-catalog-$(VERSION).yaml ## Install the O
 	-oc delete -f config/samples/pattern-catalog-$(VERSION).yaml
 	oc create -f config/samples/pattern-catalog-$(VERSION).yaml
 
+.PHONY: config/samples/pattern-catalog-$(VERSION).yaml
 config/samples/pattern-catalog-$(VERSION).yaml:
 	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
 	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
