@@ -18,9 +18,11 @@ package controllers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
@@ -28,6 +30,8 @@ import (
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	configv1 "github.com/openshift/api/config/v1"
 )
@@ -187,4 +191,42 @@ func compareMaps(m1, m2 map[string][]byte) bool {
 	}
 
 	return true
+}
+
+// writeConfigMapKeyToFile writes the value of a specified key from a ConfigMap to a file.
+// `configMapName` is the name of the ConfigMap.
+// `namespace` is the namespace where the ConfigMap resides.
+// `key` is the key within the ConfigMap whose value will be written to the file.
+// `filePath` is the path to the file where the value will be written.
+// `append` will append the data to the file
+func writeConfigMapKeyToFile(fullClient kubernetes.Interface, namespace, configMapName, key, filePath string, appendToFile bool) error {
+	// Get the ConfigMap
+	configMap, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("error getting ConfigMap %s in namespace %s: %w", configMapName, namespace, err)
+	}
+	// Get the value for the specified key
+	value, ok := configMap.Data[key]
+	if !ok {
+		return fmt.Errorf("key %s not found in ConfigMap %s", key, configMapName)
+	}
+	// Determine the file mode: append or truncate
+	var fileMode int
+	if appendToFile {
+		fileMode = os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	} else {
+		fileMode = os.O_TRUNC | os.O_CREATE | os.O_WRONLY
+	}
+	// Open the file with the determined mode
+	file, err := os.OpenFile(filePath, fileMode, 0644) //nolint:gomnd
+	if err != nil {
+		return fmt.Errorf("error opening file %s: %w", filePath, err)
+	}
+	defer file.Close()
+	// Write (or append) the value to the file
+	if _, err = file.WriteString(value + "\n"); err != nil {
+		return fmt.Errorf("error writing to file %s: %w", filePath, err)
+	}
+
+	return nil
 }

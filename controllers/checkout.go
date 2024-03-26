@@ -17,7 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	nethttp "net/http"
 	"os"
 	"strings"
 
@@ -28,6 +31,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport/client"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
@@ -39,6 +43,8 @@ const (
 	GitAuthPassword GitAuthenticationBackend = 1
 	GitAuthSsh      GitAuthenticationBackend = 2
 )
+
+const GitCustomCAFile = "/tmp/vp-git-cas.pem"
 
 const VPTmpFolder = "vp"
 
@@ -147,6 +153,24 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 }
 
 func checkoutRevision(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+	caCert, err := os.ReadFile(GitCustomCAFile)
+	if err == nil {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		// Create custom transport for Git client
+		transport := nethttp.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:    caCertPool,
+				MinVersion: tls.VersionTLS12,
+			},
+		}
+		customClient := &nethttp.Client{
+			Transport: &transport,
+		}
+		// Override http(s) default protocol to use our custom client
+		client.InstallProtocol("https", http.NewClient(customClient))
+	}
 	repo, err := gitOps.OpenRepository(directory)
 	if err != nil {
 		return err
@@ -200,8 +224,27 @@ func checkoutRevision(gitOps GitOperations, url, directory, commit string, secre
 }
 
 func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]byte) error {
+	caCert, err := os.ReadFile(GitCustomCAFile)
+	if err == nil {
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		// Create custom transport for Git client
+		transport := nethttp.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:    caCertPool,
+				MinVersion: tls.VersionTLS12,
+			},
+		}
+		customClient := &nethttp.Client{
+			Transport: &transport,
+		}
+		// Override http(s) default protocol to use our custom client
+		client.InstallProtocol("https", http.NewClient(customClient))
+	}
+
 	gitDir := filepath.Join(directory, ".git")
-	if _, err := os.Stat(gitDir); err == nil {
+	if _, err = os.Stat(gitDir); err == nil {
 		fmt.Printf("%s already exists\n", gitDir)
 		return nil
 	}
@@ -248,6 +291,7 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 		}
 		foptions.Auth = publicKey
 	}
+
 	return foptions, nil
 }
 
@@ -284,6 +328,7 @@ func getHttpAuth(secret map[string][]byte) *http.BasicAuth {
 		Username: string(getField(secret, "username")),
 		Password: string(getField(secret, "password")),
 	}
+
 	return auth
 }
 

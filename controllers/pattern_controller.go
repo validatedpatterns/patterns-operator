@@ -677,6 +677,16 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 			return "obtaining git auth info from secret", err
 		}
 	}
+	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
+	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
+	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
+	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
+		fmt.Printf("Error while writing kube-root-ca.crt configmap to file: %v", err)
+	}
+	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
+		fmt.Printf("Error while appending trusted-ca-bundle configmap to file: %v", err)
+	}
+
 	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
