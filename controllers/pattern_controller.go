@@ -409,7 +409,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
-	localCheckoutPath, _ := getLocalGitPath(output.Spec.GitConfig.TargetRepo)
+	localCheckoutPath := getLocalGitPath(output.Spec.GitConfig.TargetRepo)
 	if localCheckoutPath != output.Status.LocalCheckoutPath {
 		_ = DropLocalGitPaths()
 	}
@@ -503,6 +503,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
 		Complete(r)
@@ -670,14 +671,48 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 	var gitAuthSecret map[string][]byte
 	var err error
+	fmt.Printf("getLocalGit: %s", p.Status.LocalCheckoutPath)
 	if p.Spec.GitConfig.TokenSecret != "" {
 		if gitAuthSecret, err = r.authGitFromSecret(p.Spec.GitConfig.TokenSecretNamespace, p.Spec.GitConfig.TokenSecret); err != nil {
 			return "obtaining git auth info from secret", err
 		}
 	}
-	err = GetGit(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Spec.GitConfig.TargetRevision, p.Status.LocalCheckoutPath, gitAuthSecret)
-	if err != nil {
-		return "cloning pattern repo", err
+	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
+	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
+	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
+	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
+		fmt.Printf("Error while writing kube-root-ca.crt configmap to file: %v", err)
+	}
+	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
+		fmt.Printf("Error while appending trusted-ca-bundle configmap to file: %v", err)
+	}
+
+	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+		if err != nil {
+			return "cloning pattern repo", err
+		}
+	} else { // If the cloned repository directory already existed we check if the URL changed
+		localURL, err := getGitRemoteURL(gitDir, "origin")
+		if err != nil {
+			return "getting remote URL pattern repo", err
+		}
+		if localURL != p.Spec.GitConfig.TargetRepo {
+			fmt.Printf("Locally cloned URL is different from what is in the Spec, blowing away the folder and recloning")
+			err = os.RemoveAll(gitDir)
+			if err != nil {
+				return "failed to remove locally cloned folder", err
+			}
+			err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+			if err != nil {
+				return "cloning pattern repo after removal", err
+			}
+		}
+	}
+	if err := checkoutRevision(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
+		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
+		return "checkout target revision", err
 	}
 
 	if err := r.preValidation(p); err != nil {

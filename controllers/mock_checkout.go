@@ -11,6 +11,7 @@ package controllers
 import (
 	reflect "reflect"
 
+	git "github.com/go-git/go-git/v5"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -37,16 +38,32 @@ func (m *MockGitOperations) EXPECT() *MockGitOperationsMockRecorder {
 	return m.recorder
 }
 
-// CloneAndCheckout mocks base method.
-func (m *MockGitOperations) CloneAndCheckout(repoURL, revision, localFolder string, gitAuth map[string][]byte) error {
+// CloneRepository mocks base method.
+func (m *MockGitOperations) CloneRepository(directory string, isBare bool, options *git.CloneOptions) (*git.Repository, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CloneAndCheckout", repoURL, revision, localFolder, gitAuth)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "CloneRepository", directory, isBare, options)
+	ret0, _ := ret[0].(*git.Repository)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// CloneAndCheckout indicates an expected call of CloneAndCheckout.
-func (mr *MockGitOperationsMockRecorder) CloneAndCheckout(repoURL, revision, localFolder, gitAuth any) *gomock.Call {
+// CloneRepository indicates an expected call of CloneRepository.
+func (mr *MockGitOperationsMockRecorder) CloneRepository(directory, isBare, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloneAndCheckout", reflect.TypeOf((*MockGitOperations)(nil).CloneAndCheckout), repoURL, revision, localFolder, gitAuth)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloneRepository", reflect.TypeOf((*MockGitOperations)(nil).CloneRepository), directory, isBare, options)
+}
+
+// OpenRepository mocks base method.
+func (m *MockGitOperations) OpenRepository(directory string) (*git.Repository, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRepository", directory)
+	ret0, _ := ret[0].(*git.Repository)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRepository indicates an expected call of OpenRepository.
+func (mr *MockGitOperationsMockRecorder) OpenRepository(directory any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRepository", reflect.TypeOf((*MockGitOperations)(nil).OpenRepository), directory)
 }
