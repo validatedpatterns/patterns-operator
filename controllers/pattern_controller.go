@@ -671,6 +671,7 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 	var gitAuthSecret map[string][]byte
 	var err error
+	fmt.Printf("getLocalGit: %s", p.Status.LocalCheckoutPath)
 	if p.Spec.GitConfig.TokenSecret != "" {
 		if gitAuthSecret, err = r.authGitFromSecret(p.Spec.GitConfig.TokenSecretNamespace, p.Spec.GitConfig.TokenSecret); err != nil {
 			return "obtaining git auth info from secret", err

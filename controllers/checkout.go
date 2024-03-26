@@ -290,13 +290,13 @@ func getHttpAuth(secret map[string][]byte) *http.BasicAuth {
 func getSshPublicKey(url string, secret map[string][]byte) (*ssh.PublicKeys, error) {
 	sshKey := getField(secret, "sshPrivateKey")
 	if sshKey == nil {
-		return nil, fmt.Errorf("Could not get sshPrivateKey")
+		return nil, fmt.Errorf("could not get sshPrivateKey")
 	}
 
 	user := getUserFromURL(url)
 	publicKey, keyError := ssh.NewPublicKeys(user, sshKey, "")
 	if keyError != nil {
-		return nil, fmt.Errorf("Could not get publicKey: %s", keyError)
+		return nil, fmt.Errorf("could not get publicKey: %s", keyError)
 	}
 	// FIXME(bandini): in the future we might want to support passing some known hosts
 	publicKey.HostKeyCallback = stdssh.InsecureIgnoreHostKey() //nolint:gosec
