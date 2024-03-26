@@ -73,7 +73,7 @@ github.com/ProtonMail/go-crypto/openpgp/internal/ecc
 github.com/ProtonMail/go-crypto/openpgp/internal/encoding
 github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
-# github.com/argoproj/argo-cd/v2 v2.9.3
+# github.com/argoproj/argo-cd/v2 v2.9.9
 ## explicit; go 1.19
 github.com/argoproj/argo-cd/v2/common
 github.com/argoproj/argo-cd/v2/pkg/apis/application
@@ -945,12 +945,12 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.24.2 => k8s.io/apiserver v0.24.2
+# k8s.io/apiserver v0.24.17 => k8s.io/apiserver v0.24.2
 ## explicit; go 1.16
 k8s.io/apiserver/pkg/features
 k8s.io/apiserver/pkg/storage/names
 k8s.io/apiserver/pkg/util/feature
-# k8s.io/cli-runtime v0.24.2 => k8s.io/cli-runtime v0.24.2
+# k8s.io/cli-runtime v0.24.17 => k8s.io/cli-runtime v0.24.2
 ## explicit; go 1.16
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/printers
@@ -1152,14 +1152,14 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.24.2 => k8s.io/component-base v0.24.2
+# k8s.io/component-base v0.24.17 => k8s.io/component-base v0.24.2
 ## explicit; go 1.16
 k8s.io/component-base/cli/flag
 k8s.io/component-base/config
 k8s.io/component-base/config/v1alpha1
 k8s.io/component-base/featuregate
 k8s.io/component-base/version
-# k8s.io/component-helpers v0.24.2 => k8s.io/component-helpers v0.24.2
+# k8s.io/component-helpers v0.24.17 => k8s.io/component-helpers v0.24.2
 ## explicit; go 1.16
 k8s.io/component-helpers/auth/rbac/reconciliation
 k8s.io/component-helpers/auth/rbac/validation
@@ -1231,8 +1231,8 @@ k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 k8s.io/kubectl/pkg/validation
-# k8s.io/kubernetes v1.24.2
-## explicit; go 1.16
+# k8s.io/kubernetes v1.24.17
+## explicit; go 1.19
 k8s.io/kubernetes/pkg/api/legacyscheme
 k8s.io/kubernetes/pkg/apis/admission
 k8s.io/kubernetes/pkg/apis/admission/install

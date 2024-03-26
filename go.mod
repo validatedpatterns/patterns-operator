@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/Masterminds/semver/v3 v3.2.1
-	github.com/argoproj/argo-cd/v2 v2.9.3
+	github.com/argoproj/argo-cd/v2 v2.9.9
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-logr/logr v1.4.1
@@ -161,15 +161,15 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.24.2 // indirect
-	k8s.io/apiserver v0.24.2 // indirect
-	k8s.io/cli-runtime v0.24.2 // indirect
-	k8s.io/component-base v0.24.2 // indirect
-	k8s.io/component-helpers v0.24.2 // indirect
+	k8s.io/apiserver v0.24.17 // indirect
+	k8s.io/cli-runtime v0.24.17 // indirect
+	k8s.io/component-base v0.24.17 // indirect
+	k8s.io/component-helpers v0.24.17 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/kube-aggregator v0.24.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20231129212854-f0671cc7e66a // indirect
 	k8s.io/kubectl v0.28.4 // indirect
-	k8s.io/kubernetes v1.24.2 // indirect
+	k8s.io/kubernetes v1.24.17 // indirect
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661 // indirect
 	oras.land/oras-go/v2 v2.3.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
