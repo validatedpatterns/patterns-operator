@@ -40,6 +40,7 @@ import (
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var tempDir string
+var gitOpsImpl *GitOperationsImpl
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
