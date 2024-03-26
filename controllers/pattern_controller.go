@@ -409,7 +409,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.GitConfig.PollInterval = 180
 	}
 
-	localCheckoutPath, _ := getLocalGitPath(output.Spec.GitConfig.TargetRepo)
+	localCheckoutPath := filepath.Join(os.TempDir(), output.Namespace, output.Name)
 	if localCheckoutPath != output.Status.LocalCheckoutPath {
 		_ = DropLocalGitPaths()
 	}
