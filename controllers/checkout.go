@@ -22,6 +22,7 @@ import (
 	"fmt"
 	nethttp "net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"path/filepath"
@@ -34,6 +35,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+
+	argogit "github.com/argoproj/argo-cd/v2/util/git"
 )
 
 type GitAuthenticationBackend uint
@@ -415,4 +418,17 @@ func getGitRemoteURL(repoPath, remoteName string) (string, error) {
 	}
 
 	return remote.Config().URLs[0], nil
+}
+
+func getLocalGitPath(repoURL string) string {
+	r := regexp.MustCompile("([/:])")
+	normalizedGitURL := argogit.NormalizeGitURL(repoURL)
+	if normalizedGitURL == "" {
+		normalizedGitURL = repoURL
+	}
+	root := filepath.Join(os.TempDir(), r.ReplaceAllString(normalizedGitURL, "_"))
+	if root == os.TempDir() {
+		return filepath.Join(os.TempDir(), "vp-git-repo-fallback")
+	}
+	return root
 }
