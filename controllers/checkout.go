@@ -426,9 +426,9 @@ func getLocalGitPath(repoURL string) string {
 	if normalizedGitURL == "" {
 		normalizedGitURL = repoURL
 	}
-	root := filepath.Join(os.TempDir(), r.ReplaceAllString(normalizedGitURL, "_"))
+	root := filepath.Join(os.TempDir(), VPTmpFolder, r.ReplaceAllString(normalizedGitURL, "_"))
 	if root == os.TempDir() {
-		return filepath.Join(os.TempDir(), "vp-git-repo-fallback")
+		return filepath.Join(os.TempDir(), VPTmpFolder, "vp-git-repo-fallback")
 	}
 	return root
 }
