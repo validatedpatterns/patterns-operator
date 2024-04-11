@@ -99,3 +99,107 @@ var _ = Describe("validGitRepoURL", func() {
 		Expect(err.Error()).To(ContainSubstring(unsupportedURL))
 	})
 })
+
+var _ = Describe("compareMaps", func() {
+	It("should return true for two empty maps", func() {
+		m1 := make(map[string][]byte)
+		m2 := make(map[string][]byte)
+		Expect(compareMaps(m1, m2)).To(BeTrue())
+	})
+
+	It("should return false for maps of different sizes", func() {
+		m1 := map[string][]byte{"key1": []byte("value1")}
+		m2 := make(map[string][]byte)
+		Expect(compareMaps(m1, m2)).To(BeFalse())
+	})
+
+	It("should return true for maps with the same keys and values", func() {
+		m1 := map[string][]byte{"key1": []byte("value1"), "key2": []byte("value2")}
+		m2 := map[string][]byte{"key1": []byte("value1"), "key2": []byte("value2")}
+		Expect(compareMaps(m1, m2)).To(BeTrue())
+	})
+
+	It("should return false for maps with the same keys but different values", func() {
+		m1 := map[string][]byte{"key1": []byte("value1")}
+		m2 := map[string][]byte{"key1": []byte("differentValue")}
+		Expect(compareMaps(m1, m2)).To(BeFalse())
+	})
+
+	It("should return false for maps with different keys", func() {
+		m1 := map[string][]byte{"key1": []byte("value1")}
+		m2 := map[string][]byte{"anotherKey": []byte("value1")}
+		Expect(compareMaps(m1, m2)).To(BeFalse())
+	})
+})
+
+var _ = Describe("newSecret", func() {
+	It("should create a secret with minimal input", func() {
+		name := "my-secret"
+		namespace := "my-namespace"
+		secret := newSecret(name, namespace, map[string][]byte{}, map[string]string{})
+		Expect(secret.ObjectMeta.Name).To(Equal(name))
+		Expect(secret.ObjectMeta.Namespace).To(Equal(namespace))
+		Expect(secret.Data).To(BeEmpty())
+		Expect(secret.Labels).To(BeEmpty())
+	})
+
+	It("should create a secret with full input", func() {
+		name := "my-secret"
+		namespace := "my-namespace"
+		data := map[string][]byte{"key": []byte("value")}
+		labels := map[string]string{"app": "my-app"}
+		secret := newSecret(name, namespace, data, labels)
+		Expect(secret.ObjectMeta.Name).To(Equal(name))
+		Expect(secret.ObjectMeta.Namespace).To(Equal(namespace))
+		Expect(secret.Data).To(Equal(data))
+		Expect(secret.Labels).To(Equal(labels))
+	})
+
+	It("should create a secret with only labels", func() {
+		name := "my-secret"
+		namespace := "my-namespace"
+		labels := map[string]string{"app": "my-app"}
+		secret := newSecret(name, namespace, map[string][]byte{}, labels)
+		Expect(secret.ObjectMeta.Name).To(Equal(name))
+		Expect(secret.ObjectMeta.Namespace).To(Equal(namespace))
+		Expect(secret.Data).To(BeEmpty())
+		Expect(secret.Labels).To(Equal(labels))
+	})
+
+	It("should create a secret with only data", func() {
+		name := "my-secret"
+		namespace := "my-namespace"
+		data := map[string][]byte{"key": []byte("value")}
+		secret := newSecret(name, namespace, data, map[string]string{})
+		Expect(secret.ObjectMeta.Name).To(Equal(name))
+		Expect(secret.ObjectMeta.Namespace).To(Equal(namespace))
+		Expect(secret.Data).To(Equal(data))
+		Expect(secret.Labels).To(BeEmpty())
+	})
+})
+
+var _ = Describe("hasExperimentalCapability", func() {
+	It("should return false for empty capabilities string", func() {
+		Expect(hasExperimentalCapability("", "cap1")).To(BeFalse())
+	})
+
+	It("should return true for a single matching capability", func() {
+		Expect(hasExperimentalCapability("cap1", "cap1")).To(BeTrue())
+	})
+
+	It("should return false for a single non-matching capability", func() {
+		Expect(hasExperimentalCapability("cap2", "cap1")).To(BeFalse())
+	})
+
+	It("should return true for multiple capabilities with one matching", func() {
+		Expect(hasExperimentalCapability("cap1,cap2,cap3", "cap2")).To(BeTrue())
+	})
+
+	It("should return false for multiple capabilities with none matching", func() {
+		Expect(hasExperimentalCapability("cap1,cap2,cap3", "cap4")).To(BeFalse())
+	})
+
+	It("should return true for capabilities string containing spaces", func() {
+		Expect(hasExperimentalCapability("cap1, cap2 , cap3", "cap2")).To(BeTrue())
+	})
+})
