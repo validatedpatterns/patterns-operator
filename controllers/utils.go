@@ -30,7 +30,6 @@ import (
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -51,7 +50,7 @@ func logOnce(message string) {
 }
 
 // getPatternConditionByStatus returns a copy of the pattern condition defined by the status and the index in the slice if it exists, otherwise -1 and nil
-func getPatternConditionByStatus(conditions []api.PatternCondition, conditionStatus v1.ConditionStatus) (int, *api.PatternCondition) {
+func getPatternConditionByStatus(conditions []api.PatternCondition, conditionStatus corev1.ConditionStatus) (int, *api.PatternCondition) {
 	if conditions == nil {
 		return -1, nil
 	}
@@ -206,23 +205,8 @@ func newSecret(name, namespace string, secret map[string][]byte, labels map[stri
 	return k8sSecret
 }
 
-func createSecret(fullClient kubernetes.Interface, secret *corev1.Secret) error {
-	namespace := secret.ObjectMeta.Namespace
-	name := secret.ObjectMeta.Name
-	_, err := fullClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		if kerrors.IsNotFound(err) {
-			// Resource does not exist, create it
-			_, err = fullClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-			return err
-		}
-		return err
-	}
-	return nil
-}
-
-func createTrustedBundleCM(p *api.Pattern, fullClient kubernetes.Interface) error {
-	ns := getClusterWideArgoNamespace(p)
+func createTrustedBundleCM(fullClient kubernetes.Interface) error {
+	ns := getClusterWideArgoNamespace()
 	name := "trusted-ca-bundle"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -244,23 +228,10 @@ func createTrustedBundleCM(p *api.Pattern, fullClient kubernetes.Interface) erro
 	return nil
 }
 
-func getClusterWideArgoNamespace(p *api.Pattern) string {
-	// Uncomment this once we add support for running the cluster-wide argo instance
-	// in a different namespace
-	//if *p.Spec.Experimental {
-	//	return VPApplicationNamespace
-	//}
+func getClusterWideArgoNamespace() string {
+	// Once we add support for running the cluster-wide argo instance
+	// we will need to amend the logic here
 	return ApplicationNamespace
-}
-
-func createNamespace(fullclient kubernetes.Interface, namespace string) error {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	}
-	_, err := fullclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-	return err
 }
 
 // writeConfigMapKeyToFile writes the value of a specified key from a ConfigMap to a file.

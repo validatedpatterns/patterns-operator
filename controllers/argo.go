@@ -617,7 +617,7 @@ func newArgoOperatorApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *
 	app := argoapi.Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      applicationName(p),
-			Namespace: getClusterWideArgoNamespace(p),
+			Namespace: getClusterWideArgoNamespace(),
 			Labels:    labels,
 		},
 		Spec: *spec,

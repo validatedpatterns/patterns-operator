@@ -209,19 +209,20 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	logOnce("subscription found")
 
-	clusterWideNS := getClusterWideArgoNamespace(qualifiedInstance)
+	clusterWideNS := getClusterWideArgoNamespace()
 	if !haveNamespace(r.Client, clusterWideNS) {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
 	// Once we add support for creating the clusterwide argo in a separate NS we will uncomment this
-	//else if !haveNamespace(r.Client, clusterWideNS) && *qualifiedInstance.Spec.Experimental { // create the namespace if it does not exist
-	//	err = createNamespace(r.fullClient, clusterWideNS)
-	//	return r.actionPerformed(qualifiedInstance, "created vp clusterwide namespace", err)
-	//}
+	// else if !haveNamespace(r.Client, clusterWideNS) && *qualifiedInstance.Spec.Experimental { // create the namespace if it does not exist
+	// 	 err = createNamespace(r.fullClient, clusterWideNS)
+	//	 return r.actionPerformed(qualifiedInstance, "created vp clusterwide namespace", err)
+	// }
 	logOnce("namespace found")
 
 	// Create the trusted-bundle configmap inside the clusterwide namespace
-	errCABundle := createTrustedBundleCM(qualifiedInstance, r.fullClient)
+	// For simplicity, we do this no matter if the "initcontainers" capability is set or not
+	errCABundle := createTrustedBundleCM(r.fullClient)
 	if errCABundle != nil {
 		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
 	}
@@ -229,7 +230,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// We only create the clusterwide argo instance when the 'initcontainers' experimentalcapability is set
 	if hasExperimentalCapability(qualifiedInstance.Spec.ExperimentalCapabilities, VPInitContainers) {
 		log.Printf("Manage our own clusterwide argo")
-		err := createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
+		err = createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 		}
@@ -237,7 +238,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
 		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
-			qualifiedInstance.Spec.GitConfig.TokenSecret, getClusterWideArgoNamespace(qualifiedInstance), "vp-private-repo-credentials"); err != nil {
+			qualifiedInstance.Spec.GitConfig.TokenSecret, getClusterWideArgoNamespace(), "vp-private-repo-credentials"); err != nil {
 			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
 		}
 	}
@@ -447,7 +448,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
 			return nil
 		}
-		ns := getClusterWideArgoNamespace(instance)
+		ns := getClusterWideArgoNamespace()
 
 		targetApp := newApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
