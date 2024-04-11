@@ -133,9 +133,11 @@ var _ = Describe("compareMaps", func() {
 })
 
 var _ = Describe("newSecret", func() {
+	var myname string = "my-secret"
+	var myns string = "my-namespace"
 	It("should create a secret with minimal input", func() {
-		name := "my-secret"
-		namespace := "my-namespace"
+		name := myname
+		namespace := myns
 		secret := newSecret(name, namespace, map[string][]byte{}, map[string]string{})
 		Expect(secret.ObjectMeta.Name).To(Equal(name))
 		Expect(secret.ObjectMeta.Namespace).To(Equal(namespace))
@@ -144,8 +146,8 @@ var _ = Describe("newSecret", func() {
 	})
 
 	It("should create a secret with full input", func() {
-		name := "my-secret"
-		namespace := "my-namespace"
+		name := myname
+		namespace := myns
 		data := map[string][]byte{"key": []byte("value")}
 		labels := map[string]string{"app": "my-app"}
 		secret := newSecret(name, namespace, data, labels)
@@ -156,8 +158,8 @@ var _ = Describe("newSecret", func() {
 	})
 
 	It("should create a secret with only labels", func() {
-		name := "my-secret"
-		namespace := "my-namespace"
+		name := myname
+		namespace := myns
 		labels := map[string]string{"app": "my-app"}
 		secret := newSecret(name, namespace, map[string][]byte{}, labels)
 		Expect(secret.ObjectMeta.Name).To(Equal(name))
@@ -167,8 +169,8 @@ var _ = Describe("newSecret", func() {
 	})
 
 	It("should create a secret with only data", func() {
-		name := "my-secret"
-		namespace := "my-namespace"
+		name := myname
+		namespace := myns
 		data := map[string][]byte{"key": []byte("value")}
 		secret := newSecret(name, namespace, data, map[string]string{})
 		Expect(secret.ObjectMeta.Name).To(Equal(name))
