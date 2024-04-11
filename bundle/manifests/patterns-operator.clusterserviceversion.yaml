@@ -22,14 +22,14 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.43
-    createdAt: 2024-03-26 20:01:12
+    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.44
+    createdAt: 2024-04-11 14:00:46
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
     operators.operatorframework.io/builder: operator-sdk-v1.30.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
-  name: patterns-operator.v0.0.43
+  name: patterns-operator.v0.0.44
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -356,7 +356,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.43
+                image: quay.io/hybridcloudpatterns/patterns-operator:0.0.44
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -444,4 +444,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  version: 0.0.43
+  version: 0.0.44
