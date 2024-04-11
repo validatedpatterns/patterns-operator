@@ -27,7 +27,6 @@ import (
 
 	"github.com/go-logr/logr"
 
-	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,6 +78,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
+//+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
@@ -108,7 +108,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// r.logger.Error(err, fmt.Sprintf("[%s/%s] %s", p.Name, p.ObjectMeta.Namespace, reason))
 	// Or r.logger.Error(err, "message", "name", p.Name, "namespace", p.ObjectMeta.Namespace, "reason", reason))
 
-	// Fetch the NodeMaintenance instance
 	instance := &api.Pattern{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
@@ -208,19 +207,38 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	} else {
 		logOnce("The gitops subscription is not owned by us, leaving untouched")
 	}
-
 	logOnce("subscription found")
 
-	// -- GitOps Namespace (created by the gitops operator)
-	if !haveNamespace(r.Client, ApplicationNamespace) {
+	clusterWideNS := getClusterWideArgoNamespace()
+	if !haveNamespace(r.Client, clusterWideNS) {
 		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
 	}
-
+	// Once we add support for creating the clusterwide argo in a separate NS we will uncomment this
+	// else if !haveNamespace(r.Client, clusterWideNS) && *qualifiedInstance.Spec.Experimental { // create the namespace if it does not exist
+	// 	 err = createNamespace(r.fullClient, clusterWideNS)
+	//	 return r.actionPerformed(qualifiedInstance, "created vp clusterwide namespace", err)
+	// }
 	logOnce("namespace found")
+
+	// Create the trusted-bundle configmap inside the clusterwide namespace
+	// For simplicity, we do this no matter if the "initcontainers" capability is set or not
+	errCABundle := createTrustedBundleCM(r.fullClient)
+	if errCABundle != nil {
+		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
+	}
+
+	// We only create the clusterwide argo instance when the 'initcontainers' experimentalcapability is set
+	if hasExperimentalCapability(qualifiedInstance.Spec.ExperimentalCapabilities, VPInitContainers) {
+		log.Printf("Manage our own clusterwide argo")
+		err = createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
+		}
+	}
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
 		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
-			qualifiedInstance.Spec.GitConfig.TokenSecret, ApplicationNamespace, "vp-private-repo-credentials"); err != nil {
+			qualifiedInstance.Spec.GitConfig.TokenSecret, getClusterWideArgoNamespace(), "vp-private-repo-credentials"); err != nil {
 			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
 		}
 	}
@@ -234,14 +252,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance))
+	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
-		err = createApplication(r.argoClient, targetApp)
+		err = createApplication(r.argoClient, targetApp, clusterWideNS)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		changed, errApp := updateApplication(r.argoClient, targetApp, app)
+		changed, errApp := updateApplication(r.argoClient, targetApp, app, clusterWideNS)
 		if changed {
 			if errApp != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
@@ -252,7 +270,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	} else {
 		// Someone manually removed the owner ref
-		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("We no longer own Application %q", targetApp.Name))
+		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", targetApp.Name))
 	}
 
 	// Copy the bootstrap secret to the namespaced argo namespace
@@ -430,11 +448,12 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
 			return nil
 		}
+		ns := getClusterWideArgoNamespace()
 
 		targetApp := newApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance))
+		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance), ns)
 		if app == nil {
 			log.Printf("Application has already been removed\n")
 			return nil
@@ -451,8 +470,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 		}
-		if changed, _ := updateApplication(r.argoClient, targetApp, app); changed {
-			return fmt.Errorf("updated application %q for removal\n", app.Name)
+		if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
 		if haveACMHub(r) {
@@ -464,10 +483,10 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 
 		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-		if err := removeApplication(r.argoClient, app.Name); err != nil {
+		if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
 			return err
 		}
-		return fmt.Errorf("waiting for application %q to be removed\n", app.Name)
+		return fmt.Errorf("waiting for application %q to be removed", app.Name)
 	}
 
 	return nil
@@ -630,26 +649,12 @@ func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[str
 	return tokenSecret.Data, nil
 }
 
-func newSecret(name, namespace string, secret map[string][]byte) *corev1.Secret {
-	k8sSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels: map[string]string{
-				"argocd.argoproj.io/secret-type": "repository",
-			},
-		},
-		Data: secret,
-	}
-	return k8sSecret
-}
-
 func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destNamespace, destSecretName string) error {
 	sourceSecret, err := r.authGitFromSecret(secretNamespace, secretName)
 	if err != nil {
 		return err
 	}
-	newSecretCopy := newSecret(destSecretName, destNamespace, sourceSecret)
+	newSecretCopy := newSecret(destSecretName, destNamespace, sourceSecret, map[string]string{"argocd.argoproj.io/secret-type": "repository"})
 	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Get(context.TODO(), destSecretName, metav1.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
@@ -663,7 +668,7 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 	// The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
 	updatedSecret, err := r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
 	if err == nil && !compareMaps(newSecretCopy.Data, updatedSecret.Data) {
-		return fmt.Errorf("The secret at %s/%s has been updated", destNamespace, destSecretName)
+		return fmt.Errorf("the secret at %s/%s has been updated", destNamespace, destSecretName)
 	}
 	return err
 }

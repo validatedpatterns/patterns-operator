@@ -383,6 +383,11 @@ var _ = Describe("Argo Pattern", func() {
 						Value:       "false",
 						ForceString: false,
 					},
+					argoapi.HelmParameter{
+						Name:        "global.experimentalCapabilities",
+						Value:       "",
+						ForceString: false,
+					},
 				)))
 			})
 			It("Test newApplicationParameters with extra parameters", func() {
@@ -400,6 +405,11 @@ var _ = Describe("Argo Pattern", func() {
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
 						Value:       "false",
+						ForceString: false,
+					},
+					argoapi.HelmParameter{
+						Name:        "global.experimentalCapabilities",
+						Value:       "",
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
@@ -427,6 +437,11 @@ var _ = Describe("Argo Pattern", func() {
 					argoapi.HelmParameter{
 						Name:  "global.multiSourceTargetRevision",
 						Value: "0.0.*",
+					},
+					argoapi.HelmParameter{
+						Name:        "global.experimentalCapabilities",
+						Value:       "",
+						ForceString: false,
 					})))
 			})
 		})

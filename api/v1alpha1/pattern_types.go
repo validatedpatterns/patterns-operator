@@ -79,6 +79,10 @@ type PatternSpec struct {
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
+
+	// Comma separated capabilities to enable certain experimental features
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10
+	ExperimentalCapabilities string `json:"experimentalCapabilities,omitempty"`
 }
 
 type GitConfig struct {

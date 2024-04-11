@@ -29,7 +29,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -49,7 +50,7 @@ func logOnce(message string) {
 }
 
 // getPatternConditionByStatus returns a copy of the pattern condition defined by the status and the index in the slice if it exists, otherwise -1 and nil
-func getPatternConditionByStatus(conditions []api.PatternCondition, conditionStatus v1.ConditionStatus) (int, *api.PatternCondition) {
+func getPatternConditionByStatus(conditions []api.PatternCondition, conditionStatus corev1.ConditionStatus) (int, *api.PatternCondition) {
 	if conditions == nil {
 		return -1, nil
 	}
@@ -192,6 +193,46 @@ func compareMaps(m1, m2 map[string][]byte) bool {
 
 	return true
 }
+func newSecret(name, namespace string, secret map[string][]byte, labels map[string]string) *corev1.Secret {
+	k8sSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Data: secret,
+	}
+	return k8sSecret
+}
+
+func createTrustedBundleCM(fullClient kubernetes.Interface) error {
+	ns := getClusterWideArgoNamespace()
+	name := "trusted-ca-bundle"
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels: map[string]string{
+				"config.openshift.io/inject-trusted-cabundle": "true",
+			},
+		},
+	}
+	_, err := fullClient.CoreV1().ConfigMaps(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			_, err = fullClient.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+	return nil
+}
+
+func getClusterWideArgoNamespace() string {
+	// Once we add support for running the cluster-wide argo instance
+	// we will need to amend the logic here
+	return ApplicationNamespace
+}
 
 // writeConfigMapKeyToFile writes the value of a specified key from a ConfigMap to a file.
 // `configMapName` is the name of the ConfigMap.
@@ -229,4 +270,17 @@ func writeConfigMapKeyToFile(fullClient kubernetes.Interface, namespace, configM
 	}
 
 	return nil
+}
+
+func hasExperimentalCapability(capabilities, name string) bool {
+	s := strings.Split(capabilities, ",")
+	if len(s) == 0 {
+		return false
+	}
+	for _, element := range s {
+		if strings.TrimSpace(element) == name {
+			return true
+		}
+	}
+	return false
 }

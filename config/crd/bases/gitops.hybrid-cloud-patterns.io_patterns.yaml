@@ -51,6 +51,10 @@ spec:
                 type: string
               clusterGroupName:
                 type: string
+              experimentalCapabilities:
+                description: Comma separated capabilities to enable certain experimental
+                  features
+                type: string
               extraParameters:
                 description: '.Name is dot separated per the helm --set syntax, such
                   as: global.something.field'
