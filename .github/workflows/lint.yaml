@@ -24,7 +24,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.57.1
+          version: v1.57.2
           args: --timeout 5m -v
 
           #--exclude SA5011
