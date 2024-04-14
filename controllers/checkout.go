@@ -155,25 +155,28 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
 }
 
-func checkoutRevision(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+func getHTTPSTransport() *nethttp.Transport {
+	myTransport := &nethttp.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+		Proxy: nethttp.ProxyFromEnvironment,
+	}
 	caCert, err := os.ReadFile(GitCustomCAFile)
 	if err == nil {
 		caCertPool := x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
-
-		// Create custom transport for Git client
-		transport := nethttp.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:    caCertPool,
-				MinVersion: tls.VersionTLS12,
-			},
-		}
-		customClient := &nethttp.Client{
-			Transport: &transport,
-		}
-		// Override http(s) default protocol to use our custom client
-		client.InstallProtocol("https", http.NewClient(customClient))
+		myTransport.TLSClientConfig.RootCAs = caCertPool
 	}
+	return myTransport
+}
+
+func checkoutRevision(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+	customClient := &nethttp.Client{
+		Transport: getHTTPSTransport(),
+	}
+	// Override http(s) default protocol to use our custom client
+	client.InstallProtocol("https", http.NewClient(customClient))
 	repo, err := gitOps.OpenRepository(directory)
 	if err != nil {
 		return err
@@ -227,27 +230,14 @@ func checkoutRevision(gitOps GitOperations, url, directory, commit string, secre
 }
 
 func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]byte) error {
-	caCert, err := os.ReadFile(GitCustomCAFile)
-	if err == nil {
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-
-		// Create custom transport for Git client
-		transport := nethttp.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:    caCertPool,
-				MinVersion: tls.VersionTLS12,
-			},
-		}
-		customClient := &nethttp.Client{
-			Transport: &transport,
-		}
-		// Override http(s) default protocol to use our custom client
-		client.InstallProtocol("https", http.NewClient(customClient))
+	customClient := &nethttp.Client{
+		Transport: getHTTPSTransport(),
 	}
+	// Override http(s) default protocol to use our custom client
+	client.InstallProtocol("https", http.NewClient(customClient))
 
 	gitDir := filepath.Join(directory, ".git")
-	if _, err = os.Stat(gitDir); err == nil {
+	if _, err := os.Stat(gitDir); err == nil {
 		fmt.Printf("%s already exists\n", gitDir)
 		return nil
 	}
