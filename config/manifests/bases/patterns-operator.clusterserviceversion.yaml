@@ -7,6 +7,13 @@ metadata:
     categories: OpenShift Optional
     containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.1
     description: An operator to deploy and manage architecture patterns from https://validatedpatterns.io
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "true"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
   name: patterns-operator.v0.0.0
