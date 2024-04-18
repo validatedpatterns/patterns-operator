@@ -2,7 +2,6 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 
 go 1.21
 
-
 require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj-labs/argocd-operator v0.8.0
@@ -140,7 +139,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
