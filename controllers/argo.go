@@ -483,7 +483,7 @@ func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 
 	helmValues, err := mergeHelmValues(valueFiles...)
 	if err != nil {
-		return nil, fmt.Errorf("Could not fetch value files: %s", err)
+		return nil, fmt.Errorf("could not fetch value files: %s", err)
 	}
 	sharedValueFiles := getClusterGroupValue("sharedValueFiles", helmValues)
 	if sharedValueFiles == nil {
@@ -493,7 +493,7 @@ func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 	// Check if s is of type []interface{}
 	val, ok := sharedValueFiles.([]any)
 	if !ok {
-		return nil, fmt.Errorf("Could not make a list out of sharedValueFiles: %v", sharedValueFiles)
+		return nil, fmt.Errorf("could not make a list out of sharedValueFiles: %v", sharedValueFiles)
 	}
 
 	// Convert each element of slice to a string
@@ -501,7 +501,7 @@ func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 	for i, v := range val {
 		str, ok := v.(string)
 		if !ok {
-			return nil, fmt.Errorf("Type assertion failed at index %d: Not a string", i)
+			return nil, fmt.Errorf("type assertion failed at index %d: Not a string", i)
 		}
 		valueMap := convertArgoHelmParametersToMap(newApplicationParameters(p))
 		templatedString, err := helmTpl(str, valueFiles, valueMap)
@@ -626,7 +626,7 @@ func newArgoOperatorApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *
 	return &app
 }
 
-func newApplication(p *api.Pattern) *argoapi.Application {
+func newSourceApplication(p *api.Pattern) *argoapi.Application {
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
 	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
@@ -676,6 +676,19 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	spec := commonApplicationSpec(p, sources)
 	spec.SyncPolicy = commonSyncPolicy(p)
 	return newArgoOperatorApplication(p, spec)
+}
+
+func newArgoApplication(p *api.Pattern) *argoapi.Application {
+	// -- ArgoCD Application
+	var targetApp *argoapi.Application
+
+	if *p.Spec.MultiSourceConfig.Enabled {
+		targetApp = newMultiSourceApplication(p)
+	} else {
+		targetApp = newSourceApplication(p)
+	}
+
+	return targetApp
 }
 
 func applicationName(p *api.Pattern) string {
