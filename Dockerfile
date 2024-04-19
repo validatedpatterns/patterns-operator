@@ -1,5 +1,5 @@
 FROM quay.io/centos/centos:stream9 AS builder
-RUN dnf install git-core golang jq -y && dnf clean all
+RUN dnf install git-core jq -y && dnf clean all
 
 # Build the manager binary
 
@@ -11,14 +11,15 @@ COPY go.sum go.sum
 
 # use latest Go z release
 ENV GOTOOLCHAIN=auto
+ENV GO_INSTALL_DIR=/golang
 
 # Ensure correct Go version
 RUN export GO_VERSION=$(grep -E "go [[:digit:]]\.[[:digit:]][[:digit:]]" go.mod | awk '{print $2}') && \
-    export GO_FULLVER=$(curl -LsS 'https://golang.org/dl/?mode=json' | jq -r '.[] | select(.version | startswith("go'${GO_VERSION}'")) | .version' | sort -V | tail -n1) && \
-    go install golang.org/dl/${GO_FULLVER}@latest && \
-    ~/go/bin/${GO_FULLVER} download && \
-    /bin/cp -f ~/go/bin/${GO_FULLVER} /usr/bin/go && \
-    go version
+    export GO_FILENAME=$(curl -sL 'https://go.dev/dl/?mode=json&include=all' | jq -r "[.[] | select(.version | startswith(\"go${GO_VERSION}\"))][0].files[] | select(.os == \"linux\" and .arch == \"amd64\") | .filename") && \
+    curl -sL -o go.tar.gz "https://golang.org/dl/${GO_FILENAME}" && \
+    mkdir -p ${GO_INSTALL_DIR} && \
+    tar -C ${GO_INSTALL_DIR} -xzf go.tar.gz && \
+    rm go.tar.gz && ln -sf ${GO_INSTALL_DIR}/go/bin/go /usr/bin/go
 
 # Copy the go sources
 COPY vendor/ vendor/

@@ -24,6 +24,8 @@ case $1 in
     *)	EXTRA="build -o manager";;
 esac
 
+go version
+
 touch controllers/apikey.txt
 if [ -f "/run/secrets/apikey" ]; then
     cp -f /run/secrets/apikey controllers/apikey.txt
