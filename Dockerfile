@@ -38,8 +38,7 @@ RUN --mount=type=secret,id=apikey hack/build.sh
 # FROM gcr.io/distroless/static:nonroot
 
 # UBI is larger (158Mb vs. 56Mb) but approved by RH 
-# 20240418 - bandini - switching to ubi-micro
-FROM registry.access.redhat.com/ubi9/ubi-micro:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
