@@ -227,8 +227,8 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	apps, appsets, _ := countVPApplications(p)
 
 	endEventTracks := getAnalyticsTrack(p, event)
-	endEventTracks.Properties.Set("ApplicationCount", strconv.Itoa(apps))
-	endEventTracks.Properties.Set("ApplicationSetCount", strconv.Itoa(appsets))
+	endEventTracks.Properties.Set("appcount", strconv.Itoa(apps))
+	endEventTracks.Properties.Set("appsetcount", strconv.Itoa(appsets))
 	err := retryAnalytics(v.logger, 2, 1, endEventTracks, client.Enqueue)
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
