@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
+	"strconv"
 	"strings"
 	"time"
 
@@ -161,7 +162,6 @@ func (v *VpAnalytics) SendPatternInstallationInfo(p *api.Pattern) bool {
 		properties.Set(k, v)
 	}
 	properties.Set("pattern", p.Name)
-
 	client := analytics.New(v.apiKey)
 	defer client.Close()
 	id := analytics.Identify{
@@ -223,7 +223,13 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	} else {
 		event = PatternEndEvent
 	}
-	err := retryAnalytics(v.logger, 2, 1, getAnalyticsTrack(p, event), client.Enqueue)
+	// If there was an error the counts are both set to zero
+	apps, appsets, _ := countVPApplications(p)
+
+	endEventTracks := getAnalyticsTrack(p, event)
+	endEventTracks.Properties.Set("ApplicationCount", strconv.Itoa(apps))
+	endEventTracks.Properties.Set("ApplicationSetCount", strconv.Itoa(appsets))
+	err := retryAnalytics(v.logger, 2, 1, endEventTracks, client.Enqueue)
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false

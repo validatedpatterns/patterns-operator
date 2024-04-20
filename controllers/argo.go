@@ -691,6 +691,25 @@ func newArgoApplication(p *api.Pattern) *argoapi.Application {
 	return targetApp
 }
 
+func countVPApplications(p *api.Pattern) (appCount, appSetsCount int, err error) {
+	gitDir := p.Status.LocalCheckoutPath
+	if _, err := os.Stat(gitDir); err != nil {
+		return 0, 0, fmt.Errorf("%s path does not exist", gitDir)
+	}
+	valueFiles := newApplicationValueFiles(p, gitDir)
+	helmValues, helmErr := mergeHelmValues(valueFiles...)
+	if helmErr != nil {
+		return 0, 0, fmt.Errorf("could not fetch value files: %s", helmErr)
+	}
+
+	applicationDict := getClusterGroupValue("applications", helmValues)
+	if applicationDict == nil {
+		return 0, 0, nil
+	}
+	apps, appsets := countApplicationsAndSets(applicationDict)
+	return apps, appsets, nil
+}
+
 func applicationName(p *api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }

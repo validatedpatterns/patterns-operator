@@ -109,3 +109,35 @@ func helmTpl(templateString string, valueFiles []string, values map[string]any) 
 
 	return rendered, nil
 }
+
+func countApplicationsAndSets(a any) (appCount, appSetsCount int) {
+	applicationCount := 0
+	applicationSetsCount := 0
+	applicationSetsKeys := []string{"generators", "generatorFile", "useGeneratorValues", "destinationServer", "destinationNamespace"}
+
+	m, ok := a.(map[string]any)
+	if !ok {
+		return 0, 0
+	}
+	for _, v := range m {
+		foundApplicationSet := false
+		subMap, ok := v.(map[string]any)
+		if !ok {
+			// If it's not a map, skip it
+			continue
+		}
+		// ApplicationSets have one of these subkeys in the application
+		for _, key := range applicationSetsKeys {
+			if _, exists := subMap[key]; exists {
+				foundApplicationSet = true
+				break
+			}
+		}
+		if foundApplicationSet {
+			applicationSetsCount++
+		} else {
+			applicationCount++
+		}
+	}
+	return applicationCount, applicationSetsCount
+}

@@ -84,6 +84,67 @@ var _ = Describe("Helm Values", func() {
 	})
 })
 
+var _ = Describe("CountApplicationsAndSets", func() {
+	var (
+		input map[string]any
+	)
+
+	BeforeEach(func() {
+		input = make(map[string]any)
+	})
+
+	Context("when input is empty", func() {
+		It("returns zero for both counts", func() {
+			appCount, appSetsCount := countApplicationsAndSets(input)
+			Expect(appCount).To(Equal(0))
+			Expect(appSetsCount).To(Equal(0))
+		})
+	})
+
+	Context("when input contains only applications", func() {
+		BeforeEach(func() {
+			input["app1"] = map[string]any{"someKey": "someValue"}
+			input["app2"] = map[string]any{"anotherKey": "anotherValue"}
+		})
+
+		It("returns the correct number of applications and zero application sets", func() {
+			appCount, appSetsCount := countApplicationsAndSets(input)
+			Expect(appCount).To(Equal(2))
+			Expect(appSetsCount).To(Equal(0))
+		})
+	})
+
+	Context("when input contains only application sets", func() {
+		BeforeEach(func() {
+			input["appSet1"] = map[string]any{"generators": "someValue"}
+			input["appSet2"] = map[string]any{"destinationServer": "someServer"}
+		})
+
+		It("returns zero for applications and the correct number for application sets", func() {
+			appCount, appSetsCount := countApplicationsAndSets(input)
+			Expect(appCount).To(Equal(0))
+			Expect(appSetsCount).To(Equal(2))
+		})
+	})
+
+	Context("when input contains a mix of applications and application sets", func() {
+		BeforeEach(func() {
+			input["app1"] = map[string]any{"someKey": "someValue"}
+			input["appSet1"] = map[string]any{"generators": "someValue"}
+			input["app2"] = map[string]any{"someKey2": "someValue2"}
+			input["app3"] = map[string]any{"someKey3": "someValue3"}
+			input["appSet2"] = map[string]any{"generators": "someValue"}
+			input["app4"] = map[string]any{"someKey4": "someValue4"}
+		})
+
+		It("returns the correct counts for both applications and application sets", func() {
+			appCount, appSetsCount := countApplicationsAndSets(input)
+			Expect(appCount).To(Equal(4))
+			Expect(appSetsCount).To(Equal(2))
+		})
+	})
+})
+
 func createTempValueFile(name string, content any) string {
 	filePath := filepath.Join(tempDir, name)
 	data, err := yaml.Marshal(content)
