@@ -243,15 +243,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	var targetApp *argoapi.Application
-	// -- ArgoCD Application
-	if *qualifiedInstance.Spec.MultiSourceConfig.Enabled {
-		targetApp = newMultiSourceApplication(qualifiedInstance)
-	} else {
-		targetApp = newApplication(qualifiedInstance)
-	}
+	targetApp := newArgoApplication(qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
-
 	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
@@ -450,7 +443,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 		ns := getClusterWideArgoNamespace()
 
-		targetApp := newApplication(qualifiedInstance)
+		targetApp := newArgoApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance), ns)

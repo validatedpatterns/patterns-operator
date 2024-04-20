@@ -113,7 +113,7 @@ var _ = Describe("Argo Pattern", func() {
 				// This is needed to debug any failures as gomega truncates the diff output
 				format.MaxDepth = 100
 				format.MaxLength = 0
-				Expect(newApplication(pattern)).To(Equal(argoApp))
+				Expect(newArgoApplication(pattern)).To(Equal(argoApp))
 			})
 		})
 		Context("Default multi source", func() {
