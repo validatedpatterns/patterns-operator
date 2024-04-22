@@ -68,13 +68,14 @@ var _ = Describe("pattern controller", func() {
 			reconciler = newFakeReconciler(nsOperators, buildPatternManifest(10))
 			watch = reconciler.driftWatcher.(*watcher)
 			gitOptions = &git.CloneOptions{
-				URL:      "https://target.url",
-				Progress: os.Stdout,
-				Depth:    0,
+				URL:               "https://target.url",
+				Progress:          os.Stdout,
+				Depth:             0,
+				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+				RemoteName:        "origin",
+				SingleBranch:      false,
+				Tags:              git.AllTags,
 				// ReferenceName: plumbing.ReferenceName,
-				RemoteName:   "origin",
-				SingleBranch: false,
-				Tags:         git.AllTags,
 			}
 		})
 
