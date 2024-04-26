@@ -93,6 +93,9 @@ func getBaseGitRepo(p *api.Pattern) string {
 }
 
 func getAnalyticsContext(p *api.Pattern) *analytics.Context {
+	// If there was an error the counts are both set to zero
+	apps, appsets, _ := countVPApplications(p)
+
 	ctx := &analytics.Context{
 		Extra: map[string]any{
 			"Pattern":         p.Name,
@@ -102,6 +105,8 @@ func getAnalyticsContext(p *api.Pattern) *analytics.Context {
 			"OCPVersion":      p.Status.ClusterVersion,
 			"Platform":        p.Status.ClusterPlatform,
 			"DeviceHash":      getDeviceHash(p),
+			"AppCount":        strconv.Itoa(apps),
+			"AppSetCount":     strconv.Itoa(appsets),
 		},
 		App: analytics.AppInfo{
 			Version: version.Version,
@@ -223,13 +228,7 @@ func (v *VpAnalytics) SendPatternEndEventInfo(p *api.Pattern) bool {
 	} else {
 		event = PatternEndEvent
 	}
-	// If there was an error the counts are both set to zero
-	apps, appsets, _ := countVPApplications(p)
-
-	endEventTracks := getAnalyticsTrack(p, event)
-	endEventTracks.Properties.Set("appcount", strconv.Itoa(apps))
-	endEventTracks.Properties.Set("appsetcount", strconv.Itoa(appsets))
-	err := retryAnalytics(v.logger, 2, 1, endEventTracks, client.Enqueue)
+	err := retryAnalytics(v.logger, 2, 1, getAnalyticsTrack(p, event), client.Enqueue)
 	if err != nil {
 		v.logger.Info("Sending update info failed:", "info", err)
 		return false
