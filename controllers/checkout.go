@@ -291,13 +291,12 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, error) {
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
-		URL:               url,
-		RemoteName:        "origin",
-		Progress:          os.Stdout,
-		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth, // defaults to 10 in go-git
-		Depth:             0,
-		SingleBranch:      false,
-		Tags:              git.AllTags,
+		URL:          url,
+		RemoteName:   "origin",
+		Progress:     os.Stdout,
+		Depth:        0,
+		SingleBranch: false,
+		Tags:         git.AllTags,
 	}
 
 	authType := detectGitAuthType(secret)
