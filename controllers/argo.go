@@ -37,6 +37,7 @@ import (
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	routev1 "github.com/openshift/api/route/v1"
 )
 
 func newArgoCD(name, namespace string) *argooperator.ArgoCD {
@@ -261,6 +262,10 @@ g, cluster-admins, role:admin`
 				},
 				Route: argooperator.ArgoCDRouteSpec{
 					Enabled: true,
+					TLS: &routev1.TLSConfig{
+						Termination:                   routev1.TLSTerminationReencrypt,
+						InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+					},
 				},
 				Service: argooperator.ArgoCDServerServiceSpec{
 					Type: "",
