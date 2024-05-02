@@ -1,5 +1,5 @@
-FROM quay.io/centos/centos:stream9 AS builder
-RUN dnf install git-core jq -y && dnf clean all
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
+RUN microdnf install git-core jq tar -y && microdnf clean all
 
 # Build the manager binary
 
