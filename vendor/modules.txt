@@ -58,7 +58,7 @@ github.com/ProtonMail/go-crypto/openpgp/s2k
 ## explicit; go 1.20
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
-# github.com/argoproj/argo-cd/v2 v2.10.7
+# github.com/argoproj/argo-cd/v2 v2.10.8
 ## explicit; go 1.21
 github.com/argoproj/argo-cd/v2/common
 github.com/argoproj/argo-cd/v2/pkg/apis/application
