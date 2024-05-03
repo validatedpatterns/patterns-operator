@@ -699,12 +699,12 @@ func newArgoApplication(p *api.Pattern) *argoapi.Application {
 func countVPApplications(p *api.Pattern) (appCount, appSetsCount int, err error) {
 	gitDir := p.Status.LocalCheckoutPath
 	if _, err := os.Stat(gitDir); err != nil {
-		return 0, 0, fmt.Errorf("%s path does not exist", gitDir)
+		return -1, -1, fmt.Errorf("%s path does not exist", gitDir)
 	}
 	valueFiles := newApplicationValueFiles(p, gitDir)
 	helmValues, helmErr := mergeHelmValues(valueFiles...)
 	if helmErr != nil {
-		return 0, 0, fmt.Errorf("could not fetch value files: %s", helmErr)
+		return -2, -2, fmt.Errorf("error reading value file: %s", helmErr)
 	}
 
 	applicationDict := getClusterGroupValue("applications", helmValues)
