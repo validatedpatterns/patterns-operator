@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj-labs/argocd-operator v0.8.0
-	github.com/argoproj/argo-cd/v2 v2.10.8
+	github.com/argoproj/argo-cd/v2 v2.10.10
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-logr/logr v1.4.1
@@ -38,7 +38,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20240122213038-792124280fcc // indirect
+	github.com/argoproj/gitops-engine v0.7.1-0.20240416142647-fbecbb86e412 // indirect
 	github.com/argoproj/pkg v0.13.7-0.20230626144333-d56162821bd1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic v0.7.0 // indirect
 	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect

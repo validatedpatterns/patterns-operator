@@ -58,7 +58,7 @@ github.com/ProtonMail/go-crypto/openpgp/s2k
 ## explicit; go 1.20
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
-# github.com/argoproj/argo-cd/v2 v2.10.8
+# github.com/argoproj/argo-cd/v2 v2.10.10
 ## explicit; go 1.21
 github.com/argoproj/argo-cd/v2/common
 github.com/argoproj/argo-cd/v2/pkg/apis/application
@@ -82,7 +82,7 @@ github.com/argoproj/argo-cd/v2/util/io/path
 github.com/argoproj/argo-cd/v2/util/log
 github.com/argoproj/argo-cd/v2/util/proxy
 github.com/argoproj/argo-cd/v2/util/security
-# github.com/argoproj/gitops-engine v0.7.1-0.20240122213038-792124280fcc
+# github.com/argoproj/gitops-engine v0.7.1-0.20240416142647-fbecbb86e412
 ## explicit; go 1.19
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/api/v1/endpoints
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/util/hash
@@ -295,8 +295,8 @@ github.com/golang-jwt/jwt/v4
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.5.3
-## explicit; go 1.9
+# github.com/golang/protobuf v1.5.4
+## explicit; go 1.17
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
