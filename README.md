@@ -28,7 +28,7 @@ oc get applications -A -w
 
 In order to load the secrets out of band into the vault you can copy the
 `values-secret.yaml.template` inside the pattern's git repo to
-`~/values-secret.yaml`, edit the secrets at your discretion and then run `make
+`~/values-secret-<pattern_name>.yaml`, edit the secrets at your discretion and then run `make
 load-secrets`. Otherwise you can access the vault via its network route, login
 via the root token (contained in the `imperative` namespace in the `vaultkeys`
 secret and then add the secrets via the UI (this approach is a bit more work)
