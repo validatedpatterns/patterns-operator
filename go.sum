@@ -651,8 +651,8 @@ github.com/antlr/antlr4/runtime/Go/antlr v1.4.10/go.mod h1:F7bn7fEU90QkQ3tnmaTx3
 github.com/apache/arrow/go/v10 v10.0.1/go.mod h1:YvhnlEePVnBS4+0z3fhPfUy7W1Ikj0Ih0vcRo/gZ1M0=
 github.com/apache/arrow/go/v11 v11.0.0/go.mod h1:Eg5OsL5H+e299f7u5ssuXsuHQVEGC4xei5aX110hRiI=
 github.com/apache/thrift v0.16.0/go.mod h1:PHK3hniurgQaNMZYaCLEqXKsYK8upmhPbmdP2FXSqgU=
-github.com/argoproj-labs/argocd-operator v0.8.0 h1:VSd8RquQXXAFAg1gmBx+MKWOq/2lbN2TqXbciHfu9EU=
-github.com/argoproj-labs/argocd-operator v0.8.0/go.mod h1:0O/HStDs97mbmR5RWkYH0MVaSNZ6y67lIcph0N1eyJI=
+github.com/argoproj-labs/argocd-operator v0.10.0 h1:B2k6Rwiff3O7fG3K7nNiFuo9TV7Kr0s/K9f4Mo+5Qak=
+github.com/argoproj-labs/argocd-operator v0.10.0/go.mod h1:4TThdvK88j46P6ybACEhHHqJstdnF+CFHkmlS068dqk=
 github.com/argoproj/argo-cd/v2 v2.10.11 h1:mrFYBh1dQV+JbzUSdYLgD+WmVjlVCFaLmWZaQ+LX1C4=
 github.com/argoproj/argo-cd/v2 v2.10.11/go.mod h1:aenCbCXkvkXxFQLnYjBwLGGnNOK0OjEYo9KPDpJjZKU=
 github.com/argoproj/gitops-engine v0.7.1-0.20240416142647-fbecbb86e412 h1:je2wJpWtaoS55mA5MBPCeDnKMeF42pkxO9Oa5KbWrdg=
