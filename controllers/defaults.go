@@ -9,12 +9,10 @@ const (
 	OperatorConfigMap = "patterns-operator-config"
 	// Default Subscription Namespace
 	SubscriptionNamespace = "openshift-operators"
-	// Default Application Namespace (i.e. when EnableArgoInitContainers is false)
+	// Default Application Namespace
 	ApplicationNamespace = "openshift-gitops"
 	// ClusterWide Argo Name
 	ClusterWideArgoName = "openshift-gitops"
-	// Application Namespace of cluster-wide argo (i.e. when EnableArgoInitContainers is true)
-	VPApplicationNamespace = "validated-patterns"
 )
 
 // GitOps Subscription
@@ -37,9 +35,7 @@ const (
 )
 
 // Experimental Capabilities that can be enabled
-const (
-	VPInitContainers = "initcontainers"
-)
+// Currently none
 
 var DefaultPatternOperatorConfig = map[string]string{
 	"gitops.catalogSource":       GitOpsDefaultCatalogSource,

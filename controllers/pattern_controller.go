@@ -221,19 +221,15 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// Create the trusted-bundle configmap inside the clusterwide namespace
-	// For simplicity, we do this no matter if the "initcontainers" capability is set or not
 	errCABundle := createTrustedBundleCM(r.fullClient)
 	if errCABundle != nil {
 		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
 	}
 
-	// We only create the clusterwide argo instance when the 'initcontainers' experimentalcapability is set
-	if hasExperimentalCapability(qualifiedInstance.Spec.ExperimentalCapabilities, VPInitContainers) {
-		log.Printf("Manage our own clusterwide argo")
-		err = createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
-		}
+	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
+	err = createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 	}
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
