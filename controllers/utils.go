@@ -259,7 +259,7 @@ func writeConfigMapKeyToFile(fullClient kubernetes.Interface, namespace, configM
 		fileMode = os.O_TRUNC | os.O_CREATE | os.O_WRONLY
 	}
 	// Open the file with the determined mode
-	file, err := os.OpenFile(filePath, fileMode, 0644) //nolint:gomnd
+	file, err := os.OpenFile(filePath, fileMode, 0644) //nolint:mnd
 	if err != nil {
 		return fmt.Errorf("error opening file %s: %w", filePath, err)
 	}
