@@ -136,6 +136,15 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 		return h, nil
 	}
 
+	// Explicitly handle the "HEAD" reference
+	if name == "HEAD" {
+		headRef, err := repo.Head()
+		if err != nil {
+			return plumbing.ZeroHash, fmt.Errorf("failed to get HEAD reference: %w", err)
+		}
+		return headRef.Hash(), nil
+	}
+
 	// Try various reference types...
 	if h, err := getHashFromReference(repo, plumbing.NewBranchReferenceName(name)); err == nil {
 		return h, nil
