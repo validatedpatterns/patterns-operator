@@ -137,7 +137,7 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	}
 
 	// Explicitly handle the "HEAD" reference
-	if name == "HEAD" {
+	if name == "HEAD" { //nolint:goconst
 		headRef, err := repo.Head()
 		if err != nil {
 			return plumbing.ZeroHash, fmt.Errorf("failed to get HEAD reference: %w", err)
