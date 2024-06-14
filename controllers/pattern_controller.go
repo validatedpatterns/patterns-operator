@@ -41,6 +41,7 @@ import (
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
 
@@ -60,15 +61,17 @@ type PatternReconciler struct {
 
 	logger logr.Logger
 
-	config         *rest.Config
-	configClient   configclient.Interface
-	argoClient     argoclient.Interface
-	olmClient      olmclient.Interface
-	fullClient     kubernetes.Interface
-	dynamicClient  dynamic.Interface
-	operatorClient operatorclient.OperatorV1Interface
-	driftWatcher   driftWatcher
-	gitOperations  GitOperations
+	config          *rest.Config
+	configClient    configclient.Interface
+	argoClient      argoclient.Interface
+	olmClient       olmclient.Interface
+	fullClient      kubernetes.Interface
+	dynamicClient   dynamic.Interface
+	routeClient     routeclient.Interface
+	operatorClient  operatorclient.OperatorV1Interface
+	driftWatcher    driftWatcher
+	gitOperations   GitOperations
+	giteaOperations GiteaOperations
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -77,7 +80,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;get
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;delete;update;get;create;patch
 //+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
@@ -85,7 +88,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
-//
+//+kubebuilder:rbac:groups="route.openshift.io",namespace=vp-gitea,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -158,13 +161,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "Updated status with start event sent", nil)
 	}
 
-	ret, err := r.getLocalGit(qualifiedInstance)
-	if err != nil {
-		return r.actionPerformed(qualifiedInstance, ret, err)
-	}
-
-	// -- Git Drift monitoring
 	gitConfig := qualifiedInstance.Spec.GitConfig
+	// -- Git Drift monitoring
 	// if both git repositories are defined in the pattern's git configuration and the polling interval is not set to disable watching
 	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
 		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
@@ -237,6 +235,96 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			qualifiedInstance.Spec.GitConfig.TokenSecret, getClusterWideArgoNamespace(), "vp-private-repo-credentials"); err != nil {
 			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
 		}
+	}
+
+	log.Printf("BANDINI0: %s", gitConfig.OriginRepo)
+	// If you specified OriginRepo then we automatically spawn a gitea instance via a special argo gitea application
+	if gitConfig.OriginRepo != "" {
+		giteaApp := newArgoGiteaApplication(qualifiedInstance)
+		// BANDINI: add this in the newargogiteapplication and check the segfaulting
+		//_ = controllerutil.SetOwnerReference(qualifiedInstance, giteaApp, r.Scheme)
+		log.Printf("BANDINI1: %v", giteaApp)
+		app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
+		if app == nil {
+			log.Printf("Gitea app not found: %s\n", err.Error())
+			err = createApplication(r.argoClient, giteaApp, clusterWideNS)
+			return r.actionPerformed(qualifiedInstance, "create gitea application", err)
+		} else if ownedBySame(giteaApp, app) {
+			// Check values
+			changed, errApp := updateApplication(r.argoClient, giteaApp, app, clusterWideNS)
+			if changed {
+				if errApp != nil {
+					qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
+				}
+				_ = DropLocalGitPaths()
+
+				return r.actionPerformed(qualifiedInstance, "updated gitea application", errApp)
+			}
+		} else {
+			// Someone manually removed the owner ref
+			return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", giteaApp.Name))
+		}
+		if !haveNamespace(r.Client, GiteaNamespace) {
+			return r.actionPerformed(qualifiedInstance, "check gitea namespace", fmt.Errorf("waiting for creation"))
+		}
+		// It is okay to create the gitea secret here because the pod won't start without it and when we're
+		// here we know that the gitea namespace has been created
+		var giteaAdminPassword string
+		giteaAdminPassword, err = GenerateRandomPassword(GiteaDefaultPasswordLen)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "error Generating gitea_admin password", err)
+		}
+
+		secretData := map[string][]byte{
+			"username": []byte(GiteaAdminUser),
+			"password": []byte(giteaAdminPassword),
+		}
+		giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
+		err = r.Client.Create(context.Background(), giteaAdminSecret)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "Could not create Gitea Admin Secret", err)
+		}
+		// Here we need to call the gitea migration bits
+		// Let's get the GiteaServer route
+		giteaRouteURL, routeErr := getRoute(r.routeClient, GiteaRouteName, GiteaNamespace)
+		if routeErr != nil {
+			return r.actionPerformed(qualifiedInstance, "GiteaServer route not ready", routeErr)
+		}
+		// Extract the repository name from the original target repo
+		upstreamRepoName, repoErr := extractRepositoryName(instance.Spec.GitConfig.OriginRepo)
+		if repoErr != nil {
+			return r.actionPerformed(qualifiedInstance, "Target Repo URL", repoErr)
+		}
+
+		giteaRepoURL := fmt.Sprintf("%s/%s/%s", giteaRouteURL, GiteaAdminUser, upstreamRepoName)
+		secret, secretErr := getSecret(r.fullClient, GiteaAdminSecretName, GiteaNamespace)
+		if secretErr != nil {
+			return r.actionPerformed(qualifiedInstance, "error getting gitea Admin Secret", secretErr)
+		}
+
+		// Let's attempt to migrate the repo to Gitea
+		_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data["username"]),
+			string(secret.Data["password"]),
+			instance.Spec.GitConfig.OriginRepo,
+			giteaRouteURL)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "GiteaServer Migrate Repository Error: ", err)
+		}
+
+		// Migrate Repo has been done.
+		// Replace the Target Repo with new Gitea Repo URL
+		// and update the pattern CR
+		instance.Spec.GitConfig.TargetRepo = giteaRepoURL
+		err = r.Client.Update(context.Background(), instance)
+		if err != nil {
+			return r.actionPerformed(qualifiedInstance, "Update CR Target Repo", err)
+		}
+
+	}
+
+	ret, err := r.getLocalGit(qualifiedInstance)
+	if err != nil {
+		return r.actionPerformed(qualifiedInstance, ret, err)
 	}
 
 	targetApp := newArgoApplication(qualifiedInstance)
@@ -509,8 +597,13 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
 	}
+
+	if r.routeClient, err = routeclient.NewForConfig(r.config); err != nil {
+		return err
+	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
+	r.giteaOperations = &GiteaOperationsImpl{}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
@@ -683,7 +776,7 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 
 	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+		err = cloneRepo(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
 		if err != nil {
 			return "cloning pattern repo", err
 		}
@@ -698,13 +791,13 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 			if err != nil {
 				return "failed to remove locally cloned folder", err
 			}
-			err = cloneRepo(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+			err = cloneRepo(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
 			if err != nil {
 				return "cloning pattern repo after removal", err
 			}
 		}
 	}
-	if err := checkoutRevision(r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
+	if err := checkoutRevision(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
 		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
 		return "checkout target revision", err
 	}

@@ -17,7 +17,7 @@ var gitCommitHash = "d0f3fb283cfb17189cba89aa5ff57fd8dcb2a7fd"
 var _ = Describe("Git Functions", func() {
 	Context("cloneRepo", func() {
 		It("should clone a repository and get the HEAD", func() {
-			err := cloneRepo(gitOpsImpl, gitRepoURL, tempDir, nil)
+			err := cloneRepo(nil, gitOpsImpl, gitRepoURL, tempDir, nil)
 			Expect(err).ToNot(HaveOccurred())
 			refHash, err := repoHash(tempDir)
 			Expect(err).ToNot(HaveOccurred())
@@ -27,7 +27,7 @@ var _ = Describe("Git Functions", func() {
 
 	Context("checkoutRevision", func() {
 		It("should checkout a specific commit", func() {
-			err := checkoutRevision(gitOpsImpl, gitRepoURL, tempDir, gitCommitHash, nil) // some older existing commit hash
+			err := checkoutRevision(nil, gitOpsImpl, gitRepoURL, tempDir, gitCommitHash, nil) // some older existing commit hash
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -49,17 +49,17 @@ var _ = Describe("Git Functions", func() {
 			cleanupTempDir(tempDir2)
 		})
 		It("should clone repository and checkout a specific commit", func() {
-			err := checkout(gitOpsImpl, gitRepoURL, tempDir2, gitCommitHash, nil)
+			err := checkout(nil, gitOpsImpl, gitRepoURL, tempDir2, gitCommitHash, nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should checkout repository without checking out if commit is empty", func() {
-			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "", nil)
+			err := checkout(nil, gitOpsImpl, gitRepoURL, tempDir, "", nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should checkout a repository and switch to its remote branch", func() {
-			err := checkout(gitOpsImpl, gitRepoURL, tempDir, "test-do-not-use", nil)
+			err := checkout(nil, gitOpsImpl, gitRepoURL, tempDir, "test-do-not-use", nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})

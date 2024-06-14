@@ -17,8 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	nethttp "net/http"
 	"os"
@@ -28,6 +26,7 @@ import (
 	"path/filepath"
 
 	stdssh "golang.org/x/crypto/ssh"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -78,8 +77,8 @@ func (g *GitOperationsImpl) CloneRepository(directory string, isBare bool, optio
 }
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
-func checkout(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
-	if err := cloneRepo(gitOps, url, directory, secret); err != nil {
+func checkout(fullClient kubernetes.Interface, gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+	if err := cloneRepo(fullClient, gitOps, url, directory, secret); err != nil {
 		return err
 	}
 
@@ -88,7 +87,7 @@ func checkout(gitOps GitOperations, url, directory, commit string, secret map[st
 		return nil
 	}
 
-	if err := checkoutRevision(gitOps, url, directory, commit, secret); err != nil {
+	if err := checkoutRevision(fullClient, gitOps, url, directory, commit, secret); err != nil {
 		return err
 	}
 
@@ -164,25 +163,9 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
 }
 
-func getHTTPSTransport() *nethttp.Transport {
-	myTransport := &nethttp.Transport{
-		TLSClientConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		},
-		Proxy: nethttp.ProxyFromEnvironment,
-	}
-	caCert, err := os.ReadFile(GitCustomCAFile)
-	if err == nil {
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-		myTransport.TLSClientConfig.RootCAs = caCertPool
-	}
-	return myTransport
-}
-
-func checkoutRevision(gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+func checkoutRevision(fullClient kubernetes.Interface, gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
 	customClient := &nethttp.Client{
-		Transport: getHTTPSTransport(),
+		Transport: getHTTPSTransport(fullClient),
 	}
 	// Override http(s) default protocol to use our custom client
 	client.InstallProtocol("https", http.NewClient(customClient))
@@ -238,9 +221,9 @@ func checkoutRevision(gitOps GitOperations, url, directory, commit string, secre
 	return err
 }
 
-func cloneRepo(gitOps GitOperations, url, directory string, secret map[string][]byte) error {
+func cloneRepo(fullClient kubernetes.Interface, gitOps GitOperations, url, directory string, secret map[string][]byte) error {
 	customClient := &nethttp.Client{
-		Transport: getHTTPSTransport(),
+		Transport: getHTTPSTransport(fullClient),
 	}
 	// Override http(s) default protocol to use our custom client
 	client.InstallProtocol("https", http.NewClient(customClient))

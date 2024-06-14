@@ -709,6 +709,52 @@ func newArgoApplication(p *api.Pattern) *argoapi.Application {
 	return targetApp
 }
 
+func newArgoGiteaApplication(p *api.Pattern) *argoapi.Application {
+	consoleHref := fmt.Sprintf("https://%s-%s.%s", GiteaRouteName, GiteaNamespace, p.Status.AppClusterDomain)
+	parameters := []argoapi.HelmParameter{
+		{
+			Name:  "gitea.admin.existingSecret",
+			Value: GiteaAdminSecretName,
+		},
+		{
+			Name:  "gitea.console.href",
+			Value: consoleHref,
+		},
+		{
+			Name:  "gitea.config.server.ROOT_URL",
+			Value: consoleHref,
+		},
+	}
+	spec := &argoapi.ApplicationSpec{
+		Destination: argoapi.ApplicationDestination{
+			Name:      "in-cluster",
+			Namespace: GiteaNamespace,
+		},
+		Project: "default",
+		Source: &argoapi.ApplicationSource{
+			RepoURL:        GiteaHelmRepoUrl,
+			TargetRevision: GiteaDefaultChartVersion,
+			Chart:          GiteaChartName,
+			Helm: &argoapi.ApplicationSourceHelm{
+				Parameters: parameters,
+			},
+		},
+		SyncPolicy: commonSyncPolicy(p),
+	}
+	labels := make(map[string]string)
+	labels["validatedpatterns.io/pattern"] = p.Name
+	app := argoapi.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GiteaApplicationName,
+			Namespace: getClusterWideArgoNamespace(),
+			Labels:    labels,
+		},
+		Spec: *spec,
+	}
+	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
+	return &app
+}
+
 func countVPApplications(p *api.Pattern) (appCount, appSetsCount int, err error) {
 	gitDir := p.Status.LocalCheckoutPath
 	if _, err := os.Stat(gitDir); err != nil {

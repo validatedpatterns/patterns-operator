@@ -219,8 +219,13 @@ spec:
           resources:
           - namespaces
           verbs:
+          - create
+          - delete
           - get
           - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - ""
           resources:
@@ -445,6 +450,19 @@ spec:
           verbs:
           - create
           - patch
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          - routes/custom-host
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         serviceAccountName: patterns-operator-controller-manager
     strategy: deployment
   installModes:

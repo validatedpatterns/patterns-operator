@@ -20,13 +20,16 @@ import (
 	"context"
 	"fmt"
 
+	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"gopkg.in/yaml.v3"
@@ -86,28 +89,25 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
 }
 
-func checkAPIVersion(config *rest.Config, group, version string) error {
-	clientset, err := kubernetes.NewForConfig(config)
+func getRoute(routeClient routeclient.Interface, routeName, namespace string) (string, error) {
+	route, err := routeClient.RouteV1().Routes(namespace).Get(context.Background(), routeName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to call NewForConfig: %s", err)
-	}
-	// Get the list of API groups available in the cluster
-	apiGroups, err := clientset.Discovery().ServerGroups()
-	if err != nil {
-		return fmt.Errorf("failed to get API groups: %v", err)
+		return "", err
 	}
 
-	// Iterate through the API groups to find the specified group and version
-	//nolint:gocritic // The range is so small that this is not worth changing
-	for _, apiGroup := range apiGroups.Groups {
-		if apiGroup.Name == group {
-			for _, apiVersion := range apiGroup.Versions {
-				if apiVersion.Version == version {
-					return nil
-				}
-			}
+	url := fmt.Sprintf("https://%s", route.Status.Ingress[0].Host)
+
+	return url, nil
+}
+
+// Get a Secret instance
+func getSecret(fullClient kubernetes.Interface, name, ns string) (*v1.Secret, error) {
+	secret, err := fullClient.CoreV1().Secrets(ns).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, err
 		}
+		return nil, err
 	}
-
-	return fmt.Errorf("API version %s/%s not available", group, version)
+	return secret, nil
 }

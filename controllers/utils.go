@@ -19,12 +19,18 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
+	nethttp "net/http"
 	"net/url"
 	"os"
 	"path"
 	"strings"
+
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/go-errors/errors"
@@ -283,4 +289,83 @@ func hasExperimentalCapability(capabilities, name string) bool {
 		}
 	}
 	return false
+}
+
+// getConfigMapKeyToFile gets the value of a specified key from a ConfigMap.
+// `configMapName` is the name of the ConfigMap.
+// `namespace` is the namespace where the ConfigMap resides.
+// `key` is the key within the ConfigMap whose value will be written to the file.
+func getConfigMapKey(fullClient kubernetes.Interface, namespace, configMapName, key string) (string, error) {
+	// Get the ConfigMap
+	configMap, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting ConfigMap %s in namespace %s: %w", configMapName, namespace, err)
+	}
+	// Get the value for the specified key
+	value, ok := configMap.Data[key]
+	if !ok {
+		return "", fmt.Errorf("key %s not found in ConfigMap %s", key, configMapName)
+	}
+
+	return value, nil
+}
+
+func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
+	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
+	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
+	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
+	var err error
+	var kuberoot string = ""
+	var trustedcabundle string = ""
+
+	if fullClient != nil {
+		kuberoot, err = getConfigMapKey(fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt")
+		if err != nil {
+			fmt.Printf("Error while getting kube-root-ca.crt configmap: %v", err)
+		}
+		trustedcabundle, err = getConfigMapKey(fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt")
+		if err != nil {
+			fmt.Printf("Error while getting trusted-ca-bundle configmap: %v", err)
+		}
+	}
+	myTransport := &nethttp.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+		Proxy: nethttp.ProxyFromEnvironment,
+	}
+	var cacerts bytes.Buffer
+	if kuberoot != "" {
+		cacerts.WriteString(kuberoot)
+	}
+	if trustedcabundle != "" {
+		cacerts.WriteString("\n")
+		cacerts.WriteString(trustedcabundle)
+		cacerts.WriteString("\n")
+	}
+	// We run either in a test env or we could not fetch any certificates at all
+	// Fallback to system certs
+	var caCertPool *x509.CertPool
+	var certErr error
+	if kuberoot == "" && trustedcabundle == "" {
+		caCertPool, certErr = x509.SystemCertPool()
+	} else {
+		caCertPool = x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(cacerts.Bytes())
+	}
+	if certErr != nil {
+		return myTransport
+	}
+	myTransport.TLSClientConfig.RootCAs = caCertPool
+	return myTransport
+}
+
+// Generate a random password
+func GenerateRandomPassword(length int) (string, error) {
+	rndbytes := make([]byte, length)
+	_, err := rand.Read(rndbytes)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(rndbytes), nil
 }
