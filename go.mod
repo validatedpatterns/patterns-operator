@@ -3,6 +3,7 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 go 1.21
 
 require (
+	code.gitea.io/sdk/gitea v0.15.1
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj-labs/argocd-operator v0.11.0
 	github.com/argoproj/argo-cd/v2 v2.11.2
@@ -84,6 +85,7 @@ require (
 	github.com/google/pprof v0.0.0-20240424215950-a892ee059fd6 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
+	github.com/hashicorp/go-version v1.2.1 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
