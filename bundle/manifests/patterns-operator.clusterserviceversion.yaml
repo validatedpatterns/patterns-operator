@@ -90,10 +90,6 @@ spec:
         path: gitSpec.targetRepo
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:false
-      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
-          Default: HEAD'
-        displayName: Target Revision
-        path: gitSpec.targetRevision
       - description: Upstream git repo containing the pattern to deploy. Used when
           in-cluster fork to point to the upstream pattern repository
         displayName: Origin Repo
@@ -112,20 +108,31 @@ spec:
         path: gitSpec.pollInterval
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:number
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
+          Default: HEAD'
+        displayName: Target Revision
+        path: gitSpec.targetRevision
       - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
           is broken
         displayName: Hostname
         path: gitSpec.hostname
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Optional. K8s secret name where the info for connecting to git
           can be found. The supported secrets are modeled after the private repositories
           in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
           currently ssh and username+password are supported
         displayName: Token Secret
         path: gitSpec.tokenSecret
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Optional. K8s secret namespace where the token for connecting
           to git can be found
         displayName: Token Secret Namespace
         path: gitSpec.tokenSecretNamespace
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: (EXPERIMENTAL) Enable multi-source support when deploying the
           clustergroup argo application
         displayName: Enabled

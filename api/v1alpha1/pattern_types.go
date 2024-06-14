@@ -99,7 +99,7 @@ type GitConfig struct {
 	TargetRepo string `json:"targetRepo,omitempty"`
 
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=13
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16
 	TargetRevision string `json:"targetRevision,omitempty"`
 
 	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
@@ -111,22 +111,22 @@ type GitConfig struct {
 	OriginRevision string `json:"originRevision,omitempty"`
 
 	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:number"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:number","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	// +kubebuilder:default:=180
 	PollInterval int `json:"pollInterval,omitempty"`
 
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=17
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=17,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:advanced"}
 	Hostname string `json:"hostname,omitempty"`
 
 	// Optional. K8s secret name where the info for connecting to git can be found. The supported secrets are modeled after the
 	// private repositories in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
 	// currently ssh and username+password are supported
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=18
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=18,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:advanced"}
 	TokenSecret string `json:"tokenSecret,omitempty"`
 
 	// Optional. K8s secret namespace where the token for connecting to git can be found
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=19
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=19,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:advanced"}
 	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 }
 
