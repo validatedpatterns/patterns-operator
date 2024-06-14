@@ -59,6 +59,7 @@ type PatternSpec struct {
 
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=4
 	GitConfig GitConfig `json:"gitSpec"`
+
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=5
 	MultiSourceConfig MultiSourceConfig `json:"multiSourceConfig,omitempty"`
 
@@ -88,64 +89,69 @@ type PatternSpec struct {
 type GitConfig struct {
 	// Account              string `json:"account,omitempty"`
 
+	// Enable in-cluster gitea
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
+	// +kubebuilder:default:=false
+	GiteaEnabled *bool `json:"giteaEnabled,omitempty"`
+
 	// Git repo containing the pattern to deploy. Must use https/http or, for ssh, git@server:foo/bar.git
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=1
-	TargetRepo string `json:"targetRepo"`
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=12,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:false"}
+	TargetRepo string `json:"targetRepo,omitempty"`
 
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=2
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=13
 	TargetRevision string `json:"targetRevision,omitempty"`
 
 	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=3
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=14,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:true"}
 	OriginRepo string `json:"originRepo,omitempty"`
 
-	// Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=4
+	// (DEPRECATED) Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=15,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	OriginRevision string `json:"originRevision,omitempty"`
 
 	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=5,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:number"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:number"}
 	// +kubebuilder:default:=180
 	PollInterval int `json:"pollInterval,omitempty"`
 
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=6
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=17
 	Hostname string `json:"hostname,omitempty"`
 
 	// Optional. K8s secret name where the info for connecting to git can be found. The supported secrets are modeled after the
 	// private repositories in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
 	// currently ssh and username+password are supported
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=7
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=18
 	TokenSecret string `json:"tokenSecret,omitempty"`
 
 	// Optional. K8s secret namespace where the token for connecting to git can be found
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=19
 	TokenSecretNamespace string `json:"tokenSecretNamespace,omitempty"`
 }
 
 type MultiSourceConfig struct {
 	// (EXPERIMENTAL) Enable multi-source support when deploying the clustergroup argo application
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=20,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// The helm chart url to fetch the helm charts from in order to deploy the pattern. Defaults to https://charts.validatedpatterns.io/
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=8,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=21,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	HelmRepoUrl string `json:"helmRepoUrl,omitempty"`
 
 	// Which chart version for the clustergroup helm chart. Defaults to "0.8.*"
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=22,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	ClusterGroupChartVersion string `json:"clusterGroupChartVersion,omitempty"`
 
 	// The url when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to '' which means not used (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=12,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=23,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	ClusterGroupGitRepoUrl string `json:"clusterGroupGitRepoUrl,omitempty"`
 
 	// The git reference when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to 'main'. (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=13,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=24,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
 	// +kubebuilder:default:="main"
 	ClusterGroupChartGitRevision string `json:"clusterGroupChartGitRevision,omitempty"`
 }

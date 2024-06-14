@@ -89,6 +89,10 @@ spec:
                 type: object
               gitSpec:
                 properties:
+                  giteaEnabled:
+                    default: false
+                    description: Enable in-cluster gitea
+                    type: boolean
                   hostname:
                     description: Optional. FQDN of the git server if automatic parsing
                       from TargetRepo is broken
@@ -98,8 +102,8 @@ spec:
                       Used when in-cluster fork to point to the upstream pattern repository
                     type: string
                   originRevision:
-                    description: Branch, tag or commit in the upstream git repository.
-                      Does not support short-sha's. Default to HEAD
+                    description: (DEPRECATED) Branch, tag or commit in the upstream
+                      git repository. Does not support short-sha's. Default to HEAD
                     type: string
                   pollInterval:
                     default: 180
@@ -124,8 +128,6 @@ spec:
                     description: Optional. K8s secret namespace where the token for
                       connecting to git can be found
                     type: string
-                required:
-                - targetRepo
                 type: object
               multiSourceConfig:
                 properties:
