@@ -18,6 +18,8 @@ package controllers
 
 import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -351,6 +353,74 @@ var _ = Describe("GetPatternConditionByType", func() {
 			index, result := getPatternConditionByType(conditions, conditionType)
 			Expect(index).To(Equal(expectedIndex))
 			Expect(result).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("GetCurrentClusterVersion", func() {
+	var (
+		clusterVersion *configv1.ClusterVersion
+	)
+
+	Context("when there are completed versions in the history", func() {
+		BeforeEach(func() {
+			clusterVersion = &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					History: []configv1.UpdateHistory{
+						{State: "Completed", Version: "4.6.1"},
+					},
+					Desired: configv1.Release{
+						Version: "4.7.0",
+					},
+				},
+			}
+		})
+
+		It("should return the completed version", func() {
+			version, err := getCurrentClusterVersion(clusterVersion)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(version.String()).To(Equal("4.6.1"))
+		})
+	})
+
+	Context("when there are no completed versions in the history", func() {
+		BeforeEach(func() {
+			clusterVersion = &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					History: []configv1.UpdateHistory{
+						{State: "Partial", Version: "4.6.1"},
+					},
+					Desired: configv1.Release{
+						Version: "4.7.0",
+					},
+				},
+			}
+		})
+
+		It("should return the desired version", func() {
+			version, err := getCurrentClusterVersion(clusterVersion)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(version.String()).To(Equal("4.7.0"))
+		})
+	})
+})
+
+var _ = Describe("ParseAndReturnVersion", func() {
+	Context("when the version string is valid", func() {
+		It("should return the parsed version", func() {
+			versionStr := "4.6.1"
+			version, err := parseAndReturnVersion(versionStr)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(version.String()).To(Equal(versionStr))
+		})
+	})
+
+	Context("when the version string is invalid", func() {
+		It("should return an error", func() {
+			versionStr := "invalid-version"
+			version, err := parseAndReturnVersion(versionStr)
+			Expect(err).To(HaveOccurred())
+			Expect(version).To(BeNil())
 		})
 	})
 })
