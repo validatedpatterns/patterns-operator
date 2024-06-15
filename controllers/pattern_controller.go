@@ -281,7 +281,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
 		err = r.Client.Create(context.Background(), giteaAdminSecret)
-		if err != nil {
+		if err != nil && !kerrors.IsAlreadyExists(err) {
 			return r.actionPerformed(qualifiedInstance, "Could not create Gitea Admin Secret", err)
 		}
 		// Here we need to call the gitea migration bits

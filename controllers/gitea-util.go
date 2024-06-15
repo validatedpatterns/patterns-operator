@@ -31,7 +31,8 @@ type GiteaOperations interface {
 type GiteaOperationsImpl struct{}
 
 // Function that creates a mirror repo in Gitea
-func (g *GiteaOperationsImpl) MigrateGiteaRepo(fullClient kubernetes.Interface, username, password, upstreamURL, giteaServerRoute string) (success bool, repositoryURL string, err error) {
+func (g *GiteaOperationsImpl) MigrateGiteaRepo(
+	fullClient kubernetes.Interface, username, password, upstreamURL, giteaServerRoute string) (success bool, repositoryURL string, err error) {
 	option := gitea.SetBasicAuth(username, password)
 	httpClient := &http.Client{
 		Transport: getHTTPSTransport(fullClient),
