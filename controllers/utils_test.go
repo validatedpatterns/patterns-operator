@@ -277,3 +277,80 @@ var _ = Describe("GetPatternConditionByStatus", func() {
 		})
 	})
 })
+
+var _ = Describe("GetPatternConditionByType", func() {
+	var (
+		conditions     []api.PatternCondition
+		conditionType  api.PatternConditionType
+		expectedIndex  int
+		expectedResult *api.PatternCondition
+	)
+
+	JustBeforeEach(func() {
+		// This runs after all BeforeEach blocks, just before the It block
+		expectedIndex = -1
+		expectedResult = nil
+	})
+
+	Context("when conditions are nil", func() {
+		BeforeEach(func() {
+			conditions = nil
+			conditionType = "ConditionType1"
+		})
+
+		It("should return -1 and nil", func() {
+			index, result := getPatternConditionByType(conditions, conditionType)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("when conditions are empty", func() {
+		BeforeEach(func() {
+			conditions = []api.PatternCondition{}
+			conditionType = "ConditionType1"
+		})
+
+		It("should return -1 and nil", func() {
+			index, result := getPatternConditionByType(conditions, conditionType)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("when condition is found", func() {
+		BeforeEach(func() {
+			conditions = []api.PatternCondition{
+				{Type: "ConditionType1", Status: corev1.ConditionFalse},
+				{Type: "ConditionType2", Status: corev1.ConditionTrue},
+			}
+			conditionType = "ConditionType2"
+
+		})
+		JustBeforeEach(func() {
+			expectedIndex = 1
+			expectedResult = &api.PatternCondition{Type: "ConditionType2", Status: corev1.ConditionTrue}
+		})
+		It("should return the index and the condition", func() {
+			index, result := getPatternConditionByType(conditions, conditionType)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when condition is not found", func() {
+		BeforeEach(func() {
+			conditions = []api.PatternCondition{
+				{Type: "ConditionType1", Status: corev1.ConditionFalse},
+				{Type: "ConditionType3", Status: corev1.ConditionTrue},
+			}
+			conditionType = "ConditionType2"
+		})
+
+		It("should return -1 and nil", func() {
+			index, result := getPatternConditionByType(conditions, conditionType)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(BeNil())
+		})
+	})
+})
