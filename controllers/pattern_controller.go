@@ -242,7 +242,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if gitConfig.OriginRepo != "" {
 		giteaApp := newArgoGiteaApplication(qualifiedInstance)
 		// BANDINI: add this in the newargogiteapplication and check the segfaulting
-		//_ = controllerutil.SetOwnerReference(qualifiedInstance, giteaApp, r.Scheme)
+		// _ = controllerutil.SetOwnerReference(qualifiedInstance, giteaApp, r.Scheme)
 		log.Printf("BANDINI1: %v", giteaApp)
 		app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
 		if app == nil {
@@ -319,7 +319,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "Update CR Target Repo", err)
 		}
-
 	}
 
 	ret, err := r.getLocalGit(qualifiedInstance)
