@@ -49,18 +49,57 @@ var testCases = []struct {
 }
 
 var _ = Describe("ExtractRepositoryName", func() {
-	It("should extract the repository name from various URL formats", func() {
-		for _, testCase := range testCases {
-			repoName, err := extractRepositoryName(testCase.inputURL)
+	Context("when the git URL is SSH format", func() {
+		It("should extract the repository name correctly", func() {
+			gitURL := "git@github.com:user/repo.git"
+			repoName, err := extractRepositoryName(gitURL)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(repoName).To(Equal(testCase.expectedName))
-		}
+			Expect(repoName).To(Equal("repo"))
+		})
+
+		It("should handle URLs without .git suffix correctly", func() {
+			gitURL := "git@github.com:user/repo"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(repoName).To(Equal("repo"))
+		})
+
+		It("should return an error for invalid SSH git URL", func() {
+			gitURL := "git@github.com:user/repo:extra"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(repoName).To(BeEmpty())
+		})
 	})
 
-	It("should return an error for an invalid URL", func() {
-		invalidURL := "invalid-url"
-		_, err := extractRepositoryName(invalidURL)
-		Expect(err).To(HaveOccurred())
+	Context("when the git URL is HTTP/HTTPS format", func() {
+		It("should extract the repository name correctly", func() {
+			gitURL := "https://github.com/user/repo.git"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(repoName).To(Equal("repo"))
+		})
+
+		It("should handle URLs without .git suffix correctly", func() {
+			gitURL := "https://github.com/user/repo"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(repoName).To(Equal("repo"))
+		})
+
+		It("should return an error for invalid HTTP/HTTPS git URL", func() {
+			gitURL := "https//github.com@2/user://"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(repoName).To(BeEmpty())
+		})
+
+		It("should return an error for non-absolute HTTP/HTTPS URL", func() {
+			gitURL := "github.com/user/repo.git"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(repoName).To(BeEmpty())
+		})
 	})
 })
 
