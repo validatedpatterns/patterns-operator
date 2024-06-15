@@ -237,13 +237,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	log.Printf("BANDINI0: %s", gitConfig.OriginRepo)
 	// If you specified OriginRepo then we automatically spawn a gitea instance via a special argo gitea application
 	if gitConfig.OriginRepo != "" {
+		log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
 		giteaApp := newArgoGiteaApplication(qualifiedInstance)
-		// BANDINI: add this in the newargogiteapplication and check the segfaulting
-		// _ = controllerutil.SetOwnerReference(qualifiedInstance, giteaApp, r.Scheme)
-		log.Printf("BANDINI1: %v", giteaApp)
+		_ = controllerutil.SetOwnerReference(qualifiedInstance, giteaApp, r.Scheme)
 		app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
 		if app == nil {
 			log.Printf("Gitea app not found: %s\n", err.Error())
