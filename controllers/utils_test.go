@@ -57,6 +57,13 @@ var _ = Describe("ExtractRepositoryName", func() {
 			Expect(repoName).To(Equal("repo"))
 		})
 
+		It("should report an error when there are too many :", func() {
+			gitURL := "git@github.com:user:repo.git"
+			repoName, err := extractRepositoryName(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(repoName).To(BeEmpty())
+		})
+
 		It("should handle URLs without .git suffix correctly", func() {
 			gitURL := "git@github.com:user/repo"
 			repoName, err := extractRepositoryName(gitURL)
@@ -103,21 +110,54 @@ var _ = Describe("ExtractRepositoryName", func() {
 	})
 })
 
-var _ = Describe("extractGitFQDNHostname", func() {
-	It("should extract the fqdn name from various URL formats", func() {
-		for _, testCase := range testCases {
-			repoName, err := extractGitFQDNHostname(testCase.inputURL)
+var _ = Describe("ExtractGitFQDNHostname", func() {
+	Context("when the git URL is in SSH format", func() {
+		It("should extract the FQDN hostname correctly", func() {
+			gitURL := "git@github.com:user/repo.git"
+			hostname, err := extractGitFQDNHostname(gitURL)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(repoName).To(Equal(testCase.expectedFQDN))
-		}
+			Expect(hostname).To(Equal("github.com"))
+		})
+
+		It("should return an error for invalid SSH git URL", func() {
+			gitURL := "git@github.com:@user/repo:extra"
+			hostname, err := extractGitFQDNHostname(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(hostname).To(BeEmpty())
+		})
 	})
 
-	It("should return an error for an invalid URL", func() {
-		invalidURL := "lwn:///invalid-url"
-		_, err := extractGitFQDNHostname(invalidURL)
-		Expect(err).To(HaveOccurred())
+	Context("when the git URL is in HTTP/HTTPS format", func() {
+		It("should extract the FQDN hostname correctly", func() {
+			gitURL := "https://github.com/user/repo.git"
+			hostname, err := extractGitFQDNHostname(gitURL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(hostname).To(Equal("github.com"))
+		})
+
+		It("should return an error for invalid HTTP/HTTPS git URL", func() {
+			gitURL := "https://github.com:user/repo.git"
+			hostname, err := extractGitFQDNHostname(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(hostname).To(BeEmpty())
+		})
+
+		It("should return an error for non-absolute HTTP/HTTPS URL", func() {
+			gitURL := "github.com/user/repo.git"
+			hostname, err := extractGitFQDNHostname(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(hostname).To(BeEmpty())
+		})
+
+		It("should return an error for empty hostname in URL", func() {
+			gitURL := "https:///user/repo.git"
+			hostname, err := extractGitFQDNHostname(gitURL)
+			Expect(err).To(HaveOccurred())
+			Expect(hostname).To(BeEmpty())
+		})
 	})
 })
+
 var _ = Describe("validGitRepoURL", func() {
 	It("should accept a 'git@' URL", func() {
 		repoURL := "git@example.com:username/repo.git"
