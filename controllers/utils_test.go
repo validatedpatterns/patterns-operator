@@ -17,8 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -203,5 +205,75 @@ var _ = Describe("hasExperimentalCapability", func() {
 
 	It("should return true for capabilities string containing spaces", func() {
 		Expect(hasExperimentalCapability("cap1, cap2 , cap3", "cap2")).To(BeTrue())
+	})
+})
+
+var _ = Describe("GetPatternConditionByStatus", func() {
+	var (
+		conditions      []api.PatternCondition
+		conditionStatus corev1.ConditionStatus
+		expectedIndex   int
+		expectedResult  *api.PatternCondition
+	)
+
+	BeforeEach(func() {
+		conditions = []api.PatternCondition{
+			{Type: "ConditionA", Status: corev1.ConditionFalse},
+			{Type: "ConditionB", Status: corev1.ConditionTrue},
+		}
+		conditionStatus = corev1.ConditionTrue
+	})
+
+	Context("when conditions are nil", func() {
+		BeforeEach(func() {
+			conditions = nil
+			expectedIndex = -1
+			expectedResult = nil
+		})
+
+		It("should return -1 and nil", func() {
+			index, result := getPatternConditionByStatus(conditions, conditionStatus)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("when conditions are empty", func() {
+		BeforeEach(func() {
+			conditions = []api.PatternCondition{}
+		})
+
+		It("should return -1 and nil", func() {
+			index, result := getPatternConditionByStatus(conditions, conditionStatus)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("when condition is found", func() {
+		BeforeEach(func() {
+			expectedIndex = 1
+			expectedResult = &api.PatternCondition{Type: "ConditionB", Status: corev1.ConditionTrue}
+		})
+
+		It("should return the index and the condition", func() {
+			index, result := getPatternConditionByStatus(conditions, conditionStatus)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when condition is not found", func() {
+		BeforeEach(func() {
+			expectedIndex = -1
+			expectedResult = nil
+			conditions[1].Status = corev1.ConditionFalse // Modify to ensure condition is not found
+		})
+
+		It("should return -1 and nil", func() {
+			index, result := getPatternConditionByStatus(conditions, conditionStatus)
+			Expect(index).To(Equal(expectedIndex))
+			Expect(result).To(BeNil())
+		})
 	})
 })
