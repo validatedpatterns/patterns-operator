@@ -17,6 +17,9 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
@@ -24,6 +27,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -536,6 +544,76 @@ var _ = Describe("GenerateRandomPassword", func() {
 			password, err := GenerateRandomPassword(length, mockRandRead)
 			Expect(err).To(HaveOccurred())
 			Expect(password).To(BeEmpty())
+		})
+	})
+})
+
+var _ = Describe("CreateTrustedBundleCM", func() {
+	var (
+		clientset *kubefake.Clientset
+		namespace string
+	)
+
+	BeforeEach(func() {
+		clientset = kubefake.NewSimpleClientset()
+		namespace = "default"
+	})
+
+	Context("when the ConfigMap does not exist", func() {
+		It("should create the ConfigMap", func() {
+			err := createTrustedBundleCM(clientset, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify that the ConfigMap was created
+			cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), "trusted-ca-bundle", metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm).ToNot(BeNil())
+			Expect(cm.Labels["config.openshift.io/inject-trusted-cabundle"]).To(Equal("true"))
+		})
+	})
+
+	Context("when the ConfigMap already exists", func() {
+		BeforeEach(func() {
+			// Pre-create the ConfigMap
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "trusted-ca-bundle",
+					Namespace: namespace,
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should not return an error", func() {
+			err := createTrustedBundleCM(clientset, namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when an error occurs while checking for the ConfigMap", func() {
+		It("should return the error", func() {
+			// Inject an error into the fake client
+			clientset.PrependReactor("get", "configmaps", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
+			})
+
+			err := createTrustedBundleCM(clientset, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("some error"))
+		})
+	})
+
+	Context("when an error occurs while creating the ConfigMap", func() {
+		It("should return the error", func() {
+			// Inject an error into the fake client
+			clientset.PrependReactor("create", "configmaps", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some create error"))
+			})
+
+			err := createTrustedBundleCM(clientset, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("some create error"))
 		})
 	})
 })

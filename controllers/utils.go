@@ -211,22 +211,21 @@ func newSecret(name, namespace string, secret map[string][]byte, labels map[stri
 	return k8sSecret
 }
 
-func createTrustedBundleCM(fullClient kubernetes.Interface) error {
-	ns := getClusterWideArgoNamespace()
+func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) error {
 	name := "trusted-ca-bundle"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: ns,
+			Namespace: namespace,
 			Labels: map[string]string{
 				"config.openshift.io/inject-trusted-cabundle": "true",
 			},
 		},
 	}
-	_, err := fullClient.CoreV1().ConfigMaps(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	_, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
-			_, err = fullClient.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, metav1.CreateOptions{})
+			_, err = fullClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
 			return err
 		}
 		return err

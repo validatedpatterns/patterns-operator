@@ -219,7 +219,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// Create the trusted-bundle configmap inside the clusterwide namespace
-	errCABundle := createTrustedBundleCM(r.fullClient)
+	errCABundle := createTrustedBundleCM(r.fullClient, getClusterWideArgoNamespace())
 	if errCABundle != nil {
 		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
 	}
