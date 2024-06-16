@@ -31,6 +31,7 @@ import (
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	//+kubebuilder:scaffold:imports
@@ -743,6 +744,93 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, invalidFilePath, appendToFile)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("error opening file"))
+		})
+	})
+})
+
+var _ = Describe("GetConfigMapKey", func() {
+	var (
+		clientset     *fake.Clientset
+		namespace     string
+		configMap     *corev1.ConfigMap
+		configMapName string
+		key           string
+		value         string
+	)
+
+	BeforeEach(func() {
+		clientset = fake.NewSimpleClientset()
+		namespace = "default"
+		configMapName = "test-configmap"
+		key = "test-key"
+		value = "test-value"
+	})
+
+	Context("when the ConfigMap and key exist", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					key: value,
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return the value for the specified key", func() {
+			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(value))
+		})
+	})
+
+	Context("when the ConfigMap does not exist", func() {
+		It("should return an error", func() {
+			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeEmpty())
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("error getting ConfigMap %s in namespace %s", configMapName, namespace)))
+		})
+	})
+
+	Context("when the key does not exist in the ConfigMap", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					"another-key": "another-value",
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return an error", func() {
+			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeEmpty())
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("key %s not found in ConfigMap %s", key, configMapName)))
+		})
+	})
+
+	Context("when an error occurs while getting the ConfigMap", func() {
+		It("should return an error", func() {
+			// Inject an error into the fake client
+			clientset.PrependReactor("get", "configmaps", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
+			})
+
+			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeEmpty())
+			Expect(err.Error()).To(ContainSubstring("some error"))
 		})
 	})
 })
