@@ -486,7 +486,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.MultiSourceConfig.Enabled = &multiSourceBool
 	}
 	if output.Spec.ClusterGroupName == "" {
-		output.Spec.ClusterGroupName = "default"
+		output.Spec.ClusterGroupName = "default" //nolint:goconst
 	}
 	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
 		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"

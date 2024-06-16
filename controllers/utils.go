@@ -318,7 +318,6 @@ func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
 	var trustedcabundle string = ""
 
 	if fullClient != nil {
-
 		kuberoot, err = getConfigMapKey(fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt")
 		if err != nil {
 			fmt.Printf("Could not get kube-root-ca.crt configmap: %v\n", err)
