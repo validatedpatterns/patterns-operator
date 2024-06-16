@@ -672,6 +672,24 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(content)).To(Equal("test-value\n"))
 		})
+
+		It("should append the value to the file if appendToFile is true", func() {
+			// Write initial content to the file
+			initialContent := "initial-content\n"
+			err := os.WriteFile(filePath, []byte(initialContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Set appendToFile to true
+			appendToFile = true
+
+			err = writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify the content of the file
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal(initialContent + "test-value\n"))
+		})
 	})
 
 	Context("when the ConfigMap does not exist", func() {
