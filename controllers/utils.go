@@ -360,12 +360,16 @@ func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
 	return myTransport
 }
 
-// Generate a random password
-func GenerateRandomPassword(length int) (string, error) {
+// GenerateRandomPassword generates a random password of specified length
+func GenerateRandomPassword(length int, randRead func([]byte) (int, error)) (string, error) {
 	rndbytes := make([]byte, length)
-	_, err := rand.Read(rndbytes)
+	_, err := randRead(rndbytes)
 	if err != nil {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(rndbytes), nil
+}
+
+func DefaultRandRead(b []byte) (int, error) {
+	return rand.Read(b)
 }

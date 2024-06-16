@@ -268,7 +268,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// It is okay to create the gitea secret here because the pod won't start without it and when we're
 		// here we know that the gitea namespace has been created
 		var giteaAdminPassword string
-		giteaAdminPassword, err = GenerateRandomPassword(GiteaDefaultPasswordLen)
+		giteaAdminPassword, err = GenerateRandomPassword(GiteaDefaultPasswordLen, DefaultRandRead)
 		if err != nil {
 			return r.actionPerformed(qualifiedInstance, "error Generating gitea_admin password", err)
 		}

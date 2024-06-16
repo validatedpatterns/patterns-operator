@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -500,6 +501,41 @@ var _ = Describe("ParseAndReturnVersion", func() {
 			version, err := parseAndReturnVersion(versionStr)
 			Expect(err).To(HaveOccurred())
 			Expect(version).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("GenerateRandomPassword", func() {
+	Context("when generating a random password", func() {
+		It("should return a password of the correct length", func() {
+			length := 32
+			password, err := GenerateRandomPassword(length, DefaultRandRead)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(password)).To(BeNumerically(">", length)) // base64 encoding increases the length
+		})
+
+		It("should return different passwords on subsequent calls", func() {
+			length := 32
+			password1, err1 := GenerateRandomPassword(length, DefaultRandRead)
+			password2, err2 := GenerateRandomPassword(length, DefaultRandRead)
+			Expect(err1).ToNot(HaveOccurred())
+			Expect(err2).ToNot(HaveOccurred())
+			Expect(password1).ToNot(Equal(password2))
+		})
+	})
+
+	Context("when an error occurs while generating random bytes", func() {
+		It("should return an error", func() {
+			length := 32
+
+			// Define a mock randRead function that returns an error
+			mockRandRead := func(b []byte) (int, error) {
+				return 0, errors.New("random error")
+			}
+
+			password, err := GenerateRandomPassword(length, mockRandRead)
+			Expect(err).To(HaveOccurred())
+			Expect(password).To(BeEmpty())
 		})
 	})
 })
