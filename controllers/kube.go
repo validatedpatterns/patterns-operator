@@ -94,6 +94,11 @@ func getRoute(routeClient routeclient.Interface, routeName, namespace string) (s
 		return "", err
 	}
 
+	if len(route.Status.Ingress) == 0 {
+		return "", fmt.Errorf("no ingress found for route %s", routeName)
+	}
+
+	// Return the first ingress host
 	url := fmt.Sprintf("https://%s", route.Status.Ingress[0].Host)
 
 	return url, nil

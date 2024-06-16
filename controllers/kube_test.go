@@ -2,12 +2,20 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/testing"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	routev1 "github.com/openshift/api/route/v1"
+	routefake "github.com/openshift/client-go/route/clientset/versioned/fake"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -247,10 +255,30 @@ var _ = Describe("ReferSameObject", func() {
 		})
 	})
 
-	Context("when the API versions are invalid", func() {
+	Context("when the first API version is invalid", func() {
 		BeforeEach(func() {
 			refA = &metav1.OwnerReference{
 				APIVersion: "invalid/v1/v2",
+				Kind:       "Pod",
+				Name:       "mypod",
+			}
+			refB = &metav1.OwnerReference{
+				APIVersion: "valid/v1",
+				Kind:       "Pod",
+				Name:       "mypod",
+			}
+		})
+
+		It("should return false", func() {
+			result := referSameObject(refA, refB)
+			Expect(result).To(BeFalse())
+		})
+	})
+
+	Context("when the second API version is invalid", func() {
+		BeforeEach(func() {
+			refA = &metav1.OwnerReference{
+				APIVersion: "valid/v1",
 				Kind:       "Pod",
 				Name:       "mypod",
 			}
@@ -266,6 +294,7 @@ var _ = Describe("ReferSameObject", func() {
 			Expect(result).To(BeFalse())
 		})
 	})
+
 })
 
 var _ = Describe("OwnedBy", func() {
@@ -427,6 +456,170 @@ var _ = Describe("OwnedBy", func() {
 		It("should return false", func() {
 			result := ownedBy(object, ref)
 			Expect(result).To(BeFalse())
+		})
+	})
+})
+
+type TestStruct struct {
+	Name  string `yaml:"name"`
+	Value int    `yaml:"value"`
+}
+
+var _ = Describe("ObjectYaml", func() {
+	Context("when the object can be marshaled to YAML", func() {
+		It("should return the correct YAML string", func() {
+			obj := TestStruct{
+				Name:  "test-name",
+				Value: 42,
+			}
+
+			yamlString, err := objectYaml(obj)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(yamlString).To(Equal("name: test-name\nvalue: 42\n"))
+		})
+	})
+
+	// Commented out as the yaml pkg does not detect this and we end up in an OOM loop
+	// Context("when the object cannot be marshaled to YAML", func() {
+	// 	It("should return an error", func() {
+	// 		obj := &struct {
+	// 			A string
+	// 			B interface{}
+	// 		}{
+	// 			A: "a string",
+	// 		}
+	// 		// Add a cycle
+	// 		obj.B = obj
+	// 		yamlString, err := objectYaml(obj)
+	// 		Expect(err).To(HaveOccurred())
+	// 		Expect(yamlString).To(BeEmpty())
+	// 		Expect(err.Error()).To(ContainSubstring("error marshaling object"))
+	// 	})
+	// })
+})
+
+var _ = Describe("GetRoute", func() {
+	var (
+		routeClient *routefake.Clientset
+		namespace   string
+		routeName   string
+	)
+
+	BeforeEach(func() {
+		routeClient = routefake.NewSimpleClientset()
+		namespace = "default"
+		routeName = "test-route"
+	})
+
+	Context("when the route exists", func() {
+		BeforeEach(func() {
+			route := &routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      routeName,
+					Namespace: namespace,
+				},
+				Status: routev1.RouteStatus{
+					Ingress: []routev1.RouteIngress{
+						{
+							Host: "example.com",
+						},
+					},
+				},
+			}
+			_, err := routeClient.RouteV1().Routes(namespace).Create(context.Background(), route, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return the URL of the route", func() {
+			url, err := getRoute(routeClient, routeName, namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(url).To(Equal("https://example.com"))
+		})
+	})
+
+	Context("when the route does not exist", func() {
+		It("should return an error", func() {
+			url, err := getRoute(routeClient, routeName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(url).To(BeEmpty())
+		})
+	})
+
+	Context("when the route has no ingress", func() {
+		BeforeEach(func() {
+			route := &routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      routeName,
+					Namespace: namespace,
+				},
+				Status: routev1.RouteStatus{},
+			}
+			_, err := routeClient.RouteV1().Routes(namespace).Create(context.Background(), route, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return an error", func() {
+			url, err := getRoute(routeClient, routeName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(url).To(BeEmpty())
+		})
+	})
+})
+
+var _ = Describe("GetSecret", func() {
+	var (
+		clientset  *kubefake.Clientset
+		namespace  string
+		secretName string
+	)
+
+	BeforeEach(func() {
+		clientset = kubefake.NewSimpleClientset()
+		namespace = "default"
+		secretName = "test-secret"
+	})
+
+	Context("when the secret exists", func() {
+		BeforeEach(func() {
+			secret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: namespace,
+				},
+			}
+			_, err := clientset.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return the secret", func() {
+			secret, err := getSecret(clientset, secretName, namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secret).ToNot(BeNil())
+			Expect(secret.Name).To(Equal(secretName))
+		})
+	})
+
+	Context("when the secret does not exist", func() {
+		It("should return an error", func() {
+			secret, err := getSecret(clientset, secretName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+			Expect(secret).To(BeNil())
+		})
+	})
+
+	Context("when there is an error other than NotFound", func() {
+		BeforeEach(func() {
+			clientset.PrependReactor("get", "secrets", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, errors.NewInternalError(fmt.Errorf("internal error"))
+			})
+		})
+
+		It("should return an error", func() {
+			secret, err := getSecret(clientset, secretName, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(errors.IsInternalError(err)).To(BeTrue())
+			Expect(secret).To(BeNil())
 		})
 	})
 })
