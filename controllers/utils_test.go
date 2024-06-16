@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -614,6 +615,116 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 			err := createTrustedBundleCM(clientset, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("some create error"))
+		})
+	})
+})
+
+var _ = Describe("WriteConfigMapKeyToFile", func() {
+	var (
+		clientset     *kubefake.Clientset
+		namespace     string
+		configMap     *corev1.ConfigMap
+		configMapName string
+		key           string
+		filePath      string
+		appendToFile  bool
+	)
+
+	BeforeEach(func() {
+		clientset = kubefake.NewSimpleClientset()
+		namespace = "default"
+		configMapName = "test-configmap"
+		key = "test-key"
+		appendToFile = false
+
+		// Create a temporary file for testing
+		tmpFile, err := os.CreateTemp("", "testfile")
+		Expect(err).ToNot(HaveOccurred())
+		filePath = tmpFile.Name()
+		tmpFile.Close()
+	})
+
+	AfterEach(func() {
+		os.Remove(filePath)
+	})
+
+	Context("when the ConfigMap and key exist", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					key: "test-value",
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should write the value to the file", func() {
+			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify the content of the file
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal("test-value\n"))
+		})
+	})
+
+	Context("when the ConfigMap does not exist", func() {
+		It("should return an error", func() {
+			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("error getting ConfigMap %s in namespace %s", configMapName, namespace)))
+		})
+	})
+
+	Context("when the key does not exist in the ConfigMap", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					"another-key": "another-value",
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return an error", func() {
+			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("key %s not found in ConfigMap %s", key, configMapName)))
+		})
+	})
+
+	Context("when an error occurs while opening the file", func() {
+		BeforeEach(func() {
+			configMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					key: "test-value",
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return an error", func() {
+			invalidFilePath := "/invalid-path/testfile"
+
+			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, invalidFilePath, appendToFile)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error opening file"))
 		})
 	})
 })
