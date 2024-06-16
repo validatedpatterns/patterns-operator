@@ -549,7 +549,7 @@ var _ = Describe("GenerateRandomPassword", func() {
 			length := 32
 
 			// Define a mock randRead function that returns an error
-			mockRandRead := func(b []byte) (int, error) {
+			mockRandRead := func([]byte) (int, error) {
 				return 0, errors.New("random error")
 			}
 
@@ -606,7 +606,7 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 	Context("when an error occurs while checking for the ConfigMap", func() {
 		It("should return the error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("get", "configmaps", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("get", "configmaps", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
 			})
 
@@ -619,7 +619,7 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 	Context("when an error occurs while creating the ConfigMap", func() {
 		It("should return the error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("create", "configmaps", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("create", "configmaps", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some create error"))
 			})
 
@@ -687,7 +687,7 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 		It("should append the value to the file if appendToFile is true", func() {
 			// Write initial content to the file
 			initialContent := "initial-content\n"
-			err := os.WriteFile(filePath, []byte(initialContent), 0644)
+			err := os.WriteFile(filePath, []byte(initialContent), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Set appendToFile to true
@@ -833,7 +833,7 @@ var _ = Describe("GetConfigMapKey", func() {
 	Context("when an error occurs while getting the ConfigMap", func() {
 		It("should return an error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("get", "configmaps", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("get", "configmaps", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
 			})
 
