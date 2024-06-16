@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 
@@ -32,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	kubefake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/testing"
 	k8stesting "k8s.io/client-go/testing"
 	//+kubebuilder:scaffold:imports
 )
@@ -60,6 +62,14 @@ var testCases = []struct {
 }
 
 var _ = Describe("ExtractRepositoryName", func() {
+	It("should extract the repository name from various URL formats", func() {
+		for _, testCase := range testCases {
+			repoName, err := extractRepositoryName(testCase.inputURL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(repoName).To(Equal(testCase.expectedName))
+		}
+	})
+
 	Context("when the git URL is SSH format", func() {
 		It("should extract the repository name correctly", func() {
 			gitURL := "git@github.com:user/repo.git"
@@ -552,12 +562,12 @@ var _ = Describe("GenerateRandomPassword", func() {
 
 var _ = Describe("CreateTrustedBundleCM", func() {
 	var (
-		clientset *kubefake.Clientset
+		clientset *fake.Clientset
 		namespace string
 	)
 
 	BeforeEach(func() {
-		clientset = kubefake.NewSimpleClientset()
+		clientset = fake.NewSimpleClientset()
 		namespace = "default"
 	})
 
@@ -622,7 +632,7 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 
 var _ = Describe("WriteConfigMapKeyToFile", func() {
 	var (
-		clientset     *kubefake.Clientset
+		clientset     *fake.Clientset
 		namespace     string
 		configMap     *corev1.ConfigMap
 		configMapName string
@@ -632,7 +642,7 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 	)
 
 	BeforeEach(func() {
-		clientset = kubefake.NewSimpleClientset()
+		clientset = fake.NewSimpleClientset()
 		namespace = "default"
 		configMapName = "test-configmap"
 		key = "test-key"
@@ -831,6 +841,175 @@ var _ = Describe("GetConfigMapKey", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeEmpty())
 			Expect(err.Error()).To(ContainSubstring("some error"))
+		})
+	})
+})
+
+func parsePEM(certPEM string) *x509.Certificate {
+	block, _ := pem.Decode([]byte(certPEM))
+	if block == nil {
+		fmt.Printf("Could not decode: %s\n", certPEM)
+		return nil
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		fmt.Printf("Could not parse: %s\n", err)
+		return nil
+	}
+	return cert
+}
+
+var _ = Describe("GetHTTPSTransport", func() {
+	var (
+		clientset       *fake.Clientset
+		namespace       string
+		kubeRootCA      string
+		trustedCABundle string
+		configMapName1  string
+		configMapName2  string
+		key1            string
+		key2            string
+	)
+
+	BeforeEach(func() {
+		clientset = fake.NewSimpleClientset()
+		namespace = "openshift-config-managed"
+		kubeRootCA = `-----BEGIN CERTIFICATE-----
+MIIDUTCCAjmgAwIBAgIIWt3N131wkCwwDQYJKoZIhvcNAQELBQAwNjE0MDIGA1UE
+Awwrb3BlbnNoaWZ0LXNlcnZpY2Utc2VydmluZy1zaWduZXJAMTcxODUxODc1OTAe
+Fw0yNDA2MTYwNjE5MTlaFw0yNjA4MTUwNjE5MjBaMDYxNDAyBgNVBAMMK29wZW5z
+aGlmdC1zZXJ2aWNlLXNlcnZpbmctc2lnbmVyQDE3MTg1MTg3NTkwggEiMA0GCSqG
+SIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFi3A7uIICJBWma5+Jwep4VShGTcdSfL6u
+Flha8tM2TvDXf4Q/Mo4ZquX4Jrg+FwS2LxeChrpCv1PyEs7e1g7lH20FiIVSCPmC
+PsxwprxnwXBYzbANr0m3WUt4SSR05JAkthCMm/FqoZHBP97Ih/E4yNCGJ2x3dEE8
+DS18IN+/0yuGROmQZvB1j4njsa8tUQVcYmM+XoETxOViGhbL9S0B3YQA1mRTSyne
+SE/k/1JffYXyBoU3IkPjCnrOOjoXp87TTnYZrElAJ7PTEScLwuhWQXM1iSLKfZBG
+FWqjF4k7awTE0fSLXzEPOPrHO5gk+s/osu1AvHUifx3+gN+Xya0/AgMBAAGjYzBh
+MA4GA1UdDwEB/wQEAwICpDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRDG/i4
+PSo63fBMyNOWI1W0pUN+WzAfBgNVHSMEGDAWgBRDG/i4PSo63fBMyNOWI1W0pUN+
+WzANBgkqhkiG9w0BAQsFAAOCAQEAR/jMbOO531vkFus6df/EKgyY9CFR1xsSZlJu
+AhI0G79vmddMnuM+P0PvFGkxTzjUYjmQ0ICiLXAO7nf7aJNTB7GqHGyX87GjnOZa
+HLCARIrSm/FNSEJt3XjAqjXMbLM3sCM1DZVw5XzW8DaIctK9eYTyAoz9zC7Nb8hg
+d6UDTwBDD60GYz2ZH6eSD5513s2uZZwPGGQ2pceJ06Oc6nQW2Pf+fLWlweSJrC6u
+o20m7jT37A4pzD9p5XTw/QL2Nns6ReJtYpGpOElsqPvRV0YS72yQsp6AoI6VWDmH
+vqVDy2lIuMbqRGLTpEOxLFU3T81/jk0IPGZ0qyWTplbobN3/yQ==
+-----END CERTIFICATE-----`
+		trustedCABundle = `-----BEGIN CERTIFICATE-----
+MIIDMjCCAhqgAwIBAgIIUuYsPPrEW8cwDQYJKoZIhvcNAQELBQAwNzESMBAGA1UE
+CxMJb3BlbnNoaWZ0MSEwHwYDVQQDExhrdWJlLWFwaXNlcnZlci1sYi1zaWduZXIw
+HhcNMjQwNjE2MDYwNzExWhcNMzQwNjE0MDYwNzExWjA3MRIwEAYDVQQLEwlvcGVu
+c2hpZnQxITAfBgNVBAMTGGt1YmUtYXBpc2VydmVyLWxiLXNpZ25lcjCCASIwDQYJ
+KoZIhvcNAQEBBQADggEPADCCAQoCggEBANxEUZA/DSmiqccIas7RIygbCQy+pdqC
+BITCG50vZWDoRt/2okXBlcdVe7auSRQi64vdpLV7hk4MDMHS8itMebiZCz80X7d6
+QHGlN6xkb4/8LYBeTZxthv/6ButlHDoBHw3kj627cj5BhDfNyqSrG4heyc8hJxPa
+SiFMf+30QBSYzjcujPYENnLEfvZkhriJjwVaNIgoQd5Ti99zQYqhMttmJoRxYS0x
+P5IdGU0Tngsex54OPuaxhowTE4bkyOShjvkkby9NL20Sab0sqwhGPhjzFD4iqF1X
+pKfTx3q6IDhnXqh5jaQ7rGL01aOa8+Aeo7i8GGXL3cFtlXFz8JTH2m8CAwEAAaNC
+MEAwDgYDVR0PAQH/BAQDAgKkMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFCKd
+IDiv1Fzh83q1D2OT+ymL3w8pMA0GCSqGSIb3DQEBCwUAA4IBAQCQzUJVzR7izaQG
+ellU6uWUw/syXmgVy0DIj5FLxBHWvay15gRd5iTHtujBWEOVSuFboD+nPyVSMuFv
+y4X/QT0KzohWTOg5PcPSm+0/dxSsXD9jvpi5kmnrGWiBC6WH2wwibSZ+hU/Q1fWj
+IzB+UEPRiXlNA/9r6pKF0VX8TfiTfKtOETk4ZoTMPRwbafZ6J6neciF6+I4BvPIf
+LEpkMLMAMU6wfSCRuGzMjIHbXTuFN/Aokt354FB7ooL3jgCBgiJD8/mDeEZv0ACd
+dQLf0FVEbkwJvrQj3kN9A8xfz3L4463AC1v3kmAMtLZSDEyqLM1zXW0Eifqu98d1
+f3k4g5eL
+-----END CERTIFICATE-----`
+		configMapName1 = "kube-root-ca.crt"
+		configMapName2 = "trusted-ca-bundle"
+		key1 = "ca.crt"
+		key2 = "ca-bundle.crt"
+	})
+
+	Context("when both ConfigMaps and keys exist", func() {
+		BeforeEach(func() {
+			configMap1 := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName1,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					key1: kubeRootCA,
+				},
+			}
+			configMap2 := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName2,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					key2: trustedCABundle,
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap1, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			_, err = clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap2, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should create a transport with the combined CA certificates", func() {
+			transport := getHTTPSTransport(clientset)
+			Expect(transport).ToNot(BeNil())
+			caCertPool := transport.TLSClientConfig.RootCAs
+			Expect(caCertPool).ToNot(BeNil())
+
+			// Verify the certificates were added to the pool
+			kubeRootCert := parsePEM(kubeRootCA)
+			Expect(kubeRootCert).ToNot(BeNil())
+			trustedCACert := parsePEM(trustedCABundle)
+			Expect(trustedCACert).ToNot(BeNil())
+
+			Expect(caCertPool.Subjects()).To(ContainElement(kubeRootCert.RawSubject))
+			Expect(caCertPool.Subjects()).To(ContainElement(trustedCACert.RawSubject))
+		})
+	})
+
+	Context("when one of the ConfigMaps does not exist", func() {
+		BeforeEach(func() {
+			configMap := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName1,
+					Namespace: namespace,
+				},
+				Data: map[string]string{
+					key1: kubeRootCA,
+				},
+			}
+			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should create a transport with the available CA certificate", func() {
+			transport := getHTTPSTransport(clientset)
+			Expect(transport).ToNot(BeNil())
+
+			caCertPool := transport.TLSClientConfig.RootCAs
+			Expect(caCertPool).ToNot(BeNil())
+
+			// Verify the certificate was added to the pool
+			kubeRootCert := parsePEM(kubeRootCA)
+			Expect(kubeRootCert).ToNot(BeNil())
+
+			Expect(caCertPool.Subjects()).To(ContainElement(kubeRootCert.RawSubject))
+		})
+	})
+
+	Context("when both ConfigMaps do not exist", func() {
+		It("should fallback to system CA certificates", func() {
+			transport := getHTTPSTransport(clientset)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
+		})
+	})
+
+	Context("when an error occurs while getting a ConfigMap", func() {
+		It("should print an error message and fallback to system CA certificates", func() {
+			clientset.PrependReactor("get", "configmaps", func(action testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("some error")
+			})
+
+			transport := getHTTPSTransport(clientset)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
 		})
 	})
 })
