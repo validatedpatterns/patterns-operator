@@ -958,8 +958,8 @@ f3k4g5eL
 			trustedCACert := parsePEM(trustedCABundle)
 			Expect(trustedCACert).ToNot(BeNil())
 
-			Expect(caCertPool.Subjects()).To(ContainElement(kubeRootCert.RawSubject))
-			Expect(caCertPool.Subjects()).To(ContainElement(trustedCACert.RawSubject))
+			Expect(caCertPool.Subjects()).To(ContainElement(kubeRootCert.RawSubject))  //nolint:staticcheck
+			Expect(caCertPool.Subjects()).To(ContainElement(trustedCACert.RawSubject)) //nolint:staticcheck
 		})
 	})
 
@@ -989,7 +989,7 @@ f3k4g5eL
 			kubeRootCert := parsePEM(kubeRootCA)
 			Expect(kubeRootCert).ToNot(BeNil())
 
-			Expect(caCertPool.Subjects()).To(ContainElement(kubeRootCert.RawSubject))
+			Expect(caCertPool.Subjects()).To(ContainElement(kubeRootCert.RawSubject)) //nolint:staticcheck
 		})
 	})
 
@@ -1003,7 +1003,7 @@ f3k4g5eL
 
 	Context("when an error occurs while getting a ConfigMap", func() {
 		It("should print an error message and fallback to system CA certificates", func() {
-			clientset.PrependReactor("get", "configmaps", func(action testing.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, fmt.Errorf("some error")
 			})
 
