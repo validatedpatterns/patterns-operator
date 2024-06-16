@@ -80,13 +80,12 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	if err != nil {
 		return false
 	}
-
 	bGV, err := schema.ParseGroupVersion(b.APIVersion)
 	if err != nil {
 		return false
 	}
 
-	return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
+	return aGV.Version == bGV.Version && aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name && a.UID == b.UID
 }
 
 func getRoute(routeClient routeclient.Interface, routeName, namespace string) (string, error) {
