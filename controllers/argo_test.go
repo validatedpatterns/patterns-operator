@@ -907,5 +907,59 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			Expect(argoCD.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
 		})
 	})
+})
 
+var _ = Describe("ConvertArgoHelmParametersToMap", func() {
+	Context("when the parameters list is empty", func() {
+		It("should return an empty map", func() {
+			params := []argoapi.HelmParameter{}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(BeEmpty())
+		})
+	})
+
+	Context("when the parameters list has single level keys", func() {
+		It("should return a map with the correct key-value pairs", func() {
+			params := []argoapi.HelmParameter{
+				{Name: "key1", Value: "value1"},
+				{Name: "key2", Value: "value2"},
+			}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(HaveKeyWithValue("key1", "value1"))
+			Expect(result).To(HaveKeyWithValue("key2", "value2"))
+		})
+	})
+
+	Context("when the parameters list has nested keys", func() {
+		It("should return a map with the correct nested structure", func() {
+			params := []argoapi.HelmParameter{
+				{Name: "key1.subkey1", Value: "value1"},
+				{Name: "key1.subkey2", Value: "value2"},
+				{Name: "key2.subkey1.subsubkey1", Value: "value3"},
+			}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(HaveKey("key1"))
+			Expect(result["key1"]).To(HaveKeyWithValue("subkey1", "value1"))
+			Expect(result["key1"]).To(HaveKeyWithValue("subkey2", "value2"))
+			Expect(result).To(HaveKey("key2"))
+			Expect(result["key2"]).To(HaveKey("subkey1"))
+			Expect(result["key2"].(map[string]any)["subkey1"]).To(HaveKeyWithValue("subsubkey1", "value3"))
+		})
+	})
+
+	Context("when the parameters list has mixed nested and non-nested keys", func() {
+		It("should return a map with the correct structure", func() {
+			params := []argoapi.HelmParameter{
+				{Name: "key1", Value: "value1"},
+				{Name: "key2.subkey1", Value: "value2"},
+				{Name: "key2.subkey2.subsubkey1", Value: "value3"},
+			}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(HaveKeyWithValue("key1", "value1"))
+			Expect(result).To(HaveKey("key2"))
+			Expect(result["key2"]).To(HaveKeyWithValue("subkey1", "value2"))
+			Expect(result["key2"]).To(HaveKey("subkey2"))
+			Expect(result["key2"].(map[string]any)["subkey2"]).To(HaveKeyWithValue("subsubkey1", "value3"))
+		})
+	})
 })
