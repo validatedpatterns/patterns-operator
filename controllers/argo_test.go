@@ -845,3 +845,61 @@ var _ = Describe("haveArgo", func() {
 		})
 	})
 })
+
+var _ = Describe("CreateOrUpdateArgoCD", func() {
+	var (
+		dynamicClient dynamic.Interface
+		gvr           schema.GroupVersionResource
+		name          string
+		namespace     string
+	)
+
+	BeforeEach(func() {
+		gvr = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			gvr: "ArgoCDList",
+		})
+		name = "test-argocd"
+		namespace = "test-namespace"
+	})
+
+	Context("when the ArgoCD instance does not exist", func() {
+		It("should create a new ArgoCD instance", func() {
+			err := createOrUpdateArgoCD(dynamicClient, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(argoCD.GetName()).To(Equal(name))
+			Expect(argoCD.GetNamespace()).To(Equal(namespace))
+		})
+	})
+
+	Context("when the ArgoCD instance exists", func() {
+		BeforeEach(func() {
+			argoCD := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "argoproj.io/v1beta1",
+					"kind":       "ArgoCD",
+					"metadata": map[string]interface{}{
+						"name":            name,
+						"namespace":       namespace,
+						"resourceVersion": "1",
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), argoCD, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should update the existing ArgoCD instance", func() {
+			err := createOrUpdateArgoCD(dynamicClient, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(argoCD.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
+		})
+	})
+
+})
