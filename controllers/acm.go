@@ -57,6 +57,7 @@ func haveACMHub(r *PatternReconciler) bool {
 	umch, err := r.dynamicClient.Resource(gvrMCH).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
+		return false
 	} else if len(umch.Items) == 0 {
 		log.Printf("No hub in %s\n", ns)
 		return false
