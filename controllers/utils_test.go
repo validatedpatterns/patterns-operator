@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/testing"
-	k8stesting "k8s.io/client-go/testing"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -606,7 +605,7 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 	Context("when an error occurs while checking for the ConfigMap", func() {
 		It("should return the error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("get", "configmaps", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
 			})
 
@@ -619,7 +618,7 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 	Context("when an error occurs while creating the ConfigMap", func() {
 		It("should return the error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("create", "configmaps", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("create", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some create error"))
 			})
 
@@ -833,7 +832,7 @@ var _ = Describe("GetConfigMapKey", func() {
 	Context("when an error occurs while getting the ConfigMap", func() {
 		It("should return an error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("get", "configmaps", func(k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+			clientset.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
 			})
 

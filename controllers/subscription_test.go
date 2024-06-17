@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -9,7 +10,9 @@ import (
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubeclient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/testing"
 )
 
 var defaultTestSubscription = operatorv1alpha1.Subscription{
@@ -81,28 +84,6 @@ var _ = Describe("Subscription Functions", func() {
 		})
 	})
 
-	Context("updateSubscription", func() {
-		var currentSubscription *operatorv1alpha1.Subscription
-		var targetSubscription *operatorv1alpha1.Subscription
-		var fakeOlmClientSet *olmclient.Clientset
-
-		BeforeEach(func() {
-			currentSubscription = defaultTestSubscription.DeepCopy()
-			targetSubscription = defaultTestSubscription.DeepCopy()
-			targetSubscription.Spec.Channel = "updatedchannel"
-			fakeOlmClientSet = olmclient.NewSimpleClientset()
-
-		})
-
-		It("should update a Subscription", func() {
-			err := createSubscription(fakeOlmClientSet, currentSubscription)
-			Expect(err).ToNot(HaveOccurred())
-			changed, err := updateSubscription(fakeOlmClientSet, targetSubscription, currentSubscription)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(changed).To(BeTrue())
-		})
-	})
-
 	Context("newSubscriptionFromConfigMap", func() {
 		var testConfigMap *corev1.ConfigMap
 		var fakeClientSet *kubeclient.Clientset
@@ -136,6 +117,169 @@ var _ = Describe("Subscription Functions", func() {
 			Expect(sub.Spec.Channel).To(Equal("foo-channel"))
 			Expect(sub.Spec.StartingCSV).To(Equal("1.2.3"))
 			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
+		})
+	})
+})
+
+var _ = Describe("UpdateSubscription", func() {
+	var (
+		client         *olmclient.Clientset
+		target         *operatorv1alpha1.Subscription
+		current        *operatorv1alpha1.Subscription
+		subscriptionNs string
+	)
+
+	BeforeEach(func() {
+		client = olmclient.NewSimpleClientset()
+		subscriptionNs = "openshift-operators"
+
+		current = &operatorv1alpha1.Subscription{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-subscription",
+				Namespace: subscriptionNs,
+			},
+			Spec: &operatorv1alpha1.SubscriptionSpec{
+				CatalogSourceNamespace: "default",
+				CatalogSource:          "test-catalog",
+				Channel:                "stable",
+				Package:                "test-package",
+				InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
+				StartingCSV:            "v1.0.0",
+			},
+		}
+		target = current.DeepCopy()
+	})
+
+	Context("when current subscription is nil", func() {
+		It("should return an error", func() {
+			changed, err := updateSubscription(client, target, nil)
+			Expect(changed).To(BeFalse())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("current subscription was nil"))
+		})
+	})
+
+	Context("when target subscription is nil", func() {
+		It("should return an error", func() {
+			changed, err := updateSubscription(client, nil, current)
+			Expect(changed).To(BeFalse())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("target subscription was nil"))
+		})
+	})
+
+	Context("when the subscription specs are the same", func() {
+		It("should return false and no error", func() {
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeFalse())
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when the subscription specs are different", func() {
+		BeforeEach(func() {
+			client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Create(context.Background(), current, metav1.CreateOptions{})
+		})
+
+		It("channel difference should return true and update the current subscription", func() {
+			target.Spec.Channel = "beta"
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.Channel).To(Equal("beta"))
+		})
+
+		It("catalgsource difference should return true and update the current subscription", func() {
+			target.Spec.CatalogSource = "notdefault"
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.CatalogSource).To(Equal("notdefault"))
+		})
+
+		It("catalogsourcenamespace difference should return true and update the current subscription", func() {
+			target.Spec.CatalogSourceNamespace = "notdefault"
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.CatalogSourceNamespace).To(Equal("notdefault"))
+		})
+
+		It("package difference should return true and update the current subscription", func() {
+			target.Spec.Package = "notdefault"
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.Package).To(Equal("notdefault"))
+		})
+
+		It("InstallPlanApproval difference should return true and update the current subscription", func() {
+			target.Spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
+		})
+
+		It("StartingCSV difference should return true and update the current subscription", func() {
+			target.Spec.StartingCSV = "v1.1.0"
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.StartingCSV).To(Equal("v1.1.0"))
+		})
+
+		It("Config.Env difference should return true and update the current subscription", func() {
+			tmp := &operatorv1alpha1.SubscriptionConfig{
+				Env: []corev1.EnvVar{
+					{
+						Name:  "foo",
+						Value: "bar",
+					},
+				},
+			}
+			target.Spec.Config = tmp
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).ToNot(HaveOccurred())
+
+			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updated.Spec.Config.Env[0].Name).To(Equal("foo"))
+		})
+	})
+
+	Context("when there is an error updating the subscription", func() {
+		BeforeEach(func() {
+			client.PrependReactor("update", "subscriptions", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("update error")
+			})
+			target.Spec.Channel = "beta"
+		})
+
+		It("should return true and an error", func() {
+			changed, err := updateSubscription(client, target, current)
+			Expect(changed).To(BeTrue())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("update error"))
 		})
 	})
 })
