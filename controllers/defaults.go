@@ -58,8 +58,8 @@ const (
 	GiteaReleaseName = "gitea"
 	// Namespace for the Gitea resources
 	GiteaNamespace = "vp-gitea"
-	// Our gitea-chart default version
-	GiteaDefaultChartVersion = "0.0.2"
+	// Our gitea-chart default version (we stay on the latest 0.0.X version)
+	GiteaDefaultChartVersion = "0.0.*"
 	// Default Gitea Admin user
 	GiteaAdminUser = "gitea_admin"
 	// Gitea Admin Secrets name
