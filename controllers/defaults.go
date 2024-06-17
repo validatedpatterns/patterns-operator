@@ -34,18 +34,6 @@ const (
 	GitOpsDefaultUseCSV = "false"
 )
 
-// Experimental Capabilities that can be enabled
-// Currently none
-
-var DefaultPatternOperatorConfig = map[string]string{
-	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
-	"gitops.name":                GitOpsDefaultPackageName,
-	"gitops.channel":             GitOpsDefaultChannel,
-	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
-	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
-	"gitops.ManualSync":          GitOpsDefaultManualSync,
-}
-
 // Gitea chart defaults
 const (
 	// URL to the Validated Patterns Helm chart repo
@@ -73,6 +61,21 @@ const (
 	// Gitea Default Random Password Length
 	GiteaDefaultPasswordLen = 15
 )
+
+// Experimental Capabilities that can be enabled
+// Currently none
+
+var DefaultPatternOperatorConfig = map[string]string{
+	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
+	"gitops.name":                GitOpsDefaultPackageName,
+	"gitops.channel":             GitOpsDefaultChannel,
+	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
+	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
+	"gitops.ManualSync":          GitOpsDefaultManualSync,
+	"gitea.chartName":            GiteaChartName,
+	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
+	"gitea.chartVersion":         GiteaDefaultChartVersion,
+}
 
 type GitOpsConfig map[string]string
 

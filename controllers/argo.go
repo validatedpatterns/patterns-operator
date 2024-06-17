@@ -732,9 +732,9 @@ func newArgoGiteaApplication(p *api.Pattern) *argoapi.Application {
 		},
 		Project: "default",
 		Source: &argoapi.ApplicationSource{
-			RepoURL:        GiteaHelmRepoUrl,
-			TargetRevision: GiteaDefaultChartVersion,
-			Chart:          GiteaChartName,
+			RepoURL:        PatternsOperatorConfig.getValueWithDefault("gitea.chartName"),
+			TargetRevision: PatternsOperatorConfig.getValueWithDefault("gitea.helmRepoUrl"),
+			Chart:          PatternsOperatorConfig.getValueWithDefault("gitea.chartVersion"),
 			Helm: &argoapi.ApplicationSourceHelm{
 				Parameters: parameters,
 			},

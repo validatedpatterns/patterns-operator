@@ -31,6 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	argoNS   = "test-namespace"
+	argoName = "test-argocd"
+)
+
 func prefixArray(a []string, prefix string) []string {
 	b := []string{}
 	for _, i := range a {
@@ -745,7 +750,7 @@ var _ = Describe("NewArgoCD", func() {
 			Expect(spec.Controller.Resources.Requests[v1.ResourceCPU]).To(Equal(resource.MustParse("250m")))
 			Expect(spec.Controller.Resources.Requests[v1.ResourceMemory]).To(Equal(resource.MustParse("1Gi")))
 
-			Expect(spec.Grafana.Enabled).To(BeFalse())
+			// Expect(spec.Grafana.Enabled).To(BeFalse()) // spec.Grafana is deprecated
 			Expect(spec.Monitoring.Enabled).To(BeFalse())
 			Expect(spec.Notifications.Enabled).To(BeFalse())
 			Expect(spec.Prometheus.Enabled).To(BeFalse())
@@ -784,6 +789,7 @@ var _ = Describe("NewArgoCD", func() {
 })
 
 var _ = Describe("haveArgo", func() {
+
 	var (
 		dynamicClient dynamic.Interface
 		kubeClient    *fake.Clientset
@@ -799,17 +805,17 @@ var _ = Describe("haveArgo", func() {
 		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 			gvr: "ArgoCDList",
 		})
-		name = "test-argocd"
-		namespace = "test-namespace"
+		name = argoName
+		namespace = argoNS
 	})
 
 	Context("when the ArgoCD instance exists", func() {
 		BeforeEach(func() {
 			argoCD := &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": "argoproj.io/v1beta1",
 					"kind":       "ArgoCD",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      name,
 						"namespace": namespace,
 					},
@@ -859,8 +865,8 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 			gvr: "ArgoCDList",
 		})
-		name = "test-argocd"
-		namespace = "test-namespace"
+		name = argoName
+		namespace = argoNS
 	})
 
 	Context("when the ArgoCD instance does not exist", func() {
@@ -878,10 +884,10 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 	Context("when the ArgoCD instance exists", func() {
 		BeforeEach(func() {
 			argoCD := &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": "argoproj.io/v1beta1",
 					"kind":       "ArgoCD",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":            name,
 						"namespace":       namespace,
 						"resourceVersion": "1",

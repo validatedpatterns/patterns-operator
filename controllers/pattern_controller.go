@@ -353,7 +353,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
 	err = r.Client.Create(context.Background(), giteaAdminSecret)
 	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return fmt.Errorf("Could not create Gitea Admin Secret: %v", err)
+		return fmt.Errorf("could not create Gitea Admin Secret: %v", err)
 	}
 	// Here we need to call the gitea migration bits
 	// Let's get the GiteaServer route
@@ -388,7 +388,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	input.Spec.GitConfig.TargetRepo = giteaRepoURL
 	err = r.Client.Update(context.Background(), input)
 	if err != nil {
-		return fmt.Errorf("Update CR Target Repo: %v", err)
+		return fmt.Errorf("update CR Target Repo: %v", err)
 	}
 
 	return nil
