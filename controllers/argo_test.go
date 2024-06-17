@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -8,8 +9,13 @@ import (
 	"github.com/onsi/gomega/format"
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
+	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -29,8 +35,8 @@ var _ = Describe("Argo Pattern", func() {
 	BeforeEach(func() {
 		tmpFalse := false
 		pattern = &api.Pattern{
-			ObjectMeta: v1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
-			TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+			ObjectMeta: metav1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
+			TypeMeta:   metav1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
 			Spec: api.PatternSpec{
 				ClusterGroupName: "foogroup",
 				GitConfig: api.GitConfig{
@@ -76,7 +82,7 @@ var _ = Describe("Argo Pattern", func() {
 			},
 		}
 		argoApp = &argoapi.Application{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      applicationName(pattern),
 				Namespace: "openshift-gitops",
 				Labels: map[string]string{
@@ -478,6 +484,130 @@ var _ = Describe("Argo Pattern", func() {
 				Expect(compareSources(sources, sources)).To(BeTrue())
 			})
 
+		})
+	})
+})
+
+var _ = Describe("RemoveApplication", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		name         string
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		name = "test-application"
+		namespace = "default"
+	})
+
+	Context("when the application exists", func() {
+		BeforeEach(func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should delete the application successfully", func() {
+			err := removeApplication(argocdclient, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = argocdclient.ArgoprojV1alpha1().Applications(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).To(HaveOccurred())
+			Expect(kerrors.IsNotFound(err)).To(BeTrue())
+
+		})
+	})
+
+	Context("when the application does not exist", func() {
+		It("should return a not found error", func() {
+			err := removeApplication(argocdclient, name, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(kerrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	Context("when there is an error deleting the application", func() {
+		BeforeEach(func() {
+			argocdclient.PrependReactor("delete", "applications", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("delete error")
+			})
+		})
+
+		It("should return the error", func() {
+			err := removeApplication(argocdclient, name, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("delete error"))
+		})
+	})
+})
+
+var _ = Describe("NewApplicationValues", func() {
+	Context("when there are no extra parameters", func() {
+		It("should return the header with no parameters", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			Expect(result).To(Equal("extraParametersNested:\n"))
+		})
+	})
+
+	Context("when there is one extra parameter", func() {
+		It("should return the parameter correctly formatted", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{
+						{Name: "param1", Value: "value1"},
+					},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			expected := "extraParametersNested:\n  param1: value1\n"
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Context("when there are multiple extra parameters", func() {
+		It("should return the parameters correctly formatted", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{
+						{Name: "param1", Value: "value1"},
+						{Name: "param2", Value: "value2"},
+					},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			expected := "extraParametersNested:\n  param1: value1\n  param2: value2\n"
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Context("when the parameter names and values contain special characters", func() {
+		It("should return the parameters correctly formatted", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{
+						{Name: "param-1", Value: "value-1"},
+						{Name: "param_2", Value: "value_2"},
+					},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			expected := "extraParametersNested:\n  param-1: value-1\n  param_2: value_2\n"
+			Expect(result).To(Equal(expected))
 		})
 	})
 })
