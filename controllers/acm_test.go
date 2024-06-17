@@ -28,10 +28,6 @@ var _ = Describe("HaveACMHub", func() {
 
 	BeforeEach(func() {
 		kubeClient = fake.NewSimpleClientset()
-		//dynamicClient = dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-		// scheme := runtime.NewScheme()
-		// _ = v1.AddToScheme(scheme)
-		// _ = unstructuredscheme.AddToScheme(scheme)
 		gvrMCH = schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
 		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
@@ -60,10 +56,10 @@ var _ = Describe("HaveACMHub", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			hub := &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"apiVersion": "operator.open-cluster-management.io/v1",
 					"kind":       "MultiClusterHub",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "test-hub",
 						"namespace": "default",
 					},
@@ -88,7 +84,7 @@ var _ = Describe("HaveACMHub", func() {
 
 	Context("when there is an error listing ConfigMaps", func() {
 		BeforeEach(func() {
-			kubeClient.PrependReactor("list", "configmaps", func(action testing.Action) (handled bool, ret runtime.Object, err error) {
+			kubeClient.PrependReactor("list", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, fmt.Errorf("config map error")
 			})
 		})
@@ -113,7 +109,7 @@ var _ = Describe("HaveACMHub", func() {
 			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), configMap, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			dynamicClient.PrependReactor("list", "multiclusterhubs", func(action testing.Action) (handled bool, ret runtime.Object, err error) {
+			dynamicClient.PrependReactor("list", "multiclusterhubs", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, fmt.Errorf("multiclusterhub error")
 			})
 		})
