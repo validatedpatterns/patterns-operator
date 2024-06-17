@@ -23,8 +23,11 @@ var _ = Describe("MigrateGiteaRepo", func() {
 		password         string
 		upstreamURL      string
 		repoName         string
-		//descriptionFormat string
-		//description       string
+	)
+
+	const (
+		MigrateAPIURL = "/api/v1/repos/migrate"
+		VersionAPIURL = "/api/v1/version"
 	)
 
 	BeforeEach(func() {
@@ -35,8 +38,6 @@ var _ = Describe("MigrateGiteaRepo", func() {
 		password = "pass"
 		upstreamURL = "https://github.com/example/repo.git"
 		repoName = "repo"
-		//descriptionFormat = "The [%s] repository was migrated by the Validated Patterns Operator."
-		//description = fmt.Sprintf(descriptionFormat, repoName)
 
 		// Mock Gitea server
 		giteaServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,14 +46,13 @@ var _ = Describe("MigrateGiteaRepo", func() {
 				w.WriteHeader(http.StatusOK)
 			case fmt.Sprintf("/repos/%s/%s", GiteaAdminUser, repoName):
 				w.WriteHeader(http.StatusNotFound)
-			case "/api/v1/version":
+			case VersionAPIURL:
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"version": "1.21.11"}`))
-			case "/api/v1/repos/migrate":
+				_, _ = w.Write([]byte(`{"version": "1.21.11"}`))
+			case MigrateAPIURL:
 				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"html_url": "https://gitea.example.com/user/repo"}`))
+				_, _ = w.Write([]byte(`{"html_url": "https://gitea.example.com/user/repo"}`))
 			default:
-				fmt.Printf("FOKKO: %v\n", r.URL)
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
@@ -81,17 +81,16 @@ var _ = Describe("MigrateGiteaRepo", func() {
 					w.WriteHeader(http.StatusOK)
 				case fmt.Sprintf("/repos/%s/%s", GiteaAdminUser, repoName):
 					w.WriteHeader(http.StatusNotFound)
-				case "/api/v1/version":
+				case VersionAPIURL:
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"version": "1.21.11"}`))
-				case "/api/v1/repos/migrate":
+					_, _ = w.Write([]byte(`{"version": "1.21.11"}`))
+				case MigrateAPIURL:
 					w.WriteHeader(http.StatusCreated)
-					w.Write([]byte(`{"html_url": "https://gitea.example.com/user/repo"}`))
+					_, _ = w.Write([]byte(`{"html_url": "https://gitea.example.com/user/repo"}`))
 				case fmt.Sprintf("/repos/%s/%s", GiteaAdminUser, repoName):
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"html_url": "https://gitea.example.com/user/repo"}`))
+					_, _ = w.Write([]byte(`{"html_url": "https://gitea.example.com/user/repo"}`))
 				default:
-					fmt.Printf("FOKKO: %v\n", r.URL)
 					w.WriteHeader(http.StatusNotFound)
 				}
 			}))
@@ -120,7 +119,7 @@ var _ = Describe("MigrateGiteaRepo", func() {
 	Context("when there is an error during repository migration", func() {
 		BeforeEach(func() {
 			giteaServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/api/v1/repos/migrate" {
+				if r.URL.Path == MigrateAPIURL {
 					w.WriteHeader(http.StatusInternalServerError)
 				} else {
 					w.WriteHeader(http.StatusNotFound)
