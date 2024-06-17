@@ -67,8 +67,10 @@ github.com/argoproj/argo-cd/v2/common
 github.com/argoproj/argo-cd/v2/pkg/apis/application
 github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1
 github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned
+github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake
 github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/scheme
 github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/typed/application/v1alpha1
+github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/typed/application/v1alpha1/fake
 github.com/argoproj/argo-cd/v2/util/cache
 github.com/argoproj/argo-cd/v2/util/cert
 github.com/argoproj/argo-cd/v2/util/collections
