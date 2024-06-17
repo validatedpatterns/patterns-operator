@@ -178,7 +178,7 @@ var _ = Describe("UpdateSubscription", func() {
 
 	Context("when the subscription specs are different", func() {
 		BeforeEach(func() {
-			client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Create(context.Background(), current, metav1.CreateOptions{})
+			_, _ = client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Create(context.Background(), current, metav1.CreateOptions{})
 		})
 
 		It("channel difference should return true and update the current subscription", func() {
@@ -193,25 +193,25 @@ var _ = Describe("UpdateSubscription", func() {
 		})
 
 		It("catalgsource difference should return true and update the current subscription", func() {
-			target.Spec.CatalogSource = "notdefault"
+			target.Spec.CatalogSource = "somesource"
 			changed, err := updateSubscription(client, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
 			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updated.Spec.CatalogSource).To(Equal("notdefault"))
+			Expect(updated.Spec.CatalogSource).To(Equal("somesource"))
 		})
 
 		It("catalogsourcenamespace difference should return true and update the current subscription", func() {
-			target.Spec.CatalogSourceNamespace = "notdefault"
+			target.Spec.CatalogSourceNamespace = "another"
 			changed, err := updateSubscription(client, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
 			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updated.Spec.CatalogSourceNamespace).To(Equal("notdefault"))
+			Expect(updated.Spec.CatalogSourceNamespace).To(Equal("another"))
 		})
 
 		It("package difference should return true and update the current subscription", func() {
