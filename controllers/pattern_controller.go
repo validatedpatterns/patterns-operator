@@ -239,83 +239,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// If you specified OriginRepo then we automatically spawn a gitea instance via a special argo gitea application
 	if gitConfig.OriginRepo != "" {
-		log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
-		giteaApp := newArgoGiteaApplication(qualifiedInstance)
-		_ = controllerutil.SetOwnerReference(qualifiedInstance, giteaApp, r.Scheme)
-		app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
-		if app == nil {
-			log.Printf("Gitea app not found: %s\n", err.Error())
-			err = createApplication(r.argoClient, giteaApp, clusterWideNS)
-			return r.actionPerformed(qualifiedInstance, "create gitea application", err)
-		} else if ownedBySame(giteaApp, app) {
-			// Check values
-			changed, errApp := updateApplication(r.argoClient, giteaApp, app, clusterWideNS)
-			if changed {
-				if errApp != nil {
-					qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
-				}
-				_ = DropLocalGitPaths()
-
-				return r.actionPerformed(qualifiedInstance, "updated gitea application", errApp)
-			}
-		} else {
-			// Someone manually removed the owner ref
-			return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", giteaApp.Name))
-		}
-		if !haveNamespace(r.Client, GiteaNamespace) {
-			return r.actionPerformed(qualifiedInstance, "check gitea namespace", fmt.Errorf("waiting for creation"))
-		}
-		// It is okay to create the gitea secret here because the pod won't start without it and when we're
-		// here we know that the gitea namespace has been created
-		var giteaAdminPassword string
-		giteaAdminPassword, err = GenerateRandomPassword(GiteaDefaultPasswordLen, DefaultRandRead)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "error Generating gitea_admin password", err)
-		}
-
-		secretData := map[string][]byte{
-			"username": []byte(GiteaAdminUser),
-			"password": []byte(giteaAdminPassword),
-		}
-		giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
-		err = r.Client.Create(context.Background(), giteaAdminSecret)
-		if err != nil && !kerrors.IsAlreadyExists(err) {
-			return r.actionPerformed(qualifiedInstance, "Could not create Gitea Admin Secret", err)
-		}
-		// Here we need to call the gitea migration bits
-		// Let's get the GiteaServer route
-		giteaRouteURL, routeErr := getRoute(r.routeClient, GiteaRouteName, GiteaNamespace)
-		if routeErr != nil {
-			return r.actionPerformed(qualifiedInstance, "GiteaServer route not ready", routeErr)
-		}
-		// Extract the repository name from the original target repo
-		upstreamRepoName, repoErr := extractRepositoryName(instance.Spec.GitConfig.OriginRepo)
-		if repoErr != nil {
-			return r.actionPerformed(qualifiedInstance, "Target Repo URL", repoErr)
-		}
-
-		giteaRepoURL := fmt.Sprintf("%s/%s/%s", giteaRouteURL, GiteaAdminUser, upstreamRepoName)
-		secret, secretErr := getSecret(r.fullClient, GiteaAdminSecretName, GiteaNamespace)
-		if secretErr != nil {
-			return r.actionPerformed(qualifiedInstance, "error getting gitea Admin Secret", secretErr)
-		}
-
-		// Let's attempt to migrate the repo to Gitea
-		_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data["username"]),
-			string(secret.Data["password"]),
-			instance.Spec.GitConfig.OriginRepo,
-			giteaRouteURL)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "GiteaServer Migrate Repository Error: ", err)
-		}
-
-		// Migrate Repo has been done.
-		// Replace the Target Repo with new Gitea Repo URL
-		// and update the pattern CR
-		instance.Spec.GitConfig.TargetRepo = giteaRepoURL
-		err = r.Client.Update(context.Background(), instance)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "Update CR Target Repo", err)
+		giteaErr := r.createGiteaInstance(qualifiedInstance)
+		if giteaErr != nil {
+			return r.actionPerformed(qualifiedInstance, "error created gitea instance", giteaErr)
 		}
 	}
 
@@ -379,6 +305,93 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return result, nil
+}
+
+// Returns true if something changed + the error
+func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
+	gitConfig := input.Spec.GitConfig
+	clusterWideNS := getClusterWideArgoNamespace()
+
+	log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
+	giteaApp := newArgoGiteaApplication(input)
+	_ = controllerutil.SetOwnerReference(input, giteaApp, r.Scheme)
+	app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
+	if app == nil {
+		log.Printf("Gitea app not found: %s\n", err.Error())
+		err = createApplication(r.argoClient, giteaApp, clusterWideNS)
+		return fmt.Errorf("create gitea application: %v", err)
+	} else if ownedBySame(giteaApp, app) {
+		// Check values
+		changed, errApp := updateApplication(r.argoClient, giteaApp, app, clusterWideNS)
+		if changed {
+			if errApp != nil {
+				input.Status.Version = 1 + input.Status.Version
+			}
+			_ = DropLocalGitPaths()
+
+			return fmt.Errorf("updated gitea application: %v", errApp)
+		}
+	} else {
+		// Someone manually removed the owner ref
+		return fmt.Errorf("we no longer own Application %q", giteaApp.Name)
+	}
+	if !haveNamespace(r.Client, GiteaNamespace) {
+		return fmt.Errorf("waiting for giteanamespace creation")
+	}
+	// It is okay to create the gitea secret here because the pod won't start without it and when we're
+	// here we know that the gitea namespace has been created
+	var giteaAdminPassword string
+	giteaAdminPassword, err = GenerateRandomPassword(GiteaDefaultPasswordLen, DefaultRandRead)
+	if err != nil {
+		return fmt.Errorf("error Generating gitea_admin password: %v", err)
+	}
+
+	secretData := map[string][]byte{
+		"username": []byte(GiteaAdminUser),
+		"password": []byte(giteaAdminPassword),
+	}
+	giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
+	err = r.Client.Create(context.Background(), giteaAdminSecret)
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return fmt.Errorf("Could not create Gitea Admin Secret: %v", err)
+	}
+	// Here we need to call the gitea migration bits
+	// Let's get the GiteaServer route
+	giteaRouteURL, routeErr := getRoute(r.routeClient, GiteaRouteName, GiteaNamespace)
+	if routeErr != nil {
+		return fmt.Errorf("GiteaServer route not ready: %v", routeErr)
+	}
+	// Extract the repository name from the original target repo
+	upstreamRepoName, repoErr := extractRepositoryName(gitConfig.OriginRepo)
+	if repoErr != nil {
+		return fmt.Errorf("error getting target Repo URL: %v", repoErr)
+	}
+
+	giteaRepoURL := fmt.Sprintf("%s/%s/%s", giteaRouteURL, GiteaAdminUser, upstreamRepoName)
+	secret, secretErr := getSecret(r.fullClient, GiteaAdminSecretName, GiteaNamespace)
+	if secretErr != nil {
+		return fmt.Errorf("error getting gitea Admin Secret: %v", secretErr)
+	}
+
+	// Let's attempt to migrate the repo to Gitea
+	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data["username"]),
+		string(secret.Data["password"]),
+		input.Spec.GitConfig.OriginRepo,
+		giteaRouteURL)
+	if err != nil {
+		return fmt.Errorf("GiteaServer Migrate Repository Error: %v", err)
+	}
+
+	// Migrate Repo has been done.
+	// Replace the Target Repo with new Gitea Repo URL
+	// and update the pattern CR
+	input.Spec.GitConfig.TargetRepo = giteaRepoURL
+	err = r.Client.Update(context.Background(), input)
+	if err != nil {
+		return fmt.Errorf("Update CR Target Repo: %v", err)
+	}
+
+	return nil
 }
 
 func (r *PatternReconciler) preValidation(input *api.Pattern) error {
