@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
@@ -38,6 +39,13 @@ import (
 	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
+)
+
+// Which ArgoCD objects we're creating
+const (
+	ArgoCDGroup    = "argoproj.io"
+	ArgoCDVersion  = "v1beta1"
+	ArgoCDResource = "argocds"
 )
 
 func newArgoCD(name, namespace string) *argooperator.ArgoCD {
@@ -293,16 +301,21 @@ g, cluster-admins, role:admin`
 }
 
 func haveArgo(client dynamic.Interface, name, namespace string) bool {
-	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 	_, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	return err == nil
 }
 
-func createOrUpdateArgoCD(client dynamic.Interface, name, namespace string) error {
+func createOrUpdateArgoCD(client dynamic.Interface, config *rest.Config, name, namespace string) error {
 	argo := newArgoCD(name, namespace)
-	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 
 	var err error
+	err = checkAPIVersion(config, ArgoCDGroup, ArgoCDVersion)
+	if err != nil {
+		return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
+	}
+
 	if !haveArgo(client, name, namespace) {
 		// create it
 		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
@@ -320,7 +333,7 @@ func createOrUpdateArgoCD(client dynamic.Interface, name, namespace string) erro
 }
 
 func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, error) {
-	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 	argo := &argooperator.ArgoCD{}
 	unstructuredArgo, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {

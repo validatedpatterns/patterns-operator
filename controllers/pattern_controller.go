@@ -227,7 +227,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
-	err = createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
+	err = createOrUpdateArgoCD(r.dynamicClient, r.config, ClusterWideArgoName, clusterWideNS)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 	}
