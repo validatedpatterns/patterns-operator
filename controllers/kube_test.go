@@ -651,7 +651,7 @@ var _ = Describe("checkAPIVersion", func() {
 
 	It("should return an error when the API group and version do not exist", func() {
 		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
-		Expect(err).To(Not(BeNil()))
+		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
 	})
 
@@ -664,7 +664,7 @@ var _ = Describe("checkAPIVersion", func() {
 		}
 
 		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should return an error when the API group exists but the version does not", func() {
@@ -677,6 +677,18 @@ var _ = Describe("checkAPIVersion", func() {
 
 		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
 		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
+	})
+
+	It("should return an error when the API group exists but we query another one", func() {
+		clientset.discovery.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, "v10"),
+				APIResources: []metav1.APIResource{},
+			},
+		}
+
+		err := checkAPIVersion(clientset, "example", "v1")
+		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", "example", "v1")))
 	})
 
 	// FIXME(bandini): Not working yet
