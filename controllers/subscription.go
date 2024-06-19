@@ -119,14 +119,20 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 	} else if target.Spec.StartingCSV != current.Spec.StartingCSV {
 		log.Println("StartingCSV changed")
 		changed = true
-	} else if !reflect.DeepEqual(target.Spec.Config.Env, current.Spec.Config.Env) {
+	} else if target.Spec.Config != nil && current.Spec.Config != nil &&
+		!reflect.DeepEqual(target.Spec.Config.Env, current.Spec.Config.Env) {
+		log.Println("Config Env changed")
+		changed = true
+	} else if target.Spec.Config == nil && current.Spec.Config != nil {
+		log.Println("Config Env changed")
+		changed = true
+	} else if current.Spec.Config == nil && target.Spec.Config != nil {
 		log.Println("Config Env changed")
 		changed = true
 	}
 
 	if changed {
 		target.Spec.DeepCopyInto(current.Spec)
-
 		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return changed, err
 	}

@@ -36,83 +36,109 @@ spec:
       specDescriptors:
       - displayName: Name
         path: extraParameters[0].name
+      - displayName: Value
+        path: extraParameters[0].value
+      - displayName: Cluster Group Name
+        path: clusterGroupName
+      - displayName: Git Config
+        path: gitSpec
+      - displayName: Multi Source Config
+        path: multiSourceConfig
+      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
+        displayName: Extra Parameters
+        path: extraParameters
+      - description: URLs to additional Helm parameter files
+        displayName: Extra Value Files
+        path: extraValueFiles
+      - displayName: Git Ops Config
+        path: gitOpsSpec
+      - description: Analytics UUID. Leave empty to autogenerate a random one. Not
+          PII information
+        displayName: Analytics UUID
+        path: analyticsUUID
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Comma separated capabilities to enable certain experimental features
+        displayName: Experimental Capabilities
+        path: experimentalCapabilities
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Enable in-cluster git server (avoids the need of forking the
+          upstream repository)
+        displayName: In Cluster Git Server
+        path: gitSpec.inClusterGitServer
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
       - description: Git repo containing the pattern to deploy. Must use https/http
           or, for ssh, git@server:foo/bar.git
         displayName: Target Repo
         path: gitSpec.targetRepo
-      - displayName: Value
-        path: extraParameters[0].value
-      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
-          Default: HEAD'
-        displayName: Target Revision
-        path: gitSpec.targetRevision
-      - displayName: Cluster Group Name
-        path: clusterGroupName
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:false
       - description: Upstream git repo containing the pattern to deploy. Used when
-          in-cluster fork to point to the upstream pattern repository
+          in-cluster fork to point to the upstream pattern repository. Takes precedence
+          over TargetRepo
         displayName: Origin Repo
         path: gitSpec.originRepo
-      - displayName: Git Config
-        path: gitSpec
-      - description: Branch, tag or commit in the upstream git repository. Does not
-          support short-sha's. Default to HEAD
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:true
+      - description: (DEPRECATED) Branch, tag or commit in the upstream git repository.
+          Does not support short-sha's. Default to HEAD
         displayName: Origin Revision
         path: gitSpec.originRevision
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: 'Interval in seconds to poll for drifts between origin and target
           repositories. Default: 180 seconds'
         displayName: Poll Interval
         path: gitSpec.pollInterval
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:number
-      - displayName: Multi Source Config
-        path: multiSourceConfig
-      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
-        displayName: Extra Parameters
-        path: extraParameters
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
+          Default: HEAD'
+        displayName: Target Revision
+        path: gitSpec.targetRevision
       - description: Optional. FQDN of the git server if automatic parsing from TargetRepo
           is broken
         displayName: Hostname
         path: gitSpec.hostname
-      - description: URLs to additional Helm parameter files
-        displayName: Extra Value Files
-        path: extraValueFiles
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Optional. K8s secret name where the info for connecting to git
           can be found. The supported secrets are modeled after the private repositories
           in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
           currently ssh and username+password are supported
         displayName: Token Secret
         path: gitSpec.tokenSecret
-      - displayName: Git Ops Config
-        path: gitOpsSpec
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Optional. K8s secret namespace where the token for connecting
           to git can be found
         displayName: Token Secret Namespace
         path: gitSpec.tokenSecretNamespace
-      - description: The helm chart url to fetch the helm charts from in order to
-          deploy the pattern. Defaults to https://charts.validatedpatterns.io/
-        displayName: Helm Repo Url
-        path: multiSourceConfig.helmRepoUrl
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
-      - description: Analytics UUID. Leave empty to autogenerate a random one. Not
-          PII information
-        displayName: Analytics UUID
-        path: analyticsUUID
-      - description: Which chart version for the clustergroup helm chart. Defaults
-          to "0.8.*"
-        displayName: Cluster Group Chart Version
-        path: multiSourceConfig.clusterGroupChartVersion
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: (EXPERIMENTAL) Enable multi-source support when deploying the
           clustergroup argo application
         displayName: Enabled
         path: multiSourceConfig.enabled
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: Comma separated capabilities to enable certain experimental features
-        displayName: Experimental Capabilities
-        path: experimentalCapabilities
+      - description: The helm chart url to fetch the helm charts from in order to
+          deploy the pattern. Defaults to https://charts.validatedpatterns.io/
+        displayName: Helm Repo Url
+        path: multiSourceConfig.helmRepoUrl
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: Which chart version for the clustergroup helm chart. Defaults
+          to "0.8.*"
+        displayName: Cluster Group Chart Version
+        path: multiSourceConfig.clusterGroupChartVersion
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: The url when deploying the clustergroup helm chart directly from
           a git repo Defaults to '' which means not used (Only used when developing
           the clustergroup helm chart)
@@ -120,6 +146,7 @@ spec:
         path: multiSourceConfig.clusterGroupGitRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: The git reference when deploying the clustergroup helm chart
           directly from a git repo Defaults to 'main'. (Only used when developing
           the clustergroup helm chart)
@@ -127,6 +154,7 @@ spec:
         path: multiSourceConfig.clusterGroupChartGitRevision
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: 'Require manual intervention before Argo will sync new content.
           Default: False'
         displayName: Manual Sync

@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
@@ -306,14 +306,17 @@ func haveArgo(client dynamic.Interface, name, namespace string) bool {
 	return err == nil
 }
 
-func createOrUpdateArgoCD(client dynamic.Interface, config *rest.Config, name, namespace string) error {
+func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interface, name, namespace string) error {
 	argo := newArgoCD(name, namespace)
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 
 	var err error
-	err = checkAPIVersion(config, ArgoCDGroup, ArgoCDVersion)
-	if err != nil {
-		return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
+	// we skip this check if fullClient is explicitly nil for simpler testing
+	if fullClient != nil {
+		err = checkAPIVersion(fullClient, ArgoCDGroup, ArgoCDVersion)
+		if err != nil {
+			return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
+		}
 	}
 
 	if !haveArgo(client, name, namespace) {
@@ -707,6 +710,52 @@ func newArgoApplication(p *api.Pattern) *argoapi.Application {
 	}
 
 	return targetApp
+}
+
+func newArgoGiteaApplication(p *api.Pattern) *argoapi.Application {
+	consoleHref := fmt.Sprintf("https://%s-%s.%s", GiteaRouteName, GiteaNamespace, p.Status.AppClusterDomain)
+	parameters := []argoapi.HelmParameter{
+		{
+			Name:  "gitea.admin.existingSecret",
+			Value: GiteaAdminSecretName,
+		},
+		{
+			Name:  "gitea.console.href",
+			Value: consoleHref,
+		},
+		{
+			Name:  "gitea.config.server.ROOT_URL",
+			Value: consoleHref,
+		},
+	}
+	spec := &argoapi.ApplicationSpec{
+		Destination: argoapi.ApplicationDestination{
+			Name:      "in-cluster",
+			Namespace: GiteaNamespace,
+		},
+		Project: "default",
+		Source: &argoapi.ApplicationSource{
+			RepoURL:        PatternsOperatorConfig.getValueWithDefault("gitea.helmRepoUrl"),
+			TargetRevision: PatternsOperatorConfig.getValueWithDefault("gitea.chartVersion"),
+			Chart:          PatternsOperatorConfig.getValueWithDefault("gitea.chartName"),
+			Helm: &argoapi.ApplicationSourceHelm{
+				Parameters: parameters,
+			},
+		},
+		SyncPolicy: commonSyncPolicy(p),
+	}
+	labels := make(map[string]string)
+	labels["validatedpatterns.io/pattern"] = p.Name
+	app := argoapi.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GiteaApplicationName,
+			Namespace: getClusterWideArgoNamespace(),
+			Labels:    labels,
+		},
+		Spec: *spec,
+	}
+	controllerutil.AddFinalizer(&app, argoapi.ForegroundPropagationPolicyFinalizer)
+	return &app
 }
 
 func countVPApplications(p *api.Pattern) (appCount, appSetsCount int, err error) {

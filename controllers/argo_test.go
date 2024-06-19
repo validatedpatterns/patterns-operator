@@ -1,16 +1,40 @@
 package controllers
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"log"
+	"os"
 
+	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	routev1 "github.com/openshift/api/route/v1"
 
 	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
+	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
+	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/fake"
+
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/testing"
+
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	argoNS   = "test-namespace"
+	argoName = "test-argocd"
 )
 
 func prefixArray(a []string, prefix string) []string {
@@ -29,8 +53,8 @@ var _ = Describe("Argo Pattern", func() {
 	BeforeEach(func() {
 		tmpFalse := false
 		pattern = &api.Pattern{
-			ObjectMeta: v1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
-			TypeMeta:   v1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+			ObjectMeta: metav1.ObjectMeta{Name: "multicloud-gitops-test", Namespace: defaultNamespace},
+			TypeMeta:   metav1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
 			Spec: api.PatternSpec{
 				ClusterGroupName: "foogroup",
 				GitConfig: api.GitConfig{
@@ -76,7 +100,7 @@ var _ = Describe("Argo Pattern", func() {
 			},
 		}
 		argoApp = &argoapi.Application{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      applicationName(pattern),
 				Namespace: "openshift-gitops",
 				Labels: map[string]string{
@@ -478,6 +502,465 @@ var _ = Describe("Argo Pattern", func() {
 				Expect(compareSources(sources, sources)).To(BeTrue())
 			})
 
+		})
+	})
+})
+
+var _ = Describe("RemoveApplication", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		name         string
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		name = "test-application"
+		namespace = "default"
+	})
+
+	Context("when the application exists", func() {
+		BeforeEach(func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should delete the application successfully", func() {
+			err := removeApplication(argocdclient, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = argocdclient.ArgoprojV1alpha1().Applications(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).To(HaveOccurred())
+			Expect(kerrors.IsNotFound(err)).To(BeTrue())
+
+		})
+	})
+
+	Context("when the application does not exist", func() {
+		It("should return a not found error", func() {
+			err := removeApplication(argocdclient, name, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(kerrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	Context("when there is an error deleting the application", func() {
+		BeforeEach(func() {
+			argocdclient.PrependReactor("delete", "applications", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("delete error")
+			})
+		})
+
+		It("should return the error", func() {
+			err := removeApplication(argocdclient, name, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("delete error"))
+		})
+	})
+})
+
+var _ = Describe("NewApplicationValues", func() {
+	Context("when there are no extra parameters", func() {
+		It("should return the header with no parameters", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			Expect(result).To(Equal("extraParametersNested:\n"))
+		})
+	})
+
+	Context("when there is one extra parameter", func() {
+		It("should return the parameter correctly formatted", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{
+						{Name: "param1", Value: "value1"},
+					},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			expected := "extraParametersNested:\n  param1: value1\n"
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Context("when there are multiple extra parameters", func() {
+		It("should return the parameters correctly formatted", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{
+						{Name: "param1", Value: "value1"},
+						{Name: "param2", Value: "value2"},
+					},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			expected := "extraParametersNested:\n  param1: value1\n  param2: value2\n"
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Context("when the parameter names and values contain special characters", func() {
+		It("should return the parameters correctly formatted", func() {
+			pattern := &api.Pattern{
+				Spec: api.PatternSpec{
+					ExtraParameters: []api.PatternParameter{
+						{Name: "param-1", Value: "value-1"},
+						{Name: "param_2", Value: "value_2"},
+					},
+				},
+			}
+
+			result := newApplicationValues(pattern)
+			expected := "extraParametersNested:\n  param-1: value-1\n  param_2: value_2\n"
+			Expect(result).To(Equal(expected))
+		})
+	})
+})
+
+var _ = Describe("CompareHelmValueFile", func() {
+	var (
+		goal   string
+		actual []string
+	)
+
+	Context("when the goal value is in the actual slice", func() {
+		BeforeEach(func() {
+			goal = "value1"
+			actual = []string{"value1", "value2", "value3"}
+		})
+
+		It("should return true", func() {
+			result := compareHelmValueFile(goal, actual)
+			Expect(result).To(BeTrue())
+		})
+	})
+
+	Context("when the goal value is not in the actual slice", func() {
+		BeforeEach(func() {
+			goal = "value4"
+			actual = []string{"value1", "value2", "value3"}
+		})
+
+		It("should return false and log the appropriate message", func() {
+			logBuffer := new(bytes.Buffer)
+			log.SetOutput(logBuffer)
+			defer log.SetOutput(os.Stderr)
+
+			result := compareHelmValueFile(goal, actual)
+			Expect(result).To(BeFalse())
+			Expect(logBuffer.String()).To(ContainSubstring("Values file \"value4\" not found"))
+		})
+	})
+
+	Context("when the actual slice is empty", func() {
+		BeforeEach(func() {
+			goal = "value1"
+			actual = []string{}
+		})
+
+		It("should return false and log the appropriate message", func() {
+			logBuffer := new(bytes.Buffer)
+			log.SetOutput(logBuffer)
+			defer log.SetOutput(os.Stderr)
+
+			result := compareHelmValueFile(goal, actual)
+			Expect(result).To(BeFalse())
+			Expect(logBuffer.String()).To(ContainSubstring("Values file \"value1\" not found"))
+		})
+	})
+
+	Context("when the goal value is empty", func() {
+		BeforeEach(func() {
+			goal = ""
+			actual = []string{"value1", "value2", "value3"}
+		})
+
+		It("should return false and log the appropriate message", func() {
+			logBuffer := new(bytes.Buffer)
+			log.SetOutput(logBuffer)
+			defer log.SetOutput(os.Stderr)
+
+			result := compareHelmValueFile(goal, actual)
+			Expect(result).To(BeFalse())
+			Expect(logBuffer.String()).To(ContainSubstring("Values file \"\" not found"))
+		})
+	})
+
+	Context("when both the goal value and the actual slice are empty", func() {
+		BeforeEach(func() {
+			goal = ""
+			actual = []string{}
+		})
+
+		It("should return false and log the appropriate message", func() {
+			logBuffer := new(bytes.Buffer)
+			log.SetOutput(logBuffer)
+			defer log.SetOutput(os.Stderr)
+
+			result := compareHelmValueFile(goal, actual)
+			Expect(result).To(BeFalse())
+			Expect(logBuffer.String()).To(ContainSubstring("Values file \"\" not found"))
+		})
+	})
+})
+
+var _ = Describe("NewArgoCD", func() {
+	var (
+		name      string
+		namespace string
+		argoCD    *argooperator.ArgoCD
+	)
+
+	BeforeEach(func() {
+		name = "test-argocd"
+		namespace = "test-namespace"
+		argoCD = newArgoCD(name, namespace)
+	})
+
+	Context("when creating a new ArgoCD object", func() {
+		It("should have the correct metadata", func() {
+			Expect(argoCD.Name).To(Equal(name))
+			Expect(argoCD.Namespace).To(Equal(namespace))
+			Expect(argoCD.Kind).To(Equal("ArgoCD"))
+			Expect(argoCD.APIVersion).To(Equal("argoproj.io/v1beta1"))
+		})
+
+		It("should have the correct spec values", func() {
+			spec := argoCD.Spec
+
+			Expect(spec.ApplicationSet.Resources.Limits[v1.ResourceCPU]).To(Equal(resource.MustParse("2")))
+			Expect(spec.ApplicationSet.Resources.Limits[v1.ResourceMemory]).To(Equal(resource.MustParse("1Gi")))
+			Expect(spec.ApplicationSet.Resources.Requests[v1.ResourceCPU]).To(Equal(resource.MustParse("250m")))
+			Expect(spec.ApplicationSet.Resources.Requests[v1.ResourceMemory]).To(Equal(resource.MustParse("512Mi")))
+
+			Expect(spec.Controller.Resources.Limits[v1.ResourceCPU]).To(Equal(resource.MustParse("2")))
+			Expect(spec.Controller.Resources.Limits[v1.ResourceMemory]).To(Equal(resource.MustParse("2Gi")))
+			Expect(spec.Controller.Resources.Requests[v1.ResourceCPU]).To(Equal(resource.MustParse("250m")))
+			Expect(spec.Controller.Resources.Requests[v1.ResourceMemory]).To(Equal(resource.MustParse("1Gi")))
+
+			// Expect(spec.Grafana.Enabled).To(BeFalse()) // spec.Grafana is deprecated
+			Expect(spec.Monitoring.Enabled).To(BeFalse())
+			Expect(spec.Notifications.Enabled).To(BeFalse())
+			Expect(spec.Prometheus.Enabled).To(BeFalse())
+			Expect(spec.Server.Route.Enabled).To(BeTrue())
+
+			Expect(spec.RBAC.Policy).ToNot(BeNil())
+			Expect(spec.RBAC.Scopes).ToNot(BeNil())
+		})
+
+		It("should have the correct init containers", func() {
+			Expect(argoCD.Spec.Repo.InitContainers).To(HaveLen(1))
+			initContainer := argoCD.Spec.Repo.InitContainers[0]
+			Expect(initContainer.Name).To(Equal("fetch-ca"))
+			Expect(initContainer.Image).To(Equal("registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel9:latest"))
+		})
+
+		It("should have the correct volumes", func() {
+			Expect(argoCD.Spec.Repo.Volumes).To(HaveLen(3))
+			Expect(argoCD.Spec.Repo.Volumes[0].Name).To(Equal("kube-root-ca"))
+			Expect(argoCD.Spec.Repo.Volumes[1].Name).To(Equal("trusted-ca-bundle"))
+			Expect(argoCD.Spec.Repo.Volumes[2].Name).To(Equal("ca-bundles"))
+		})
+
+		It("should have the correct volume mounts", func() {
+			Expect(argoCD.Spec.Repo.VolumeMounts).To(HaveLen(1))
+			Expect(argoCD.Spec.Repo.VolumeMounts[0].Name).To(Equal("ca-bundles"))
+			Expect(argoCD.Spec.Repo.VolumeMounts[0].MountPath).To(Equal("/etc/pki/tls/certs"))
+		})
+
+		It("should have the correct server route TLS configuration", func() {
+			Expect(argoCD.Spec.Server.Route.TLS).ToNot(BeNil())
+			Expect(argoCD.Spec.Server.Route.TLS.Termination).To(Equal(routev1.TLSTerminationReencrypt))
+			Expect(argoCD.Spec.Server.Route.TLS.InsecureEdgeTerminationPolicy).To(Equal(routev1.InsecureEdgeTerminationPolicyRedirect))
+		})
+	})
+})
+
+var _ = Describe("haveArgo", func() {
+
+	var (
+		dynamicClient dynamic.Interface
+		kubeClient    *fake.Clientset
+
+		gvr       schema.GroupVersionResource
+		name      string
+		namespace string
+	)
+
+	BeforeEach(func() {
+		gvr = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+		kubeClient = fake.NewSimpleClientset()
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			gvr: "ArgoCDList",
+		})
+		name = argoName
+		namespace = argoNS
+	})
+
+	Context("when the ArgoCD instance exists", func() {
+		BeforeEach(func() {
+			argoCD := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "argoproj.io/v1beta1",
+					"kind":       "ArgoCD",
+					"metadata": map[string]any{
+						"name":      name,
+						"namespace": namespace,
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), argoCD, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return true", func() {
+			result := haveArgo(dynamicClient, name, namespace)
+			Expect(result).To(BeTrue())
+		})
+	})
+
+	Context("when the ArgoCD instance does not exist", func() {
+		It("should return false", func() {
+			result := haveArgo(dynamicClient, name, namespace)
+			Expect(result).To(BeFalse())
+		})
+	})
+
+	Context("when there is an error retrieving the ArgoCD instance", func() {
+		BeforeEach(func() {
+			kubeClient.PrependReactor("get", "argocds", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("get error")
+			})
+		})
+
+		It("should return false", func() {
+			result := haveArgo(dynamicClient, name, namespace)
+			Expect(result).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("CreateOrUpdateArgoCD", func() {
+	var (
+		dynamicClient dynamic.Interface
+		gvr           schema.GroupVersionResource
+		name          string
+		namespace     string
+	)
+
+	BeforeEach(func() {
+		gvr = schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			gvr: "ArgoCDList",
+		})
+		name = argoName
+		namespace = argoNS
+	})
+
+	Context("when the ArgoCD instance does not exist", func() {
+		It("should create a new ArgoCD instance", func() {
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(argoCD.GetName()).To(Equal(name))
+			Expect(argoCD.GetNamespace()).To(Equal(namespace))
+		})
+	})
+
+	Context("when the ArgoCD instance exists", func() {
+		BeforeEach(func() {
+			argoCD := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "argoproj.io/v1beta1",
+					"kind":       "ArgoCD",
+					"metadata": map[string]any{
+						"name":            name,
+						"namespace":       namespace,
+						"resourceVersion": "1",
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), argoCD, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should update the existing ArgoCD instance", func() {
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(argoCD.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
+		})
+	})
+})
+
+var _ = Describe("ConvertArgoHelmParametersToMap", func() {
+	Context("when the parameters list is empty", func() {
+		It("should return an empty map", func() {
+			params := []argoapi.HelmParameter{}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(BeEmpty())
+		})
+	})
+
+	Context("when the parameters list has single level keys", func() {
+		It("should return a map with the correct key-value pairs", func() {
+			params := []argoapi.HelmParameter{
+				{Name: "key1", Value: "value1"},
+				{Name: "key2", Value: "value2"},
+			}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(HaveKeyWithValue("key1", "value1"))
+			Expect(result).To(HaveKeyWithValue("key2", "value2"))
+		})
+	})
+
+	Context("when the parameters list has nested keys", func() {
+		It("should return a map with the correct nested structure", func() {
+			params := []argoapi.HelmParameter{
+				{Name: "key1.subkey1", Value: "value1"},
+				{Name: "key1.subkey2", Value: "value2"},
+				{Name: "key2.subkey1.subsubkey1", Value: "value3"},
+			}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(HaveKey("key1"))
+			Expect(result["key1"]).To(HaveKeyWithValue("subkey1", "value1"))
+			Expect(result["key1"]).To(HaveKeyWithValue("subkey2", "value2"))
+			Expect(result).To(HaveKey("key2"))
+			Expect(result["key2"]).To(HaveKey("subkey1"))
+			Expect(result["key2"].(map[string]any)["subkey1"]).To(HaveKeyWithValue("subsubkey1", "value3"))
+		})
+	})
+
+	Context("when the parameters list has mixed nested and non-nested keys", func() {
+		It("should return a map with the correct structure", func() {
+			params := []argoapi.HelmParameter{
+				{Name: "key1", Value: "value1"},
+				{Name: "key2.subkey1", Value: "value2"},
+				{Name: "key2.subkey2.subsubkey1", Value: "value3"},
+			}
+			result := convertArgoHelmParametersToMap(params)
+			Expect(result).To(HaveKeyWithValue("key1", "value1"))
+			Expect(result).To(HaveKey("key2"))
+			Expect(result["key2"]).To(HaveKeyWithValue("subkey1", "value2"))
+			Expect(result["key2"]).To(HaveKey("subkey2"))
+			Expect(result["key2"].(map[string]any)["subkey2"]).To(HaveKeyWithValue("subsubkey1", "value3"))
 		})
 	})
 })

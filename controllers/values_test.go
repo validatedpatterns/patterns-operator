@@ -155,3 +155,53 @@ func createTempValueFile(name string, content any) string {
 
 	return filePath
 }
+
+var _ = Describe("helmTpl", func() {
+	const (
+		templateString = "Hello, {{ .Values.name }}!"
+	)
+
+	It("should successfully render a template with inline values", func() {
+		values := map[string]any{"name": "World"}
+		valueFiles := []string{}
+
+		rendered, err := helmTpl(templateString, valueFiles, values)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rendered).To(Equal("Hello, World!"))
+	})
+
+	It("should successfully render a template with values from a values file", func() {
+		values := map[string]any{}
+		valueFiles := []string{"testdata/values.yaml"}
+
+		// Create a temporary values file
+		valuesFileContent := []byte("name: WorldFromFile")
+		_ = os.MkdirAll("testdata", os.ModePerm)
+		defer os.RemoveAll("testdata")
+		_ = os.WriteFile("testdata/values.yaml", valuesFileContent, 0600) //nolint:gosec
+
+		rendered, err := helmTpl(templateString, valueFiles, values)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rendered).To(Equal("Hello, WorldFromFile!"))
+	})
+
+	It("should handle missing values files gracefully", func() {
+		values := map[string]any{"name": "World"}
+		valueFiles := []string{"testdata/missing_values.yaml"}
+
+		rendered, err := helmTpl(templateString, valueFiles, values)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rendered).To(Equal("Hello, World!"))
+	})
+
+	It("should handle errors while preparing render values", func() {
+		values := map[string]any{"name": make(chan int)} // invalid value type
+		valueFiles := []string{}
+
+		rendered, err := helmTpl(templateString, valueFiles, values)
+
+		Expect(err).To(HaveOccurred())
+		Expect(rendered).To(BeEmpty())
+	})
+})

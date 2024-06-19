@@ -34,6 +34,34 @@ const (
 	GitOpsDefaultUseCSV = "false"
 )
 
+// Gitea chart defaults
+const (
+	// URL to the Validated Patterns Helm chart repo
+	GiteaHelmRepoUrl = "https://charts.validatedpatterns.io/"
+	// Repo name for the Validated Patterns Helm repo
+	GiteaRepoName = "helm-charts"
+	// Gitea chart name in the Validated Patterns repo
+	GiteaChartName = "gitea"
+	// Release name used by the Helm SDK
+	GiteaReleaseName = "gitea"
+	// Namespace for the Gitea resources
+	GiteaNamespace = "vp-gitea"
+	// Our gitea-chart default version (we stay on the latest 0.0.X version)
+	GiteaDefaultChartVersion = "0.0.*"
+	// Default Gitea Admin user
+	GiteaAdminUser = "gitea_admin"
+	// Gitea Admin Secrets name
+	GiteaAdminSecretName = "gitea-admin-secret" //nolint:gosec
+	// GiteaServer default name
+	GiteaServerDefaultName = "vp-gitea-instance"
+	// Gitea Route Name
+	GiteaRouteName = "gitea-route"
+	// Gitea Argo Application Name
+	GiteaApplicationName = "gitea-in-cluster"
+	// Gitea Default Random Password Length
+	GiteaDefaultPasswordLen = 15
+)
+
 // Experimental Capabilities that can be enabled
 // Currently none
 
@@ -44,6 +72,9 @@ var DefaultPatternOperatorConfig = map[string]string{
 	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
 	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
 	"gitops.ManualSync":          GitOpsDefaultManualSync,
+	"gitea.chartName":            GiteaChartName,
+	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
+	"gitea.chartVersion":         GiteaDefaultChartVersion,
 }
 
 type GitOpsConfig map[string]string
