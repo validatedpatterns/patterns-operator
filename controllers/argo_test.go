@@ -28,6 +28,7 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/testing"
+
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -861,7 +862,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 	)
 
 	BeforeEach(func() {
-		gvr = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
+		gvr = schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 			gvr: "ArgoCDList",
 		})
@@ -871,7 +872,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 
 	Context("when the ArgoCD instance does not exist", func() {
 		It("should create a new ArgoCD instance", func() {
-			err := createOrUpdateArgoCD(dynamicClient, name, namespace)
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -899,7 +900,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 		})
 
 		It("should update the existing ArgoCD instance", func() {
-			err := createOrUpdateArgoCD(dynamicClient, name, namespace)
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})

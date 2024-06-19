@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	routev1 "github.com/openshift/api/route/v1"
+	routefake "github.com/openshift/client-go/route/clientset/versioned/fake"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,9 +15,6 @@ import (
 	"k8s.io/client-go/testing"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	routev1 "github.com/openshift/api/route/v1"
-	routefake "github.com/openshift/client-go/route/clientset/versioned/fake"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
