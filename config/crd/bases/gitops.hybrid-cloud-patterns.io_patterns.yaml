@@ -89,17 +89,19 @@ spec:
                 type: object
               gitSpec:
                 properties:
-                  giteaEnabled:
-                    default: false
-                    description: Enable in-cluster gitea
-                    type: boolean
                   hostname:
                     description: Optional. FQDN of the git server if automatic parsing
                       from TargetRepo is broken
                     type: string
+                  inClusterGitServer:
+                    default: false
+                    description: Enable in-cluster git server (avoids the need of
+                      forking the upstream repository)
+                    type: boolean
                   originRepo:
-                    description: Upstream git repo containing the pattern to deploy.
-                      Used when in-cluster fork to point to the upstream pattern repository
+                    description: |-
+                      Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository.
+                      Takes precedence over TargetRepo
                     type: string
                   originRevision:
                     description: (DEPRECATED) Branch, tag or commit in the upstream

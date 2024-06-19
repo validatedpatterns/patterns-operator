@@ -59,9 +59,10 @@ spec:
       - description: Comma separated capabilities to enable certain experimental features
         displayName: Experimental Capabilities
         path: experimentalCapabilities
-      - description: Enable in-cluster gitea
-        displayName: Gitea Enabled
-        path: gitSpec.giteaEnabled
+      - description: Enable in-cluster git server (avoids the need of forking the
+          upstream repository)
+        displayName: In Cluster Git Server
+        path: gitSpec.inClusterGitServer
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
       - description: Git repo containing the pattern to deploy. Must use https/http
@@ -69,13 +70,14 @@ spec:
         displayName: Target Repo
         path: gitSpec.targetRepo
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:false
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:false
       - description: Upstream git repo containing the pattern to deploy. Used when
-          in-cluster fork to point to the upstream pattern repository
+          in-cluster fork to point to the upstream pattern repository. Takes precedence
+          over TargetRepo
         displayName: Origin Repo
         path: gitSpec.originRepo
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:true
+        - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:true
       - description: (DEPRECATED) Branch, tag or commit in the upstream git repository.
           Does not support short-sha's. Default to HEAD
         displayName: Origin Revision

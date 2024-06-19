@@ -87,23 +87,22 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
-	// Account              string `json:"account,omitempty"`
-
-	// Enable in-cluster gitea
+	// Enable in-cluster git server (avoids the need of forking the upstream repository)
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	// +kubebuilder:default:=false
-	GiteaEnabled *bool `json:"giteaEnabled,omitempty"`
+	InClusterGitServer *bool `json:"inClusterGitServer,omitempty"`
 
 	// Git repo containing the pattern to deploy. Must use https/http or, for ssh, git@server:foo/bar.git
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=12,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:false"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=12,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:false"}
 	TargetRepo string `json:"targetRepo,omitempty"`
 
 	// Branch, tag, or commit to deploy.  Does not support short-sha's. Default: HEAD
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16
 	TargetRevision string `json:"targetRevision,omitempty"`
 
-	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=14,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.giteaEnabled:true"}
+	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository.
+	// Takes precedence over TargetRepo
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=14,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:true"}
 	OriginRepo string `json:"originRepo,omitempty"`
 
 	// (DEPRECATED) Branch, tag or commit in the upstream git repository. Does not support short-sha's. Default to HEAD
