@@ -10,7 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
+	discoveryfake "k8s.io/client-go/discovery/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/testing"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -621,4 +624,68 @@ var _ = Describe("GetSecret", func() {
 			Expect(secret).To(BeNil())
 		})
 	})
+})
+
+// CustomClientset is a wrapper around fake.Clientset that overrides the Discovery method
+type CustomClientset struct {
+	*kubefake.Clientset
+	discovery *discoveryfake.FakeDiscovery
+}
+
+func (c *CustomClientset) Discovery() discovery.DiscoveryInterface {
+	return c.discovery
+}
+
+var _ = Describe("checkAPIVersion", func() {
+	var (
+		clientset *CustomClientset
+	)
+
+	BeforeEach(func() {
+		clientset = &CustomClientset{
+			Clientset: kubefake.NewSimpleClientset(),
+			discovery: &discoveryfake.FakeDiscovery{
+				Fake: &kubefake.NewSimpleClientset().Fake},
+		}
+	})
+
+	It("should return an error when the API group and version do not exist", func() {
+		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
+		Expect(err).To(Not(BeNil()))
+		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
+	})
+
+	It("should return nil when the API group and version exist", func() {
+		clientset.discovery.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, ArgoCDVersion),
+				APIResources: []metav1.APIResource{},
+			},
+		}
+
+		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
+		Expect(err).To(BeNil())
+	})
+
+	It("should return an error when the API group exists but the version does not", func() {
+		clientset.discovery.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, "v10"),
+				APIResources: []metav1.APIResource{},
+			},
+		}
+
+		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
+		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
+	})
+
+	// FIXME(bandini): Not working yet
+	// It("should return an error when there is an error fetching the API groups", func() {
+	// 	clientset.discovery.PrependReactor("*", "*", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+	// 		return true, nil, kubeerrors.NewInternalError(fmt.Errorf("discovery error"))
+	// 	})
+
+	// 	err := checkAPIVersion(clientset, "example.com", "v1")
+	// 	Expect(err).To(MatchError("failed to get API groups: discovery error"))
+	// })
 })
