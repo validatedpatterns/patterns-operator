@@ -307,10 +307,35 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return result, nil
 }
 
-// Returns true if something changed + the error
 func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	gitConfig := input.Spec.GitConfig
 	clusterWideNS := getClusterWideArgoNamespace()
+	// The reason we create the vp-gitea namespace and and the
+	// gitea-admin-secret is because otherwise it takes and extremely long time
+	// to reconcile everything because the reconcile loop will be waiting a long time
+	// for the namespace to show up and then the pod will take quite a while to retry
+	// with the gitea-admin-secret mounted into it
+	if !haveNamespace(r.Client, GiteaNamespace) {
+		err := createNamespace(r.fullClient, GiteaNamespace)
+		if err != nil {
+			return fmt.Errorf("error creating %s namespace: %v", GiteaNamespace, err)
+		}
+	}
+	var giteaAdminPassword string
+	giteaAdminPassword, err := GenerateRandomPassword(GiteaDefaultPasswordLen, DefaultRandRead)
+	if err != nil {
+		return fmt.Errorf("error Generating gitea_admin password: %v", err)
+	}
+
+	secretData := map[string][]byte{
+		"username": []byte(GiteaAdminUser),
+		"password": []byte(giteaAdminPassword),
+	}
+	giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
+	err = r.Client.Create(context.Background(), giteaAdminSecret)
+	if err != nil && !kerrors.IsAlreadyExists(err) {
+		return fmt.Errorf("could not create Gitea Admin Secret: %v", err)
+	}
 
 	log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
 	giteaApp := newArgoGiteaApplication(input)
@@ -338,23 +363,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	if !haveNamespace(r.Client, GiteaNamespace) {
 		return fmt.Errorf("waiting for giteanamespace creation")
 	}
-	// It is okay to create the gitea secret here because the pod won't start without it and when we're
-	// here we know that the gitea namespace has been created
-	var giteaAdminPassword string
-	giteaAdminPassword, err = GenerateRandomPassword(GiteaDefaultPasswordLen, DefaultRandRead)
-	if err != nil {
-		return fmt.Errorf("error Generating gitea_admin password: %v", err)
-	}
 
-	secretData := map[string][]byte{
-		"username": []byte(GiteaAdminUser),
-		"password": []byte(giteaAdminPassword),
-	}
-	giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
-	err = r.Client.Create(context.Background(), giteaAdminSecret)
-	if err != nil && !kerrors.IsAlreadyExists(err) {
-		return fmt.Errorf("could not create Gitea Admin Secret: %v", err)
-	}
 	// Here we need to call the gitea migration bits
 	// Let's get the GiteaServer route
 	giteaRouteURL, routeErr := getRoute(r.routeClient, GiteaRouteName, GiteaNamespace)

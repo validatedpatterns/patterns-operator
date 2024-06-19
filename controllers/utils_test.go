@@ -33,6 +33,7 @@ import (
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/testing"
 	//+kubebuilder:scaffold:imports
@@ -1010,5 +1011,60 @@ f3k4g5eL
 			Expect(transport).ToNot(BeNil())
 			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
 		})
+	})
+})
+
+var _ = Describe("createNamespace", func() {
+	var (
+		kubeClient kubernetes.Interface
+		namespace  string
+	)
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+		namespace = "test-ns"
+	})
+
+	It("should not return an error if the namespace already exists", func() {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}
+		_, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		err = createNamespace(kubeClient, namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should create the namespace if it does not exist", func() {
+		err := createNamespace(kubeClient, namespace)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = kubeClient.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return an error if there is an error checking if the namespace exists", func() {
+		kubeClient.(*fake.Clientset).PrependReactor("get", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, kubeerrors.NewInternalError(fmt.Errorf("internal error"))
+		})
+
+		err := createNamespace(kubeClient, namespace)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("internal error"))
+	})
+
+	It("should return an error if there is an error creating the namespace", func() {
+		kubeClient.(*fake.Clientset).PrependReactor("get", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, kubeerrors.NewNotFound(corev1.Resource("namespace"), namespace)
+		})
+		kubeClient.(*fake.Clientset).PrependReactor("create", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, kubeerrors.NewInternalError(fmt.Errorf("internal error"))
+		})
+		err := createNamespace(kubeClient, namespace)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("internal error"))
 	})
 })

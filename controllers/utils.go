@@ -211,6 +211,27 @@ func newSecret(name, namespace string, secret map[string][]byte, labels map[stri
 	return k8sSecret
 }
 
+func createNamespace(kubeClient kubernetes.Interface, namespace string) error {
+	// Create the namespace if it doesn't exist
+	_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
 func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) error {
 	name := "trusted-ca-bundle"
 	cm := &corev1.ConfigMap{
