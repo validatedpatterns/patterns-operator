@@ -56,9 +56,13 @@ spec:
           PII information
         displayName: Analytics UUID
         path: analyticsUUID
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Comma separated capabilities to enable certain experimental features
         displayName: Experimental Capabilities
         path: experimentalCapabilities
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Enable in-cluster git server (avoids the need of forking the
           upstream repository)
         displayName: In Cluster Git Server
@@ -127,12 +131,14 @@ spec:
         path: multiSourceConfig.helmRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: Which chart version for the clustergroup helm chart. Defaults
           to "0.8.*"
         displayName: Cluster Group Chart Version
         path: multiSourceConfig.clusterGroupChartVersion
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: The url when deploying the clustergroup helm chart directly from
           a git repo Defaults to '' which means not used (Only used when developing
           the clustergroup helm chart)
@@ -140,6 +146,7 @@ spec:
         path: multiSourceConfig.clusterGroupGitRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: The git reference when deploying the clustergroup helm chart
           directly from a git repo Defaults to 'main'. (Only used when developing
           the clustergroup helm chart)
@@ -147,6 +154,7 @@ spec:
         path: multiSourceConfig.clusterGroupChartGitRevision
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
+        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: 'Require manual intervention before Argo will sync new content.
           Default: False'
         displayName: Manual Sync

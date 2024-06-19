@@ -76,13 +76,13 @@ type PatternSpec struct {
 	ExtraValueFiles []string `json:"extraValueFiles,omitempty"`
 
 	// Analytics UUID. Leave empty to autogenerate a random one. Not PII information
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=9,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:advanced"}
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
 	// Look for external changes every N minutes
 	// ReconcileMinutes int    `json:"reconcileMinutes,omitempty"`
 
 	// Comma separated capabilities to enable certain experimental features
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=10,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:advanced"}
 	ExperimentalCapabilities string `json:"experimentalCapabilities,omitempty"`
 }
 
@@ -136,21 +136,21 @@ type MultiSourceConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// The helm chart url to fetch the helm charts from in order to deploy the pattern. Defaults to https://charts.validatedpatterns.io/
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=21,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=21,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	HelmRepoUrl string `json:"helmRepoUrl,omitempty"`
 
 	// Which chart version for the clustergroup helm chart. Defaults to "0.8.*"
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=22,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=22,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	ClusterGroupChartVersion string `json:"clusterGroupChartVersion,omitempty"`
 
 	// The url when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to '' which means not used (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=23,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=23,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	ClusterGroupGitRepoUrl string `json:"clusterGroupGitRepoUrl,omitempty"`
 
 	// The git reference when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to 'main'. (Only used when developing the clustergroup helm chart)
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=24,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true"}
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=24,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	// +kubebuilder:default:="main"
 	ClusterGroupChartGitRevision string `json:"clusterGroupChartGitRevision,omitempty"`
 }
