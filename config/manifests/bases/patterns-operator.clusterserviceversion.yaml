@@ -63,8 +63,8 @@ spec:
         path: experimentalCapabilities
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:advanced
-      - description: Enable in-cluster git server (avoids the need of forking the
-          upstream repository)
+      - description: (EXPERIMENTAL) Enable in-cluster git server (avoids the need
+          of forking the upstream repository)
         displayName: In Cluster Git Server
         path: gitSpec.inClusterGitServer
         x-descriptors:

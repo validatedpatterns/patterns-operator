@@ -87,7 +87,7 @@ type PatternSpec struct {
 }
 
 type GitConfig struct {
-	// Enable in-cluster git server (avoids the need of forking the upstream repository)
+	// (EXPERIMENTAL) Enable in-cluster git server (avoids the need of forking the upstream repository)
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=11,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	// +kubebuilder:default:=false
 	InClusterGitServer *bool `json:"inClusterGitServer,omitempty"`

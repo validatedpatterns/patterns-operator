@@ -153,8 +153,9 @@ Operator*. Install the operator from the source *Test Patterns Operator*.
 
 ### Releases
 
-As a first step, make sure you have already cloned the community-operators-prod via `git clone git@github.com:$USER/community-operators-prod.git`
-and that it is up-to-date:
+As a first step, make sure you have already cloned the community-operators-prod
+via `git clone git@github.com:$USER/community-operators-prod.git` and that it
+is up-to-date:
 ```
 # First make sure community-operators-prod is uptodate
 cd community-operators-prod
