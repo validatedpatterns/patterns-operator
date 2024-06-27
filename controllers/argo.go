@@ -396,27 +396,19 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Name:  "global.multiSourceSupport",
 			Value: strconv.FormatBool(*p.Spec.MultiSourceConfig.Enabled),
 		},
+		{
+			Name:  "global.multiSourceRepoUrl",
+			Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
+		},
+		{
+			Name:  "global.multiSourceTargetRevision",
+			Value: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
+		},
+		{
+			Name:  "global.experimentalCapabilities",
+			Value: p.Spec.ExperimentalCapabilities,
+		},
 	}
-
-	if *p.Spec.MultiSourceConfig.Enabled {
-		multiSourceParameters := []argoapi.HelmParameter{
-			{
-				Name:  "global.multiSourceRepoUrl",
-				Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
-			},
-			{
-				Name:  "global.multiSourceTargetRevision",
-				Value: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
-			},
-		}
-
-		parameters = append(parameters, multiSourceParameters...)
-	}
-
-	parameters = append(parameters, argoapi.HelmParameter{
-		Name:  "global.experimentalCapabilities",
-		Value: p.Spec.ExperimentalCapabilities,
-	})
 
 	for _, extra := range p.Spec.ExtraParameters {
 		if !updateHelmParameter(extra, parameters) {
