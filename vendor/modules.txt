@@ -4,8 +4,8 @@ cloud.google.com/go/compute/internal
 # cloud.google.com/go/compute/metadata v0.2.3
 ## explicit; go 1.19
 cloud.google.com/go/compute/metadata
-# code.gitea.io/sdk/gitea v0.15.1
-## explicit; go 1.13
+# code.gitea.io/sdk/gitea v0.18.0
+## explicit; go 1.18
 code.gitea.io/sdk/gitea
 # dario.cat/mergo v1.0.0
 ## explicit; go 1.13
@@ -154,6 +154,9 @@ github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/davidmz/go-pageant v1.0.2
+## explicit; go 1.16
+github.com/davidmz/go-pageant
 # github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
 ## explicit
 github.com/dgryski/go-rendezvous
@@ -194,6 +197,9 @@ github.com/fvbommel/sortorder
 # github.com/go-errors/errors v1.5.1
 ## explicit; go 1.14
 github.com/go-errors/errors
+# github.com/go-fed/httpsig v1.1.0
+## explicit; go 1.13
+github.com/go-fed/httpsig
 # github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376
 ## explicit; go 1.13
 github.com/go-git/gcfg
@@ -349,7 +355,7 @@ github.com/google/uuid
 # github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 ## explicit
 github.com/gregjones/httpcache
-# github.com/hashicorp/go-version v1.2.1
+# github.com/hashicorp/go-version v1.6.0
 ## explicit
 github.com/hashicorp/go-version
 # github.com/huandu/xstrings v1.3.3
@@ -640,15 +646,18 @@ go.uber.org/zap/zapcore
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blake2b
+golang.org/x/crypto/blake2s
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/cast5
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
+golang.org/x/crypto/ed25519
 golang.org/x/crypto/hkdf
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/ripemd160
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh
