@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/openshift/api/operator/v1alpha1"
+	operatorv1alpha1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -19,9 +21,9 @@ type FakeImageContentSourcePolicies struct {
 	Fake *FakeOperatorV1alpha1
 }
 
-var imagecontentsourcepoliciesResource = schema.GroupVersionResource{Group: "operator.openshift.io", Version: "v1alpha1", Resource: "imagecontentsourcepolicies"}
+var imagecontentsourcepoliciesResource = v1alpha1.SchemeGroupVersion.WithResource("imagecontentsourcepolicies")
 
-var imagecontentsourcepoliciesKind = schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1alpha1", Kind: "ImageContentSourcePolicy"}
+var imagecontentsourcepoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("ImageContentSourcePolicy")
 
 // Get takes name of the imageContentSourcePolicy, and returns the corresponding imageContentSourcePolicy object, and an error if there is any.
 func (c *FakeImageContentSourcePolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ImageContentSourcePolicy, err error) {
@@ -83,7 +85,7 @@ func (c *FakeImageContentSourcePolicies) Update(ctx context.Context, imageConten
 // Delete takes name of the imageContentSourcePolicy and deletes it. Returns an error if one occurs.
 func (c *FakeImageContentSourcePolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(imagecontentsourcepoliciesResource, name), &v1alpha1.ImageContentSourcePolicy{})
+		Invokes(testing.NewRootDeleteActionWithOptions(imagecontentsourcepoliciesResource, name, opts), &v1alpha1.ImageContentSourcePolicy{})
 	return err
 }
 
@@ -99,6 +101,27 @@ func (c *FakeImageContentSourcePolicies) DeleteCollection(ctx context.Context, o
 func (c *FakeImageContentSourcePolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ImageContentSourcePolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(imagecontentsourcepoliciesResource, name, pt, data, subresources...), &v1alpha1.ImageContentSourcePolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ImageContentSourcePolicy), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied imageContentSourcePolicy.
+func (c *FakeImageContentSourcePolicies) Apply(ctx context.Context, imageContentSourcePolicy *operatorv1alpha1.ImageContentSourcePolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ImageContentSourcePolicy, err error) {
+	if imageContentSourcePolicy == nil {
+		return nil, fmt.Errorf("imageContentSourcePolicy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(imageContentSourcePolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := imageContentSourcePolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("imageContentSourcePolicy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(imagecontentsourcepoliciesResource, *name, types.ApplyPatchType, data), &v1alpha1.ImageContentSourcePolicy{})
 	if obj == nil {
 		return nil, err
 	}

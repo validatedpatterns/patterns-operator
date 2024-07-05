@@ -48,6 +48,10 @@ func (c *FakeOperatorV1) IngressControllers(namespace string) v1.IngressControll
 	return &FakeIngressControllers{c, namespace}
 }
 
+func (c *FakeOperatorV1) InsightsOperators() v1.InsightsOperatorInterface {
+	return &FakeInsightsOperators{c}
+}
+
 func (c *FakeOperatorV1) KubeAPIServers() v1.KubeAPIServerInterface {
 	return &FakeKubeAPIServers{c}
 }
@@ -62,6 +66,10 @@ func (c *FakeOperatorV1) KubeSchedulers() v1.KubeSchedulerInterface {
 
 func (c *FakeOperatorV1) KubeStorageVersionMigrators() v1.KubeStorageVersionMigratorInterface {
 	return &FakeKubeStorageVersionMigrators{c}
+}
+
+func (c *FakeOperatorV1) MachineConfigurations() v1.MachineConfigurationInterface {
+	return &FakeMachineConfigurations{c}
 }
 
 func (c *FakeOperatorV1) Networks() v1.NetworkInterface {
