@@ -25,4 +25,4 @@ jobs:
               echo "Key is set"
               echo "${KEY}" > "${APIFILE}"
           fi
-          make docker-build
+          make USE_IMAGE_DIGESTS=true docker-build
