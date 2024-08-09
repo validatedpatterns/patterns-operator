@@ -54,7 +54,7 @@ jobs:
               echo "Key is set"
               echo "${KEY}" > "${APIFILE}"
           fi
-          make docker-build
+          make USE_IMAGE_DIGESTS=true docker-build
           echo "${{ secrets.QUAY_ROBOT_TOKEN }}" | docker login -u="${{ secrets.QUAY_ROBOT_USER }}" --password-stdin quay.io
           docker images
           docker push "${REPO}:${VERSION}"
