@@ -181,6 +181,13 @@ git push <upstream-remote> $VERSION
 # triggered when pushing a numeric tag (x.y.z). So check the result of the 'vp-patterns/update-quay-image'
 # GH action.
 
+# IMPORTANT: Run the following and commit it as well
+git co -b "update-bundle-${VERSION}"
+CHANNELS=fast USE_IMAGE_DIGESTS=true make bundle
+gh pr create
+# Merge the PR
+git co main
+
 # Sync the bundle/ folder to the community-operators-prod git repo
 rsync -va bundle/ ../community-operators-prod/operators/patterns-operator/$VERSION
 ```
