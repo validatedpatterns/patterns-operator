@@ -168,7 +168,7 @@ Then switch to the `patterns-operator` git folder, define the version and create
 cd ../patterns-operator
 export VERSION=0.0.5
 git checkout -b "patterns-operator-v$VERSION"
-CHANNELS=fast make bundle
+CHANNELS=fast USE_IMAGE_DIGESTS=true make bundle
 git commit -a -m "Upgrade version to ${VERSION}"
 gh pr create
 # Merge the PR

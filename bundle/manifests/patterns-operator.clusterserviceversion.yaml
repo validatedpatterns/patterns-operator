@@ -481,6 +481,4 @@ spec:
       name: kube-rbac-proxy
     - image: quay.io/hybridcloudpatterns/patterns-operator@sha256:e09fbb38429be15a57d675f03e1748fbce95b5545e0cdf28028e76ca4921751a
       name: manager
-    - image: quay.io/hybridcloudpatterns/patterns-operator@sha256:92f5e9e077a7766240d7d5afdce2032f030b89d3e4983ae099ef0208cea86723
-      name: patterns-operator-92f5e9e077a7766240d7d5afdce2032f030b89d3e4983ae099ef0208cea86723-annotation
   version: 0.0.53
