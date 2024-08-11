@@ -8,7 +8,7 @@ require (
 	code.gitea.io/sdk/gitea v0.18.0
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/argoproj-labs/argocd-operator v0.11.0
-	github.com/argoproj/argo-cd/v2 v2.11.4
+	github.com/argoproj/argo-cd/v2 v2.11.6
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-logr/logr v1.4.2
@@ -41,7 +41,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20240702153804-5995eca2fb63 // indirect
+	github.com/argoproj/gitops-engine v0.7.1-0.20240715141605-18ba62e1f1fb // indirect
 	github.com/argoproj/pkg v0.13.7-0.20230626144333-d56162821bd1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
