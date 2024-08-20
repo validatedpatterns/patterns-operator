@@ -181,7 +181,8 @@ git push <upstream-remote> $VERSION
 # triggered when pushing a numeric tag (x.y.z). So check the result of the 'vp-patterns/update-quay-image'
 # GH action.
 
-# IMPORTANT: Run the following and commit it as well
+# IMPORTANT: Run the following and commit it as well. This will generate a larger diff because some tool is a bit buggy
+# and changes the indent depending on USE_IMAGE_DIGESTS
 git co -b "update-bundle-${VERSION}"
 CHANNELS=fast USE_IMAGE_DIGESTS=true make bundle
 gh pr create
