@@ -6,6 +6,7 @@
 VERSION ?= 0.0.4
 OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
+GOLANGCI_VERSION ?= 1.60.2
 
 # CI uses a non-writable home dir, make sure .cache is writable
 ifeq ("${HOME}", "/")
@@ -152,7 +153,7 @@ docker-push: ## Push docker image with the manager.
 
 .PHONY: golangci-lint
 golangci-lint: apikey ## Run golangci-lint locally
-	podman run --pull=newer --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v1.59.1 golangci-lint run -v
+	podman run --pull=newer --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v$(GOLANGCI_VERSION) golangci-lint run -v
 
 ##@ Deployment
 
