@@ -61,14 +61,12 @@ func (g *GiteaOperationsImpl) MigrateGiteaRepo(
 	description := fmt.Sprintf(descriptionFormat, repoName)
 
 	repository, _, err = giteaClient.MigrateRepo(gitea.MigrateRepoOption{
-		CloneAddr: upstreamURL,
-		RepoOwner: username,
-		RepoName:  repoName,
-		Mirror:    true, // We want gitea to periodically check for changes so create a mirror
-		// Private:     true, // TODO: uncomment this if you want the repo to be private on gitea
+		CloneAddr:   upstreamURL,
+		RepoOwner:   username,
+		RepoName:    repoName,
+		Mirror:      false, // We do not create a mirror because of https://www.github.com/go-gitea/gitea/issues/7609
 		Description: description,
 	})
-
 	if err != nil {
 		return false, "", err
 	}
