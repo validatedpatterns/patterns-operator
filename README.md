@@ -168,7 +168,7 @@ Then switch to the `patterns-operator` git folder, define the version and create
 cd ../patterns-operator
 export VERSION=0.0.5
 git checkout -b "patterns-operator-v$VERSION"
-CHANNELS=fast USE_IMAGE_DIGESTS=true make bundle
+CHANNELS=fast make bundle
 git commit -a -m "Upgrade version to ${VERSION}"
 gh pr create
 # Merge the PR
@@ -185,6 +185,7 @@ git push <upstream-remote> $VERSION
 # and changes the indent depending on USE_IMAGE_DIGESTS
 git co -b "update-bundle-${VERSION}"
 CHANNELS=fast USE_IMAGE_DIGESTS=true make bundle
+git commit -a -m "Update bundle for image digests ${VERSION}"
 gh pr create
 # Merge the PR
 git co main
