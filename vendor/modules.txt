@@ -4,7 +4,7 @@ cloud.google.com/go/compute/internal
 # cloud.google.com/go/compute/metadata v0.2.3
 ## explicit; go 1.19
 cloud.google.com/go/compute/metadata
-# code.gitea.io/sdk/gitea v0.18.0
+# code.gitea.io/sdk/gitea v0.19.0
 ## explicit; go 1.18
 code.gitea.io/sdk/gitea
 # dario.cat/mergo v1.0.0
