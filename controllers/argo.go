@@ -361,6 +361,10 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Value: p.Spec.GitConfig.TargetRepo,
 		},
 		{
+			Name:  "global.originURL",
+			Value: p.Spec.GitConfig.OriginRepo,
+		},
+		{
 			Name:  "global.targetRevision",
 			Value: p.Spec.GitConfig.TargetRevision,
 		},

@@ -359,6 +359,10 @@ var _ = Describe("Argo Pattern", func() {
 						ForceString: false,
 					},
 					{
+						Name:  "global.originURL",
+						Value: "",
+					},
+					{
 						Name:        "global.targetRevision",
 						Value:       "main",
 						ForceString: false,
