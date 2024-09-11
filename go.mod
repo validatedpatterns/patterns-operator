@@ -6,7 +6,7 @@ toolchain go1.22.5
 
 require (
 	code.gitea.io/sdk/gitea v0.19.0
-	github.com/Masterminds/semver/v3 v3.2.1
+	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/argoproj-labs/argocd-operator v0.11.0
 	github.com/argoproj/argo-cd/v2 v2.11.7
 	github.com/go-errors/errors v1.5.1
