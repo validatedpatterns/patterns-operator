@@ -19,7 +19,7 @@ package chartutil
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -68,7 +68,7 @@ func (v Values) Table(name string) (Values, error) {
 //
 // It protects against nil map panics.
 func (v Values) AsMap() map[string]interface{} {
-	if v == nil || len(v) == 0 {
+	if len(v) == 0 {
 		return map[string]interface{}{}
 	}
 	return v
@@ -114,7 +114,7 @@ func ReadValues(data []byte) (vals Values, err error) {
 
 // ReadValuesFile will parse a YAML file into a map of values.
 func ReadValuesFile(filename string) (Values, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return map[string]interface{}{}, err
 	}
@@ -135,6 +135,13 @@ type ReleaseOptions struct {
 //
 // This takes both ReleaseOptions and Capabilities to merge into the render values.
 func ToRenderValues(chrt *chart.Chart, chrtVals map[string]interface{}, options ReleaseOptions, caps *Capabilities) (Values, error) {
+	return ToRenderValuesWithSchemaValidation(chrt, chrtVals, options, caps, false)
+}
+
+// ToRenderValuesWithSchemaValidation composes the struct from the data coming from the Releases, Charts and Values files
+//
+// This takes both ReleaseOptions and Capabilities to merge into the render values.
+func ToRenderValuesWithSchemaValidation(chrt *chart.Chart, chrtVals map[string]interface{}, options ReleaseOptions, caps *Capabilities, skipSchemaValidation bool) (Values, error) {
 	if caps == nil {
 		caps = DefaultCapabilities
 	}
@@ -156,9 +163,11 @@ func ToRenderValues(chrt *chart.Chart, chrtVals map[string]interface{}, options 
 		return top, err
 	}
 
-	if err := ValidateAgainstSchema(chrt, vals); err != nil {
-		errFmt := "values don't meet the specifications of the schema(s) in the following chart(s):\n%s"
-		return top, fmt.Errorf(errFmt, err.Error())
+	if !skipSchemaValidation {
+		if err := ValidateAgainstSchema(chrt, vals); err != nil {
+			errFmt := "values don't meet the specifications of the schema(s) in the following chart(s):\n%s"
+			return top, fmt.Errorf(errFmt, err.Error())
+		}
 	}
 
 	top["Values"] = vals
