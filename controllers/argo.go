@@ -50,9 +50,10 @@ const (
 
 func newArgoCD(name, namespace string) *argooperator.ArgoCD {
 	argoPolicy := `g, system:cluster-admins, role:admin
-g, cluster-admins, role:admin`
-	defaultPolicy := ""
-	argoScopes := "[groups]"
+g, cluster-admins, role:admin
+g, admin, role:admin`
+	defaultPolicy := "role:readonly"
+	argoScopes := "[groups,email]"
 	trueBool := true
 	initVolumes := []v1.Volume{
 		{
