@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,7 +47,7 @@ func NewReactionForwardingClientsetDecorator(objects []runtime.Object, options .
 
 	// Swap out the embedded ReactionChain with a Reactor that reduces over the decorator's ReactionChain.
 	decorator.ReactionChain = decorator.Clientset.ReactionChain
-	decorator.Clientset.ReactionChain = []testing.Reactor{&testing.SimpleReactor{"*", "*", decorator.reduceReactions}}
+	decorator.Clientset.ReactionChain = []testing.Reactor{&testing.SimpleReactor{Verb: "*", Resource: "*", Reaction: decorator.reduceReactions}}
 
 	// Apply options
 	for _, option := range options {
@@ -81,5 +81,5 @@ func (c *ReactionForwardingClientsetDecorator) reduceReactions(action testing.Ac
 
 // PrependReactor adds a reactor to the beginning of the chain.
 func (c *ReactionForwardingClientsetDecorator) PrependReactor(verb, resource string, reaction testing.ReactionFunc) {
-	c.ReactionChain = append([]testing.Reactor{&testing.SimpleReactor{verb, resource, reaction}}, c.ReactionChain...)
+	c.ReactionChain = append([]testing.Reactor{&testing.SimpleReactor{Verb: verb, Resource: resource, Reaction: reaction}}, c.ReactionChain...)
 }

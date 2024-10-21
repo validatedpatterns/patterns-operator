@@ -36,16 +36,6 @@ rules:
   - argoproj.io
   resources:
   - applications
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-- apiGroups:
-  - argoproj.io
-  resources:
   - argocds
   verbs:
   - create
@@ -58,19 +48,7 @@ rules:
   - config.openshift.io
   resources:
   - clusterversions
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - config.openshift.io
-  resources:
   - infrastructures
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - config.openshift.io
-  resources:
   - ingresses
   verbs:
   - get
