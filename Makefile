@@ -139,6 +139,11 @@ apikey: ## Generates an empty apikey file if one does not exist already
 build: apikey generate fmt vet ## Build manager binary.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh
 
+.PHONY: clean
+clean: ## Remove build artifacts and downloaded tools
+	find bin/ -exec chmod +w "{}" \;
+	rm -rf ./manager ./bin/*
+
 .PHONY: run
 run: apikey manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
