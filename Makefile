@@ -14,7 +14,7 @@ HOME=/tmp
 export HOME=/tmp
 endif
 
-APIKEYFILE ?= controllers/apikey.txt
+APIKEYFILE ?= internal/controller/apikey.txt
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -66,7 +66,7 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.24
+ENVTEST_K8S_VERSION = 1.30
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -139,6 +139,11 @@ apikey: ## Generates an empty apikey file if one does not exist already
 build: apikey generate fmt vet ## Build manager binary.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh
 
+.PHONY: clean
+clean: ## Remove build artifacts and downloaded tools
+	find bin/ -exec chmod +w "{}" \;
+	rm -rf ./manager ./bin/*
+
 .PHONY: run
 run: apikey manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
@@ -188,9 +193,9 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
-OPERATOR_SDK_VERSION ?= v1.30.0
+KUSTOMIZE_VERSION ?= v5.4.3
+CONTROLLER_TOOLS_VERSION ?= v0.16.4
+OPERATOR_SDK_VERSION ?= v1.37.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 
@@ -222,7 +227,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 
 .PHONY: envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.16)
+	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
