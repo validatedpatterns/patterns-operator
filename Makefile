@@ -14,7 +14,7 @@ HOME=/tmp
 export HOME=/tmp
 endif
 
-APIKEYFILE ?= controllers/apikey.txt
+APIKEYFILE ?= internal/controller/apikey.txt
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
