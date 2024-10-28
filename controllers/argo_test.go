@@ -417,13 +417,13 @@ var _ = Describe("Argo Pattern", func() {
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
-						Name:        "global.multiSourceTargetRevision",
-						Value:       "0.0.*",
+						Name:        "global.experimentalCapabilities",
+						Value:       "",
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
-						Name:        "global.experimentalCapabilities",
-						Value:       "",
+						Name:        "global.multiSourceTargetRevision",
+						Value:       "0.0.*",
 						ForceString: false,
 					},
 				)))
@@ -451,13 +451,13 @@ var _ = Describe("Argo Pattern", func() {
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
-						Name:        "global.multiSourceTargetRevision",
-						Value:       "0.0.*",
+						Name:        "global.experimentalCapabilities",
+						Value:       "",
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
-						Name:        "global.experimentalCapabilities",
-						Value:       "",
+						Name:        "global.multiSourceTargetRevision",
+						Value:       "0.0.*",
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
@@ -482,14 +482,15 @@ var _ = Describe("Argo Pattern", func() {
 						Name:  "global.multiSourceRepoUrl",
 						Value: "https://charts.validatedpatterns.io/",
 					},
-					argoapi.HelmParameter{
-						Name:  "global.multiSourceTargetRevision",
-						Value: "0.0.*",
-					},
+
 					argoapi.HelmParameter{
 						Name:        "global.experimentalCapabilities",
 						Value:       "",
 						ForceString: false,
+					},
+					argoapi.HelmParameter{
+						Name:  "global.multiSourceTargetRevision",
+						Value: "0.0.*",
 					})))
 			})
 		})

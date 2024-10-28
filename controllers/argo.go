@@ -405,16 +405,16 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Name:  "global.multiSourceRepoUrl",
 			Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
 		},
-		{
-			Name:  "global.multiSourceTargetRevision",
-			Value: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
-		},
+
 		{
 			Name:  "global.experimentalCapabilities",
 			Value: p.Spec.ExperimentalCapabilities,
 		},
 	}
-
+	parameters = append(parameters, argoapi.HelmParameter{
+		Name:  "global.multiSourceTargetRevision",
+		Value: getClusterGroupChartVersion(p),
+	})
 	for _, extra := range p.Spec.ExtraParameters {
 		if !updateHelmParameter(extra, parameters) {
 			log.Printf("Parameter %q = %q added", extra.Name, extra.Value)
@@ -675,10 +675,12 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	// If we do not specify a custom repo for the clustergroup chart, let's use the default
 	// clustergroup chart from the helm repo url. Otherwise use the git repo that was given
 	if p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl == "" {
+		// If the user set the clustergroupchart version use that
+
 		baseSource = &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
 			Chart:          "clustergroup",
-			TargetRevision: p.Spec.MultiSourceConfig.ClusterGroupChartVersion,
+			TargetRevision: getClusterGroupChartVersion(p),
 			Helm:           commonApplicationSourceHelm(p, "$patternref"),
 		}
 	} else {
@@ -694,6 +696,20 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	spec := commonApplicationSpec(p, sources)
 	spec.SyncPolicy = commonSyncPolicy(p)
 	return newArgoOperatorApplication(p, spec)
+}
+
+func getClusterGroupChartVersion(p *api.Pattern) string {
+	var clusterGroupChartVersion string
+	if p.Spec.MultiSourceConfig.ClusterGroupChartVersion != "" {
+		clusterGroupChartVersion = p.Spec.MultiSourceConfig.ClusterGroupChartVersion
+	} else { // if the user has not specified anything, then let's detect if common is slimmed
+		if IsCommonSlimmed(p.Status.LocalCheckoutPath) {
+			clusterGroupChartVersion = "0.9.*"
+		} else {
+			clusterGroupChartVersion = "0.8.*"
+		}
+	}
+	return clusterGroupChartVersion
 }
 
 func newArgoApplication(p *api.Pattern) *argoapi.Application {
