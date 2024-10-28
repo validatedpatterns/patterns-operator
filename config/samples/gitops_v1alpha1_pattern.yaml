@@ -7,5 +7,6 @@ spec:
   gitSpec:
     targetRepo: "https://github.com/validatedpatterns/multicloud-gitops"
     targetRevision: "main"
-    multiSourceSupport: false
+  multiSourceConfig:
+    enabled: true
 

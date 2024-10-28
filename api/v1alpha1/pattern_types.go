@@ -151,7 +151,6 @@ type MultiSourceConfig struct {
 	// The git reference when deploying the clustergroup helm chart directly from a git repo
 	// Defaults to 'main'. (Only used when developing the clustergroup helm chart)
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=24,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true","urn:alm:descriptor:com.tectonic.ui:advanced"}
-	// +kubebuilder:default:="main"
 	ClusterGroupChartGitRevision string `json:"clusterGroupChartGitRevision,omitempty"`
 }
 

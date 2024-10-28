@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"crypto/rand"
@@ -393,4 +394,13 @@ func GenerateRandomPassword(length int, randRead func([]byte) (int, error)) (str
 
 func DefaultRandRead(b []byte) (int, error) {
 	return rand.Read(b)
+}
+
+// This function returns true if common is the slimmed version and false if it is not
+func IsCommonSlimmed(patternPath string) bool {
+	fullPath := filepath.Join(patternPath, "common", "operator-install")
+	if _, err := os.Stat(fullPath); err == nil {
+		return false
+	}
+	return true
 }
