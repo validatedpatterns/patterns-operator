@@ -790,7 +790,7 @@ var _ = Describe("NewArgoCD", func() {
 			Expect(argoCD.Spec.Repo.InitContainers).To(HaveLen(1))
 			initContainer := argoCD.Spec.Repo.InitContainers[0]
 			Expect(initContainer.Name).To(Equal("fetch-ca"))
-			Expect(initContainer.Image).To(Equal("registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel9:latest"))
+			Expect(initContainer.Image).To(Equal("registry.redhat.io/ubi9/ubi-minimal:latest"))
 		})
 
 		It("should have the correct volumes", func() {
