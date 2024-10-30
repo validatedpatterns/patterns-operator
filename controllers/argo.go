@@ -94,7 +94,7 @@ g, admin, role:admin`
 	initContainers := []v1.Container{
 		{
 			Name:  "fetch-ca",
-			Image: "registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel9:latest",
+			Image: "registry.redhat.io/ubi9/ubi-minimal:latest",
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "kube-root-ca",
