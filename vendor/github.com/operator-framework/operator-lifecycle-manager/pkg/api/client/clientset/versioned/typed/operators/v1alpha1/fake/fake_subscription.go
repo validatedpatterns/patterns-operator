@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,28 +35,30 @@ type FakeSubscriptions struct {
 	ns   string
 }
 
-var subscriptionsResource = schema.GroupVersionResource{Group: "operators.coreos.com", Version: "v1alpha1", Resource: "subscriptions"}
+var subscriptionsResource = v1alpha1.SchemeGroupVersion.WithResource("subscriptions")
 
-var subscriptionsKind = schema.GroupVersionKind{Group: "operators.coreos.com", Version: "v1alpha1", Kind: "Subscription"}
+var subscriptionsKind = v1alpha1.SchemeGroupVersion.WithKind("Subscription")
 
 // Get takes name of the subscription, and returns the corresponding subscription object, and an error if there is any.
 func (c *FakeSubscriptions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Subscription, err error) {
+	emptyResult := &v1alpha1.Subscription{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(subscriptionsResource, c.ns, name), &v1alpha1.Subscription{})
+		Invokes(testing.NewGetActionWithOptions(subscriptionsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Subscription), err
 }
 
 // List takes label and field selectors, and returns the list of Subscriptions that match those selectors.
 func (c *FakeSubscriptions) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.SubscriptionList, err error) {
+	emptyResult := &v1alpha1.SubscriptionList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(subscriptionsResource, subscriptionsKind, c.ns, opts), &v1alpha1.SubscriptionList{})
+		Invokes(testing.NewListActionWithOptions(subscriptionsResource, subscriptionsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -76,40 +77,43 @@ func (c *FakeSubscriptions) List(ctx context.Context, opts v1.ListOptions) (resu
 // Watch returns a watch.Interface that watches the requested subscriptions.
 func (c *FakeSubscriptions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(subscriptionsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(subscriptionsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a subscription and creates it.  Returns the server's representation of the subscription, and an error, if there is any.
 func (c *FakeSubscriptions) Create(ctx context.Context, subscription *v1alpha1.Subscription, opts v1.CreateOptions) (result *v1alpha1.Subscription, err error) {
+	emptyResult := &v1alpha1.Subscription{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(subscriptionsResource, c.ns, subscription), &v1alpha1.Subscription{})
+		Invokes(testing.NewCreateActionWithOptions(subscriptionsResource, c.ns, subscription, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Subscription), err
 }
 
 // Update takes the representation of a subscription and updates it. Returns the server's representation of the subscription, and an error, if there is any.
 func (c *FakeSubscriptions) Update(ctx context.Context, subscription *v1alpha1.Subscription, opts v1.UpdateOptions) (result *v1alpha1.Subscription, err error) {
+	emptyResult := &v1alpha1.Subscription{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(subscriptionsResource, c.ns, subscription), &v1alpha1.Subscription{})
+		Invokes(testing.NewUpdateActionWithOptions(subscriptionsResource, c.ns, subscription, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Subscription), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSubscriptions) UpdateStatus(ctx context.Context, subscription *v1alpha1.Subscription, opts v1.UpdateOptions) (*v1alpha1.Subscription, error) {
+func (c *FakeSubscriptions) UpdateStatus(ctx context.Context, subscription *v1alpha1.Subscription, opts v1.UpdateOptions) (result *v1alpha1.Subscription, err error) {
+	emptyResult := &v1alpha1.Subscription{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(subscriptionsResource, "status", c.ns, subscription), &v1alpha1.Subscription{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(subscriptionsResource, "status", c.ns, subscription, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Subscription), err
 }
@@ -117,14 +121,14 @@ func (c *FakeSubscriptions) UpdateStatus(ctx context.Context, subscription *v1al
 // Delete takes name of the subscription and deletes it. Returns an error if one occurs.
 func (c *FakeSubscriptions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(subscriptionsResource, c.ns, name), &v1alpha1.Subscription{})
+		Invokes(testing.NewDeleteActionWithOptions(subscriptionsResource, c.ns, name, opts), &v1alpha1.Subscription{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeSubscriptions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(subscriptionsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(subscriptionsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.SubscriptionList{})
 	return err
@@ -132,11 +136,12 @@ func (c *FakeSubscriptions) DeleteCollection(ctx context.Context, opts v1.Delete
 
 // Patch applies the patch and returns the patched subscription.
 func (c *FakeSubscriptions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Subscription, err error) {
+	emptyResult := &v1alpha1.Subscription{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(subscriptionsResource, c.ns, name, pt, data, subresources...), &v1alpha1.Subscription{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(subscriptionsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Subscription), err
 }

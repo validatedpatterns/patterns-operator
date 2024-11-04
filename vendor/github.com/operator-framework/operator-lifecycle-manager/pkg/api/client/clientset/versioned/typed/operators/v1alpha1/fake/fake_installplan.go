@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,28 +35,30 @@ type FakeInstallPlans struct {
 	ns   string
 }
 
-var installplansResource = schema.GroupVersionResource{Group: "operators.coreos.com", Version: "v1alpha1", Resource: "installplans"}
+var installplansResource = v1alpha1.SchemeGroupVersion.WithResource("installplans")
 
-var installplansKind = schema.GroupVersionKind{Group: "operators.coreos.com", Version: "v1alpha1", Kind: "InstallPlan"}
+var installplansKind = v1alpha1.SchemeGroupVersion.WithKind("InstallPlan")
 
 // Get takes name of the installPlan, and returns the corresponding installPlan object, and an error if there is any.
 func (c *FakeInstallPlans) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.InstallPlan, err error) {
+	emptyResult := &v1alpha1.InstallPlan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(installplansResource, c.ns, name), &v1alpha1.InstallPlan{})
+		Invokes(testing.NewGetActionWithOptions(installplansResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.InstallPlan), err
 }
 
 // List takes label and field selectors, and returns the list of InstallPlans that match those selectors.
 func (c *FakeInstallPlans) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.InstallPlanList, err error) {
+	emptyResult := &v1alpha1.InstallPlanList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(installplansResource, installplansKind, c.ns, opts), &v1alpha1.InstallPlanList{})
+		Invokes(testing.NewListActionWithOptions(installplansResource, installplansKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -76,40 +77,43 @@ func (c *FakeInstallPlans) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested installPlans.
 func (c *FakeInstallPlans) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(installplansResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(installplansResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a installPlan and creates it.  Returns the server's representation of the installPlan, and an error, if there is any.
 func (c *FakeInstallPlans) Create(ctx context.Context, installPlan *v1alpha1.InstallPlan, opts v1.CreateOptions) (result *v1alpha1.InstallPlan, err error) {
+	emptyResult := &v1alpha1.InstallPlan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(installplansResource, c.ns, installPlan), &v1alpha1.InstallPlan{})
+		Invokes(testing.NewCreateActionWithOptions(installplansResource, c.ns, installPlan, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.InstallPlan), err
 }
 
 // Update takes the representation of a installPlan and updates it. Returns the server's representation of the installPlan, and an error, if there is any.
 func (c *FakeInstallPlans) Update(ctx context.Context, installPlan *v1alpha1.InstallPlan, opts v1.UpdateOptions) (result *v1alpha1.InstallPlan, err error) {
+	emptyResult := &v1alpha1.InstallPlan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(installplansResource, c.ns, installPlan), &v1alpha1.InstallPlan{})
+		Invokes(testing.NewUpdateActionWithOptions(installplansResource, c.ns, installPlan, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.InstallPlan), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeInstallPlans) UpdateStatus(ctx context.Context, installPlan *v1alpha1.InstallPlan, opts v1.UpdateOptions) (*v1alpha1.InstallPlan, error) {
+func (c *FakeInstallPlans) UpdateStatus(ctx context.Context, installPlan *v1alpha1.InstallPlan, opts v1.UpdateOptions) (result *v1alpha1.InstallPlan, err error) {
+	emptyResult := &v1alpha1.InstallPlan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(installplansResource, "status", c.ns, installPlan), &v1alpha1.InstallPlan{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(installplansResource, "status", c.ns, installPlan, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.InstallPlan), err
 }
@@ -117,14 +121,14 @@ func (c *FakeInstallPlans) UpdateStatus(ctx context.Context, installPlan *v1alph
 // Delete takes name of the installPlan and deletes it. Returns an error if one occurs.
 func (c *FakeInstallPlans) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(installplansResource, c.ns, name), &v1alpha1.InstallPlan{})
+		Invokes(testing.NewDeleteActionWithOptions(installplansResource, c.ns, name, opts), &v1alpha1.InstallPlan{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeInstallPlans) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(installplansResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(installplansResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.InstallPlanList{})
 	return err
@@ -132,11 +136,12 @@ func (c *FakeInstallPlans) DeleteCollection(ctx context.Context, opts v1.DeleteO
 
 // Patch applies the patch and returns the patched installPlan.
 func (c *FakeInstallPlans) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.InstallPlan, err error) {
+	emptyResult := &v1alpha1.InstallPlan{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(installplansResource, c.ns, name, pt, data, subresources...), &v1alpha1.InstallPlan{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(installplansResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.InstallPlan), err
 }

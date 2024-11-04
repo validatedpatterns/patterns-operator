@@ -44,7 +44,7 @@ jobs:
           set -e
           export VERSION=$(yq -r '.spec.version' bundle/manifests/patterns-operator.clusterserviceversion.yaml)
           export REPO="quay.io/hybridcloudpatterns/patterns-operator"
-          export APIFILE="controllers/apikey.txt"
+          export APIFILE="internal/controller/apikey.txt"
           trap "rm -f ${APIFILE}" SIGINT EXIT
 
           if [ -z "${KEY}" ]; then

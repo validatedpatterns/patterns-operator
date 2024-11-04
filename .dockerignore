@@ -4,3 +4,4 @@ bin/
 testbin/
 apikey.txt
 controllers/apikey.txt
+internal/controller/apikey.txt

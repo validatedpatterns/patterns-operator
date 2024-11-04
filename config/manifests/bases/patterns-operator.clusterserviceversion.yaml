@@ -44,7 +44,9 @@ spec:
         path: gitSpec
       - displayName: Multi Source Config
         path: multiSourceConfig
-      - description: '.Name is dot separated per the helm --set syntax, such as: global.something.field'
+      - description: |-
+          .Name is dot separated per the helm --set syntax, such as:
+            global.something.field
         displayName: Extra Parameters
         path: extraParameters
       - description: URLs to additional Helm parameter files
@@ -75,9 +77,9 @@ spec:
         path: gitSpec.targetRepo
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:false
-      - description: Upstream git repo containing the pattern to deploy. Used when
-          in-cluster fork to point to the upstream pattern repository. Takes precedence
-          over TargetRepo
+      - description: |-
+          Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository.
+          Takes precedence over TargetRepo
         displayName: Origin Repo
         path: gitSpec.originRepo
         x-descriptors:
@@ -105,9 +107,9 @@ spec:
         path: gitSpec.hostname
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:advanced
-      - description: Optional. K8s secret name where the info for connecting to git
-          can be found. The supported secrets are modeled after the private repositories
-          in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
+      - description: |-
+          Optional. K8s secret name where the info for connecting to git can be found. The supported secrets are modeled after the
+          private repositories in argo (https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#repositories)
           currently ssh and username+password are supported
         displayName: Token Secret
         path: gitSpec.tokenSecret
@@ -139,17 +141,17 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
         - urn:alm:descriptor:com.tectonic.ui:advanced
-      - description: The url when deploying the clustergroup helm chart directly from
-          a git repo Defaults to '' which means not used (Only used when developing
-          the clustergroup helm chart)
+      - description: |-
+          The url when deploying the clustergroup helm chart directly from a git repo
+          Defaults to '' which means not used (Only used when developing the clustergroup helm chart)
         displayName: Cluster Group Git Repo Url
         path: multiSourceConfig.clusterGroupGitRepoUrl
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:fieldDependency:multiSourceConfig.enabled:true
         - urn:alm:descriptor:com.tectonic.ui:advanced
-      - description: The git reference when deploying the clustergroup helm chart
-          directly from a git repo Defaults to 'main'. (Only used when developing
-          the clustergroup helm chart)
+      - description: |-
+          The git reference when deploying the clustergroup helm chart directly from a git repo
+          Defaults to 'main'. (Only used when developing the clustergroup helm chart)
         displayName: Cluster Group Chart Git Revision
         path: multiSourceConfig.clusterGroupChartGitRevision
         x-descriptors:
