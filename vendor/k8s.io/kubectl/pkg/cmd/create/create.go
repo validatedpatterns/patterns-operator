@@ -33,7 +33,6 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -52,7 +51,9 @@ type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunStrategy          cmdutil.DryRunStrategy
+	DryRunVerifier          *resource.QueryParamVerifier
+	FieldValidationVerifier *resource.QueryParamVerifier
 
 	ValidationDirective string
 
@@ -66,7 +67,7 @@ type CreateOptions struct {
 	Recorder genericclioptions.Recorder
 	PrintObj func(obj kruntime.Object) error
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 var (
@@ -87,7 +88,7 @@ var (
 )
 
 // NewCreateOptions returns an initialized CreateOptions instance
-func NewCreateOptions(ioStreams genericiooptions.IOStreams) *CreateOptions {
+func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -99,7 +100,7 @@ func NewCreateOptions(ioStreams genericiooptions.IOStreams) *CreateOptions {
 }
 
 // NewCmdCreate returns new initialized instance of create sub command
-func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -109,6 +110,12 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 		Long:                  createLong,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
+				ioStreams.ErrOut.Write([]byte("Error: must specify one of -f and -k\n\n"))
+				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
+				defaultRunFunc(cmd, args)
+				return
+			}
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunCreate(f, cmd))
@@ -153,12 +160,8 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 	return cmd
 }
 
-// Validate makes sure there is no discrepancy in command options
+// Validate makes sure there is no discrepency in command options
 func (o *CreateOptions) Validate() error {
-	if err := o.FilenameOptions.RequireFilenameOrKustomize(); err != nil {
-		return err
-	}
-
 	if len(o.Raw) > 0 {
 		if o.EditBeforeCreate {
 			return fmt.Errorf("--raw and --edit are mutually exclusive")
@@ -203,6 +206,12 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
 	if err != nil {
@@ -237,7 +246,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return RunEditOnCreate(f, o.PrintFlags, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions, o.fieldManager)
 	}
 
-	schema, err := f.Validator(o.ValidationDirective)
+	schema, err := f.Validator(o.ValidationDirective, o.FieldValidationVerifier)
 	if err != nil {
 		return err
 	}
@@ -275,6 +284,11 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 
 		if o.DryRunStrategy != cmdutil.DryRunClient {
+			if o.DryRunStrategy == cmdutil.DryRunServer {
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return cmdutil.AddSourceToErr("creating", info.Source, err)
+				}
+			}
 			obj, err := resource.
 				NewHelper(info.Client, info.Mapping).
 				DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
@@ -301,7 +315,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 // RunEditOnCreate performs edit on creation
-func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags, recordFlags *genericclioptions.RecordFlags, ioStreams genericiooptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions, fieldManager string) error {
+func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions, fieldManager string) error {
 	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
 	editOptions.FilenameOptions = *options
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
@@ -345,6 +359,7 @@ type CreateSubcommandOptions struct {
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator generate.StructuredGenerator
 	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
 	CreateAnnotation    bool
 	FieldManager        string
 	ValidationDirective string
@@ -357,11 +372,11 @@ type CreateSubcommandOptions struct {
 
 	PrintObj printers.ResourcePrinterFunc
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewCreateSubcommandOptions returns initialized CreateSubcommandOptions
-func NewCreateSubcommandOptions(ioStreams genericiooptions.IOStreams) *CreateSubcommandOptions {
+func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -381,6 +396,11 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
@@ -451,6 +471,9 @@ func (o *CreateSubcommandOptions) Run() error {
 		createOptions.FieldValidation = o.ValidationDirective
 
 		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+				return err
+			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(context.TODO(), asUnstructured, createOptions)

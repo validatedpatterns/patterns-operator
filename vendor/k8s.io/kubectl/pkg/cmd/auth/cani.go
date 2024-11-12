@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -62,7 +63,7 @@ type CanIOptions struct {
 	ResourceName   string
 	List           bool
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
 }
 
@@ -83,10 +84,6 @@ var (
 		# Check to see if I can list deployments in my current namespace
 		kubectl auth can-i list deployments.apps
 
-		# Check to see if service account "foo" of namespace "dev" can list pods in the namespace "prod"
-		# You must be allowed to use impersonation for the global option "--as"
-		kubectl auth can-i list pods --as=system:serviceaccount:dev:foo -n prod
-
 		# Check to see if I can do everything in my current namespace ("*" means all)
 		kubectl auth can-i '*' '*'
 
@@ -99,20 +96,17 @@ var (
 		# Check to see if I can access the URL /logs/
 		kubectl auth can-i get /logs/
 
-		# Check to see if I can approve certificates.k8s.io
-		kubectl auth can-i approve certificates.k8s.io
-
 		# List all allowed actions in namespace "foo"
 		kubectl auth can-i --list --namespace=foo`)
 
-	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*", "approve")
+	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*")
 	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
 	// holds all the server-supported resources that cannot be discovered by clients. i.e. users and groups for the impersonate verb
 	nonStandardResourceNames = sets.NewString("users", "groups")
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
-func NewCmdCanI(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
 		IOStreams: streams,
 	}
@@ -163,7 +157,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		}
 	} else {
 		if o.Quiet {
-			o.Out = io.Discard
+			o.Out = ioutil.Discard
 		}
 
 		switch len(args) {
@@ -185,7 +179,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		default:
 			errString := "you must specify two arguments: verb resource or verb resource/resourceName."
 			usageString := "See 'kubectl auth can-i -h' for help and examples."
-			return fmt.Errorf("%s\n%s", errString, usageString)
+			return errors.New(fmt.Sprintf("%s\n%s", errString, usageString))
 		}
 	}
 

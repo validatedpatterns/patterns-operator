@@ -47,17 +47,8 @@ type Thread struct {
 	// See example_test.go for some example implementations of Load.
 	Load func(thread *Thread, module string) (StringDict, error)
 
-	// OnMaxSteps is called when the thread reaches the limit set by SetMaxExecutionSteps.
-	// The default behavior is to call thread.Cancel("too many steps").
-	OnMaxSteps func(thread *Thread)
-
-	// Steps a count of abstract computation steps executed
-	// by this thread. It is incremented by the interpreter. It may be used
-	// as a measure of the approximate cost of Starlark execution, by
-	// computing the difference in its value before and after a computation.
-	//
-	// The precise meaning of "step" is not specified and may change.
-	Steps, maxSteps uint64
+	// steps counts abstract computation steps executed by this thread.
+	steps, maxSteps uint64
 
 	// cancelReason records the reason from the first call to Cancel.
 	cancelReason *string
@@ -70,26 +61,22 @@ type Thread struct {
 	proftime time.Duration
 }
 
-// ExecutionSteps returns the current value of Steps.
+// ExecutionSteps returns a count of abstract computation steps executed
+// by this thread. It is incremented by the interpreter. It may be used
+// as a measure of the approximate cost of Starlark execution, by
+// computing the difference in its value before and after a computation.
+//
+// The precise meaning of "step" is not specified and may change.
 func (thread *Thread) ExecutionSteps() uint64 {
-	return thread.Steps
+	return thread.steps
 }
 
 // SetMaxExecutionSteps sets a limit on the number of Starlark
 // computation steps that may be executed by this thread. If the
 // thread's step counter exceeds this limit, the interpreter calls
-// the optional OnMaxSteps function or the default behavior
-// of calling thread.Cancel("too many steps").
+// thread.Cancel("too many steps").
 func (thread *Thread) SetMaxExecutionSteps(max uint64) {
 	thread.maxSteps = max
-}
-
-// Uncancel resets the cancellation state.
-//
-// Unlike most methods of Thread, it is safe to call Uncancel from any
-// goroutine, even if the thread is actively executing.
-func (thread *Thread) Uncancel() {
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason)), nil)
 }
 
 // Cancel causes execution of Starlark code in the specified thread to
@@ -97,7 +84,7 @@ func (thread *Thread) Uncancel() {
 // There may be a delay before the interpreter observes the cancellation
 // if the thread is currently in a call to a built-in function.
 //
-// Call [Uncancel] to reset the cancellation state.
+// Cancellation cannot be undone.
 //
 // Unlike most methods of Thread, it is safe to call Cancel from any
 // goroutine, even if the thread is actively executing.
@@ -1044,12 +1031,6 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 			if y, ok := y.(Int); ok {
 				return x.Or(y), nil
 			}
-
-		case *Dict: // union
-			if y, ok := y.(*Dict); ok {
-				return x.Union(y), nil
-			}
-
 		case *Set: // union
 			if y, ok := y.(*Set); ok {
 				iter := Iterate(y)
@@ -1070,10 +1051,10 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 				if x.Len() > y.Len() {
 					x, y = y, x // opt: range over smaller set
 				}
-				for xe := x.ht.head; xe != nil; xe = xe.next {
+				for _, xelem := range x.elems() {
 					// Has, Insert cannot fail here.
-					if found, _ := y.Has(xe.key); found {
-						set.Insert(xe.key)
+					if found, _ := y.Has(xelem); found {
+						set.Insert(xelem)
 					}
 				}
 				return set, nil
@@ -1089,14 +1070,14 @@ func Binary(op syntax.Token, x, y Value) (Value, error) {
 		case *Set: // symmetric difference
 			if y, ok := y.(*Set); ok {
 				set := new(Set)
-				for xe := x.ht.head; xe != nil; xe = xe.next {
-					if found, _ := y.Has(xe.key); !found {
-						set.Insert(xe.key)
+				for _, xelem := range x.elems() {
+					if found, _ := y.Has(xelem); !found {
+						set.Insert(xelem)
 					}
 				}
-				for ye := y.ht.head; ye != nil; ye = ye.next {
-					if found, _ := x.Has(ye.key); !found {
-						set.Insert(ye.key)
+				for _, yelem := range y.elems() {
+					if found, _ := x.Has(yelem); !found {
+						set.Insert(yelem)
 					}
 				}
 				return set, nil
@@ -1233,22 +1214,8 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 	fr.callable = c
 
 	thread.beginProfSpan()
-
-	// Use defer to ensure that panics from built-ins
-	// pass through the interpreter without leaving
-	// it in a bad state.
-	defer func() {
-		thread.endProfSpan()
-
-		// clear out any references
-		// TODO(adonovan): opt: zero fr.Locals and
-		// reuse it if it is large enough.
-		*fr = frame{}
-
-		thread.stack = thread.stack[:len(thread.stack)-1] // pop
-	}()
-
 	result, err := c.CallInternal(thread, args, kwargs)
+	thread.endProfSpan()
 
 	// Sanity check: nil is not a valid Starlark value.
 	if result == nil && err == nil {
@@ -1261,6 +1228,9 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 			err = thread.evalError(err)
 		}
 	}
+
+	*fr = frame{}                                     // clear out any references
+	thread.stack = thread.stack[:len(thread.stack)-1] // pop
 
 	return result, err
 }

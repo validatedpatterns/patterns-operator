@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/ptr"
+	"k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -84,11 +84,13 @@ func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 		}
 		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
 			// Set default MaxUnavailable as 1 by default.
-			updateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
+			maxUnavailable := intstr.FromInt(1)
+			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if updateStrategy.RollingUpdate.MaxSurge == nil {
 			// Set default MaxSurge as 0 by default.
-			updateStrategy.RollingUpdate.MaxSurge = ptr.To(intstr.FromInt32(0))
+			maxSurge := intstr.FromInt(0)
+			updateStrategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
@@ -115,11 +117,12 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 		obj.Spec.UpdateStrategy.RollingUpdate != nil {
 
 		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.Partition = ptr.To[int32](0)
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = pointer.Int32(0)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
 			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
+				maxUnavailable := intstr.FromInt(1)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 			}
 		}
 	}

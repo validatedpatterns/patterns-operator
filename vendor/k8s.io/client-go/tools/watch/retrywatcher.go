@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -54,7 +54,6 @@ type RetryWatcher struct {
 	stopChan            chan struct{}
 	doneChan            chan struct{}
 	minRestartDelay     time.Duration
-	stopChanLock        sync.Mutex
 }
 
 // NewRetryWatcher creates a new RetryWatcher.
@@ -192,7 +191,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				errObject := apierrors.FromObject(event.Object)
 				statusErr, ok := errObject.(*apierrors.StatusError)
 				if !ok {
-					klog.Error(fmt.Sprintf("Received an error which is not *metav1.Status but %s", dump.Pretty(event.Object)))
+					klog.Error(spew.Sprintf("Received an error which is not *metav1.Status but %#+v", event.Object))
 					// Retry unknown errors
 					return false, 0
 				}
@@ -221,7 +220,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 					// Log here so we have a record of hitting the unexpected error
 					// and we can whitelist some error codes if we missed any that are expected.
-					klog.V(5).Info(fmt.Sprintf("Retrying after unexpected error: %s", dump.Pretty(event.Object)))
+					klog.V(5).Info(spew.Sprintf("Retrying after unexpected error: %#+v", event.Object))
 
 					// Retry
 					return false, statusDelay
@@ -288,15 +287,7 @@ func (rw *RetryWatcher) ResultChan() <-chan watch.Event {
 
 // Stop implements Interface.
 func (rw *RetryWatcher) Stop() {
-	rw.stopChanLock.Lock()
-	defer rw.stopChanLock.Unlock()
-
-	// Prevent closing an already closed channel to prevent a panic
-	select {
-	case <-rw.stopChan:
-	default:
-		close(rw.stopChan)
-	}
+	close(rw.stopChan)
 }
 
 // Done allows the caller to be notified when Retry watcher stops.

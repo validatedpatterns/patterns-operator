@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -67,13 +67,14 @@ type QuotaOpts struct {
 
 	Client              *coreclient.CoreV1Client
 	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewQuotaOpts creates a new *QuotaOpts with sane defaults
-func NewQuotaOpts(ioStreams genericiooptions.IOStreams) *QuotaOpts {
+func NewQuotaOpts(ioStreams genericclioptions.IOStreams) *QuotaOpts {
 	return &QuotaOpts{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -81,7 +82,7 @@ func NewQuotaOpts(ioStreams genericiooptions.IOStreams) *QuotaOpts {
 }
 
 // NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewQuotaOpts(ioStreams)
 
 	cmd := &cobra.Command{
@@ -132,6 +133,11 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 	if err != nil {
 		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -183,6 +189,9 @@ func (o *QuotaOpts) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(resourceQuota.GroupVersionKind()); err != nil {
+				return err
+			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		resourceQuota, err = o.Client.ResourceQuotas(o.Namespace).Create(context.TODO(), resourceQuota, createOptions)

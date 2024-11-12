@@ -29,8 +29,8 @@ import (
 	goruntime "runtime"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
-	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -69,7 +68,8 @@ type EditOptions struct {
 	WindowsLineEndings bool
 
 	cmdutil.ValidateOptions
-	ValidationDirective string
+	ValidationDirective     string
+	FieldValidationVerifier *resource.QueryParamVerifier
 
 	OriginalResult *resource.Result
 
@@ -81,7 +81,7 @@ type EditOptions struct {
 
 	managedFields map[types.UID][]metav1.ManagedFieldsEntry
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 
 	Recorder            genericclioptions.Recorder
 	f                   cmdutil.Factory
@@ -94,7 +94,7 @@ type EditOptions struct {
 }
 
 // NewEditOptions returns an initialized EditOptions instance
-func NewEditOptions(editMode EditMode, ioStreams genericiooptions.IOStreams) *EditOptions {
+func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *EditOptions {
 	return &EditOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -217,6 +217,12 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 		return o.PrintFlags.ToPrinter()
 	}
 
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
+
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
 	if err != nil {
 		return err
@@ -316,7 +322,7 @@ func (o *EditOptions) Run() error {
 			klog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.ValidationDirective)
+			schema, err := o.f.Validator(o.ValidationDirective, o.FieldValidationVerifier)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}

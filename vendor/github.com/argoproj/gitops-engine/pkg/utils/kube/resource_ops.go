@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -155,9 +154,6 @@ func kubeCmdFactory(kubeconfig, ns string, config *rest.Config) cmdutil.Factory 
 	kubeConfigFlags.KubeConfig = &kubeconfig
 	kubeConfigFlags.WithDiscoveryBurst(config.Burst)
 	kubeConfigFlags.WithDiscoveryQPS(config.QPS)
-	kubeConfigFlags.Impersonate = &config.Impersonate.UserName
-	kubeConfigFlags.ImpersonateUID = &config.Impersonate.UID
-	kubeConfigFlags.ImpersonateGroup = &config.Impersonate.Groups
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	return cmdutil.NewFactory(matchVersionKubeConfigFlags)
 }
@@ -196,7 +192,7 @@ func (k *kubectlResourceOperations) CreateResource(ctx context.Context, obj *uns
 		}
 		defer cleanup()
 
-		createOptions, err := k.newCreateOptions(ioStreams, fileName, dryRunStrategy)
+		createOptions, err := k.newCreateOptions(k.config, ioStreams, fileName, dryRunStrategy)
 		if err != nil {
 			return err
 		}
@@ -270,11 +266,11 @@ func (k *kubectlResourceOperations) ApplyResource(ctx context.Context, obj *unst
 }
 
 func (k *kubectlResourceOperations) newApplyOptions(ioStreams genericclioptions.IOStreams, obj *unstructured.Unstructured, fileName string, validate bool, force, serverSideApply bool, dryRunStrategy cmdutil.DryRunStrategy, manager string, serverSideDiff bool) (*apply.ApplyOptions, error) {
-	flags := apply.NewApplyFlags(ioStreams)
+	flags := apply.NewApplyFlags(k.fact, ioStreams)
 	o := &apply.ApplyOptions{
 		IOStreams:         ioStreams,
-		VisitedUids:       sets.Set[types.UID]{},
-		VisitedNamespaces: sets.Set[string]{},
+		VisitedUids:       sets.NewString(),
+		VisitedNamespaces: sets.NewString(),
 		Recorder:          genericclioptions.NoopRecorder{},
 		PrintFlags:        flags.PrintFlags,
 		Overwrite:         true,
@@ -290,14 +286,14 @@ func (k *kubectlResourceOperations) newApplyOptions(ioStreams genericclioptions.
 	if err != nil {
 		return nil, err
 	}
-	o.OpenAPIGetter = k.fact
-	o.DryRunStrategy = dryRunStrategy
-	o.FieldManager = manager
+	o.OpenAPISchema = k.openAPISchema
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, k.fact.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, k.fact.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	validateDirective := metav1.FieldValidationIgnore
 	if validate {
 		validateDirective = metav1.FieldValidationStrict
 	}
-	o.Validator, err = k.fact.Validator(validateDirective)
+	o.Validator, err = k.fact.Validator(validateDirective, o.DryRunVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +343,7 @@ func (k *kubectlResourceOperations) newApplyOptions(ioStreams genericclioptions.
 	return o, nil
 }
 
-func (k *kubectlResourceOperations) newCreateOptions(ioStreams genericclioptions.IOStreams, fileName string, dryRunStrategy cmdutil.DryRunStrategy) (*create.CreateOptions, error) {
+func (k *kubectlResourceOperations) newCreateOptions(config *rest.Config, ioStreams genericclioptions.IOStreams, fileName string, dryRunStrategy cmdutil.DryRunStrategy) (*create.CreateOptions, error) {
 	o := create.NewCreateOptions(ioStreams)
 
 	recorder, err := o.RecordFlags.ToRecorder()
@@ -355,6 +351,14 @@ func (k *kubectlResourceOperations) newCreateOptions(ioStreams genericclioptions
 		return nil, err
 	}
 	o.Recorder = recorder
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, k.fact.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, k.fact.OpenAPIGetter(), resource.QueryParamFieldValidation)
 
 	switch dryRunStrategy {
 	case cmdutil.DryRunClient:
@@ -400,6 +404,8 @@ func (k *kubectlResourceOperations) newReplaceOptions(config *rest.Config, f cmd
 		return nil, err
 	}
 
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, k.fact.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, k.fact.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	o.Builder = func() *resource.Builder {
 		return f.NewBuilder()
 	}

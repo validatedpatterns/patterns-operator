@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -63,7 +63,7 @@ var (
 
 	ingressExample = templates.Examples(i18n.T(`
 		# Create a single ingress called 'simple' that directs requests to foo.com/bar to svc
-		# svc1:8080 with a TLS secret "my-cert"
+		# svc1:8080 with a tls secret "my-cert"
 		kubectl create ingress simple --rule="foo.com/bar=svc1:8080,tls=my-cert"
 
 		# Create a catch all ingress of "/path" pointing to service svc:port and Ingress Class as "otheringress"
@@ -118,15 +118,16 @@ type CreateIngressOptions struct {
 
 	Client              networkingv1client.NetworkingV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
 	FieldManager string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // NewCreateIngressOptions creates the CreateIngressOptions to be used later
-func NewCreateIngressOptions(ioStreams genericiooptions.IOStreams) *CreateIngressOptions {
+func NewCreateIngressOptions(ioStreams genericclioptions.IOStreams) *CreateIngressOptions {
 	return &CreateIngressOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -135,7 +136,7 @@ func NewCreateIngressOptions(ioStreams genericiooptions.IOStreams) *CreateIngres
 
 // NewCmdCreateIngress is a macro command to create a new ingress.
 // This command is better known to users as `kubectl create ingress`.
-func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateIngressOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -194,6 +195,11 @@ func (o *CreateIngressOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -253,6 +259,9 @@ func (o *CreateIngressOptions) Run() error {
 		}
 		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(ingress.GroupVersionKind()); err != nil {
+				return err
+			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error

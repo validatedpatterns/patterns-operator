@@ -18,6 +18,7 @@ package replace
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -77,8 +77,10 @@ type ReplaceOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRunStrategy      cmdutil.DryRunStrategy
-	validationDirective string
+	DryRunStrategy          cmdutil.DryRunStrategy
+	DryRunVerifier          *resource.QueryParamVerifier
+	FieldValidationVerifier *resource.QueryParamVerifier
+	validationDirective     string
 
 	PrintObj func(obj runtime.Object) error
 
@@ -96,12 +98,12 @@ type ReplaceOptions struct {
 
 	Subresource string
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 
 	fieldManager string
 }
 
-func NewReplaceOptions(streams genericiooptions.IOStreams) *ReplaceOptions {
+func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
 		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to replace."),
@@ -110,7 +112,7 @@ func NewReplaceOptions(streams genericiooptions.IOStreams) *ReplaceOptions {
 	}
 }
 
-func NewCmdReplace(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewReplaceOptions(streams)
 
 	cmd := &cobra.Command{
@@ -164,6 +166,8 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -197,7 +201,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	schema, err := f.Validator(o.validationDirective)
+	schema, err := f.Validator(o.validationDirective, o.FieldValidationVerifier)
 	if err != nil {
 		return err
 	}
@@ -300,6 +304,11 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		if o.DryRunStrategy == cmdutil.DryRunClient {
 			return o.PrintObj(info.Object)
 		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
 
 		// Serialize the object with the annotation applied.
 		obj, err := resource.
@@ -322,7 +331,7 @@ func (o *ReplaceOptions) forceReplace() error {
 	stdinInUse := false
 	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
-			tempDir, err := os.MkdirTemp("", "kubectl_replace_")
+			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
 			if err != nil {
 				return err
 			}

@@ -31,12 +31,6 @@ func LookupContainerPortNumberByName(pod v1.Pod, name string) (int32, error) {
 			}
 		}
 	}
-	for _, ctr := range pod.Spec.InitContainers {
-		for _, ctrportspec := range ctr.Ports {
-			if ctrportspec.Name == name {
-				return ctrportspec.ContainerPort, nil
-			}
-		}
-	}
+
 	return int32(-1), fmt.Errorf("Pod '%s' does not have a named port '%s'", pod.Name, name)
 }

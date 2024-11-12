@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -51,13 +50,14 @@ type SetLastAppliedOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
+	dryRunVerifier               *resource.QueryParamVerifier
 	shortOutput                  bool
 	output                       string
 	patchBufferList              []PatchBuffer
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 // PatchBuffer caches changes that are to be applied.
@@ -85,7 +85,7 @@ var (
 )
 
 // NewSetLastAppliedOptions takes option arguments from a CLI stream and returns it at SetLastAppliedOptions type.
-func NewSetLastAppliedOptions(ioStreams genericiooptions.IOStreams) *SetLastAppliedOptions {
+func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastAppliedOptions {
 	return &SetLastAppliedOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("configured").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -93,7 +93,7 @@ func NewSetLastAppliedOptions(ioStreams genericiooptions.IOStreams) *SetLastAppl
 }
 
 // NewCmdApplySetLastApplied creates the cobra CLI `apply` subcommand `set-last-applied`.`
-func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSetLastAppliedOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "set-last-applied -f FILENAME",
@@ -124,6 +124,11 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	if err != nil {
 		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
@@ -202,6 +207,11 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
+			}
+			if o.dryRunStrategy == cmdutil.DryRunServer {
+				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+					return err
+				}
 			}
 			helper := resource.
 				NewHelper(client, mapping).

@@ -1,4 +1,3 @@
-//go:build windows
 // +build windows
 
 package windowsconsole
@@ -30,11 +29,8 @@ func GetHandleInfo(in interface{}) (uintptr, bool) {
 
 // IsConsole returns true if the given file descriptor is a Windows Console.
 // The code assumes that GetConsoleMode will return an error for file descriptors that are not a console.
-//
-// Deprecated: use [windows.GetConsoleMode] or [golang.org/x/term.IsTerminal].
-func IsConsole(fd uintptr) bool {
-	return isConsole(fd)
-}
+// Deprecated: use golang.org/x/sys/windows.GetConsoleMode() or golang.org/x/term.IsTerminal()
+var IsConsole = isConsole
 
 func isConsole(fd uintptr) bool {
 	var mode uint32

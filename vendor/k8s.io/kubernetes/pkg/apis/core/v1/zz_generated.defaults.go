@@ -48,7 +48,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*v1.PersistentVolumeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*v1.Pod)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*v1.PodList)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodStatusResult{}, func(obj interface{}) { SetObjectDefaults_PodStatusResult(obj.(*v1.PodStatusResult)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*v1.PodTemplate)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*v1.PodTemplateList)) })
 	scheme.AddTypeDefaultingFunc(&v1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*v1.ReplicationController)) })
@@ -137,46 +136,16 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		SetDefaults_HostPathVolumeSource(in.Spec.PersistentVolumeSource.HostPath)
 	}
 	if in.Spec.PersistentVolumeSource.RBD != nil {
-		if in.Spec.PersistentVolumeSource.RBD.RBDPool == "" {
-			in.Spec.PersistentVolumeSource.RBD.RBDPool = "rbd"
-		}
-		if in.Spec.PersistentVolumeSource.RBD.RadosUser == "" {
-			in.Spec.PersistentVolumeSource.RBD.RadosUser = "admin"
-		}
-		if in.Spec.PersistentVolumeSource.RBD.Keyring == "" {
-			in.Spec.PersistentVolumeSource.RBD.Keyring = "/etc/ceph/keyring"
-		}
+		SetDefaults_RBDPersistentVolumeSource(in.Spec.PersistentVolumeSource.RBD)
 	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
-		if in.Spec.PersistentVolumeSource.ISCSI.ISCSIInterface == "" {
-			in.Spec.PersistentVolumeSource.ISCSI.ISCSIInterface = "default"
-		}
+		SetDefaults_ISCSIPersistentVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
 	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
-		if in.Spec.PersistentVolumeSource.AzureDisk.CachingMode == nil {
-			ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
-			in.Spec.PersistentVolumeSource.AzureDisk.CachingMode = &ptrVar1
-		}
-		if in.Spec.PersistentVolumeSource.AzureDisk.FSType == nil {
-			var ptrVar1 string = "ext4"
-			in.Spec.PersistentVolumeSource.AzureDisk.FSType = &ptrVar1
-		}
-		if in.Spec.PersistentVolumeSource.AzureDisk.ReadOnly == nil {
-			var ptrVar1 bool = false
-			in.Spec.PersistentVolumeSource.AzureDisk.ReadOnly = &ptrVar1
-		}
-		if in.Spec.PersistentVolumeSource.AzureDisk.Kind == nil {
-			ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
-			in.Spec.PersistentVolumeSource.AzureDisk.Kind = &ptrVar1
-		}
+		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
 	}
 	if in.Spec.PersistentVolumeSource.ScaleIO != nil {
-		if in.Spec.PersistentVolumeSource.ScaleIO.StorageMode == "" {
-			in.Spec.PersistentVolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
-		}
-		if in.Spec.PersistentVolumeSource.ScaleIO.FSType == "" {
-			in.Spec.PersistentVolumeSource.ScaleIO.FSType = "xfs"
-		}
+		SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.PersistentVolumeSource.ScaleIO)
 	}
 }
 
@@ -216,20 +185,10 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
-				a.VolumeSource.ISCSI.ISCSIInterface = "default"
-			}
+			SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			if a.VolumeSource.RBD.RBDPool == "" {
-				a.VolumeSource.RBD.RBDPool = "rbd"
-			}
-			if a.VolumeSource.RBD.RadosUser == "" {
-				a.VolumeSource.RBD.RadosUser = "admin"
-			}
-			if a.VolumeSource.RBD.Keyring == "" {
-				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
-			}
+			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -244,22 +203,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			if a.VolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
-				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
-			}
-			if a.VolumeSource.AzureDisk.FSType == nil {
-				var ptrVar1 string = "ext4"
-				a.VolumeSource.AzureDisk.FSType = &ptrVar1
-			}
-			if a.VolumeSource.AzureDisk.ReadOnly == nil {
-				var ptrVar1 bool = false
-				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
-			}
-			if a.VolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
-				a.VolumeSource.AzureDisk.Kind = &ptrVar1
-			}
+			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
 			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
@@ -279,12 +223,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			if a.VolumeSource.ScaleIO.StorageMode == "" {
-				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
-			}
-			if a.VolumeSource.ScaleIO.FSType == "" {
-				a.VolumeSource.ScaleIO.FSType = "xfs"
-			}
+			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
@@ -499,63 +438,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 	}
 	SetDefaults_ResourceList(&in.Spec.Overhead)
-	for i := range in.Status.InitContainerStatuses {
-		a := &in.Status.InitContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	for i := range in.Status.ContainerStatuses {
-		a := &in.Status.ContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	for i := range in.Status.EphemeralContainerStatuses {
-		a := &in.Status.EphemeralContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
 }
 
 func SetObjectDefaults_PodList(in *v1.PodList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Pod(a)
-	}
-}
-
-func SetObjectDefaults_PodStatusResult(in *v1.PodStatusResult) {
-	for i := range in.Status.InitContainerStatuses {
-		a := &in.Status.InitContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	for i := range in.Status.ContainerStatuses {
-		a := &in.Status.ContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
-	}
-	for i := range in.Status.EphemeralContainerStatuses {
-		a := &in.Status.EphemeralContainerStatuses[i]
-		SetDefaults_ResourceList(&a.AllocatedResources)
-		if a.Resources != nil {
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
-		}
 	}
 }
 
@@ -571,20 +459,10 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
-				a.VolumeSource.ISCSI.ISCSIInterface = "default"
-			}
+			SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			if a.VolumeSource.RBD.RBDPool == "" {
-				a.VolumeSource.RBD.RBDPool = "rbd"
-			}
-			if a.VolumeSource.RBD.RadosUser == "" {
-				a.VolumeSource.RBD.RadosUser = "admin"
-			}
-			if a.VolumeSource.RBD.Keyring == "" {
-				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
-			}
+			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -599,22 +477,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			if a.VolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
-				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
-			}
-			if a.VolumeSource.AzureDisk.FSType == nil {
-				var ptrVar1 string = "ext4"
-				a.VolumeSource.AzureDisk.FSType = &ptrVar1
-			}
-			if a.VolumeSource.AzureDisk.ReadOnly == nil {
-				var ptrVar1 bool = false
-				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
-			}
-			if a.VolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
-				a.VolumeSource.AzureDisk.Kind = &ptrVar1
-			}
+			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
 			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
@@ -634,12 +497,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			if a.VolumeSource.ScaleIO.StorageMode == "" {
-				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
-			}
-			if a.VolumeSource.ScaleIO.FSType == "" {
-				a.VolumeSource.ScaleIO.FSType = "xfs"
-			}
+			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
@@ -877,20 +735,10 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 			}
 			if a.VolumeSource.ISCSI != nil {
-				if a.VolumeSource.ISCSI.ISCSIInterface == "" {
-					a.VolumeSource.ISCSI.ISCSIInterface = "default"
-				}
+				SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 			}
 			if a.VolumeSource.RBD != nil {
-				if a.VolumeSource.RBD.RBDPool == "" {
-					a.VolumeSource.RBD.RBDPool = "rbd"
-				}
-				if a.VolumeSource.RBD.RadosUser == "" {
-					a.VolumeSource.RBD.RadosUser = "admin"
-				}
-				if a.VolumeSource.RBD.Keyring == "" {
-					a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
-				}
+				SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 			}
 			if a.VolumeSource.DownwardAPI != nil {
 				SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -905,22 +753,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 			}
 			if a.VolumeSource.AzureDisk != nil {
-				if a.VolumeSource.AzureDisk.CachingMode == nil {
-					ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
-					a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
-				}
-				if a.VolumeSource.AzureDisk.FSType == nil {
-					var ptrVar1 string = "ext4"
-					a.VolumeSource.AzureDisk.FSType = &ptrVar1
-				}
-				if a.VolumeSource.AzureDisk.ReadOnly == nil {
-					var ptrVar1 bool = false
-					a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
-				}
-				if a.VolumeSource.AzureDisk.Kind == nil {
-					ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
-					a.VolumeSource.AzureDisk.Kind = &ptrVar1
-				}
+				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 			}
 			if a.VolumeSource.Projected != nil {
 				SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
@@ -940,12 +773,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				}
 			}
 			if a.VolumeSource.ScaleIO != nil {
-				if a.VolumeSource.ScaleIO.StorageMode == "" {
-					a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
-				}
-				if a.VolumeSource.ScaleIO.FSType == "" {
-					a.VolumeSource.ScaleIO.FSType = "xfs"
-				}
+				SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 			}
 			if a.VolumeSource.Ephemeral != nil {
 				if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {

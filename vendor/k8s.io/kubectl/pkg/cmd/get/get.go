@@ -36,7 +36,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/utils/ptr"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // GetOptions contains the input to the get command.
@@ -57,6 +57,7 @@ type GetOptions struct {
 	PrintFlags             *PrintFlags
 	ToPrinter              func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
+	PrintWithOpenAPICols   bool
 
 	CmdParent string
 
@@ -75,14 +76,14 @@ type GetOptions struct {
 	Namespace         string
 	ExplicitNamespace bool
 	Subresource       string
-	SortBy            string
 
 	ServerPrint bool
 
 	NoHeaders      bool
+	Sort           bool
 	IgnoreNotFound bool
 
-	genericiooptions.IOStreams
+	genericclioptions.IOStreams
 }
 
 var (
@@ -91,8 +92,8 @@ var (
 
 		Prints a table of the most important information about the specified resources.
 		You can filter the list using a label selector and the --selector flag. If the
-		desired resource type is namespaced you will only see results in the current
-		namespace if you don't specify any namespace.
+		desired resource type is namespaced you will only see results in your current
+		namespace unless you pass --all-namespaces.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`))
@@ -131,24 +132,19 @@ var (
 		# List one or more resources by their type and names
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
-		# List the 'status' subresource for a single pod
-		kubectl get pod web-pod-13je7 --subresource status
-
-		# List all deployments in namespace 'backend'
-		kubectl get deployments.apps --namespace backend
-
-		# List all pods existing in all namespaces
-		kubectl get pods --all-namespaces`))
+		# List status subresource for a single pod.
+		kubectl get pod web-pod-13je7 --subresource status`))
 )
 
 const (
-	useServerPrintColumns = "server-print"
+	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
+	useServerPrintColumns          = "server-print"
 )
 
 var supportedSubresources = []string{"status", "scale"}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
-func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOptions {
+func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
 		PrintFlags: NewGetPrintFlags(),
 		CmdParent:  parent,
@@ -161,7 +157,7 @@ func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOption
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewGetOptions(parent, streams)
 
 	cmd := &cobra.Command{
@@ -174,7 +170,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, args))
+			cmdutil.CheckErr(o.Run(f, cmd, args))
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -188,6 +184,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	addOpenAPIPrintColumnFlags(cmd, o)
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
@@ -214,9 +211,11 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.ExplicitNamespace = false
 	}
 
-	if o.PrintFlags.HumanReadableFlags.SortBy != nil {
-		o.SortBy = *o.PrintFlags.HumanReadableFlags.SortBy
+	sortBy, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		return err
 	}
+	o.Sort = len(sortBy) > 0
 
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 
@@ -242,6 +241,11 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		printFlags := o.PrintFlags.Copy()
 
 		if mapping != nil {
+			if !cmdSpecifiesOutputFmt(cmd) && o.PrintWithOpenAPICols {
+				if apiSchema, err := f.OpenAPISchema(); err == nil {
+					printFlags.UseOpenAPIColumns(apiSchema, mapping)
+				}
+			}
 			printFlags.SetKind(mapping.GroupVersionKind.GroupKind())
 		}
 		if withNamespace {
@@ -260,8 +264,8 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 			return nil, err
 		}
 
-		if len(o.SortBy) > 0 {
-			printer = &SortingPrinter{Delegate: printer, SortField: o.SortBy}
+		if o.Sort {
+			printer = &SortingPrinter{Delegate: printer, SortField: sortBy}
 		}
 		if outputObjects != nil {
 			printer = &skipPrinter{delegate: printer, output: outputObjects}
@@ -273,13 +277,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	switch {
-	case o.Watch:
-		if len(o.SortBy) > 0 {
-			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch requested, --sort-by will be ignored for watch events received\n")
-		}
-	case o.WatchOnly:
-		if len(o.SortBy) > 0 {
-			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch-only requested, --sort-by will be ignored\n")
+	case o.Watch || o.WatchOnly:
+		if o.Sort {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch or --watch-only requested, --sort-by will be ignored\n")
 		}
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
@@ -292,6 +292,11 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 			return cmdutil.UsageErrorf(cmd, usageString)
 		}
+	}
+
+	// openapi printing is mutually exclusive with server side printing
+	if o.PrintWithOpenAPICols && o.ServerPrint {
+		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
 	}
 
 	return nil
@@ -428,6 +433,10 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 }
 
 func (o *GetOptions) transformRequests(req *rest.Request) {
+	// We need full objects if printing with openapi columns
+	if o.PrintWithOpenAPICols {
+		return
+	}
 	if !o.ServerPrint || !o.IsHumanReadablePrinter {
 		return
 	}
@@ -439,14 +448,14 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 	}, ","))
 
 	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
-	if len(o.SortBy) > 0 {
+	if o.Sort {
 		req.Param("includeObject", "Object")
 	}
 }
 
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
+func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -455,11 +464,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f, args)
+		return o.watch(f, cmd, args)
 	}
 
 	chunkSize := o.ChunkSize
-	if len(o.SortBy) > 0 {
+	if o.Sort {
 		// TODO(juanvallejo): in the future, we could have the client use chunking
 		// to gather all results, then sort them all at the end to reduce server load.
 		chunkSize = 0
@@ -504,9 +513,14 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		objs[ix] = infos[ix].Object
 	}
 
+	sorting, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		return err
+	}
+
 	var positioner OriginalPositioner
-	if len(o.SortBy) > 0 {
-		sorter := NewRuntimeSorter(objs, o.SortBy)
+	if o.Sort {
+		sorter := NewRuntimeSorter(objs, sorting)
 		if err := sorter.Sort(); err != nil {
 			return err
 		}
@@ -566,6 +580,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 			lastMapping = mapping
 		}
 
+		// ensure a versioned object is passed to the custom-columns printer
+		// if we are using OpenAPI columns to print
+		if o.PrintWithOpenAPICols {
+			printer.PrintObj(info.Object, w)
+			continue
+		}
+
 		printer.PrintObj(info.Object, w)
 	}
 	w.Flush()
@@ -611,7 +632,7 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
+func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -637,7 +658,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	outputObjects := ptr.To(!o.WatchOnly)
+	outputObjects := utilpointer.BoolPtr(!o.WatchOnly)
 	printer, err := o.ToPrinter(mapping, outputObjects, o.AllNamespaces, false)
 	if err != nil {
 		return err
@@ -809,12 +830,21 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 }
 
+func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+	cmd.Flags().BoolVar(&opt.PrintWithOpenAPICols, useOpenAPIPrintColumnFlagLabel, opt.PrintWithOpenAPICols, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
+	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "deprecated in favor of server-side printing")
+}
+
 func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
 	cmd.Flags().BoolVar(&opt.ServerPrint, useServerPrintColumns, opt.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
+}
+
+func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
+	return cmdutil.GetFlagString(cmd, "output") != ""
 }
 
 func multipleGVKsRequested(infos []*resource.Info) bool {
