@@ -316,7 +316,6 @@ func matchLen(a []byte, b []byte) int {
 	return len(a) + checked
 }
 
-// input must be > inputMargin
 func calcBlockSize(src []byte) (d int) {
 	// Initialize the hash table.
 	const (
@@ -502,7 +501,6 @@ emitRemainder:
 	return d
 }
 
-// length must be > inputMargin.
 func calcBlockSizeSmall(src []byte) (d int) {
 	// Initialize the hash table.
 	const (

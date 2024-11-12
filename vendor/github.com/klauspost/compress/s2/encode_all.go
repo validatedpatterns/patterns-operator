@@ -117,12 +117,6 @@ func encodeBlockGo(dst, src []byte) (d int) {
 					i--
 					base--
 				}
-
-				// Bail if we exceed the maximum size.
-				if d+(base-nextEmit) > dstLimit {
-					return 0
-				}
-
 				d += emitLiteral(dst[d:], src[nextEmit:base])
 
 				// Extend forward
@@ -158,6 +152,7 @@ func encodeBlockGo(dst, src []byte) (d int) {
 				if s >= sLimit {
 					goto emitRemainder
 				}
+
 				cv = load64(src, s)
 				continue
 			}
@@ -330,11 +325,6 @@ func encodeBlockSnappyGo(dst, src []byte) (d int) {
 					i--
 					base--
 				}
-				// Bail if we exceed the maximum size.
-				if d+(base-nextEmit) > dstLimit {
-					return 0
-				}
-
 				d += emitLiteral(dst[d:], src[nextEmit:base])
 
 				// Extend forward
@@ -542,11 +532,6 @@ searchDict:
 					i--
 					base--
 				}
-				// Bail if we exceed the maximum size.
-				if d+(base-nextEmit) > dstLimit {
-					return 0
-				}
-
 				d += emitLiteral(dst[d:], src[nextEmit:base])
 				if debug && nextEmit != base {
 					fmt.Println("emitted ", base-nextEmit, "literals")
@@ -757,6 +742,7 @@ searchDict:
 				x := load64(src, s-2)
 				m2Hash := hash6(x, tableBits)
 				currHash := hash6(x>>8, tableBits)
+				candidate = int(table[currHash])
 				table[m2Hash] = uint32(s - 2)
 				table[currHash] = uint32(s - 1)
 				cv = load64(src, s)
@@ -895,11 +881,6 @@ searchDict:
 					i--
 					base--
 				}
-				// Bail if we exceed the maximum size.
-				if d+(base-nextEmit) > dstLimit {
-					return 0
-				}
-
 				d += emitLiteral(dst[d:], src[nextEmit:base])
 				if debug && nextEmit != base {
 					fmt.Println("emitted ", base-nextEmit, "literals")
