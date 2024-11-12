@@ -379,7 +379,7 @@ func (ResourceSlice) SwaggerDoc() map[string]string {
 
 var map_ResourceSliceList = map[string]string{
 	"":         "ResourceSliceList is a collection of ResourceSlices.",
-	"metadata": "Standard list metadata",
+	"listMeta": "Standard list metadata",
 	"items":    "Items is the list of resource ResourceSlices.",
 }
 
