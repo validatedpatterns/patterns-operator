@@ -21,7 +21,7 @@ import digest "github.com/opencontainers/go-digest"
 // when marshalled to JSON.
 type Descriptor struct {
 	// MediaType is the media type of the object this schema refers to.
-	MediaType string `json:"mediaType"`
+	MediaType string `json:"mediaType,omitempty"`
 
 	// Digest is the digest of the targeted content.
 	Digest digest.Digest `json:"digest"`
