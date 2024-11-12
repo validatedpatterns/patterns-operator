@@ -40,22 +40,20 @@ var operatorsKind = v1.SchemeGroupVersion.WithKind("Operator")
 
 // Get takes name of the operator, and returns the corresponding operator object, and an error if there is any.
 func (c *FakeOperators) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Operator, err error) {
-	emptyResult := &v1.Operator{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(operatorsResource, name, options), emptyResult)
+		Invokes(testing.NewRootGetAction(operatorsResource, name), &v1.Operator{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Operator), err
 }
 
 // List takes label and field selectors, and returns the list of Operators that match those selectors.
 func (c *FakeOperators) List(ctx context.Context, opts metav1.ListOptions) (result *v1.OperatorList, err error) {
-	emptyResult := &v1.OperatorList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(operatorsResource, operatorsKind, opts), emptyResult)
+		Invokes(testing.NewRootListAction(operatorsResource, operatorsKind, opts), &v1.OperatorList{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -74,39 +72,36 @@ func (c *FakeOperators) List(ctx context.Context, opts metav1.ListOptions) (resu
 // Watch returns a watch.Interface that watches the requested operators.
 func (c *FakeOperators) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(operatorsResource, opts))
+		InvokesWatch(testing.NewRootWatchAction(operatorsResource, opts))
 }
 
 // Create takes the representation of a operator and creates it.  Returns the server's representation of the operator, and an error, if there is any.
 func (c *FakeOperators) Create(ctx context.Context, operator *v1.Operator, opts metav1.CreateOptions) (result *v1.Operator, err error) {
-	emptyResult := &v1.Operator{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(operatorsResource, operator, opts), emptyResult)
+		Invokes(testing.NewRootCreateAction(operatorsResource, operator), &v1.Operator{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Operator), err
 }
 
 // Update takes the representation of a operator and updates it. Returns the server's representation of the operator, and an error, if there is any.
 func (c *FakeOperators) Update(ctx context.Context, operator *v1.Operator, opts metav1.UpdateOptions) (result *v1.Operator, err error) {
-	emptyResult := &v1.Operator{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(operatorsResource, operator, opts), emptyResult)
+		Invokes(testing.NewRootUpdateAction(operatorsResource, operator), &v1.Operator{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Operator), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeOperators) UpdateStatus(ctx context.Context, operator *v1.Operator, opts metav1.UpdateOptions) (result *v1.Operator, err error) {
-	emptyResult := &v1.Operator{}
+func (c *FakeOperators) UpdateStatus(ctx context.Context, operator *v1.Operator, opts metav1.UpdateOptions) (*v1.Operator, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(operatorsResource, "status", operator, opts), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceAction(operatorsResource, "status", operator), &v1.Operator{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Operator), err
 }
@@ -120,7 +115,7 @@ func (c *FakeOperators) Delete(ctx context.Context, name string, opts metav1.Del
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeOperators) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(operatorsResource, opts, listOpts)
+	action := testing.NewRootDeleteCollectionAction(operatorsResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.OperatorList{})
 	return err
@@ -128,11 +123,10 @@ func (c *FakeOperators) DeleteCollection(ctx context.Context, opts metav1.Delete
 
 // Patch applies the patch and returns the patched operator.
 func (c *FakeOperators) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Operator, err error) {
-	emptyResult := &v1.Operator{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(operatorsResource, name, pt, data, opts, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceAction(operatorsResource, name, pt, data, subresources...), &v1.Operator{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Operator), err
 }

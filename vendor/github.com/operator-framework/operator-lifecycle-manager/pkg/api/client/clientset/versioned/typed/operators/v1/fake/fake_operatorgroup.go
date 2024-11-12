@@ -41,24 +41,22 @@ var operatorgroupsKind = v1.SchemeGroupVersion.WithKind("OperatorGroup")
 
 // Get takes name of the operatorGroup, and returns the corresponding operatorGroup object, and an error if there is any.
 func (c *FakeOperatorGroups) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.OperatorGroup, err error) {
-	emptyResult := &v1.OperatorGroup{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(operatorgroupsResource, c.ns, name, options), emptyResult)
+		Invokes(testing.NewGetAction(operatorgroupsResource, c.ns, name), &v1.OperatorGroup{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.OperatorGroup), err
 }
 
 // List takes label and field selectors, and returns the list of OperatorGroups that match those selectors.
 func (c *FakeOperatorGroups) List(ctx context.Context, opts metav1.ListOptions) (result *v1.OperatorGroupList, err error) {
-	emptyResult := &v1.OperatorGroupList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(operatorgroupsResource, operatorgroupsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(operatorgroupsResource, operatorgroupsKind, c.ns, opts), &v1.OperatorGroupList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -77,43 +75,40 @@ func (c *FakeOperatorGroups) List(ctx context.Context, opts metav1.ListOptions) 
 // Watch returns a watch.Interface that watches the requested operatorGroups.
 func (c *FakeOperatorGroups) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(operatorgroupsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(operatorgroupsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a operatorGroup and creates it.  Returns the server's representation of the operatorGroup, and an error, if there is any.
 func (c *FakeOperatorGroups) Create(ctx context.Context, operatorGroup *v1.OperatorGroup, opts metav1.CreateOptions) (result *v1.OperatorGroup, err error) {
-	emptyResult := &v1.OperatorGroup{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(operatorgroupsResource, c.ns, operatorGroup, opts), emptyResult)
+		Invokes(testing.NewCreateAction(operatorgroupsResource, c.ns, operatorGroup), &v1.OperatorGroup{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.OperatorGroup), err
 }
 
 // Update takes the representation of a operatorGroup and updates it. Returns the server's representation of the operatorGroup, and an error, if there is any.
 func (c *FakeOperatorGroups) Update(ctx context.Context, operatorGroup *v1.OperatorGroup, opts metav1.UpdateOptions) (result *v1.OperatorGroup, err error) {
-	emptyResult := &v1.OperatorGroup{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(operatorgroupsResource, c.ns, operatorGroup, opts), emptyResult)
+		Invokes(testing.NewUpdateAction(operatorgroupsResource, c.ns, operatorGroup), &v1.OperatorGroup{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.OperatorGroup), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeOperatorGroups) UpdateStatus(ctx context.Context, operatorGroup *v1.OperatorGroup, opts metav1.UpdateOptions) (result *v1.OperatorGroup, err error) {
-	emptyResult := &v1.OperatorGroup{}
+func (c *FakeOperatorGroups) UpdateStatus(ctx context.Context, operatorGroup *v1.OperatorGroup, opts metav1.UpdateOptions) (*v1.OperatorGroup, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(operatorgroupsResource, "status", c.ns, operatorGroup, opts), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(operatorgroupsResource, "status", c.ns, operatorGroup), &v1.OperatorGroup{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.OperatorGroup), err
 }
@@ -128,7 +123,7 @@ func (c *FakeOperatorGroups) Delete(ctx context.Context, name string, opts metav
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeOperatorGroups) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(operatorgroupsResource, c.ns, opts, listOpts)
+	action := testing.NewDeleteCollectionAction(operatorgroupsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.OperatorGroupList{})
 	return err
@@ -136,12 +131,11 @@ func (c *FakeOperatorGroups) DeleteCollection(ctx context.Context, opts metav1.D
 
 // Patch applies the patch and returns the patched operatorGroup.
 func (c *FakeOperatorGroups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OperatorGroup, err error) {
-	emptyResult := &v1.OperatorGroup{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(operatorgroupsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(operatorgroupsResource, c.ns, name, pt, data, subresources...), &v1.OperatorGroup{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.OperatorGroup), err
 }

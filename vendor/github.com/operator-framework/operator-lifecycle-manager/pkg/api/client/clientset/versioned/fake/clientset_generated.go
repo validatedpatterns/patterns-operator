@@ -37,12 +37,8 @@ import (
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
-// without applying any field management, validations and/or defaults. It shouldn't be considered a replacement
+// without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
-//
-// DEPRECATED: NewClientset replaces this with support for field management, which significantly improves
-// server side apply testing. NewClientset is only available when apply configurations are generated (e.g.
-// via --with-applyconfig).
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
@@ -89,11 +85,6 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// OperatorsV1 retrieves the OperatorsV1Client
-func (c *Clientset) OperatorsV1() operatorsv1.OperatorsV1Interface {
-	return &fakeoperatorsv1.FakeOperatorsV1{Fake: &c.Fake}
-}
-
 // OperatorsV1alpha1 retrieves the OperatorsV1alpha1Client
 func (c *Clientset) OperatorsV1alpha1() operatorsv1alpha1.OperatorsV1alpha1Interface {
 	return &fakeoperatorsv1alpha1.FakeOperatorsV1alpha1{Fake: &c.Fake}
@@ -102,6 +93,11 @@ func (c *Clientset) OperatorsV1alpha1() operatorsv1alpha1.OperatorsV1alpha1Inter
 // OperatorsV1alpha2 retrieves the OperatorsV1alpha2Client
 func (c *Clientset) OperatorsV1alpha2() operatorsv1alpha2.OperatorsV1alpha2Interface {
 	return &fakeoperatorsv1alpha2.FakeOperatorsV1alpha2{Fake: &c.Fake}
+}
+
+// OperatorsV1 retrieves the OperatorsV1Client
+func (c *Clientset) OperatorsV1() operatorsv1.OperatorsV1Interface {
+	return &fakeoperatorsv1.FakeOperatorsV1{Fake: &c.Fake}
 }
 
 // OperatorsV2 retrieves the OperatorsV2Client

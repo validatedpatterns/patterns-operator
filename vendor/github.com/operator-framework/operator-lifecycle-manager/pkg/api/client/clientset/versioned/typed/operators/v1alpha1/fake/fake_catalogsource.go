@@ -41,24 +41,22 @@ var catalogsourcesKind = v1alpha1.SchemeGroupVersion.WithKind("CatalogSource")
 
 // Get takes name of the catalogSource, and returns the corresponding catalogSource object, and an error if there is any.
 func (c *FakeCatalogSources) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.CatalogSource, err error) {
-	emptyResult := &v1alpha1.CatalogSource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(catalogsourcesResource, c.ns, name, options), emptyResult)
+		Invokes(testing.NewGetAction(catalogsourcesResource, c.ns, name), &v1alpha1.CatalogSource{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.CatalogSource), err
 }
 
 // List takes label and field selectors, and returns the list of CatalogSources that match those selectors.
 func (c *FakeCatalogSources) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.CatalogSourceList, err error) {
-	emptyResult := &v1alpha1.CatalogSourceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(catalogsourcesResource, catalogsourcesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(catalogsourcesResource, catalogsourcesKind, c.ns, opts), &v1alpha1.CatalogSourceList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -77,43 +75,40 @@ func (c *FakeCatalogSources) List(ctx context.Context, opts v1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested catalogSources.
 func (c *FakeCatalogSources) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(catalogsourcesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchAction(catalogsourcesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a catalogSource and creates it.  Returns the server's representation of the catalogSource, and an error, if there is any.
 func (c *FakeCatalogSources) Create(ctx context.Context, catalogSource *v1alpha1.CatalogSource, opts v1.CreateOptions) (result *v1alpha1.CatalogSource, err error) {
-	emptyResult := &v1alpha1.CatalogSource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(catalogsourcesResource, c.ns, catalogSource, opts), emptyResult)
+		Invokes(testing.NewCreateAction(catalogsourcesResource, c.ns, catalogSource), &v1alpha1.CatalogSource{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.CatalogSource), err
 }
 
 // Update takes the representation of a catalogSource and updates it. Returns the server's representation of the catalogSource, and an error, if there is any.
 func (c *FakeCatalogSources) Update(ctx context.Context, catalogSource *v1alpha1.CatalogSource, opts v1.UpdateOptions) (result *v1alpha1.CatalogSource, err error) {
-	emptyResult := &v1alpha1.CatalogSource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(catalogsourcesResource, c.ns, catalogSource, opts), emptyResult)
+		Invokes(testing.NewUpdateAction(catalogsourcesResource, c.ns, catalogSource), &v1alpha1.CatalogSource{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.CatalogSource), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCatalogSources) UpdateStatus(ctx context.Context, catalogSource *v1alpha1.CatalogSource, opts v1.UpdateOptions) (result *v1alpha1.CatalogSource, err error) {
-	emptyResult := &v1alpha1.CatalogSource{}
+func (c *FakeCatalogSources) UpdateStatus(ctx context.Context, catalogSource *v1alpha1.CatalogSource, opts v1.UpdateOptions) (*v1alpha1.CatalogSource, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(catalogsourcesResource, "status", c.ns, catalogSource, opts), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(catalogsourcesResource, "status", c.ns, catalogSource), &v1alpha1.CatalogSource{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.CatalogSource), err
 }
@@ -128,7 +123,7 @@ func (c *FakeCatalogSources) Delete(ctx context.Context, name string, opts v1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeCatalogSources) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(catalogsourcesResource, c.ns, opts, listOpts)
+	action := testing.NewDeleteCollectionAction(catalogsourcesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.CatalogSourceList{})
 	return err
@@ -136,12 +131,11 @@ func (c *FakeCatalogSources) DeleteCollection(ctx context.Context, opts v1.Delet
 
 // Patch applies the patch and returns the patched catalogSource.
 func (c *FakeCatalogSources) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.CatalogSource, err error) {
-	emptyResult := &v1alpha1.CatalogSource{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(catalogsourcesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(catalogsourcesResource, c.ns, name, pt, data, subresources...), &v1alpha1.CatalogSource{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.CatalogSource), err
 }
