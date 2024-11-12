@@ -23,10 +23,10 @@ RUN export GO_VERSION=$(grep -E "go [[:digit:]]\.[[:digit:]][[:digit:]]" go.mod 
 
 # Copy the go sources
 COPY vendor/ vendor/
-COPY cmd/main.go cmd/main.go
+COPY main.go main.go
 COPY api/ api/
 COPY version/ version/
-COPY internal/controller/ internal/controller/
+COPY controllers/  controllers/ 
 COPY hack/ hack/
 COPY .git/ .git/
 

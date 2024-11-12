@@ -41,7 +41,7 @@ import (
 
 	argov1beta1api "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	controllers "github.com/hybrid-cloud-patterns/patterns-operator/internal/controller"
+	"github.com/hybrid-cloud-patterns/patterns-operator/controllers"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
