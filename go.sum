@@ -392,8 +392,8 @@ github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e h1:qGjfKX8i0h4
 github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e/go.mod h1:2am3qrggh9LlDCf/MDGzcFWMhdaushxFQi0+ZZDhdVk=
 github.com/operator-framework/api v0.27.0 h1:OrVaGKZJvbZo58HTv2guz7aURkhVKYhFqZ/6VpifiXI=
 github.com/operator-framework/api v0.27.0/go.mod h1:lg2Xx+S8NQWGYlEOvFwQvH46E5EK5IrAIL7HWfAhciM=
-github.com/operator-framework/operator-lifecycle-manager v0.30.0 h1:tt98f0lx2EfxfE/5PbpUi5fTnDnqZ17zGpftUA6oRm0=
-github.com/operator-framework/operator-lifecycle-manager v0.30.0/go.mod h1:nPbzJVqxAwoUz5q7QovYZcHN/v4in5sucPT2UpF+ikQ=
+github.com/operator-framework/operator-lifecycle-manager v0.29.0 h1:C2k3P6A5qPF25rJoVtc/uwc3OznH0Qx01LOwvfzAGNg=
+github.com/operator-framework/operator-lifecycle-manager v0.29.0/go.mod h1:VE5qysnIYbf9ecvAQ9zBeKpyUwUu9c5jQ6twHtyFCgA=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
