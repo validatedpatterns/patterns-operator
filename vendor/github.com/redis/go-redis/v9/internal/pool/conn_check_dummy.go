@@ -1,9 +1,10 @@
 //go:build !linux && !darwin && !dragonfly && !freebsd && !netbsd && !openbsd && !solaris && !illumos
+// +build !linux,!darwin,!dragonfly,!freebsd,!netbsd,!openbsd,!solaris,!illumos
 
 package pool
 
-import "syscall"
+import "net"
 
-func connCheck(_ syscall.Conn) error {
+func connCheck(conn net.Conn) error {
 	return nil
 }

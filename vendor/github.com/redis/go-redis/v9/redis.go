@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,15 +40,12 @@ type (
 )
 
 type hooksMixin struct {
-	hooksMu *sync.Mutex
-
 	slice   []Hook
 	initial hooks
 	current hooks
 }
 
 func (hs *hooksMixin) initHooks(hooks hooks) {
-	hs.hooksMu = new(sync.Mutex)
 	hs.initial = hooks
 	hs.chain()
 }
@@ -120,9 +116,6 @@ func (hs *hooksMixin) AddHook(hook Hook) {
 func (hs *hooksMixin) chain() {
 	hs.initial.setDefaults()
 
-	hs.hooksMu.Lock()
-	defer hs.hooksMu.Unlock()
-
 	hs.current.dial = hs.initial.dial
 	hs.current.process = hs.initial.process
 	hs.current.pipeline = hs.initial.pipeline
@@ -145,13 +138,9 @@ func (hs *hooksMixin) chain() {
 }
 
 func (hs *hooksMixin) clone() hooksMixin {
-	hs.hooksMu.Lock()
-	defer hs.hooksMu.Unlock()
-
 	clone := *hs
 	l := len(clone.slice)
 	clone.slice = clone.slice[:l:l]
-	clone.hooksMu = new(sync.Mutex)
 	return clone
 }
 
@@ -176,8 +165,6 @@ func (hs *hooksMixin) withProcessPipelineHook(
 }
 
 func (hs *hooksMixin) dialHook(ctx context.Context, network, addr string) (net.Conn, error) {
-	hs.hooksMu.Lock()
-	defer hs.hooksMu.Unlock()
 	return hs.current.dial(ctx, network, addr)
 }
 
@@ -283,13 +270,8 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 	}
 	cn.Inited = true
 
-	var err error
 	username, password := c.opt.Username, c.opt.Password
-	if c.opt.CredentialsProviderContext != nil {
-		if username, password, err = c.opt.CredentialsProviderContext(ctx); err != nil {
-			return err
-		}
-	} else if c.opt.CredentialsProvider != nil {
+	if c.opt.CredentialsProvider != nil {
 		username, password = c.opt.CredentialsProvider()
 	}
 
@@ -305,7 +287,7 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 
 	// for redis-server versions that do not support the HELLO command,
 	// RESP2 will continue to be used.
-	if err = conn.Hello(ctx, protocol, username, password, "").Err(); err == nil {
+	if err := conn.Hello(ctx, protocol, username, password, "").Err(); err == nil {
 		auth = true
 	} else if !isRedisError(err) {
 		// When the server responds with the RESP protocol and the result is not a normal
@@ -318,7 +300,7 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 		return err
 	}
 
-	_, err = conn.Pipelined(ctx, func(pipe Pipeliner) error {
+	_, err := conn.Pipelined(ctx, func(pipe Pipeliner) error {
 		if !auth && password != "" {
 			if username != "" {
 				pipe.AuthACL(ctx, username, password)
@@ -343,18 +325,6 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 	})
 	if err != nil {
 		return err
-	}
-
-	if !c.opt.DisableIndentity {
-		libName := ""
-		libVer := Version()
-		if c.opt.IdentitySuffix != "" {
-			libName = c.opt.IdentitySuffix
-		}
-		p := conn.Pipeline()
-		p.ClientSetInfo(ctx, WithLibraryName(libName))
-		p.ClientSetInfo(ctx, WithLibraryVersion(libVer))
-		_, _ = p.Exec(ctx)
 	}
 
 	if c.opt.OnConnect != nil {

@@ -79,10 +79,9 @@ type RingOptions struct {
 	MinRetryBackoff time.Duration
 	MaxRetryBackoff time.Duration
 
-	DialTimeout           time.Duration
-	ReadTimeout           time.Duration
-	WriteTimeout          time.Duration
-	ContextTimeoutEnabled bool
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 
 	// PoolFIFO uses FIFO mode for each node connection pool GET/PUT (default LIFO).
 	PoolFIFO bool
@@ -91,15 +90,11 @@ type RingOptions struct {
 	PoolTimeout     time.Duration
 	MinIdleConns    int
 	MaxIdleConns    int
-	MaxActiveConns  int
 	ConnMaxIdleTime time.Duration
 	ConnMaxLifetime time.Duration
 
 	TLSConfig *tls.Config
 	Limiter   Limiter
-
-	DisableIndentity bool
-	IdentitySuffix   string
 }
 
 func (opt *RingOptions) init() {
@@ -149,25 +144,20 @@ func (opt *RingOptions) clientOptions() *Options {
 
 		MaxRetries: -1,
 
-		DialTimeout:           opt.DialTimeout,
-		ReadTimeout:           opt.ReadTimeout,
-		WriteTimeout:          opt.WriteTimeout,
-		ContextTimeoutEnabled: opt.ContextTimeoutEnabled,
+		DialTimeout:  opt.DialTimeout,
+		ReadTimeout:  opt.ReadTimeout,
+		WriteTimeout: opt.WriteTimeout,
 
 		PoolFIFO:        opt.PoolFIFO,
 		PoolSize:        opt.PoolSize,
 		PoolTimeout:     opt.PoolTimeout,
 		MinIdleConns:    opt.MinIdleConns,
 		MaxIdleConns:    opt.MaxIdleConns,
-		MaxActiveConns:  opt.MaxActiveConns,
 		ConnMaxIdleTime: opt.ConnMaxIdleTime,
 		ConnMaxLifetime: opt.ConnMaxLifetime,
 
 		TLSConfig: opt.TLSConfig,
 		Limiter:   opt.Limiter,
-
-		DisableIndentity: opt.DisableIndentity,
-		IdentitySuffix:   opt.IdentitySuffix,
 	}
 }
 
@@ -302,6 +292,7 @@ func (c *ringSharding) SetAddrs(addrs map[string]string) {
 func (c *ringSharding) newRingShards(
 	addrs map[string]string, existing *ringShards,
 ) (shards *ringShards, created, unused map[string]*ringShard) {
+
 	shards = &ringShards{m: make(map[string]*ringShard, len(addrs))}
 	created = make(map[string]*ringShard) // indexed by addr
 	unused = make(map[string]*ringShard)  // indexed by addr
@@ -680,8 +671,21 @@ func (c *Ring) cmdsInfo(ctx context.Context) (map[string]*CommandInfo, error) {
 	return nil, firstErr
 }
 
+func (c *Ring) cmdInfo(ctx context.Context, name string) *CommandInfo {
+	cmdsInfo, err := c.cmdsInfoCache.Get(ctx)
+	if err != nil {
+		return nil
+	}
+	info := cmdsInfo[name]
+	if info == nil {
+		internal.Logger.Printf(ctx, "info for cmd=%s not found", name)
+	}
+	return info
+}
+
 func (c *Ring) cmdShard(ctx context.Context, cmd Cmder) (*ringShard, error) {
-	pos := cmdFirstKeyPos(cmd)
+	cmdInfo := c.cmdInfo(ctx, cmd.Name())
+	pos := cmdFirstKeyPos(cmd, cmdInfo)
 	if pos == 0 {
 		return c.sharding.Random()
 	}
@@ -749,7 +753,8 @@ func (c *Ring) generalProcessPipeline(
 	cmdsMap := make(map[string][]Cmder)
 
 	for _, cmd := range cmds {
-		hash := cmd.stringArg(cmdFirstKeyPos(cmd))
+		cmdInfo := c.cmdInfo(ctx, cmd.Name())
+		hash := cmd.stringArg(cmdFirstKeyPos(cmd, cmdInfo))
 		if hash != "" {
 			hash = c.sharding.Hash(hash)
 		}

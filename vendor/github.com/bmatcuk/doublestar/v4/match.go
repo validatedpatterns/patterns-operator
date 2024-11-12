@@ -301,14 +301,9 @@ MATCH:
 }
 
 func isZeroLengthPattern(pattern string, separator rune) (ret bool, err error) {
-	// `/**`, `**/`, and `/**/` are special cases - a pattern such as `path/to/a/**` or `path/to/a/**/`
-	// *should* match `path/to/a` because `a` might be a directory
-	if pattern == "" ||
-		pattern == "*" ||
-		pattern == "**" ||
-		pattern == string(separator)+"**" ||
-		pattern == "**"+string(separator) ||
-		pattern == string(separator)+"**"+string(separator) {
+	// `/**` is a special case - a pattern such as `path/to/a/**` *should* match
+	// `path/to/a` because `a` might be a directory
+	if pattern == "" || pattern == "*" || pattern == "**" || pattern == string(separator)+"**" {
 		return true, nil
 	}
 

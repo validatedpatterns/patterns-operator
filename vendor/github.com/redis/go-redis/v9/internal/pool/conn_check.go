@@ -1,16 +1,26 @@
 //go:build linux || darwin || dragonfly || freebsd || netbsd || openbsd || solaris || illumos
+// +build linux darwin dragonfly freebsd netbsd openbsd solaris illumos
 
 package pool
 
 import (
 	"errors"
 	"io"
+	"net"
 	"syscall"
+	"time"
 )
 
 var errUnexpectedRead = errors.New("unexpected read from socket")
 
-func connCheck(sysConn syscall.Conn) error {
+func connCheck(conn net.Conn) error {
+	// Reset previous timeout.
+	_ = conn.SetDeadline(time.Time{})
+
+	sysConn, ok := conn.(syscall.Conn)
+	if !ok {
+		return nil
+	}
 	rawConn, err := sysConn.SyscallConn()
 	if err != nil {
 		return err
