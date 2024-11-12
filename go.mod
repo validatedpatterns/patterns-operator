@@ -7,8 +7,8 @@ toolchain go1.22.5
 require (
 	code.gitea.io/sdk/gitea v0.19.0
 	github.com/Masterminds/semver/v3 v3.3.0
-	github.com/argoproj-labs/argocd-operator v0.12.0
-	github.com/argoproj/argo-cd/v2 v2.12.3
+	github.com/argoproj-labs/argocd-operator v0.11.0
+	github.com/argoproj/argo-cd/v2 v2.11.7
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-logr/logr v1.4.2
@@ -56,7 +56,6 @@ require (
 	github.com/davidmz/go-pageant v1.0.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.5.0 // indirect
-	github.com/dlclark/regexp2 v1.11.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
