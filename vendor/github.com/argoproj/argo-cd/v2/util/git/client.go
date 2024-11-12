@@ -630,7 +630,11 @@ func (m *nativeGitClient) lsRemote(revision string) (string, error) {
 		revision = "HEAD"
 	}
 
-	semverSha := m.resolveSemverRevision(revision, refs)
+	semverSha, err := m.resolveSemverRevision(revision, refs)
+	if err != nil {
+		return "", err
+	}
+
 	if semverSha != "" {
 		return semverSha, nil
 	}
@@ -678,29 +682,21 @@ func (m *nativeGitClient) lsRemote(revision string) (string, error) {
 
 	// If we get here, revision string had non hexadecimal characters (indicating its a branch, tag,
 	// or symbolic ref) and we were unable to resolve it to a commit SHA.
-	return "", fmt.Errorf("unable to resolve '%s' to a commit SHA", revision)
+	return "", fmt.Errorf("Unable to resolve '%s' to a commit SHA", revision)
 }
 
 // resolveSemverRevision is a part of the lsRemote method workflow.
-// When the user correctly configures the Git repository revision, and that revision is a valid semver constraint, we
-// use this logic path rather than the standard lsRemote revision resolution loop.
-// Some examples to illustrate the actual behavior - if the revision is:
-// * "v0.1.2"/"0.1.2" or "v0.1"/"0.1", then this is not a constraint, it's a pinned version - so we fall back to the standard tag matching in the lsRemote loop.
-// * "v0.1.*"/"0.1.*", and there's a tag matching that constraint, then we find the latest matching version and return its commit hash.
-// * "v0.1.*"/"0.1.*", and there is *no* tag matching that constraint, then we fall back to the standard tag matching in the lsRemote loop.
-// * "custom-tag", only the lsRemote loop will run - because that revision is an invalid semver;
-// * "master-branch", only the lsRemote loop will run because that revision is an invalid semver;
-func (m *nativeGitClient) resolveSemverRevision(revision string, refs []*plumbing.Reference) string {
-	if _, err := semver.NewVersion(revision); err == nil {
-		// If the revision is a valid version, then we know it isn't a constraint; it's just a pin.
-		// In which case, we should use standard tag resolution mechanisms.
-		return ""
-	}
-
+// When the user configure correctly the Git repository revision and the revision is a valid semver constraint
+// only the for loop in this function will run, otherwise the lsRemote loop will try to resolve the revision.
+// Some examples to illustrate the actual behavior, if:
+// * The revision is "v0.1.*"/"0.1.*" or "v0.1.2"/"0.1.2" and there's a tag matching that constraint only this function loop will run;
+// * The revision is "v0.1.*"/"0.1.*" or "0.1.2"/"0.1.2" and there is no tag matching that constraint this function loop and lsRemote loop will run for backward compatibility;
+// * The revision is "custom-tag" only the lsRemote loop will run because that revision is an invalid semver;
+// * The revision is "master-branch" only the lsRemote loop will run because that revision is an invalid semver;
+func (m *nativeGitClient) resolveSemverRevision(revision string, refs []*plumbing.Reference) (string, error) {
 	constraint, err := semver.NewConstraint(revision)
 	if err != nil {
-		log.Debugf("Revision '%s' is not a valid semver constraint, skipping semver resolution.", revision)
-		return ""
+		return "", nil
 	}
 
 	maxVersion := semver.New(0, 0, 0, "", "")
@@ -713,9 +709,12 @@ func (m *nativeGitClient) resolveSemverRevision(revision string, refs []*plumbin
 		tag := ref.Name().Short()
 		version, err := semver.NewVersion(tag)
 		if err != nil {
-			log.Debugf("Error parsing version for tag: '%s': %v", tag, err)
-			// Skip this tag and continue to the next one
-			continue
+			if errors.Is(err, semver.ErrInvalidSemVer) {
+				log.Debugf("Invalid semantic version: %s", tag)
+				continue
+			}
+
+			return "", fmt.Errorf("error parsing version for tag: %w", err)
 		}
 
 		if constraint.Check(version) {
@@ -727,11 +726,10 @@ func (m *nativeGitClient) resolveSemverRevision(revision string, refs []*plumbin
 	}
 
 	if maxVersionHash.IsZero() {
-		return ""
+		return "", nil
 	}
 
-	log.Debugf("Semver constraint '%s' resolved to tag '%s', at reference '%s'", revision, maxVersion.Original(), maxVersionHash.String())
-	return maxVersionHash.String()
+	return maxVersionHash.String(), nil
 }
 
 // CommitSHA returns current commit sha from `git rev-parse HEAD`
