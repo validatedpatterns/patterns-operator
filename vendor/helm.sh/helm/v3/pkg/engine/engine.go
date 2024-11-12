@@ -239,7 +239,7 @@ func (e Engine) initFunMap(t *template.Template) {
 	// When DNS lookups are not enabled override the sprig function and return
 	// an empty string.
 	if !e.EnableDNS {
-		funcMap["getHostByName"] = func(_ string) string {
+		funcMap["getHostByName"] = func(name string) string {
 			return ""
 		}
 	}
