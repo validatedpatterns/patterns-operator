@@ -26,9 +26,9 @@ esac
 
 go version
 
-touch internal/controller/apikey.txt
+touch controllers/apikey.txt
 if [ -f "/run/secrets/apikey" ]; then
-    cp -f /run/secrets/apikey internal/controller/apikey.txt
+    cp -f /run/secrets/apikey controllers/apikey.txt
 fi
 
 GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go $EXTRA -ldflags="${LDFLAGS}" cmd/main.go

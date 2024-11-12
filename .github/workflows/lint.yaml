@@ -18,7 +18,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          export APIFILE="internal/controller/apikey.txt"
+          export APIFILE="controllers/apikey.txt"
           echo '' > "${APIFILE}"
 
       - name: Run golangci-lint
