@@ -68,21 +68,16 @@ type versionedTracker struct {
 }
 
 type fakeClient struct {
-	// trackerWriteLock must be acquired before writing to
-	// the tracker or performing reads that affect a following
-	// write.
-	trackerWriteLock sync.Mutex
-	tracker          versionedTracker
-
-	schemeWriteLock sync.Mutex
-	scheme          *runtime.Scheme
-
+	tracker               versionedTracker
+	scheme                *runtime.Scheme
 	restMapper            meta.RESTMapper
 	withStatusSubresource sets.Set[schema.GroupVersionKind]
 
 	// indexes maps each GroupVersionKind (GVK) to the indexes registered for that GVK.
 	// The inner map maps from index name to IndexerFunc.
 	indexes map[schema.GroupVersionKind]map[string]client.IndexerFunc
+
+	schemeWriteLock sync.Mutex
 }
 
 var _ client.WithWatch = &fakeClient{}
@@ -472,11 +467,6 @@ func (t versionedTracker) updateObject(gvr schema.GroupVersionResource, obj runt
 		switch {
 		case allowsUnconditionalUpdate(gvk):
 			accessor.SetResourceVersion(oldAccessor.GetResourceVersion())
-			// This is needed because if the patch explicitly sets the RV to null, the client-go reaction we use
-			// to apply it and whose output we process here will have it unset. It is not clear why the Kubernetes
-			// apiserver accepts such a patch, but it does so we just copy that behavior.
-			// Kubernetes apiserver behavior can be checked like this:
-			// `kubectl patch configmap foo --patch '{"metadata":{"annotations":{"foo":"bar"},"resourceVersion":null}}' -v=9`
 		case bytes.
 			Contains(debug.Stack(), []byte("sigs.k8s.io/controller-runtime/pkg/client/fake.(*fakeClient).Patch")):
 			// We apply patches using a client-go reaction that ends up calling the trackers Update. As we can't change
@@ -518,10 +508,7 @@ func (c *fakeClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 		return err
 	}
 
-	_, isUnstructured := obj.(runtime.Unstructured)
-	_, isPartialObject := obj.(*metav1.PartialObjectMetadata)
-
-	if isUnstructured || isPartialObject {
+	if _, isUnstructured := obj.(runtime.Unstructured); isUnstructured {
 		gvk, err := apiutil.GVKForObject(obj, c.scheme)
 		if err != nil {
 			return err
@@ -742,8 +729,6 @@ func (c *fakeClient) Create(ctx context.Context, obj client.Object, opts ...clie
 		accessor.SetDeletionTimestamp(nil)
 	}
 
-	c.trackerWriteLock.Lock()
-	defer c.trackerWriteLock.Unlock()
 	return c.tracker.Create(gvr, obj, accessor.GetNamespace())
 }
 
@@ -765,8 +750,6 @@ func (c *fakeClient) Delete(ctx context.Context, obj client.Object, opts ...clie
 		}
 	}
 
-	c.trackerWriteLock.Lock()
-	defer c.trackerWriteLock.Unlock()
 	// Check the ResourceVersion if that Precondition was specified.
 	if delOptions.Preconditions != nil && delOptions.Preconditions.ResourceVersion != nil {
 		name := accessor.GetName()
@@ -789,7 +772,7 @@ func (c *fakeClient) Delete(ctx context.Context, obj client.Object, opts ...clie
 		}
 	}
 
-	return c.deleteObjectLocked(gvr, accessor)
+	return c.deleteObject(gvr, accessor)
 }
 
 func (c *fakeClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
@@ -806,9 +789,6 @@ func (c *fakeClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ..
 			return nil
 		}
 	}
-
-	c.trackerWriteLock.Lock()
-	defer c.trackerWriteLock.Unlock()
 
 	gvr, _ := meta.UnsafeGuessKindToResource(gvk)
 	o, err := c.tracker.List(gvr, gvk, dcOptions.Namespace)
@@ -829,7 +809,7 @@ func (c *fakeClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ..
 		if err != nil {
 			return err
 		}
-		err = c.deleteObjectLocked(gvr, accessor)
+		err = c.deleteObject(gvr, accessor)
 		if err != nil {
 			return err
 		}
@@ -859,9 +839,6 @@ func (c *fakeClient) update(obj client.Object, isStatus bool, opts ...client.Upd
 	if err != nil {
 		return err
 	}
-
-	c.trackerWriteLock.Lock()
-	defer c.trackerWriteLock.Unlock()
 	return c.tracker.update(gvr, obj, accessor.GetNamespace(), isStatus, false, *updateOptions.AsUpdateOptions())
 }
 
@@ -897,8 +874,6 @@ func (c *fakeClient) patch(obj client.Object, patch client.Patch, opts ...client
 		return err
 	}
 
-	c.trackerWriteLock.Lock()
-	defer c.trackerWriteLock.Unlock()
 	oldObj, err := c.tracker.Get(gvr, accessor.GetNamespace(), accessor.GetName())
 	if err != nil {
 		return err
@@ -1107,7 +1082,7 @@ func (c *fakeClient) SubResource(subResource string) client.SubResourceClient {
 	return &fakeSubResourceClient{client: c, subResource: subResource}
 }
 
-func (c *fakeClient) deleteObjectLocked(gvr schema.GroupVersionResource, accessor metav1.Object) error {
+func (c *fakeClient) deleteObject(gvr schema.GroupVersionResource, accessor metav1.Object) error {
 	old, err := c.tracker.Get(gvr, accessor.GetNamespace(), accessor.GetName())
 	if err == nil {
 		oldAccessor, err := meta.Accessor(old)
@@ -1189,7 +1164,7 @@ func (sw *fakeSubResourceClient) Update(ctx context.Context, obj client.Object, 
 
 	switch sw.subResource {
 	case subResourceScale:
-		if err := sw.client.Get(ctx, client.ObjectKeyFromObject(obj), obj.DeepCopyObject().(client.Object)); err != nil {
+		if err := sw.client.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
 			return err
 		}
 		if updateOptions.SubResourceBody == nil {
