@@ -29,6 +29,8 @@ COPY version/ version/
 COPY internal/controller/ internal/controller/
 COPY hack/ hack/
 COPY .git/ .git/
+RUN mkdir /licenses
+COPY LICENSE /licenses
 
 # Build
 RUN --mount=type=secret,id=apikey hack/build.sh
@@ -41,6 +43,7 @@ RUN --mount=type=secret,id=apikey hack/build.sh
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /licenses/ /licenses/
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
