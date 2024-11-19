@@ -7,7 +7,6 @@ References:
 
 Follow https://sdk.operatorframework.io/docs/installation/ to install the operator-sdk
 
-
 ## Deploy the operator
 
 Search OperatorHub for "pattern" and accept all the defaults
