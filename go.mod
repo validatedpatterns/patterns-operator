@@ -6,14 +6,14 @@ toolchain go1.23.2
 
 require (
 	code.gitea.io/sdk/gitea v0.19.0
-	github.com/Masterminds/semver/v3 v3.3.0
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/argoproj-labs/argocd-operator v0.12.2
 	github.com/argoproj/argo-cd/v2 v2.13.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
-	github.com/onsi/ginkgo/v2 v2.21.0
+	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.35.1
 	github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible
 	github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e // release-4.16
