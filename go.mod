@@ -7,8 +7,8 @@ toolchain go1.23.2
 require (
 	code.gitea.io/sdk/gitea v0.20.0
 	github.com/Masterminds/semver/v3 v3.3.1
-	github.com/argoproj-labs/argocd-operator v0.12.2
-	github.com/argoproj/argo-cd/v2 v2.13.2
+	github.com/argoproj-labs/argocd-operator v0.13.0
+	github.com/argoproj/argo-cd/v2 v2.13.3
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.13.1
 	github.com/go-logr/logr v1.4.2
