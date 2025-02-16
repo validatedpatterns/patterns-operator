@@ -51,7 +51,6 @@ linters-settings:
     ignored-functions:
       - strings.SplitN
   govet:
-    shadow: true
     settings:
       printf:
         funcs:
