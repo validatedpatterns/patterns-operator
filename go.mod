@@ -2,7 +2,7 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 
 go 1.22.5
 
-toolchain go1.23.2
+toolchain go1.24.0
 
 require (
 	code.gitea.io/sdk/gitea v0.20.0
