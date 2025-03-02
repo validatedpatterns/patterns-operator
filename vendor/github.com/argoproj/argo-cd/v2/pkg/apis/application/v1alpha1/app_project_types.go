@@ -483,7 +483,6 @@ func (proj AppProject) IsDestinationPermitted(dst ApplicationDestination, projec
 
 func (proj AppProject) isDestinationMatched(dst ApplicationDestination) bool {
 	anyDestinationMatched := false
-	noDenyDestinationsMatched := true
 
 	for _, item := range proj.Spec.Destinations {
 		dstNameMatched := dst.Name != "" && globMatch(item.Name, dst.Name, true)
@@ -493,12 +492,14 @@ func (proj AppProject) isDestinationMatched(dst ApplicationDestination) bool {
 		matched := (dstServerMatched || dstNameMatched) && dstNamespaceMatched
 		if matched {
 			anyDestinationMatched = true
-		} else if ((!dstNameMatched && isDenyPattern(item.Name)) || (!dstServerMatched && isDenyPattern(item.Server))) || (!dstNamespaceMatched && isDenyPattern(item.Namespace)) {
-			noDenyDestinationsMatched = false
+		} else if (!dstNameMatched && isDenyPattern(item.Name)) || (!dstServerMatched && isDenyPattern(item.Server)) && dstNamespaceMatched {
+			return false
+		} else if !dstNamespaceMatched && isDenyPattern(item.Namespace) && dstServerMatched {
+			return false
 		}
 	}
 
-	return anyDestinationMatched && noDenyDestinationsMatched
+	return anyDestinationMatched
 }
 
 func isDenyPattern(pattern string) bool {
