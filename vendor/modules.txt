@@ -61,7 +61,7 @@ github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/argoproj-labs/argocd-operator v0.13.0
+# github.com/argoproj-labs/argocd-operator v0.13.1
 ## explicit; go 1.22.0
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
