@@ -16,16 +16,16 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible
-	github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e // release-4.16
+	github.com/openshift/client-go v0.0.0-20250402181141-b3bad3b645f2 // release-4.16
 	github.com/operator-framework/api v0.27.0
 	github.com/operator-framework/operator-lifecycle-manager v0.30.0
 	github.com/segmentio/analytics-go/v3 v3.3.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/crypto v0.35.0
+	golang.org/x/crypto v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.16.4
-	k8s.io/api v0.31.3
-	k8s.io/apimachinery v0.31.3
+	k8s.io/api v0.32.3
+	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v12.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.19.4
 )
@@ -147,12 +147,12 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.28.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
@@ -170,15 +170,15 @@ require (
 	k8s.io/component-helpers v0.31.2 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-aggregator v0.31.2 // indirect
-	k8s.io/kube-openapi v0.0.0-20240816214639-573285566f34 // indirect
+	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	k8s.io/kubectl v0.31.3 // indirect
 	k8s.io/kubernetes v1.31.0 // indirect
-	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
+	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	oras.land/oras-go/v2 v2.5.0 // indirect
-	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
@@ -186,7 +186,7 @@ replace (
 	// Usually not needed unless we have newer k8s.io deps and argocd still uses an old gitops-engine
 	// github.com/argoproj/gitops-engine => github.com/argoproj/gitops-engine v0.0.0-20240905010810-bd7681ae3f8b
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
-	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20250402181141-b3bad3b645f2
 	// Caused by Argo importing 'k8s.io/api'
 	// Override all the v0.0.0 entries
 	k8s.io/api => k8s.io/api v0.31.2
