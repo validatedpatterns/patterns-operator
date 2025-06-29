@@ -3,10 +3,8 @@ package pool
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"net"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/redis/go-redis/v9/internal/proto"
@@ -18,9 +16,6 @@ type Conn struct {
 	usedAt  int64 // atomic
 	netConn net.Conn
 
-	// for checking the health status of the connection, it may be nil.
-	sysConn syscall.Conn
-
 	rd *proto.Reader
 	bw *bufio.Writer
 	wr *proto.Writer
@@ -28,6 +23,8 @@ type Conn struct {
 	Inited    bool
 	pooled    bool
 	createdAt time.Time
+
+	onClose func() error
 }
 
 func NewConn(netConn net.Conn) *Conn {
@@ -39,7 +36,6 @@ func NewConn(netConn net.Conn) *Conn {
 	cn.bw = bufio.NewWriter(netConn)
 	cn.wr = proto.NewWriter(cn.bw)
 	cn.SetUsedAt(time.Now())
-	cn.setSysConn()
 	return cn
 }
 
@@ -52,26 +48,14 @@ func (cn *Conn) SetUsedAt(tm time.Time) {
 	atomic.StoreInt64(&cn.usedAt, tm.Unix())
 }
 
+func (cn *Conn) SetOnClose(fn func() error) {
+	cn.onClose = fn
+}
+
 func (cn *Conn) SetNetConn(netConn net.Conn) {
 	cn.netConn = netConn
 	cn.rd.Reset(netConn)
 	cn.bw.Reset(netConn)
-	cn.setSysConn()
-}
-
-func (cn *Conn) setSysConn() {
-	cn.sysConn = nil
-	conn := cn.netConn
-	if conn == nil {
-		return
-	}
-	if tlsConn, ok := conn.(*tls.Conn); ok {
-		conn = tlsConn.NetConn()
-	}
-
-	if sysConn, ok := conn.(syscall.Conn); ok {
-		cn.sysConn = sysConn
-	}
 }
 
 func (cn *Conn) Write(b []byte) (int, error) {
@@ -117,6 +101,10 @@ func (cn *Conn) WithWriter(
 }
 
 func (cn *Conn) Close() error {
+	if cn.onClose != nil {
+		// ignore error
+		_ = cn.onClose()
+	}
 	return cn.netConn.Close()
 }
 
