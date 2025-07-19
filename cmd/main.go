@@ -144,11 +144,11 @@ func printVersion() {
 func createGitOpsConfigMap() error {
 	config, err := ctrl.GetConfig()
 	if err != nil {
-		return fmt.Errorf("Failed to get config: %s", err)
+		return fmt.Errorf("failed to get config: %s", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("Failed to call NewForConfig: %s", err)
+		return fmt.Errorf("failed to call NewForConfig: %s", err)
 	}
 
 	configMap := corev1.ConfigMap{

@@ -112,7 +112,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Or r.logger.Error(err, "message", "name", p.Name, "namespace", p.ObjectMeta.Namespace, "reason", reason))
 
 	instance := &api.Pattern{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+	err := r.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -127,19 +127,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Remove the ArgoCD application on deletion
-	if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+	if instance.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
 		if !controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) {
 			controllerutil.AddFinalizer(instance, api.PatternFinalizer)
-			err = r.Client.Update(context.TODO(), instance)
+			err = r.Update(context.TODO(), instance)
 			return r.actionPerformed(instance, "updated finalizer", err)
 		}
 	} else if err = r.finalizeObject(instance); err != nil {
 		return r.actionPerformed(instance, "finalize", err)
 	} else {
-		log.Printf("Removing finalizer from %s\n", instance.ObjectMeta.Name)
+		log.Printf("Removing finalizer from %s\n", instance.Name)
 		controllerutil.RemoveFinalizer(instance, api.PatternFinalizer)
-		if err = r.Client.Update(context.TODO(), instance); err != nil {
+		if err = r.Update(context.TODO(), instance); err != nil {
 			log.Printf("\x1b[31;1m\tReconcile step %q failed: %s\x1b[0m\n", "remove finalizer", err.Error())
 			return reconcile.Result{}, err
 		}
@@ -332,7 +332,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 		"password": []byte(giteaAdminPassword),
 	}
 	giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
-	err = r.Client.Create(context.Background(), giteaAdminSecret)
+	err = r.Create(context.Background(), giteaAdminSecret)
 	if err != nil && !kerrors.IsAlreadyExists(err) {
 		return fmt.Errorf("could not create Gitea Admin Secret: %v", err)
 	}
@@ -395,7 +395,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	// Replace the Target Repo with new Gitea Repo URL
 	// and update the pattern CR
 	input.Spec.GitConfig.TargetRepo = giteaRepoURL
-	err = r.Client.Update(context.Background(), input)
+	err = r.Update(context.Background(), input)
 	if err != nil {
 		return fmt.Errorf("update CR Target Repo: %v", err)
 	}
@@ -488,11 +488,11 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	}
 
 	if output.Spec.GitConfig.TargetRevision == "" {
-		output.Spec.GitConfig.TargetRevision = "HEAD"
+		output.Spec.GitConfig.TargetRevision = GitHEAD
 	}
 
 	if output.Spec.GitConfig.OriginRevision == "" {
-		output.Spec.GitConfig.OriginRevision = "HEAD"
+		output.Spec.GitConfig.OriginRevision = GitHEAD
 	}
 
 	if output.Spec.GitConfig.Hostname == "" {
@@ -653,7 +653,7 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 	if err != nil {
 		delay := time.Minute * 1
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
-	} else if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+	} else if !p.DeletionTimestamp.IsZero() {
 		delay := time.Minute * 2
 		return r.onReconcileErrorWithRequeue(p, reason, err, &delay)
 	}
@@ -665,7 +665,7 @@ func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err e
 // Returns true if the CR was updated else it returns false
 func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, error) {
 	fUpdateCR := false
-	var labelFilter = "validatedpatterns.io/pattern=" + input.ObjectMeta.Name
+	var labelFilter = "validatedpatterns.io/pattern=" + input.Name
 
 	// Copy just the applications
 	// Used to compare against input which will be updated with
@@ -691,7 +691,7 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// into input
 	for _, app := range applications.Items { //nolint:gocritic // rangeValCopy: each iteration copies 936 bytes
 		// Add Application information to ApplicationInfo struct
-		var applicationInfo api.PatternApplicationInfo = api.PatternApplicationInfo{
+		var applicationInfo = api.PatternApplicationInfo{
 			Name:             app.Name,
 			Namespace:        app.Namespace,
 			AppHealthStatus:  string(app.Status.Health.Status),

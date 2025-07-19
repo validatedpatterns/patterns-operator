@@ -47,7 +47,7 @@ const (
 )
 
 const GitCustomCAFile = "/tmp/vp-git-cas.pem"
-
+const GitHEAD = "HEAD"
 const VPTmpFolder = "vp"
 
 // GitOperations interface defines the methods used from the go-git package.
@@ -136,7 +136,7 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	}
 
 	// Explicitly handle the "HEAD" reference
-	if name == "HEAD" { //nolint:goconst
+	if name == GitHEAD {
 		headRef, err := repo.Head()
 		if err != nil {
 			return plumbing.ZeroHash, fmt.Errorf("failed to get HEAD reference: %w", err)
@@ -266,10 +266,10 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 		InsecureSkipTLS: true,
 		Tags:            git.AllTags,
 	}
-	authType := detectGitAuthType(secret)
-	if authType == GitAuthPassword {
+	switch authType := detectGitAuthType(secret); authType {
+	case GitAuthPassword:
 		foptions.Auth = getHttpAuth(secret)
-	} else if authType == GitAuthSsh {
+	case GitAuthSsh:
 		publicKey, err := getSshPublicKey(url, secret)
 		if err != nil {
 			return nil, err
@@ -291,10 +291,10 @@ func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, e
 		Tags:         git.AllTags,
 	}
 
-	authType := detectGitAuthType(secret)
-	if authType == GitAuthPassword {
+	switch authType := detectGitAuthType(secret); authType {
+	case GitAuthPassword:
 		options.Auth = getHttpAuth(secret)
-	} else if authType == GitAuthSsh {
+	case GitAuthSsh:
 		publicKey, err := getSshPublicKey(url, secret)
 		if err != nil {
 			return nil, err
