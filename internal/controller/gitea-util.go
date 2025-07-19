@@ -50,7 +50,7 @@ func (g *GiteaOperationsImpl) MigrateGiteaRepo(
 	repository, response, _ := giteaClient.GetRepo(GiteaAdminUser, repoName)
 
 	// Repo has been already migrated
-	if response.Response.StatusCode == http.StatusOK {
+	if response.StatusCode == http.StatusOK {
 		return true, repository.HTMLURL, nil
 	}
 

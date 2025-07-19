@@ -22,9 +22,9 @@ jobs:
           echo '' > "${APIFILE}"
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: v1.64.5
+          version: v2.2.2
           args: --timeout 5m -v
 
           #--exclude SA5011

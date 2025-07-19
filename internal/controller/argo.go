@@ -424,7 +424,7 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			})
 		}
 	}
-	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !p.DeletionTimestamp.IsZero() {
 		parameters = append(parameters, argoapi.HelmParameter{
 			Name:        "global.deletePattern",
 			Value:       "1",
@@ -541,7 +541,7 @@ func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 
 func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 	var syncPolicy *argoapi.SyncPolicy
-	if !p.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !p.DeletionTimestamp.IsZero() {
 		syncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision
 			Automated: &argoapi.SyncPolicyAutomated{

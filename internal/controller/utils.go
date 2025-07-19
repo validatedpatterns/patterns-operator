@@ -336,8 +336,8 @@ func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
 	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
 	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
 	var err error
-	var kuberoot string = ""
-	var trustedcabundle string = ""
+	var kuberoot = ""
+	var trustedcabundle = ""
 
 	if fullClient != nil {
 		kuberoot, err = getConfigMapKey(fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt")
