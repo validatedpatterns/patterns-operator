@@ -375,7 +375,8 @@ spec:
     - name: workspace
     - name: git-auth
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-bundle
   workspaces:
   - name: workspace
     volumeClaimTemplate:
