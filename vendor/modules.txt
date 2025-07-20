@@ -7,8 +7,8 @@ code.gitea.io/sdk/gitea
 # dario.cat/mergo v1.0.1
 ## explicit; go 1.13
 dario.cat/mergo
-# github.com/42wim/httpsig v1.2.2
-## explicit; go 1.18
+# github.com/42wim/httpsig v1.2.3
+## explicit; go 1.23.0
 github.com/42wim/httpsig
 # github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c
 ## explicit; go 1.16
