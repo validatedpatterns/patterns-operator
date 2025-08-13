@@ -34,6 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -103,11 +104,12 @@ func main() {
 
 	registerComponentOrExit(mgr, argov1beta1api.AddToScheme)
 
-	isAnalyticsDisabled := strings.ToLower(os.Getenv("ANALYTICS")) == "false"
+	analyticsDisabled := isAnalyticsDisabled(mgr.GetAPIReader())
+	setupLog.Info("analytics disabled", "disabled", analyticsDisabled)
 	if err = (&controllers.PatternReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
-		AnalyticsClient: controllers.AnalyticsInit(isAnalyticsDisabled, setupLog),
+		AnalyticsClient: controllers.AnalyticsInit(analyticsDisabled, setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pattern")
 		os.Exit(1)
@@ -183,4 +185,23 @@ func registerComponentOrExit(mgr manager.Manager, f func(*k8sruntime.Scheme) err
 		os.Exit(1)
 	}
 	setupLog.Info(fmt.Sprintf("Component registered: %v", reflect.ValueOf(f)))
+}
+
+// isAnalyticsDisabled determines whether analytics are disabled.
+// Precedence: Operator ConfigMap key "analytics.disabled" (true/false) > ENV ANALYTICS (false means disabled)
+func isAnalyticsDisabled(reader crclient.Reader) bool {
+	disabled := strings.ToLower(os.Getenv("ANALYTICS")) == "false"
+
+	var cm corev1.ConfigMap
+	err := reader.Get(context.Background(), crclient.ObjectKey{Namespace: controllers.OperatorNamespace, Name: controllers.OperatorConfigMap}, &cm)
+	if err != nil {
+		setupLog.Error(err, "error reading operator configmap for analytics setting")
+		return disabled
+	}
+
+	if v, ok := cm.Data["analytics.disabled"]; ok {
+		return strings.EqualFold(v, "true")
+	}
+
+	return disabled
 }
