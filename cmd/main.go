@@ -104,12 +104,12 @@ func main() {
 
 	registerComponentOrExit(mgr, argov1beta1api.AddToScheme)
 
-	analyticsDisabled := isAnalyticsDisabled(mgr.GetAPIReader())
-	setupLog.Info("analytics disabled", "disabled", analyticsDisabled)
+	analyticsEnabled := areAnalyticsEnabled(mgr.GetAPIReader())
+	setupLog.Info("analytics enabled", "enabled", analyticsEnabled)
 	if err = (&controllers.PatternReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
-		AnalyticsClient: controllers.AnalyticsInit(analyticsDisabled, setupLog),
+		AnalyticsClient: controllers.AnalyticsInit(!analyticsEnabled, setupLog),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pattern")
 		os.Exit(1)
@@ -187,21 +187,21 @@ func registerComponentOrExit(mgr manager.Manager, f func(*k8sruntime.Scheme) err
 	setupLog.Info(fmt.Sprintf("Component registered: %v", reflect.ValueOf(f)))
 }
 
-// isAnalyticsDisabled determines whether analytics are disabled.
-// Precedence: Operator ConfigMap key "analytics.disabled" (true/false) > ENV ANALYTICS (false means disabled)
-func isAnalyticsDisabled(reader crclient.Reader) bool {
-	disabled := strings.ToLower(os.Getenv("ANALYTICS")) == "false"
+// areAnalyticsEnabled determines whether analytics are enabled.
+// Precedence: Operator ConfigMap key "analytics.enabled" (true/false) > ENV ANALYTICS (false means disabled)
+func areAnalyticsEnabled(reader crclient.Reader) bool {
+	enabled := strings.ToLower(os.Getenv("ANALYTICS")) != "false"
 
 	var cm corev1.ConfigMap
 	err := reader.Get(context.Background(), crclient.ObjectKey{Namespace: controllers.OperatorNamespace, Name: controllers.OperatorConfigMap}, &cm)
 	if err != nil {
 		setupLog.Error(err, "error reading operator configmap for analytics setting")
-		return disabled
+		return enabled
 	}
 
-	if v, ok := cm.Data["analytics.disabled"]; ok {
+	if v, ok := cm.Data["analytics.enabled"]; ok {
 		return strings.EqualFold(v, "true")
 	}
 
-	return disabled
+	return enabled
 }
