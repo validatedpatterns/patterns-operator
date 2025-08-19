@@ -8,6 +8,7 @@ approvers:
   - darkdoc
   - yukinchan
   - mlabonte-rh
+  - gaurav-nelson
 options: {}
 reviewers:
   - beekhof
@@ -18,3 +19,4 @@ reviewers:
   - darkdoc
   - yukinchan
   - mlabonte-rh
+  - gaurav-nelson
