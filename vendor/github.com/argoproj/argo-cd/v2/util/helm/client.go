@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/credentials"
 
 	"github.com/argoproj/argo-cd/v2/util/cache"
 	argoio "github.com/argoproj/argo-cd/v2/util/io"
@@ -54,8 +55,8 @@ type indexCache interface {
 }
 
 type Client interface {
-	CleanChartCache(chart string, version string, project string) error
-	ExtractChart(chart string, version string, project string, passCredentials bool, manifestMaxExtractedSize int64, disableManifestMaxExtractedSize bool) (string, argoio.Closer, error)
+	CleanChartCache(chart string, version string) error
+	ExtractChart(chart string, version string, passCredentials bool, manifestMaxExtractedSize int64, disableManifestMaxExtractedSize bool) (string, argoio.Closer, error)
 	GetIndex(noCache bool, maxIndexSize int64) (*Index, error)
 	GetTags(chart string, noCache bool) (*TagsList, error)
 	TestHelmOCI() (bool, error)
@@ -119,8 +120,8 @@ func fileExist(filePath string) (bool, error) {
 	return true, nil
 }
 
-func (c *nativeHelmChart) CleanChartCache(chart string, version string, project string) error {
-	cachePath, err := c.getCachedChartPath(chart, version, project)
+func (c *nativeHelmChart) CleanChartCache(chart string, version string) error {
+	cachePath, err := c.getCachedChartPath(chart, version)
 	if err != nil {
 		return fmt.Errorf("error getting cached chart path: %w", err)
 	}
@@ -147,7 +148,7 @@ func untarChart(tempDir string, cachedChartPath string, manifestMaxExtractedSize
 	return files.Untgz(tempDir, reader, manifestMaxExtractedSize, false)
 }
 
-func (c *nativeHelmChart) ExtractChart(chart string, version string, project string, passCredentials bool, manifestMaxExtractedSize int64, disableManifestMaxExtractedSize bool) (string, argoio.Closer, error) {
+func (c *nativeHelmChart) ExtractChart(chart string, version string, passCredentials bool, manifestMaxExtractedSize int64, disableManifestMaxExtractedSize bool) (string, argoio.Closer, error) {
 	// always use Helm V3 since we don't have chart content to determine correct Helm version
 	helmCmd, err := NewCmdWithVersion("", c.enableOci, c.proxy, c.noProxy)
 	if err != nil {
@@ -161,8 +162,9 @@ func (c *nativeHelmChart) ExtractChart(chart string, version string, project str
 		return "", nil, fmt.Errorf("error creating temporary directory: %w", err)
 	}
 
-	cachedChartPath, err := c.getCachedChartPath(chart, version, project)
+	cachedChartPath, err := c.getCachedChartPath(chart, version)
 	if err != nil {
+		_ = os.RemoveAll(tempDir)
 		return "", nil, fmt.Errorf("error getting cached chart path: %w", err)
 	}
 
@@ -172,6 +174,7 @@ func (c *nativeHelmChart) ExtractChart(chart string, version string, project str
 	// check if chart tar is already downloaded
 	exists, err := fileExist(cachedChartPath)
 	if err != nil {
+		_ = os.RemoveAll(tempDir)
 		return "", nil, fmt.Errorf("error checking existence of cached chart path: %w", err)
 	}
 
@@ -179,6 +182,7 @@ func (c *nativeHelmChart) ExtractChart(chart string, version string, project str
 		// create empty temp directory to extract chart from the registry
 		tempDest, err := files.CreateTempDir(os.TempDir())
 		if err != nil {
+			_ = os.RemoveAll(tempDir)
 			return "", nil, fmt.Errorf("error creating temporary destination directory: %w", err)
 		}
 		defer func() { _ = os.RemoveAll(tempDest) }()
@@ -187,6 +191,7 @@ func (c *nativeHelmChart) ExtractChart(chart string, version string, project str
 			if c.creds.Password != "" && c.creds.Username != "" {
 				_, err = helmCmd.RegistryLogin(c.repoURL, c.creds)
 				if err != nil {
+					_ = os.RemoveAll(tempDir)
 					return "", nil, fmt.Errorf("error logging into OCI registry: %w", err)
 				}
 
@@ -198,11 +203,13 @@ func (c *nativeHelmChart) ExtractChart(chart string, version string, project str
 			// 'helm pull' ensures that chart is downloaded into temp directory
 			_, err = helmCmd.PullOCI(c.repoURL, chart, version, tempDest, c.creds)
 			if err != nil {
+				_ = os.RemoveAll(tempDir)
 				return "", nil, fmt.Errorf("error pulling OCI chart: %w", err)
 			}
 		} else {
 			_, err = helmCmd.Fetch(c.repoURL, chart, version, tempDest, c.creds, passCredentials)
 			if err != nil {
+				_ = os.RemoveAll(tempDir)
 				return "", nil, fmt.Errorf("error fetching chart: %w", err)
 			}
 		}
@@ -378,8 +385,8 @@ func normalizeChartName(chart string) string {
 	return nc
 }
 
-func (c *nativeHelmChart) getCachedChartPath(chart string, version string, project string) (string, error) {
-	keyData, err := json.Marshal(map[string]string{"url": c.repoURL, "chart": chart, "version": version, "project": project})
+func (c *nativeHelmChart) getCachedChartPath(chart string, version string) (string, error) {
+	keyData, err := json.Marshal(map[string]string{"url": c.repoURL, "chart": chart, "version": version})
 	if err != nil {
 		return "", fmt.Errorf("error marshaling cache key data: %w", err)
 	}
@@ -441,13 +448,23 @@ func (c *nativeHelmChart) GetTags(chart string, noCache bool) (*TagsList, error)
 		}}
 
 		repoHost, _, _ := strings.Cut(tagsURL, "/")
+		credential := auth.StaticCredential(repoHost, auth.Credential{
+			Username: c.creds.Username,
+			Password: c.creds.Password,
+		})
+
+		// Try to fallback to the environment config, but we shouldn't error if the file is not set
+		if c.creds.Username == "" && c.creds.Password == "" {
+			store, _ := credentials.NewStoreFromDocker(credentials.StoreOptions{})
+			if store != nil {
+				credential = credentials.Credential(store)
+			}
+		}
+
 		repo.Client = &auth.Client{
-			Client: client,
-			Cache:  nil,
-			Credential: auth.StaticCredential(repoHost, auth.Credential{
-				Username: c.creds.Username,
-				Password: c.creds.Password,
-			}),
+			Client:     client,
+			Cache:      nil,
+			Credential: credential,
 		}
 
 		ctx := context.Background()
