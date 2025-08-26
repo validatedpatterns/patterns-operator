@@ -14,13 +14,13 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/fake"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
@@ -28,6 +28,11 @@ import (
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/testing"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	runtimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -533,34 +538,36 @@ var _ = Describe("Argo Pattern", func() {
 
 var _ = Describe("RemoveApplication", func() {
 	var (
-		argocdclient *argoclient.Clientset
-		name         string
-		namespace    string
+		name      string
+		namespace string
+		cl        client.Client
+		app       argoapi.Application
 	)
 
 	BeforeEach(func() {
-		argocdclient = argoclient.NewSimpleClientset()
+
 		name = "test-application"
 		namespace = "default"
+
 	})
 
 	Context("when the application exists", func() {
-		BeforeEach(func() {
-			app := &argoapi.Application{
+
+		It("should delete the application successfully", func() {
+			app = argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
 			}
-			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
 
-		It("should delete the application successfully", func() {
-			err := removeApplication(argocdclient, name, namespace)
+			cl = runtimefake.NewClientBuilder().WithObjects(&app).WithScheme(testEnv.Scheme).Build()
+			err := removeApplication(cl, &app)
 			Expect(err).ToNot(HaveOccurred())
 
-			_, err = argocdclient.ArgoprojV1alpha1().Applications(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			deleted_app := argoapi.Application{}
+
+			err = cl.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &deleted_app)
 			Expect(err).To(HaveOccurred())
 			Expect(kerrors.IsNotFound(err)).To(BeTrue())
 
@@ -569,7 +576,14 @@ var _ = Describe("RemoveApplication", func() {
 
 	Context("when the application does not exist", func() {
 		It("should return a not found error", func() {
-			err := removeApplication(argocdclient, name, namespace)
+			app = argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+
+			err := removeApplication(cl, &app)
 			Expect(err).To(HaveOccurred())
 			Expect(kerrors.IsNotFound(err)).To(BeTrue())
 		})
@@ -577,13 +591,21 @@ var _ = Describe("RemoveApplication", func() {
 
 	Context("when there is an error deleting the application", func() {
 		BeforeEach(func() {
-			argocdclient.PrependReactor("delete", "applications", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, fmt.Errorf("delete error")
-			})
+			cl = runtimefake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Delete: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+					return fmt.Errorf("delete error")
+				}}).WithScheme(testEnv.Scheme).Build()
 		})
 
 		It("should return the error", func() {
-			err := removeApplication(argocdclient, name, namespace)
+			app = argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+
+			err := removeApplication(cl, &app)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("delete error"))
 		})

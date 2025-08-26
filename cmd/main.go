@@ -41,6 +41,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	argov1beta1api "github.com/argoproj-labs/argocd-operator/api/v1beta1"
+	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	controllers "github.com/hybrid-cloud-patterns/patterns-operator/internal/controller"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
@@ -59,6 +60,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(gitopsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(argoapi.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
