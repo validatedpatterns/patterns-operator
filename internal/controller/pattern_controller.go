@@ -29,6 +29,7 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -39,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
@@ -63,7 +63,6 @@ type PatternReconciler struct {
 
 	config          *rest.Config
 	configClient    configclient.Interface
-	argoClient      argoclient.Interface
 	olmClient       olmclient.Interface
 	fullClient      kubernetes.Interface
 	dynamicClient   dynamic.Interface
@@ -252,14 +251,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	targetApp := newArgoApplication(qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
-	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
+	app, err := getApplication(r.Client, applicationName(qualifiedInstance), clusterWideNS)
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
-		err = createApplication(r.argoClient, targetApp, clusterWideNS)
+		err = createApplication(r.Client, targetApp, clusterWideNS)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		changed, errApp := updateApplication(r.argoClient, targetApp, app, clusterWideNS)
+		changed, errApp := updateApplication(r.Client, targetApp, app, clusterWideNS)
 		if changed {
 			if errApp != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
@@ -340,14 +339,14 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
 	giteaApp := newArgoGiteaApplication(input)
 	_ = controllerutil.SetOwnerReference(input, giteaApp, r.Scheme)
-	app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
+	app, err := getApplication(r.Client, GiteaApplicationName, clusterWideNS)
 	if app == nil {
 		log.Printf("Gitea app not found: %s\n", err.Error())
-		err = createApplication(r.argoClient, giteaApp, clusterWideNS)
+		err = createApplication(r.Client, giteaApp, clusterWideNS)
 		return fmt.Errorf("create gitea application: %v", err)
 	} else if ownedBySame(giteaApp, app) {
 		// Check values
-		changed, errApp := updateApplication(r.argoClient, giteaApp, app, clusterWideNS)
+		changed, errApp := updateApplication(r.Client, giteaApp, app, clusterWideNS)
 		if changed {
 			if errApp != nil {
 				input.Status.Version = 1 + input.Status.Version
@@ -546,7 +545,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		targetApp := newArgoApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance), ns)
+		app, _ := getApplication(r.Client, applicationName(qualifiedInstance), ns)
 		if app == nil {
 			log.Printf("Application has already been removed\n")
 			return nil
@@ -563,7 +562,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 		}
-		if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+		if changed, _ := updateApplication(r.Client, targetApp, app, ns); changed {
 			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
@@ -576,7 +575,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 
 		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-		if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
+		if err := removeApplication(r.Client, app); err != nil {
 			return err
 		}
 		return fmt.Errorf("waiting for application %q to be removed", app.Name)
@@ -591,10 +590,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.config = mgr.GetConfig()
 
 	if r.configClient, err = configclient.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.argoClient, err = argoclient.NewForConfig(r.config); err != nil {
 		return err
 	}
 
@@ -676,10 +671,12 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
 	//
 	// The VP framework adds the label to each application it creates.
-	applications, err := r.argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
-		metav1.ListOptions{
-			LabelSelector: labelFilter,
-		})
+	applications := &argoapi.ApplicationList{}
+	labelSelector, err := labels.Parse(labelFilter)
+	if err != nil {
+		return false, err
+	}
+	err = r.List(context.TODO(), applications, &client.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		return false, err
 	}

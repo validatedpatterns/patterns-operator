@@ -21,11 +21,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apiv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -76,6 +78,8 @@ var _ = BeforeSuite(func() {
 	err = apiv1.Install(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = operatorv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = argoapi.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	//+kubebuilder:scaffold:scheme
 
