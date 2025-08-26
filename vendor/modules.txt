@@ -563,22 +563,11 @@ github.com/opencontainers/image-spec/specs-go/v1
 # github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible => github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
 ## explicit; go 1.21
 github.com/openshift/api/config/v1
-github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/operator/v1
 github.com/openshift/api/operator/v1alpha1
 github.com/openshift/api/route/v1
 # github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e => github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e
 ## explicit; go 1.21
-github.com/openshift/client-go/config/applyconfigurations/config/v1
-github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
-github.com/openshift/client-go/config/applyconfigurations/internal
-github.com/openshift/client-go/config/clientset/versioned
-github.com/openshift/client-go/config/clientset/versioned/fake
-github.com/openshift/client-go/config/clientset/versioned/scheme
-github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
-github.com/openshift/client-go/config/clientset/versioned/typed/config/v1/fake
-github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1
-github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1/fake
 github.com/openshift/client-go/operator/applyconfigurations/internal
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1alpha1

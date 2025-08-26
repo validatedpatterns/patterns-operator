@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	v1 "github.com/openshift/api/config/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
@@ -62,7 +63,6 @@ type PatternReconciler struct {
 	logger logr.Logger
 
 	config          *rest.Config
-	configClient    configclient.Interface
 	olmClient       olmclient.Interface
 	fullClient      kubernetes.Interface
 	dynamicClient   dynamic.Interface
@@ -427,50 +427,62 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	// Cluster ID:
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
 	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
-	if cv, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{}); err != nil {
+	cv := v1.ClusterVersion{}
+	err := r.Get(context.Background(),
+		types.NamespacedName{Name: "version"}, &cv)
+	if err != nil {
 		return output, err
-	} else {
-		output.Status.ClusterID = string(cv.Spec.ClusterID)
 	}
+
+	output.Status.ClusterID = string(cv.Spec.ClusterID)
 
 	// Cluster platform
 	// oc get Infrastructure.config.openshift.io/cluster  -o jsonpath='{.spec.platformSpec.type}'
-	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), "cluster", metav1.GetOptions{})
+	clusterInfra := v1.Infrastructure{}
+	err = r.Get(context.Background(), client.ObjectKey{
+		Namespace: "",
+		Name:      "cluster",
+	}, &clusterInfra)
+
 	if err != nil {
 		return output, err
-	} else {
-		//   status:
-		//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
-		//    apiServerURL: https://api.beekhof49.blueprints.rhecoeng.com:6443
-		//    controlPlaneTopology: HighlyAvailable
-		//    etcdDiscoveryDomain: ""
-		//    infrastructureName: beekhof49-pqzfb
-		//    infrastructureTopology: HighlyAvailable
-		//    platform: AWS
-		//    platformStatus:
-		//      aws:
-		//        region: ap-southeast-2
-		//      type: AWS
-
-		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
 	}
+	//   status:
+	//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
+	//    apiServerURL: https://api.beekhof49.blueprints.rhecoeng.com:6443
+	//    controlPlaneTopology: HighlyAvailable
+	//    etcdDiscoveryDomain: ""
+	//    infrastructureName: beekhof49-pqzfb
+	//    infrastructureTopology: HighlyAvailable
+	//    platform: AWS
+	//    platformStatus:
+	//      aws:
+	//        region: ap-southeast-2
+	//      type: AWS
+
+	output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
 
 	// Cluster Version
 	// oc get clusterversion/version -o yaml
-	clusterVersions, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
+	clusterVersions := v1.ClusterVersion{}
+	err = r.Get(context.Background(),
+		types.NamespacedName{Name: "version"}, &clusterVersions)
+
 	if err != nil {
 		return output, err
-	} else {
-		v, version_err := getCurrentClusterVersion(clusterVersions)
-		if version_err != nil {
-			return output, version_err
-		}
-		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 	}
+	v, version_err := getCurrentClusterVersion(&clusterVersions)
+
+	if version_err != nil {
+		return output, version_err
+	}
+	output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
-	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
+	clusterIngress := v1.Ingress{}
+	err = r.Get(context.Background(),
+		types.NamespacedName{Name: "cluster"}, &clusterIngress)
 	if err != nil {
 		return output, err
 	}
@@ -588,10 +600,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
 	r.config = mgr.GetConfig()
-
-	if r.configClient, err = configclient.NewForConfig(r.config); err != nil {
-		return err
-	}
 
 	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
 		return err
