@@ -28,7 +28,6 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
-	configclient "github.com/openshift/client-go/config/clientset/versioned/fake"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 	gomock "go.uber.org/mock/gomock"
@@ -207,7 +206,6 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	defer mockctrl.Finish()
 	mockGitOps = NewMockGitOperations(mockctrl)
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
 	clusterVersion := &v1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{Name: "version"},
 		Spec:       v1.ClusterVersionSpec{ClusterID: "10"},
@@ -226,6 +224,8 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		Spec:       operatorv1.OpenShiftControllerManagerSpec{},
 		Status:     operatorv1.OpenShiftControllerManagerStatus{OperatorStatus: operatorv1.OperatorStatus{Version: "4.10.3"}}}
 	ingress := &v1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.IngressSpec{Domain: "hello.world"}}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).
+		WithRuntimeObjects(clusterVersion, clusterInfra, ingress).Build()
 	watcher, _ := newDriftWatcher(fakeClient, logr.New(log.NullLogSink{}), newGitClient())
 	return &PatternReconciler{
 		Scheme:          scheme.Scheme,
@@ -233,7 +233,6 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		olmClient:       olmclient.NewSimpleClientset(),
 		driftWatcher:    watcher,
 		fullClient:      kubeclient.NewSimpleClientset(),
-		configClient:    configclient.NewSimpleClientset(clusterVersion, clusterInfra, ingress),
 		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
 		gitOperations:   mockGitOps,
