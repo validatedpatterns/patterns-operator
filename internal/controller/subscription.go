@@ -23,10 +23,12 @@ import (
 	"reflect"
 
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -80,20 +82,20 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	return newSubscription, nil
 }
 
-func getSubscription(client olmclient.Interface, name string) (*operatorv1alpha1.Subscription, error) {
-	sub, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+func getSubscription(cl client.Client, name string) (*operatorv1alpha1.Subscription, error) {
+	sub := &operatorv1alpha1.Subscription{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: name, Namespace: SubscriptionNamespace}, sub)
 	if err != nil {
 		return nil, err
 	}
 	return sub, nil
 }
 
-func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
-	return err
+func createSubscription(cl client.Client, sub *operatorv1alpha1.Subscription) error {
+	return cl.Create(context.Background(), sub)
 }
 
-func updateSubscription(client olmclient.Interface, target, current *operatorv1alpha1.Subscription) (bool, error) {
+func updateSubscription(cl client.Client, target, current *operatorv1alpha1.Subscription) (bool, error) {
 	changed := false
 	if current == nil || current.Spec == nil {
 		return false, fmt.Errorf("current subscription was nil")
@@ -133,7 +135,7 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 	if changed {
 		target.Spec.DeepCopyInto(current.Spec)
-		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		err := cl.Update(context.Background(), current)
 		return changed, err
 	}
 

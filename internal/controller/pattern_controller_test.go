@@ -29,7 +29,6 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 	gomock "go.uber.org/mock/gomock"
 
 	kubeclient "k8s.io/client-go/kubernetes/fake"
@@ -230,7 +229,6 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 	return &PatternReconciler{
 		Scheme:          scheme.Scheme,
 		Client:          fakeClient,
-		olmClient:       olmclient.NewSimpleClientset(),
 		driftWatcher:    watcher,
 		fullClient:      kubeclient.NewSimpleClientset(),
 		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),

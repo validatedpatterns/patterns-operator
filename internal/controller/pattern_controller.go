@@ -43,10 +43,7 @@ import (
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
-
-	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
@@ -63,7 +60,6 @@ type PatternReconciler struct {
 	logger logr.Logger
 
 	config          *rest.Config
-	olmClient       olmclient.Interface
 	fullClient      kubernetes.Interface
 	dynamicClient   dynamic.Interface
 	routeClient     routeclient.Interface
@@ -190,14 +186,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	sub, _ := getSubscription(r.olmClient, targetSub.Name)
+	sub, _ := getSubscription(r.Client, targetSub.Name)
 	if sub == nil {
-		err = createSubscription(r.olmClient, targetSub)
+		err = createSubscription(r.Client, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		changed, errSub := updateSubscription(r.olmClient, targetSub, sub)
+		changed, errSub := updateSubscription(r.Client, targetSub, sub)
 		if changed {
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
 		}
@@ -600,10 +596,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
 	r.config = mgr.GetConfig()
-
-	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
-		return err
-	}
 
 	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
 		return err
