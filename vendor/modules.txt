@@ -589,24 +589,7 @@ github.com/openshift/client-go/route/clientset/versioned/typed/route/v1/fake
 ## explicit; go 1.24.4
 github.com/operator-framework/api/pkg/lib/version
 github.com/operator-framework/api/pkg/operators
-github.com/operator-framework/api/pkg/operators/v1
 github.com/operator-framework/api/pkg/operators/v1alpha1
-github.com/operator-framework/api/pkg/operators/v1alpha2
-github.com/operator-framework/api/pkg/operators/v2
-# github.com/operator-framework/operator-lifecycle-manager v0.33.0
-## explicit; go 1.24.4
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/scheme
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1/fake
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1/fake
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha2
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha2/fake
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v2
-github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v2/fake
-github.com/operator-framework/operator-lifecycle-manager/pkg/lib/clientfake
 # github.com/patrickmn/go-cache v2.1.0+incompatible
 ## explicit
 github.com/patrickmn/go-cache
@@ -1084,7 +1067,6 @@ k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.33.4 => k8s.io/apiserver v0.33.4
 ## explicit; go 1.24.0
 k8s.io/apiserver/pkg/features
-k8s.io/apiserver/pkg/storage/names
 k8s.io/apiserver/pkg/util/feature
 # k8s.io/cli-runtime v0.33.4 => k8s.io/cli-runtime v0.33.4
 ## explicit; go 1.24.0

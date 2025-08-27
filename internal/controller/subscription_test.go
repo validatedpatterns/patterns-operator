@@ -7,12 +7,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	kubeclient "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 var defaultTestSubscription = operatorv1alpha1.Subscription{
@@ -53,26 +54,23 @@ var defaultTestSubConfigMap = corev1.ConfigMap{
 }
 
 var _ = Describe("Subscription Functions", func() {
+	var fakeClient client.Client
+
 	Context("getSubscription", func() {
-		var testSubscription *operatorv1alpha1.Subscription
-		var fakeOlmClientSet *olmclient.Clientset
-
-		BeforeEach(func() {
-			testSubscription = defaultTestSubscription.DeepCopy()
-			fakeOlmClientSet = olmclient.NewSimpleClientset()
-		})
-
 		It("should error out with a non existing a Subscription", func() {
-			err := createSubscription(fakeOlmClientSet, testSubscription)
-			Expect(err).ToNot(HaveOccurred())
-			_, err = getSubscription(fakeOlmClientSet, "foo")
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+			_, err := getSubscription(fakeClient, "foo")
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("should return a proper Subscription", func() {
-			err := createSubscription(fakeOlmClientSet, testSubscription)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).Build()
+
+			err := createSubscription(fakeClient, &defaultTestSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			sub, err := getSubscription(fakeOlmClientSet, "foosubscription")
+
+			sub, err := getSubscription(fakeClient, "foosubscription")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub.Spec.Channel).To(Equal("foochannel"))
 			Expect(sub.Spec.CatalogSource).To(Equal("foosource"))
@@ -123,14 +121,14 @@ var _ = Describe("Subscription Functions", func() {
 
 var _ = Describe("UpdateSubscription", func() {
 	var (
-		client         *olmclient.Clientset
+		fakeClient     client.Client
 		target         *operatorv1alpha1.Subscription
 		current        *operatorv1alpha1.Subscription
 		subscriptionNs string
 	)
 
 	BeforeEach(func() {
-		client = olmclient.NewSimpleClientset()
+
 		subscriptionNs = "openshift-operators"
 
 		current = &operatorv1alpha1.Subscription{
@@ -148,11 +146,15 @@ var _ = Describe("UpdateSubscription", func() {
 			},
 		}
 		target = current.DeepCopy()
+
+		fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+			WithRuntimeObjects(current).Build()
+
 	})
 
 	Context("when current subscription is nil", func() {
 		It("should return an error", func() {
-			changed, err := updateSubscription(client, target, nil)
+			changed, err := updateSubscription(fakeClient, target, nil)
 			Expect(changed).To(BeFalse())
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("current subscription was nil"))
@@ -161,7 +163,7 @@ var _ = Describe("UpdateSubscription", func() {
 
 	Context("when target subscription is nil", func() {
 		It("should return an error", func() {
-			changed, err := updateSubscription(client, nil, current)
+			changed, err := updateSubscription(fakeClient, nil, current)
 			Expect(changed).To(BeFalse())
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("target subscription was nil"))
@@ -170,79 +172,85 @@ var _ = Describe("UpdateSubscription", func() {
 
 	Context("when the subscription specs are the same", func() {
 		It("should return false and no error", func() {
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeFalse())
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	Context("when the subscription specs are different", func() {
-		BeforeEach(func() {
-			_, _ = client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Create(context.Background(), current, metav1.CreateOptions{})
-		})
 
 		It("channel difference should return true and update the current subscription", func() {
 			target.Spec.Channel = "beta"
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.Channel).To(Equal("beta"))
 		})
 
 		It("catalgsource difference should return true and update the current subscription", func() {
 			target.Spec.CatalogSource = "somesource"
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.CatalogSource).To(Equal("somesource"))
 		})
 
 		It("catalogsourcenamespace difference should return true and update the current subscription", func() {
 			target.Spec.CatalogSourceNamespace = "another"
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.CatalogSourceNamespace).To(Equal("another"))
 		})
 
 		It("package difference should return true and update the current subscription", func() {
 			target.Spec.Package = "notdefault"
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
+
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.Package).To(Equal("notdefault"))
 		})
 
 		It("InstallPlanApproval difference should return true and update the current subscription", func() {
 			target.Spec.InstallPlanApproval = operatorv1alpha1.ApprovalManual
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
+
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
 		})
 
 		It("StartingCSV difference should return true and update the current subscription", func() {
 			target.Spec.StartingCSV = "v1.1.0"
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
+
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.StartingCSV).To(Equal("v1.1.0"))
 		})
@@ -257,26 +265,28 @@ var _ = Describe("UpdateSubscription", func() {
 				},
 			}
 			target.Spec.Config = tmp
-			changed, err := updateSubscription(client, target, current)
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
-			updated, err := client.OperatorsV1alpha1().Subscriptions(subscriptionNs).Get(context.Background(), current.Name, metav1.GetOptions{})
+			updated := operatorv1alpha1.Subscription{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: current.Name, Namespace: current.Namespace}, &updated)
+
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updated.Spec.Config.Env[0].Name).To(Equal("foo"))
 		})
 	})
 
 	Context("when there is an error updating the subscription", func() {
-		BeforeEach(func() {
-			client.PrependReactor("update", "subscriptions", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, fmt.Errorf("update error")
-			})
-			target.Spec.Channel = "beta"
-		})
 
 		It("should return true and an error", func() {
-			changed, err := updateSubscription(client, target, current)
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					return fmt.Errorf("update error")
+				}}).WithScheme(testEnv.Scheme).Build()
+			target.Spec.Channel = "beta"
+
+			changed, err := updateSubscription(fakeClient, target, current)
 			Expect(changed).To(BeTrue())
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("update error"))
