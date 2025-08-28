@@ -43,7 +43,7 @@ import (
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
-	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/api/core/v1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
@@ -60,7 +60,6 @@ type PatternReconciler struct {
 	logger logr.Logger
 
 	config          *rest.Config
-	fullClient      kubernetes.Interface
 	dynamicClient   dynamic.Interface
 	routeClient     routeclient.Interface
 	operatorClient  operatorclient.OperatorV1Interface
@@ -183,7 +182,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
+	targetSub, _ := newSubscriptionFromConfigMap(r.Client)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
 	sub, _ := getSubscription(r.Client, targetSub.Name)
@@ -214,13 +213,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// Create the trusted-bundle configmap inside the clusterwide namespace
-	errCABundle := createTrustedBundleCM(r.fullClient, getClusterWideArgoNamespace())
+	errCABundle := createTrustedBundleCM(r.Client, getClusterWideArgoNamespace())
 	if errCABundle != nil {
 		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
 	}
 
 	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
-	err = createOrUpdateArgoCD(r.dynamicClient, r.fullClient, ClusterWideArgoName, clusterWideNS)
+	err = createOrUpdateArgoCD(r.dynamicClient, ClusterWideArgoName, clusterWideNS)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 	}
@@ -311,7 +310,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	// for the namespace to show up and then the pod will take quite a while to retry
 	// with the gitea-admin-secret mounted into it
 	if !haveNamespace(r.Client, GiteaNamespace) {
-		err := createNamespace(r.fullClient, GiteaNamespace)
+		err := createNamespace(r.Client, GiteaNamespace)
 		if err != nil {
 			return fmt.Errorf("error creating %s namespace: %v", GiteaNamespace, err)
 		}
@@ -372,13 +371,13 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	}
 
 	giteaRepoURL := fmt.Sprintf("%s/%s/%s", giteaRouteURL, GiteaAdminUser, upstreamRepoName)
-	secret, secretErr := getSecret(r.fullClient, GiteaAdminSecretName, GiteaNamespace)
+	secret, secretErr := getSecret(r.Client, GiteaAdminSecretName, GiteaNamespace)
 	if secretErr != nil {
 		return fmt.Errorf("error getting gitea Admin Secret: %v", secretErr)
 	}
 
 	// Let's attempt to migrate the repo to Gitea
-	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data["username"]),
+	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.Client, string(secret.Data["username"]),
 		string(secret.Data["password"]),
 		input.Spec.GitConfig.OriginRepo,
 		giteaRouteURL)
@@ -597,10 +596,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
 	r.config = mgr.GetConfig()
 
-	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
-		return err
-	}
-
 	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
 		return err
 	}
@@ -736,7 +731,8 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 }
 
 func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {
-	tokenSecret, err := r.fullClient.CoreV1().Secrets(namespace).Get(context.TODO(), secret, metav1.GetOptions{})
+	tokenSecret := &corev1.Secret{}
+	err := r.Get(context.Background(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
 		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", namespace, secret))
 		return nil, err
@@ -750,19 +746,22 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 		return err
 	}
 	newSecretCopy := newSecret(destSecretName, destNamespace, sourceSecret, map[string]string{"argocd.argoproj.io/secret-type": "repository"})
-	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Get(context.TODO(), destSecretName, metav1.GetOptions{})
+	oldsecret := &corev1.Secret{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: destSecretName, Namespace: destNamespace}, oldsecret)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			// Resource does not exist, create it
-			_, err = r.fullClient.CoreV1().Secrets(destNamespace).Create(context.TODO(), newSecretCopy, metav1.CreateOptions{})
-			return err
+			err := r.Create(context.Background(), newSecretCopy)
+			if err != nil {
+				return err
+			}
 		}
 		return err
 	}
 
 	// The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
-	updatedSecret, err := r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
-	if err == nil && !compareMaps(newSecretCopy.Data, updatedSecret.Data) {
+	err = r.Update(context.Background(), newSecretCopy)
+	if err == nil && !compareMaps(newSecretCopy.Data, oldsecret.Data) {
 		return fmt.Errorf("the secret at %s/%s has been updated", destNamespace, destSecretName)
 	}
 	return err
@@ -780,16 +779,16 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
 	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
 	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
-	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
+	if err = writeConfigMapKeyToFile(r.Client, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
 		fmt.Printf("Error while writing kube-root-ca.crt configmap to file: %v", err)
 	}
-	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
+	if err = writeConfigMapKeyToFile(r.Client, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
 		fmt.Printf("Error while appending trusted-ca-bundle configmap to file: %v", err)
 	}
 
 	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		err = cloneRepo(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+		err = cloneRepo(r.Client, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
 		if err != nil {
 			return "cloning pattern repo", err
 		}
@@ -804,13 +803,13 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 			if err != nil {
 				return "failed to remove locally cloned folder", err
 			}
-			err = cloneRepo(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+			err = cloneRepo(r.Client, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
 			if err != nil {
 				return "cloning pattern repo after removal", err
 			}
 		}
 	}
-	if err := checkoutRevision(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
+	if err := checkoutRevision(r.Client, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
 		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
 		return "checkout target revision", err
 	}

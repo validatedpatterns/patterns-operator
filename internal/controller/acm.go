@@ -22,28 +22,28 @@ import (
 	"fmt"
 	"log"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func haveACMHub(r *PatternReconciler) bool {
 	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
-	serverNamespace := ""
+	labelSelector, err := labels.Parse(fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"))
 
-	cms, err := r.fullClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
+	if err != nil {
+		log.Printf("config map error: %s\n", err.Error())
+		return false
+	}
+
+	cms := corev1.ConfigMapList{}
+	err = r.List(context.Background(), &cms, &client.ListOptions{
+		LabelSelector: labelSelector,
 	})
-	if (err != nil || len(cms.Items) == 0) && serverNamespace != "" {
-		cms, err = r.fullClient.CoreV1().ConfigMaps(serverNamespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-		})
-	}
-	if err != nil || len(cms.Items) == 0 {
-		cms, err = r.fullClient.CoreV1().ConfigMaps("open-cluster-management").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-		})
-	}
+
 	if err != nil {
 		log.Printf("config map error: %s\n", err.Error())
 		return false

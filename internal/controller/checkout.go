@@ -26,7 +26,7 @@ import (
 	"path/filepath"
 
 	stdssh "golang.org/x/crypto/ssh"
-	"k8s.io/client-go/kubernetes"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -77,8 +77,8 @@ func (g *GitOperationsImpl) CloneRepository(directory string, isBare bool, optio
 }
 
 // https://github.com/go-git/go-git/blob/master/_examples/commit/main.go
-func checkout(fullClient kubernetes.Interface, gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
-	if err := cloneRepo(fullClient, gitOps, url, directory, secret); err != nil {
+func checkout(cl ctrlclient.Client, gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+	if err := cloneRepo(cl, gitOps, url, directory, secret); err != nil {
 		return err
 	}
 
@@ -87,7 +87,7 @@ func checkout(fullClient kubernetes.Interface, gitOps GitOperations, url, direct
 		return nil
 	}
 
-	if err := checkoutRevision(fullClient, gitOps, url, directory, commit, secret); err != nil {
+	if err := checkoutRevision(cl, gitOps, url, directory, commit, secret); err != nil {
 		return err
 	}
 
@@ -163,9 +163,9 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	return plumbing.ZeroHash, fmt.Errorf("unknown target %q", name)
 }
 
-func checkoutRevision(fullClient kubernetes.Interface, gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
+func checkoutRevision(cl ctrlclient.Client, gitOps GitOperations, url, directory, commit string, secret map[string][]byte) error {
 	customClient := &nethttp.Client{
-		Transport: getHTTPSTransport(fullClient),
+		Transport: getHTTPSTransport(cl),
 	}
 	// Override http(s) default protocol to use our custom client
 	client.InstallProtocol("https", http.NewClient(customClient))
@@ -221,9 +221,9 @@ func checkoutRevision(fullClient kubernetes.Interface, gitOps GitOperations, url
 	return err
 }
 
-func cloneRepo(fullClient kubernetes.Interface, gitOps GitOperations, url, directory string, secret map[string][]byte) error {
+func cloneRepo(cl ctrlclient.Client, gitOps GitOperations, url, directory string, secret map[string][]byte) error {
 	customClient := &nethttp.Client{
-		Transport: getHTTPSTransport(fullClient),
+		Transport: getHTTPSTransport(cl),
 	}
 	// Override http(s) default protocol to use our custom client
 	client.InstallProtocol("https", http.NewClient(customClient))
