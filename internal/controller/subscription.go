@@ -29,20 +29,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 )
 
-func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Subscription, error) {
+func newSubscriptionFromConfigMap(cl client.Client) (*operatorv1alpha1.Subscription, error) {
 	var newSubscription *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	cm := &corev1.ConfigMap{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: OperatorConfigMap, Namespace: OperatorNamespace}, cm)
 	// If we hit an error that is not related to the configmap not existing bubble it up
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	if cm != nil {
+	if cm.Data != nil {
 		PatternsOperatorConfig = cm.Data
 	}
 

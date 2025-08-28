@@ -26,16 +26,16 @@ import (
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/testing"
+	"k8s.io/apimachinery/pkg/types"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -562,22 +562,25 @@ var _ = Describe("GenerateRandomPassword", func() {
 
 var _ = Describe("CreateTrustedBundleCM", func() {
 	var (
-		clientset *fake.Clientset
-		namespace string
+		fakeClient client.Client
+		namespace  string
 	)
 
 	BeforeEach(func() {
-		clientset = fake.NewSimpleClientset()
 		namespace = "default"
 	})
 
 	Context("when the ConfigMap does not exist", func() {
 		It("should create the ConfigMap", func() {
-			err := createTrustedBundleCM(clientset, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+
+			err := createTrustedBundleCM(fakeClient, namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify that the ConfigMap was created
-			cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), "trusted-ca-bundle", metav1.GetOptions{})
+			cm := corev1.ConfigMap{}
+			err = fakeClient.Get(context.Background(), types.NamespacedName{Name: "trusted-ca-bundle", Namespace: namespace}, &cm)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cm).ToNot(BeNil())
 			Expect(cm.Labels["config.openshift.io/inject-trusted-cabundle"]).To(Equal("true"))
@@ -593,12 +596,12 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 					Namespace: namespace,
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(cm).Build()
 		})
 
 		It("should not return an error", func() {
-			err := createTrustedBundleCM(clientset, namespace)
+			err := createTrustedBundleCM(fakeClient, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -606,11 +609,12 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 	Context("when an error occurs while checking for the ConfigMap", func() {
 		It("should return the error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
-			})
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					return kubeerrors.NewInternalError(fmt.Errorf("some error"))
+				}}).WithScheme(testEnv.Scheme).Build()
 
-			err := createTrustedBundleCM(clientset, namespace)
+			err := createTrustedBundleCM(fakeClient, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("some error"))
 		})
@@ -619,11 +623,13 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 	Context("when an error occurs while creating the ConfigMap", func() {
 		It("should return the error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("create", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some create error"))
-			})
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					return kubeerrors.NewInternalError(fmt.Errorf("some create error"))
+				}},
+			).WithScheme(testEnv.Scheme).Build()
 
-			err := createTrustedBundleCM(clientset, namespace)
+			err := createTrustedBundleCM(fakeClient, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("some create error"))
 		})
@@ -632,7 +638,7 @@ var _ = Describe("CreateTrustedBundleCM", func() {
 
 var _ = Describe("WriteConfigMapKeyToFile", func() {
 	var (
-		clientset     *fake.Clientset
+		fakeClient    client.Client
 		namespace     string
 		configMap     *corev1.ConfigMap
 		configMapName string
@@ -642,7 +648,6 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 	)
 
 	BeforeEach(func() {
-		clientset = fake.NewSimpleClientset()
 		namespace = "default"
 		configMapName = "test-configmap"
 		key = "test-key"
@@ -670,12 +675,12 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 					key: "test-value",
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 		})
 
 		It("should write the value to the file", func() {
-			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			err := writeConfigMapKeyToFile(fakeClient, namespace, configMapName, key, filePath, appendToFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify the content of the file
@@ -693,7 +698,7 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 			// Set appendToFile to true
 			appendToFile = true
 
-			err = writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			err = writeConfigMapKeyToFile(fakeClient, namespace, configMapName, key, filePath, appendToFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify the content of the file
@@ -705,7 +710,9 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 
 	Context("when the ConfigMap does not exist", func() {
 		It("should return an error", func() {
-			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+			err := writeConfigMapKeyToFile(fakeClient, namespace, configMapName, key, filePath, appendToFile)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("error getting ConfigMap %s in namespace %s", configMapName, namespace)))
 		})
@@ -722,12 +729,12 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 					"another-key": "another-value",
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 		})
 
 		It("should return an error", func() {
-			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, filePath, appendToFile)
+			err := writeConfigMapKeyToFile(fakeClient, namespace, configMapName, key, filePath, appendToFile)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("key %s not found in ConfigMap %s", key, configMapName)))
 		})
@@ -744,14 +751,14 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 					key: "test-value",
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 		})
 
 		It("should return an error", func() {
 			invalidFilePath := "/invalid-path/testfile"
 
-			err := writeConfigMapKeyToFile(clientset, namespace, configMapName, key, invalidFilePath, appendToFile)
+			err := writeConfigMapKeyToFile(fakeClient, namespace, configMapName, key, invalidFilePath, appendToFile)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("error opening file"))
 		})
@@ -760,7 +767,7 @@ var _ = Describe("WriteConfigMapKeyToFile", func() {
 
 var _ = Describe("GetConfigMapKey", func() {
 	var (
-		clientset     *fake.Clientset
+		fakeClient    client.Client
 		namespace     string
 		configMap     *corev1.ConfigMap
 		configMapName string
@@ -769,7 +776,6 @@ var _ = Describe("GetConfigMapKey", func() {
 	)
 
 	BeforeEach(func() {
-		clientset = fake.NewSimpleClientset()
 		namespace = "default"
 		configMapName = "test-configmap"
 		key = "test-key"
@@ -787,12 +793,12 @@ var _ = Describe("GetConfigMapKey", func() {
 					key: value,
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 		})
 
 		It("should return the value for the specified key", func() {
-			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			result, err := getConfigMapKey(fakeClient, namespace, configMapName, key)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(value))
 		})
@@ -800,7 +806,9 @@ var _ = Describe("GetConfigMapKey", func() {
 
 	Context("when the ConfigMap does not exist", func() {
 		It("should return an error", func() {
-			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+			result, err := getConfigMapKey(fakeClient, namespace, configMapName, key)
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeEmpty())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("error getting ConfigMap %s in namespace %s", configMapName, namespace)))
@@ -818,12 +826,12 @@ var _ = Describe("GetConfigMapKey", func() {
 					"another-key": "another-value",
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 		})
 
 		It("should return an error", func() {
-			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			result, err := getConfigMapKey(fakeClient, namespace, configMapName, key)
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeEmpty())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("key %s not found in ConfigMap %s", key, configMapName)))
@@ -833,11 +841,12 @@ var _ = Describe("GetConfigMapKey", func() {
 	Context("when an error occurs while getting the ConfigMap", func() {
 		It("should return an error", func() {
 			// Inject an error into the fake client
-			clientset.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("some error"))
-			})
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					return kubeerrors.NewInternalError(fmt.Errorf("some error"))
+				}}).WithScheme(testEnv.Scheme).Build()
 
-			result, err := getConfigMapKey(clientset, namespace, configMapName, key)
+			result, err := getConfigMapKey(fakeClient, namespace, configMapName, key)
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeEmpty())
 			Expect(err.Error()).To(ContainSubstring("some error"))
@@ -861,7 +870,7 @@ func parsePEM(certPEM string) *x509.Certificate {
 
 var _ = Describe("GetHTTPSTransport", func() {
 	var (
-		clientset       *fake.Clientset
+		fakeClient      client.Client
 		namespace       string
 		kubeRootCA      string
 		trustedCABundle string
@@ -872,7 +881,6 @@ var _ = Describe("GetHTTPSTransport", func() {
 	)
 
 	BeforeEach(func() {
-		clientset = fake.NewSimpleClientset()
 		namespace = "openshift-config-managed"
 		kubeRootCA = `-----BEGIN CERTIFICATE-----
 MIIDUTCCAjmgAwIBAgIIWt3N131wkCwwDQYJKoZIhvcNAQELBQAwNjE0MDIGA1UE
@@ -940,14 +948,12 @@ f3k4g5eL
 					key2: trustedCABundle,
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap1, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			_, err = clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap2, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap1, configMap2).Build()
 		})
 
 		It("should create a transport with the combined CA certificates", func() {
-			transport := getHTTPSTransport(clientset)
+			transport := getHTTPSTransport(fakeClient)
 			Expect(transport).ToNot(BeNil())
 			caCertPool := transport.TLSClientConfig.RootCAs
 			Expect(caCertPool).ToNot(BeNil())
@@ -974,12 +980,12 @@ f3k4g5eL
 					key1: kubeRootCA,
 				},
 			}
-			_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 		})
 
 		It("should create a transport with the available CA certificate", func() {
-			transport := getHTTPSTransport(clientset)
+			transport := getHTTPSTransport(fakeClient)
 			Expect(transport).ToNot(BeNil())
 
 			caCertPool := transport.TLSClientConfig.RootCAs
@@ -995,7 +1001,7 @@ f3k4g5eL
 
 	Context("when both ConfigMaps do not exist", func() {
 		It("should fallback to system CA certificates", func() {
-			transport := getHTTPSTransport(clientset)
+			transport := getHTTPSTransport(fakeClient)
 			Expect(transport).ToNot(BeNil())
 			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
 		})
@@ -1003,11 +1009,12 @@ f3k4g5eL
 
 	Context("when an error occurs while getting a ConfigMap", func() {
 		It("should print an error message and fallback to system CA certificates", func() {
-			clientset.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, fmt.Errorf("some error")
-			})
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					return fmt.Errorf("some error")
+				}}).WithScheme(testEnv.Scheme).Build()
 
-			transport := getHTTPSTransport(clientset)
+			transport := getHTTPSTransport(fakeClient)
 			Expect(transport).ToNot(BeNil())
 			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
 		})
@@ -1016,12 +1023,11 @@ f3k4g5eL
 
 var _ = Describe("createNamespace", func() {
 	var (
-		kubeClient kubernetes.Interface
+		fakeClient client.Client
 		namespace  string
 	)
 
 	BeforeEach(func() {
-		kubeClient = fake.NewSimpleClientset()
 		namespace = "test-ns"
 	})
 
@@ -1031,39 +1037,44 @@ var _ = Describe("createNamespace", func() {
 				Name: namespace,
 			},
 		}
-		_, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
-		err = createNamespace(kubeClient, namespace)
+		fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+			WithRuntimeObjects(ns).Build()
+		err := createNamespace(fakeClient, namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should create the namespace if it does not exist", func() {
-		err := createNamespace(kubeClient, namespace)
+		err := createNamespace(fakeClient, namespace)
 		Expect(err).ToNot(HaveOccurred())
-
-		_, err = kubeClient.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+		found := &corev1.Namespace{}
+		err = fakeClient.Get(context.Background(), types.NamespacedName{Name: namespace}, found)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should return an error if there is an error checking if the namespace exists", func() {
-		kubeClient.(*fake.Clientset).PrependReactor("get", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-			return true, nil, kubeerrors.NewInternalError(fmt.Errorf("internal error"))
-		})
 
-		err := createNamespace(kubeClient, namespace)
+		fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+			interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				return fmt.Errorf("internal error")
+			}}).WithScheme(testEnv.Scheme).Build()
+
+		err := createNamespace(fakeClient, namespace)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("internal error"))
 	})
 
 	It("should return an error if there is an error creating the namespace", func() {
-		kubeClient.(*fake.Clientset).PrependReactor("get", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-			return true, nil, kubeerrors.NewNotFound(corev1.Resource("namespace"), namespace)
-		})
-		kubeClient.(*fake.Clientset).PrependReactor("create", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-			return true, nil, kubeerrors.NewInternalError(fmt.Errorf("internal error"))
-		})
-		err := createNamespace(kubeClient, namespace)
+		fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+			interceptor.Funcs{
+				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					return kubeerrors.NewNotFound(corev1.Resource("namespace"), namespace)
+				},
+				Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					return kubeerrors.NewInternalError(fmt.Errorf("internal error"))
+				},
+			}).WithScheme(testEnv.Scheme).Build()
+
+		err := createNamespace(fakeClient, namespace)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("internal error"))
 	})

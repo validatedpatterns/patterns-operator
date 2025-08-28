@@ -8,8 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -21,23 +23,17 @@ import (
 var _ = Describe("HaveACMHub", func() {
 	var (
 		patternReconciler *PatternReconciler
-		kubeClient        *fake.Clientset
 		dynamicClient     *dynamicfake.FakeDynamicClient
 		gvrMCH            schema.GroupVersionResource
+		fakeClient        client.Client
 	)
 
 	BeforeEach(func() {
-		kubeClient = fake.NewSimpleClientset()
 		gvrMCH = schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
 		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
 			gvrMCH: "MultiClusterHubList",
 		})
-
-		patternReconciler = &PatternReconciler{
-			fullClient:    kubeClient,
-			dynamicClient: dynamicClient,
-		}
 
 	})
 
@@ -52,8 +48,13 @@ var _ = Describe("HaveACMHub", func() {
 					},
 				},
 			}
-			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
+			patternReconciler = &PatternReconciler{
+				Client:        fakeClient,
+				dynamicClient: dynamicClient,
+			}
 
 			hub := &unstructured.Unstructured{
 				Object: map[string]any{
@@ -65,7 +66,7 @@ var _ = Describe("HaveACMHub", func() {
 					},
 				},
 			}
-			_, err = dynamicClient.Resource(gvrMCH).Namespace("default").Create(context.Background(), hub, metav1.CreateOptions{})
+			_, err := dynamicClient.Resource(gvrMCH).Namespace("default").Create(context.Background(), hub, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -77,6 +78,13 @@ var _ = Describe("HaveACMHub", func() {
 
 	Context("when the ACM Hub does not exist", func() {
 		It("should return false", func() {
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+			patternReconciler = &PatternReconciler{
+				Client:        fakeClient,
+				dynamicClient: dynamicClient,
+			}
+
 			result := haveACMHub(patternReconciler)
 			Expect(result).To(BeFalse())
 		})
@@ -84,9 +92,14 @@ var _ = Describe("HaveACMHub", func() {
 
 	Context("when there is an error listing ConfigMaps", func() {
 		BeforeEach(func() {
-			kubeClient.PrependReactor("list", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, fmt.Errorf("config map error")
-			})
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{List: func(ctx context.Context, client client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+					return fmt.Errorf("list error")
+				}}).WithScheme(testEnv.Scheme).Build()
+			patternReconciler = &PatternReconciler{
+				Client:        fakeClient,
+				dynamicClient: dynamicClient,
+			}
 		})
 
 		It("should return false and log the error", func() {
@@ -106,12 +119,16 @@ var _ = Describe("HaveACMHub", func() {
 					},
 				},
 			}
-			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(configMap).Build()
 
 			dynamicClient.PrependReactor("list", "multiclusterhubs", func(testing.Action) (handled bool, ret runtime.Object, err error) {
 				return true, nil, fmt.Errorf("multiclusterhub error")
 			})
+			patternReconciler = &PatternReconciler{
+				Client:        fakeClient,
+				dynamicClient: dynamicClient,
+			}
 		})
 
 		It("should return false and log the error", func() {

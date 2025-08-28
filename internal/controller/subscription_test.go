@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	kubeclient "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -84,15 +83,16 @@ var _ = Describe("Subscription Functions", func() {
 
 	Context("newSubscriptionFromConfigMap", func() {
 		var testConfigMap *corev1.ConfigMap
-		var fakeClientSet *kubeclient.Clientset
 
 		BeforeEach(func() {
-			fakeClientSet = kubeclient.NewSimpleClientset()
 			testConfigMap = defaultTestSubConfigMap.DeepCopy()
+
 		})
 
 		It("should handle the absence of the ConfigMap gracefully", func() {
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+			sub, err := newSubscriptionFromConfigMap(fakeClient)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))
@@ -104,9 +104,9 @@ var _ = Describe("Subscription Functions", func() {
 		})
 
 		It("should create a Subscription from a configmap", func() {
-			_, err := fakeClientSet.CoreV1().ConfigMaps(OperatorNamespace).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(testConfigMap).Build()
+			sub, err := newSubscriptionFromConfigMap(fakeClient)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))

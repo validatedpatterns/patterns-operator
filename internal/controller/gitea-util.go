@@ -21,21 +21,21 @@ import (
 	"net/http"
 
 	"code.gitea.io/sdk/gitea"
-	"k8s.io/client-go/kubernetes"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type GiteaOperations interface {
-	MigrateGiteaRepo(fullClient kubernetes.Interface, username, password, upstreamURL, giteaServerRoute string) (success bool, repositoryURL string, err error)
+	MigrateGiteaRepo(cl ctrlclient.Client, username, password, upstreamURL, giteaServerRoute string) (success bool, repositoryURL string, err error)
 }
 
 type GiteaOperationsImpl struct{}
 
 // Function that creates a mirror repo in Gitea
 func (g *GiteaOperationsImpl) MigrateGiteaRepo(
-	fullClient kubernetes.Interface, username, password, upstreamURL, giteaServerRoute string) (success bool, repositoryURL string, err error) {
+	cl ctrlclient.Client, username, password, upstreamURL, giteaServerRoute string) (success bool, repositoryURL string, err error) {
 	option := gitea.SetBasicAuth(username, password)
 	httpClient := &http.Client{
-		Transport: getHTTPSTransport(fullClient),
+		Transport: getHTTPSTransport(cl),
 	}
 
 	giteaClient, err := gitea.NewClient(giteaServerRoute, option, gitea.SetHTTPClient(httpClient))
