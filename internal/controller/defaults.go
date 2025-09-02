@@ -17,7 +17,7 @@ const (
 
 // GitOps Subscription
 const (
-	GitOpsDefaultChannel                = "gitops-1.15"
+	GitOpsDefaultChannel                = "gitops-1.17"
 	GitOpsDefaultPackageName            = "openshift-gitops-operator"
 	GitOpsDefaultCatalogSource          = "redhat-operators"
 	GitOpsDefaultCatalogSourceNamespace = "openshift-marketplace"
