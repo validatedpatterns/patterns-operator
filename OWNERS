@@ -3,20 +3,20 @@ approvers:
   - beekhof
   - mbaldessari
   - day0hero
-  - claudiol
   - mhjacks
   - darkdoc
   - yukinchan
   - mlabonte-rh
   - gaurav-nelson
+  - dminnear-rh
 options: {}
 reviewers:
   - beekhof
   - mbaldessari
   - day0hero
-  - claudiol
   - mhjacks
   - darkdoc
   - yukinchan
   - mlabonte-rh
   - gaurav-nelson
+  - dminnear-rh
