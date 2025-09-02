@@ -24,8 +24,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/hybridcloudpatterns/patterns-operator:0.0.62
-    createdAt: 2025-09-02 16:05:13
+    containerImage: ""
+    createdAt: "2025-09-02T14:12:56Z"
     description: "An operator to deploy and manage architecture patterns from https://validatedpatterns.io.
       \nThis operator collects some Analytics like cluster version, cloud type, etc.
       To disable this\nadd \"ANALYTICS: false\" to the environment variables in the
