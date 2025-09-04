@@ -1,6 +1,9 @@
 name: "Docker Build"
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   docker-build:
     name: Docker Build
@@ -8,6 +11,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Docker Build
         env:
