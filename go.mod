@@ -8,7 +8,7 @@ require (
 	code.gitea.io/sdk/gitea v0.21.0
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/argoproj-labs/argocd-operator v0.14.0
-	github.com/argoproj/argo-cd/v2 v2.13.3
+	github.com/argoproj/argo-cd/v2 v2.13.8
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/go-logr/logr v1.4.3
@@ -41,7 +41,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20240905010810-bd7681ae3f8b // indirect
+	github.com/argoproj/gitops-engine v0.7.1-0.20250129155113-4c6e03c46314 // indirect
 	github.com/argoproj/pkg v0.13.7-0.20230626144333-d56162821bd1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -77,7 +77,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -123,7 +123,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/redis/go-redis/v9 v9.6.1 // indirect
+	github.com/redis/go-redis/v9 v9.7.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/segmentio/backo-go v1.0.0 // indirect
