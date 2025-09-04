@@ -30,3 +30,7 @@
 /config/samples/pattern-catalog-*.yaml
 **/apikey.txt
 /coverage.html
+
+# Govulncheck stuff
+govulncheck.results
+/database
