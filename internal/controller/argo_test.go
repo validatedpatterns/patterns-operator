@@ -13,8 +13,8 @@ import (
 	"github.com/onsi/gomega/format"
 	routev1 "github.com/openshift/api/route/v1"
 
-	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned/fake"
+	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/fake"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"

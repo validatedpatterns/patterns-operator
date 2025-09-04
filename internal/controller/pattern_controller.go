@@ -38,8 +38,8 @@ import (
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
+	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
