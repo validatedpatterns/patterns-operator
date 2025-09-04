@@ -35,7 +35,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
-	argogit "github.com/argoproj/argo-cd/v2/util/git"
+	argogit "github.com/argoproj/argo-cd/v3/util/git"
 )
 
 type GitAuthenticationBackend uint

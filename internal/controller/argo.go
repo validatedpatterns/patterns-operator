@@ -35,8 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
-	argoapi "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v2/pkg/client/clientset/versioned"
+	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 )

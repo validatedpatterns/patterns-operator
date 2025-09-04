@@ -97,7 +97,7 @@ const (
 
 var (
 	// globally skipped annotations
-	skipAnnotations = sets.NewString(corev1.LastAppliedConfigAnnotation)
+	skipAnnotations = sets.New[string](corev1.LastAppliedConfigAnnotation)
 
 	// DescriberFn gives a way to easily override the function for unit testing if needed
 	DescriberFn DescriberFunc = Describer
@@ -217,6 +217,8 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "ServiceCIDR"}:                 &ServiceCIDRDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "IPAddress"}:                   &IPAddressDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "ServiceCIDR"}:                      &ServiceCIDRDescriber{c},
+		{Group: networkingv1.GroupName, Kind: "IPAddress"}:                        &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
@@ -317,7 +319,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.ContainsString(skip, skipExpr, nil) {
+			if slice.Contains[string](skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -325,7 +327,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.ContainsString(skip, skipExpr, nil) {
+			if slice.Contains[string](skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -340,7 +342,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		default:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.ContainsString(skip, skipExpr, nil) {
+			if slice.Contains[string](skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
@@ -365,7 +367,7 @@ func smartLabelFor(field string) string {
 			continue
 		}
 
-		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
+		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
 			part = strings.Title(part)
@@ -838,6 +840,11 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "NominatedNodeName:\t%s\n", pod.Status.NominatedNodeName)
 		}
 
+		if pod.Spec.Resources != nil {
+			w.Write(LEVEL_0, "Resources:\n")
+			describeResources(pod.Spec.Resources, w, LEVEL_1)
+		}
+
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
@@ -1000,6 +1007,8 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printProjectedVolumeSource(volume.VolumeSource.Projected, w)
 		case volume.VolumeSource.CSI != nil:
 			printCSIVolumeSource(volume.VolumeSource.CSI, w)
+		case volume.VolumeSource.Image != nil:
+			printImageVolumeSource(volume.VolumeSource.Image, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -1075,15 +1084,17 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
 	for _, source := range projected.Sources {
 		if source.Secret != nil {
+			optional := source.Secret.Optional != nil && *source.Secret.Optional
 			w.Write(LEVEL_2, "SecretName:\t%v\n"+
-				"    SecretOptionalName:\t%v\n",
-				source.Secret.Name, source.Secret.Optional)
+				"    Optional:\t%v\n",
+				source.Secret.Name, optional)
 		} else if source.DownwardAPI != nil {
 			w.Write(LEVEL_2, "DownwardAPI:\ttrue\n")
 		} else if source.ConfigMap != nil {
+			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
 			w.Write(LEVEL_2, "ConfigMapName:\t%v\n"+
-				"    ConfigMapOptional:\t%v\n",
-				source.ConfigMap.Name, source.ConfigMap.Optional)
+				"    Optional:\t%v\n",
+				source.ConfigMap.Name, optional)
 		} else if source.ServiceAccountToken != nil {
 			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
 				*source.ServiceAccountToken.ExpirationSeconds)
@@ -1442,10 +1453,10 @@ func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w Pre
 }
 
 func printCSIPersistentVolumeAttributesMultiline(w PrefixWriter, title string, annotations map[string]string) {
-	printCSIPersistentVolumeAttributesMultilineIndent(w, "", title, "\t", annotations, sets.NewString())
+	printCSIPersistentVolumeAttributesMultilineIndent(w, "", title, "\t", annotations, sets.New[string]())
 }
 
-func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIndent, title, innerIndent string, attributes map[string]string, skip sets.String) {
+func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIndent, title, innerIndent string, attributes map[string]string, skip sets.Set[string]) {
 	w.Write(LEVEL_2, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if len(attributes) == 0 {
@@ -1479,6 +1490,13 @@ func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIn
 			w.Write(LEVEL_2, "%s\n", line)
 		}
 	}
+}
+
+func printImageVolumeSource(image *corev1.ImageVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tImage (a container image or OCI artifact)\n"+
+		"    Reference:\t%v\n"+
+		"    PullPolicy:\t%v\n",
+		image.Reference, image.PullPolicy)
 }
 
 type PersistentVolumeDescriber struct {
@@ -1791,7 +1809,7 @@ func describeContainers(label string, containers []corev1.Container, containerSt
 		if ok {
 			describeContainerState(status, w)
 		}
-		describeContainerResource(container, w)
+		describeResources(&container.Resources, w, LEVEL_2)
 		describeContainerProbe(container, w)
 		if len(container.EnvFrom) > 0 {
 			describeContainerEnvFrom(container, resolverFn, w)
@@ -1877,22 +1895,25 @@ func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerResource(container corev1.Container, w PrefixWriter) {
-	resources := container.Resources
+func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, level int) {
+	if resources == nil {
+		return
+	}
+
 	if len(resources.Limits) > 0 {
-		w.Write(LEVEL_2, "Limits:\n")
+		w.Write(level, "Limits:\n")
 	}
 	for _, name := range SortedResourceNames(resources.Limits) {
 		quantity := resources.Limits[name]
-		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
 	}
 
 	if len(resources.Requests) > 0 {
-		w.Write(LEVEL_2, "Requests:\n")
+		w.Write(level, "Requests:\n")
 	}
 	for _, name := range SortedResourceNames(resources.Requests) {
 		quantity := resources.Requests[name]
-		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
 	}
 }
 
@@ -2111,8 +2132,8 @@ func describeVolumeClaimTemplates(templates []corev1.PersistentVolumeClaim, w Pr
 	for _, pvc := range templates {
 		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_1, "StorageClass:\t%s\n", storageutil.GetPersistentVolumeClaimClass(&pvc))
-		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
-		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
+		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.New[string]())
+		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.New[string]())
 		if capacity, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity.String())
 		} else {
@@ -2506,18 +2527,14 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 		events, _ = searchEvents(d.CoreV1(), daemon, describerSettings.ChunkSize)
 	}
 
-	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
+	return describeDaemonSet(daemon, selector, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *appsv1.DaemonSet, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *appsv1.DaemonSet, selector labels.Selector, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
-		selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
-		if err != nil {
-			// this shouldn't happen if LabelSelector passed validation
-			return err
-		}
+		w.Write(LEVEL_0, "Namespace:\t%s\n", daemon.Namespace)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		w.Write(LEVEL_0, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
 		printLabelsMultiline(w, "Labels", daemon.Labels)
@@ -2870,6 +2887,14 @@ type ServiceCIDRDescriber struct {
 func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
+	svcV1, err := c.client.NetworkingV1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(c.client.CoreV1(), svcV1, describerSettings.ChunkSize)
+		}
+		return c.describeServiceCIDRV1(svcV1, events)
+	}
+
 	svcV1beta1, err := c.client.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
@@ -2878,6 +2903,37 @@ func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSetting
 		return c.describeServiceCIDRV1beta1(svcV1beta1, events)
 	}
 	return "", err
+}
+
+func (c *ServiceCIDRDescriber) describeServiceCIDRV1(svc *networkingv1.ServiceCIDR, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%v\n", svc.Name)
+		printLabelsMultiline(w, "Labels", svc.Labels)
+		printAnnotationsMultiline(w, "Annotations", svc.Annotations)
+
+		w.Write(LEVEL_0, "CIDRs:\t%v\n", strings.Join(svc.Spec.CIDRs, ", "))
+
+		if len(svc.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Status:\n")
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+			for _, c := range svc.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+					c.Type,
+					c.Status,
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
+			}
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
 }
 
 func (c *ServiceCIDRDescriber) describeServiceCIDRV1beta1(svc *networkingv1beta1.ServiceCIDR, events *corev1.EventList) (string, error) {
@@ -2919,6 +2975,14 @@ type IPAddressDescriber struct {
 func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
+	ipV1, err := c.client.NetworkingV1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(c.client.CoreV1(), ipV1, describerSettings.ChunkSize)
+		}
+		return c.describeIPAddressV1(ipV1, events)
+	}
+
 	ipV1beta1, err := c.client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
@@ -2927,6 +2991,28 @@ func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings 
 		return c.describeIPAddressV1beta1(ipV1beta1, events)
 	}
 	return "", err
+}
+
+func (c *IPAddressDescriber) describeIPAddressV1(ip *networkingv1.IPAddress, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%v\n", ip.Name)
+		printLabelsMultiline(w, "Labels", ip.Labels)
+		printAnnotationsMultiline(w, "Annotations", ip.Annotations)
+
+		if ip.Spec.ParentRef != nil {
+			w.Write(LEVEL_0, "Parent Reference:\n")
+			w.Write(LEVEL_1, "Group:\t%v\n", ip.Spec.ParentRef.Group)
+			w.Write(LEVEL_1, "Resource:\t%v\n", ip.Spec.ParentRef.Resource)
+			w.Write(LEVEL_1, "Namespace:\t%v\n", ip.Spec.ParentRef.Namespace)
+			w.Write(LEVEL_1, "Name:\t%v\n", ip.Spec.ParentRef.Name)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
 }
 
 func (c *IPAddressDescriber) describeIPAddressV1beta1(ip *networkingv1beta1.IPAddress, events *corev1.EventList) (string, error) {
@@ -3323,7 +3409,7 @@ func describeEndpointSliceV1beta1(eps *discoveryv1beta1.EndpointSlice, events *c
 					w.Write(LEVEL_2, "TargetRef:\t%s/%s\n", endpoint.TargetRef.Kind, endpoint.TargetRef.Name)
 				}
 
-				printLabelsMultilineWithIndent(w, "    ", "Topology", "\t", endpoint.Topology, sets.NewString())
+				printLabelsMultilineWithIndent(w, "    ", "Topology", "\t", endpoint.Topology, sets.New[string]())
 			}
 		}
 
@@ -3351,7 +3437,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 	// missingSecrets is the set of all secrets present in the
 	// serviceAccount but not present in the set of existing secrets.
-	missingSecrets := sets.NewString()
+	missingSecrets := sets.New[string]()
 	secrets := corev1.SecretList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
@@ -3368,7 +3454,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	if err == nil {
 		// existingSecrets is the set of all secrets remaining on a
 		// service account that are not present in the "tokens" slice.
-		existingSecrets := sets.NewString()
+		existingSecrets := sets.New[string]()
 
 		for _, s := range secrets.Items {
 			if s.Type == corev1.SecretTypeServiceAccountToken {
@@ -3401,7 +3487,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	return describeServiceAccount(serviceAccount, tokens, missingSecrets, events)
 }
 
-func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.String, events *corev1.EventList) (string, error) {
+func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.Set[string], events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -3435,7 +3521,7 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
-		for _, header := range sets.StringKeySet(types).List() {
+		for _, header := range sets.List(sets.KeySet(types)) {
 			names := types[header]
 			if len(names) == 0 {
 				w.Write(LEVEL_0, "%s\t<none>\n", header)
@@ -3631,10 +3717,11 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		return "", err
 	}
 
-	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(corev1.PodSucceeded) + ",status.phase!=" + string(corev1.PodFailed))
-	if err != nil {
-		return "", err
-	}
+	fieldSelector := fields.AndSelectors(
+		fields.OneTermEqualSelector("spec.nodeName", name),
+		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodSucceeded)),
+		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodFailed)),
+	)
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
@@ -5132,11 +5219,11 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(w PrefixWriter, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.NewString())
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.New[string]())
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
+func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.Set[string]) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if len(labels) == 0 {
@@ -5442,6 +5529,15 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 				if len(list) == max {
 					more = true
 				}
+				isReady := endpointSlices[i].Endpoints[j].Conditions.Ready == nil || *endpointSlices[i].Endpoints[j].Conditions.Ready
+				if !isReady {
+					// ready indicates that this endpoint is prepared to receive traffic,
+					// according to whatever system is managing the endpoint. A nil value
+					// indicates an unknown state. In most cases consumers should interpret this
+					// unknown state as ready.
+					// More info: vendor/k8s.io/api/discovery/v1/types.go
+					continue
+				}
 				if !more {
 					list = append(list, endpointSlices[i].Endpoints[j].Addresses[0])
 				}
@@ -5457,6 +5553,15 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 							more = true
 						}
 						addr := endpointSlices[i].Endpoints[k].Addresses[0]
+						isReady := endpointSlices[i].Endpoints[k].Conditions.Ready == nil || *endpointSlices[i].Endpoints[k].Conditions.Ready
+						if !isReady {
+							// ready indicates that this endpoint is prepared to receive traffic,
+							// according to whatever system is managing the endpoint. A nil value
+							// indicates an unknown state. In most cases consumers should interpret this
+							// unknown state as ready.
+							// More info: vendor/k8s.io/api/discovery/v1/types.go
+							continue
+						}
 						if !more {
 							hostPort := net.JoinHostPort(addr, strconv.Itoa(int(*port.Port)))
 							list = append(list, hostPort)
@@ -5532,7 +5637,7 @@ func backendStringer(backend *networkingv1beta1.IngressBackend) string {
 // * a node-role.kubernetes.io/<role>="" label
 // * a kubernetes.io/role="<role>" label
 func findNodeRoles(node *corev1.Node) []string {
-	roles := sets.NewString()
+	roles := sets.New[string]()
 	for k, v := range node.Labels {
 		switch {
 		case strings.HasPrefix(k, LabelNodeRolePrefix):
@@ -5544,14 +5649,14 @@ func findNodeRoles(node *corev1.Node) []string {
 			roles.Insert(v)
 		}
 	}
-	return roles.List()
+	return sets.List(roles)
 }
 
 // ingressLoadBalancerStatusStringerV1 behaves mostly like a string interface and converts the given status to a string.
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
 func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
-	result := sets.NewString()
+	result := sets.New[string]()
 	for i := range ingress {
 		if ingress[i].IP != "" {
 			result.Insert(ingress[i].IP)
@@ -5560,7 +5665,7 @@ func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatu
 		}
 	}
 
-	r := strings.Join(result.List(), ",")
+	r := strings.Join(sets.List(result), ",")
 	if !wide && len(r) > LoadBalancerWidth {
 		r = r[0:(LoadBalancerWidth-3)] + "..."
 	}
@@ -5571,7 +5676,7 @@ func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatu
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
 func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
-	result := sets.NewString()
+	result := sets.New[string]()
 	for i := range ingress {
 		if ingress[i].IP != "" {
 			result.Insert(ingress[i].IP)
@@ -5580,7 +5685,7 @@ func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBal
 		}
 	}
 
-	r := strings.Join(result.List(), ",")
+	r := strings.Join(sets.List(result), ",")
 	if !wide && len(r) > LoadBalancerWidth {
 		r = r[0:(LoadBalancerWidth-3)] + "..."
 	}
