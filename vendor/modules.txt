@@ -123,8 +123,8 @@ github.com/ProtonMail/go-crypto/openpgp/x448
 ## explicit; go 1.24.4
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
-# github.com/argoproj/argo-cd/v3 v3.0.11
-## explicit; go 1.24.4
+# github.com/argoproj/argo-cd/v3 v3.0.14
+## explicit; go 1.24.6
 github.com/argoproj/argo-cd/v3/assets
 github.com/argoproj/argo-cd/v3/common
 github.com/argoproj/argo-cd/v3/pkg/apis/application
