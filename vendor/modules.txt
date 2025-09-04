@@ -92,15 +92,13 @@ github.com/argoproj/argo-cd/v2/util/log
 github.com/argoproj/argo-cd/v2/util/proxy
 github.com/argoproj/argo-cd/v2/util/regex
 github.com/argoproj/argo-cd/v2/util/security
-# github.com/argoproj/gitops-engine v0.7.1-0.20240905010810-bd7681ae3f8b
-## explicit; go 1.22.0
+# github.com/argoproj/gitops-engine v0.7.1
+## explicit; go 1.17
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/api/v1/endpoints
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/util/hash
 github.com/argoproj/gitops-engine/pkg/diff
-github.com/argoproj/gitops-engine/pkg/diff/internal/fieldmanager
 github.com/argoproj/gitops-engine/pkg/health
 github.com/argoproj/gitops-engine/pkg/sync/common
-github.com/argoproj/gitops-engine/pkg/sync/resource
 github.com/argoproj/gitops-engine/pkg/utils/io
 github.com/argoproj/gitops-engine/pkg/utils/json
 github.com/argoproj/gitops-engine/pkg/utils/kube
@@ -1378,8 +1376,7 @@ k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
-k8s.io/klog/v2/internal/verbosity
-k8s.io/klog/v2/textlogger
+k8s.io/klog/v2/klogr
 # k8s.io/kube-aggregator v0.31.2 => k8s.io/kube-aggregator v0.31.2
 ## explicit; go 1.22.0
 k8s.io/kube-aggregator/pkg/apis/apiregistration
