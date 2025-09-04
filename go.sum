@@ -36,10 +36,10 @@ github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be/go.mod h1:ySMOLuW
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/argoproj-labs/argocd-operator v0.14.0 h1:ksHsdV5hC8u275PWU746EXB/c09g7UzdJPdkIqDQwjU=
 github.com/argoproj-labs/argocd-operator v0.14.0/go.mod h1:UHe70eXnnCEfzp7EWRofMU+BFnPgZiT5OSqpuInEARA=
-github.com/argoproj/argo-cd/v2 v2.13.3 h1:pP0MdX9hUnOd5MDJ6VkspLFctoVCdDtlAv9EQOA94TI=
-github.com/argoproj/argo-cd/v2 v2.13.3/go.mod h1:RC23V2744nhZstZVpLCWTQLT2gR0+IXGC3GTBCI6M+I=
-github.com/argoproj/gitops-engine v0.7.1-0.20240905010810-bd7681ae3f8b h1:wOPWJ5MBScQO767WpU55oUJDXObfvPL0EfAYWxogbSw=
-github.com/argoproj/gitops-engine v0.7.1-0.20240905010810-bd7681ae3f8b/go.mod h1:b1vuwkyMUszyUK+USUJqC8vJijnQsEPNDpC+sDdDLtM=
+github.com/argoproj/argo-cd/v2 v2.13.8 h1:FX4wajO+DUADwyMq/+y+UlLhcljVY8v/+5DllzxEfwo=
+github.com/argoproj/argo-cd/v2 v2.13.8/go.mod h1:VnIEoaw53mwPEGKqixL3ee1qfP3tNUFj+9RHJVhmxws=
+github.com/argoproj/gitops-engine v0.7.1-0.20250129155113-4c6e03c46314 h1:UIM6b4b/eNmWLwnsaJNmLzcm0qjHCuyHTuJKeIq2WeE=
+github.com/argoproj/gitops-engine v0.7.1-0.20250129155113-4c6e03c46314/go.mod h1:b1vuwkyMUszyUK+USUJqC8vJijnQsEPNDpC+sDdDLtM=
 github.com/argoproj/pkg v0.13.7-0.20230626144333-d56162821bd1 h1:qsHwwOJ21K2Ao0xPju1sNuqphyMnMYkyB3ZLoLtxWpo=
 github.com/argoproj/pkg v0.13.7-0.20230626144333-d56162821bd1/go.mod h1:CZHlkyAD1/+FbEn6cB2DQTj48IoLGvEYsWEvtzP3238=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
@@ -184,8 +184,9 @@ github.com/gobwas/pool v0.2.1/go.mod h1:q8bcK0KcYlCgd9e7WYLm9LpyS+YeLd8JVDW6Wezm
 github.com/gobwas/ws v1.2.1/go.mod h1:hRKAFb8wOxFROYNsT1bqfWnhX+b5MFeJM9r2ZSwg/KY=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
-github.com/golang-jwt/jwt/v4 v4.5.0 h1:7cYmW1XlMY7h7ii7UhUyChSgS5wUJEnm9uZVTGqOWzg=
 github.com/golang-jwt/jwt/v4 v4.5.0/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
+github.com/golang-jwt/jwt/v4 v4.5.2 h1:YtQM7lnr8iZ+j5q71MGKkNw9Mn7AjHM68uc9g5fXeUI=
+github.com/golang-jwt/jwt/v4 v4.5.2/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
@@ -422,8 +423,8 @@ github.com/prometheus/common v0.62.0/go.mod h1:vyBcEuLSvWos9B1+CyL7JZ2up+uFzXhkq
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/redis/go-redis/v9 v9.0.0-rc.4/go.mod h1:Vo3EsyWnicKnSKCA7HhgnvnyA74wOA69Cd2Meli5mmA=
-github.com/redis/go-redis/v9 v9.6.1 h1:HHDteefn6ZkTtY5fGUE8tj8uy85AHk6zP7CpzIAM0y4=
-github.com/redis/go-redis/v9 v9.6.1/go.mod h1:0C0c6ycQsdpVNQpxb1njEQIqkx5UcsM8FJCQLgE9+RA=
+github.com/redis/go-redis/v9 v9.7.1 h1:4LhKRCIduqXqtvCUlaq9c8bdHOkICjDMrr1+Zb3osAc=
+github.com/redis/go-redis/v9 v9.7.1/go.mod h1:f6zhXITC7JUJIlPEiBOTXxJgPLdZcA93GewI7inzyWw=
 github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
 github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
