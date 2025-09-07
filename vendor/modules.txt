@@ -1,4 +1,4 @@
-# cloud.google.com/go/compute/metadata v0.7.0
+# cloud.google.com/go/compute/metadata v0.8.0
 ## explicit; go 1.23.0
 cloud.google.com/go/compute/metadata
 # code.gitea.io/sdk/gitea v0.22.0
