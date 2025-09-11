@@ -22,9 +22,7 @@ import (
 
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -84,28 +82,6 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	}
 
 	return aGV.Version == bGV.Version && aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name && a.UID == b.UID
-}
-
-func checkAPIVersion(clientset kubernetes.Interface, group, version string) error {
-	// Get the list of API groups available in the cluster
-	apiGroups, err := clientset.Discovery().ServerGroups()
-	if err != nil {
-		return fmt.Errorf("failed to get API groups: %v", err)
-	}
-
-	// Iterate through the API groups to find the specified group and version
-	//nolint:gocritic // The range is so small that this is not worth changing
-	for _, apiGroup := range apiGroups.Groups {
-		if apiGroup.Name == group {
-			for _, apiVersion := range apiGroup.Versions {
-				if apiVersion.Version == version {
-					return nil
-				}
-			}
-		}
-	}
-
-	return fmt.Errorf("API version %s/%s not available", group, version)
 }
 
 func getRoute(routeClient routeclient.Interface, routeName, namespace string) (string, error) {

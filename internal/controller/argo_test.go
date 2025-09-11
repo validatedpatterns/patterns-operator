@@ -18,19 +18,15 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/testing"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	runtimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
@@ -839,99 +835,20 @@ var _ = Describe("NewArgoCD", func() {
 var _ = Describe("haveArgo", func() {
 
 	var (
-		dynamicClient dynamic.Interface
-		kubeClient    *fake.Clientset
+		fakeClient client.Client
 
-		gvr       schema.GroupVersionResource
 		name      string
 		namespace string
 	)
 
 	BeforeEach(func() {
-		gvr = schema.GroupVersionResource{Group: "argoproj.io", Version: "v1beta1", Resource: "argocds"}
-		kubeClient = fake.NewSimpleClientset()
-		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
-			gvr: "ArgoCDList",
-		})
 		name = argoName
 		namespace = argoNS
 	})
 
 	Context("when the ArgoCD instance exists", func() {
-		BeforeEach(func() {
-			argoCD := &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "argoproj.io/v1beta1",
-					"kind":       "ArgoCD",
-					"metadata": map[string]any{
-						"name":      name,
-						"namespace": namespace,
-					},
-				},
-			}
-			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), argoCD, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("should return true", func() {
-			result := haveArgo(dynamicClient, name, namespace)
-			Expect(result).To(BeTrue())
-		})
-	})
-
-	Context("when the ArgoCD instance does not exist", func() {
-		It("should return false", func() {
-			result := haveArgo(dynamicClient, name, namespace)
-			Expect(result).To(BeFalse())
-		})
-	})
-
-	Context("when there is an error retrieving the ArgoCD instance", func() {
-		BeforeEach(func() {
-			kubeClient.PrependReactor("get", "argocds", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, fmt.Errorf("get error")
-			})
-		})
-
-		It("should return false", func() {
-			result := haveArgo(dynamicClient, name, namespace)
-			Expect(result).To(BeFalse())
-		})
-	})
-})
-
-var _ = Describe("CreateOrUpdateArgoCD", func() {
-	var (
-		dynamicClient dynamic.Interface
-		gvr           schema.GroupVersionResource
-		name          string
-		namespace     string
-	)
-
-	BeforeEach(func() {
-		gvr = schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
-		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
-			gvr: "ArgoCDList",
-		})
-		name = argoName
-		namespace = argoNS
-	})
-
-	Context("when the ArgoCD instance does not exist", func() {
-		It("should create a new ArgoCD instance", func() {
-			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
-			Expect(err).ToNot(HaveOccurred())
-
-			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(argoCD.GetName()).To(Equal(name))
-			Expect(argoCD.GetNamespace()).To(Equal(namespace))
-		})
-	})
-
-	Context("when the ArgoCD instance exists", func() {
-		BeforeEach(func() {
-			argoCD := &unstructured.Unstructured{
+			unstructuredArgo := &unstructured.Unstructured{
 				Object: map[string]any{
 					"apiVersion": "argoproj.io/v1beta1",
 					"kind":       "ArgoCD",
@@ -942,17 +859,125 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 					},
 				},
 			}
-			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), argoCD, metav1.CreateOptions{})
+			unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   ArgoCDGroup,
+				Kind:    ArgoCDResource,
+				Version: ArgoCDVersion,
+			})
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(unstructuredArgo).Build()
+
+			result, err := haveArgo(fakeClient, name, namespace)
+			Expect(result).To(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
+
 		})
+	})
 
+	Context("when the ArgoCD instance does not exist", func() {
+		It("should return false", func() {
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+			result, err := haveArgo(fakeClient, name, namespace)
+			Expect(result).To(BeFalse())
+			Expect(err).ToNot(HaveOccurred())
+
+		})
+	})
+
+	Context("when there is an error retrieving the ArgoCD instance", func() {
+		It("should return false", func() {
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					return fmt.Errorf("get error")
+				}},
+			).WithScheme(testEnv.Scheme).Build()
+
+			result, err := haveArgo(fakeClient, name, namespace)
+			Expect(result).To(BeFalse())
+			Expect(err).To(HaveOccurred())
+
+		})
+	})
+})
+
+var _ = Describe("CreateOrUpdateArgoCD", func() {
+	var (
+		fakeClient client.Client
+		name       string
+		namespace  string
+	)
+
+	BeforeEach(func() {
+		name = argoName
+		namespace = argoNS
+	})
+
+	Context("when the ArgoCD instance does not exist", func() {
+		It("should create a new ArgoCD instance", func() {
+
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+
+			err := createOrUpdateArgoCD(fakeClient, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			unstructuredArgo := &unstructured.Unstructured{}
+			unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   ArgoCDGroup,
+				Kind:    ArgoCDResource,
+				Version: ArgoCDVersion,
+			})
+			err = fakeClient.Get(context.Background(), client.ObjectKey{
+				Namespace: namespace,
+				Name:      name,
+			}, unstructuredArgo)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(unstructuredArgo.GetName()).To(Equal(name))
+			Expect(unstructuredArgo.GetNamespace()).To(Equal(namespace))
+		})
+	})
+
+	Context("when the ArgoCD instance exists", func() {
 		It("should update the existing ArgoCD instance", func() {
-			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
+
+			unstructuredArgo := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "argoproj.io/v1beta1",
+					"kind":       "ArgoCD",
+					"metadata": map[string]any{
+						"name":            name,
+						"namespace":       namespace,
+						"resourceVersion": "0",
+					},
+				},
+			}
+			unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   ArgoCDGroup,
+				Kind:    ArgoCDResource,
+				Version: ArgoCDVersion,
+			})
+
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(unstructuredArgo).Build()
+
+			err := createOrUpdateArgoCD(fakeClient, name, namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			updatedUnstructuredArgo := &unstructured.Unstructured{}
+			updatedUnstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   ArgoCDGroup,
+				Kind:    ArgoCDResource,
+				Version: ArgoCDVersion,
+			})
+			err = fakeClient.Get(context.Background(), client.ObjectKey{
+				Namespace: namespace,
+				Name:      name,
+			}, updatedUnstructuredArgo)
+
 			Expect(err).ToNot(HaveOccurred())
-			Expect(argoCD.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
+			Expect(updatedUnstructuredArgo.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
 		})
 	})
 })

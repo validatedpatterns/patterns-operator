@@ -25,14 +25,13 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -302,45 +301,81 @@ g, admin, role:admin`
 	return &s
 }
 
-func haveArgo(cl dynamic.Interface, name, namespace string) bool {
-	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
-	_, err := cl.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	return err == nil
+func haveArgo(cl client.Client, name, namespace string) (bool, error) {
+	// Using an unstructured object.
+	unstructuredArgo := &unstructured.Unstructured{}
+	unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   ArgoCDGroup,
+		Kind:    ArgoCDResource,
+		Version: ArgoCDVersion,
+	})
+	err := cl.Get(context.Background(), client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, unstructuredArgo)
+
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
-func createOrUpdateArgoCD(cl dynamic.Interface, fullClient kubernetes.Interface, name, namespace string) error {
+func createOrUpdateArgoCD(cl client.Client, name, namespace string) error {
 	argo := newArgoCD(name, namespace)
-	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
-
 	var err error
-	// we skip this check if fullClient is explicitly nil for simpler testing
-	if fullClient != nil {
-		err = checkAPIVersion(fullClient, ArgoCDGroup, ArgoCDVersion)
-		if err != nil {
-			return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
-		}
+
+	foundArgo, err := haveArgo(cl, name, namespace)
+	if err != nil {
+		return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
 	}
 
-	if !haveArgo(cl, name, namespace) {
+	if !foundArgo {
 		// create it
 		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		newArgo := &unstructured.Unstructured{Object: obj}
-		_, err = cl.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
+
+		// Using a unstructured object.
+
+		newArgo.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   ArgoCDGroup,
+			Kind:    ArgoCDResource,
+			Version: ArgoCDVersion,
+		})
+
+		err = cl.Create(context.Background(), newArgo)
 	} else { // update it
 		oldArgo, _ := getArgoCD(cl, name, namespace)
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
 		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		newArgo := &unstructured.Unstructured{Object: obj}
-
-		_, err = cl.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
+		newArgo.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   ArgoCDGroup,
+			Kind:    ArgoCDResource,
+			Version: ArgoCDVersion,
+		})
+		err = cl.Update(context.Background(), newArgo)
 	}
 	return err
 }
 
-func getArgoCD(cl dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, error) {
-	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
+func getArgoCD(cl client.Client, name, namespace string) (*argooperator.ArgoCD, error) {
 	argo := &argooperator.ArgoCD{}
-	unstructuredArgo, err := cl.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+	// Using an unstructured object.
+	unstructuredArgo := &unstructured.Unstructured{}
+	unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   ArgoCDGroup,
+		Kind:    ArgoCDResource,
+		Version: ArgoCDVersion,
+	})
+	err := cl.Get(context.Background(), client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, unstructuredArgo)
+
 	if err != nil {
 		return nil, err
 	}
