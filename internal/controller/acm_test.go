@@ -19,10 +19,9 @@ import (
 var _ = Describe("HaveACMHub", func() {
 
 	var (
-		patternReconciler *PatternReconciler
-		fakeClient        client.Client
-		configMap         *v1.ConfigMap
-		hub               *unstructured.Unstructured
+		fakeClient client.Client
+		configMap  *v1.ConfigMap
+		hub        *unstructured.Unstructured
 	)
 	BeforeEach(func() {
 		configMap = &v1.ConfigMap{
@@ -51,11 +50,8 @@ var _ = Describe("HaveACMHub", func() {
 		It("should return true", func() {
 			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
 				WithRuntimeObjects(configMap, hub).Build()
-			patternReconciler = &PatternReconciler{
-				Client: fakeClient,
-			}
 
-			result := haveACMHub(patternReconciler)
+			result := haveACMHub(fakeClient)
 			Expect(result).To(BeTrue())
 		})
 	})
@@ -66,11 +62,8 @@ var _ = Describe("HaveACMHub", func() {
 
 			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
 				WithRuntimeObjects(configMap, hub).Build()
-			patternReconciler = &PatternReconciler{
-				Client: fakeClient,
-			}
 
-			result := haveACMHub(patternReconciler)
+			result := haveACMHub(fakeClient)
 			Expect(result).To(BeFalse())
 		})
 	})
@@ -79,11 +72,8 @@ var _ = Describe("HaveACMHub", func() {
 		It("should return false", func() {
 			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
 				WithRuntimeObjects().Build()
-			patternReconciler = &PatternReconciler{
-				Client: fakeClient,
-			}
 
-			result := haveACMHub(patternReconciler)
+			result := haveACMHub(fakeClient)
 			Expect(result).To(BeFalse())
 		})
 	})
@@ -95,11 +85,7 @@ var _ = Describe("HaveACMHub", func() {
 					return fmt.Errorf("list error")
 				}}).WithScheme(testEnv.Scheme).Build()
 
-			patternReconciler = &PatternReconciler{
-				Client: fakeClient,
-			}
-
-			result := haveACMHub(patternReconciler)
+			result := haveACMHub(fakeClient)
 			Expect(result).To(BeFalse())
 		})
 	})
@@ -111,11 +97,7 @@ var _ = Describe("HaveACMHub", func() {
 					return fmt.Errorf("list error")
 				}}).WithScheme(testEnv.Scheme).WithRuntimeObjects(configMap).Build()
 
-			patternReconciler = &PatternReconciler{
-				Client: fakeClient,
-			}
-
-			result := haveACMHub(patternReconciler)
+			result := haveACMHub(fakeClient)
 			Expect(result).To(BeFalse())
 		})
 	})
