@@ -25,18 +25,18 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 )
@@ -301,45 +301,81 @@ g, admin, role:admin`
 	return &s
 }
 
-func haveArgo(client dynamic.Interface, name, namespace string) bool {
-	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
-	_, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	return err == nil
+func haveArgo(cl client.Client, name, namespace string) (bool, error) {
+	// Using an unstructured object.
+	unstructuredArgo := &unstructured.Unstructured{}
+	unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   ArgoCDGroup,
+		Kind:    ArgoCDResource,
+		Version: ArgoCDVersion,
+	})
+	err := cl.Get(context.Background(), client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, unstructuredArgo)
+
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
-func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interface, name, namespace string) error {
+func createOrUpdateArgoCD(cl client.Client, name, namespace string) error {
 	argo := newArgoCD(name, namespace)
-	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
-
 	var err error
-	// we skip this check if fullClient is explicitly nil for simpler testing
-	if fullClient != nil {
-		err = checkAPIVersion(fullClient, ArgoCDGroup, ArgoCDVersion)
-		if err != nil {
-			return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
-		}
+
+	foundArgo, err := haveArgo(cl, name, namespace)
+	if err != nil {
+		return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
 	}
 
-	if !haveArgo(client, name, namespace) {
+	if !foundArgo {
 		// create it
 		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		newArgo := &unstructured.Unstructured{Object: obj}
-		_, err = client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
+
+		// Using a unstructured object.
+
+		newArgo.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   ArgoCDGroup,
+			Kind:    ArgoCDResource,
+			Version: ArgoCDVersion,
+		})
+
+		err = cl.Create(context.Background(), newArgo)
 	} else { // update it
-		oldArgo, _ := getArgoCD(client, name, namespace)
+		oldArgo, _ := getArgoCD(cl, name, namespace)
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
 		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		newArgo := &unstructured.Unstructured{Object: obj}
-
-		_, err = client.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
+		newArgo.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   ArgoCDGroup,
+			Kind:    ArgoCDResource,
+			Version: ArgoCDVersion,
+		})
+		err = cl.Update(context.Background(), newArgo)
 	}
 	return err
 }
 
-func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, error) {
-	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
+func getArgoCD(cl client.Client, name, namespace string) (*argooperator.ArgoCD, error) {
 	argo := &argooperator.ArgoCD{}
-	unstructuredArgo, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+	// Using an unstructured object.
+	unstructuredArgo := &unstructured.Unstructured{}
+	unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   ArgoCDGroup,
+		Kind:    ArgoCDResource,
+		Version: ArgoCDVersion,
+	})
+	err := cl.Get(context.Background(), client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, unstructuredArgo)
+
 	if err != nil {
 		return nil, err
 	}
@@ -794,22 +830,23 @@ func applicationName(p *api.Pattern) string {
 	return fmt.Sprintf("%s-%s", p.Name, p.Spec.ClusterGroupName)
 }
 
-func getApplication(client argoclient.Interface, name, namespace string) (*argoapi.Application, error) {
-	if app, err := client.ArgoprojV1alpha1().Applications(namespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+func getApplication(cl client.Client, name, namespace string) (*argoapi.Application, error) {
+	app := &argoapi.Application{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, app)
+	if err != nil {
 		return nil, err
-	} else {
-		return app, nil
 	}
+	return app, nil
 }
 
-func createApplication(client argoclient.Interface, app *argoapi.Application, namespace string) error {
-	saved, err := client.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
-	yamlOutput, _ := objectYaml(saved)
+func createApplication(cl client.Client, app *argoapi.Application, _ string) error {
+	err := cl.Create(context.Background(), app)
+	yamlOutput, _ := objectYaml(app)
 	log.Printf("Created: %s\n", yamlOutput)
 	return err
 }
 
-func updateApplication(client argoclient.Interface, target, current *argoapi.Application, namespace string) (bool, error) {
+func updateApplication(cl client.Client, target, current *argoapi.Application, _ string) (bool, error) {
 	if current == nil {
 		return false, fmt.Errorf("current application was nil")
 	} else if target == nil {
@@ -828,13 +865,14 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	spec := current.Spec.DeepCopy()
 	target.Spec.DeepCopyInto(spec)
 	current.Spec = *spec
-
-	_, err := client.ArgoprojV1alpha1().Applications(namespace).Update(context.Background(), current, metav1.UpdateOptions{})
-	return true, err
+	if err := cl.Update(context.Background(), current); err != nil {
+		return false, fmt.Errorf("could not update application: %w", err)
+	}
+	return true, nil
 }
 
-func removeApplication(client argoclient.Interface, name, namespace string) error {
-	return client.ArgoprojV1alpha1().Applications(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+func removeApplication(cl client.Client, app *argoapi.Application) error {
+	return cl.Delete(context.Background(), app)
 }
 
 func compareSource(goal, actual *argoapi.ApplicationSource) bool {
