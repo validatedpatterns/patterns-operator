@@ -41,7 +41,6 @@ import (
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
-	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -58,7 +57,6 @@ type PatternReconciler struct {
 	logger logr.Logger
 
 	config          *rest.Config
-	routeClient     routeclient.Interface
 	driftWatcher    driftWatcher
 	gitOperations   GitOperations
 	giteaOperations GiteaOperations
@@ -356,7 +354,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 
 	// Here we need to call the gitea migration bits
 	// Let's get the GiteaServer route
-	giteaRouteURL, routeErr := getRoute(r.routeClient, GiteaRouteName, GiteaNamespace)
+	giteaRouteURL, routeErr := getRoute(r.Client, GiteaRouteName, GiteaNamespace)
 	if routeErr != nil {
 		return fmt.Errorf("GiteaServer route not ready: %v", routeErr)
 	}
@@ -589,12 +587,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	var err error
 	r.config = mgr.GetConfig()
 
-	if r.routeClient, err = routeclient.NewForConfig(r.config); err != nil {
-		return err
-	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
 	r.giteaOperations = &GiteaOperationsImpl{}

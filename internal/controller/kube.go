@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	routev1 "github.com/openshift/api/route/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,8 +84,10 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	return aGV.Version == bGV.Version && aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name && a.UID == b.UID
 }
 
-func getRoute(routeClient routeclient.Interface, routeName, namespace string) (string, error) {
-	route, err := routeClient.RouteV1().Routes(namespace).Get(context.Background(), routeName, metav1.GetOptions{})
+func getRoute(cl kubeclient.Client, routeName, namespace string) (string, error) {
+	route := routev1.Route{}
+
+	err := cl.Get(context.Background(), types.NamespacedName{Name: routeName, Namespace: namespace}, &route)
 	if err != nil {
 		return "", err
 	}
