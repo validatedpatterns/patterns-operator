@@ -27,8 +27,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	gomock "go.uber.org/mock/gomock"
 
 	corev1 "k8s.io/api/core/v1"
@@ -216,10 +214,6 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		},
 	}
 	clusterInfra := &v1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.InfrastructureSpec{PlatformSpec: v1.PlatformSpec{Type: "AWS"}}}
-	osControlManager := &operatorv1.OpenShiftControllerManager{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-		Spec:       operatorv1.OpenShiftControllerManagerSpec{},
-		Status:     operatorv1.OpenShiftControllerManagerStatus{OperatorStatus: operatorv1.OperatorStatus{Version: "4.10.3"}}}
 	ingress := &v1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}, Spec: v1.IngressSpec{Domain: "hello.world"}}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).
 		WithRuntimeObjects(clusterVersion, clusterInfra, ingress).Build()
@@ -228,7 +222,6 @@ func newFakeReconciler(initObjects ...runtime.Object) *PatternReconciler {
 		Scheme:          scheme.Scheme,
 		Client:          fakeClient,
 		driftWatcher:    watcher,
-		operatorClient:  operatorclient.NewSimpleClientset(osControlManager).OperatorV1(),
 		AnalyticsClient: AnalyticsInit(true, logr.New(log.NullLogSink{})),
 		gitOperations:   mockGitOps,
 	}

@@ -46,6 +46,8 @@ import (
 	controllers "github.com/hybrid-cloud-patterns/patterns-operator/internal/controller"
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	apiv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -62,7 +64,9 @@ func init() {
 
 	utilruntime.Must(gitopsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(apiv1.Install(scheme))
+	utilruntime.Must(operatorv1.Install(scheme))
 	utilruntime.Must(argoapi.AddToScheme(scheme))
+	utilruntime.Must(operatorv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

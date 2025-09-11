@@ -45,7 +45,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
 const ReconcileLoopRequeueTime = 180 * time.Second
@@ -60,7 +59,6 @@ type PatternReconciler struct {
 
 	config          *rest.Config
 	routeClient     routeclient.Interface
-	operatorClient  operatorclient.OperatorV1Interface
 	driftWatcher    driftWatcher
 	gitOperations   GitOperations
 	giteaOperations GiteaOperations
@@ -593,10 +591,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
 	r.config = mgr.GetConfig()
-
-	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
-		return err
-	}
 
 	if r.routeClient, err = routeclient.NewForConfig(r.config); err != nil {
 		return err
