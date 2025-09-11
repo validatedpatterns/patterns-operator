@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	routev1 "github.com/openshift/api/route/v1"
-	routefake "github.com/openshift/client-go/route/clientset/versioned/fake"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -498,20 +497,19 @@ var _ = Describe("ObjectYaml", func() {
 
 var _ = Describe("GetRoute", func() {
 	var (
-		routeClient *routefake.Clientset
-		namespace   string
-		routeName   string
+		fakeClient client.Client
+		namespace  string
+		routeName  string
 	)
 
 	BeforeEach(func() {
-		routeClient = routefake.NewSimpleClientset()
 		namespace = "default"
 		routeName = "test-route"
 	})
 
 	Context("when the route exists", func() {
-		BeforeEach(func() {
-			route := &routev1.Route{
+		It("should return the URL of the route", func() {
+			route := routev1.Route{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      routeName,
 					Namespace: namespace,
@@ -524,12 +522,11 @@ var _ = Describe("GetRoute", func() {
 					},
 				},
 			}
-			_, err := routeClient.RouteV1().Routes(namespace).Create(context.Background(), route, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
 
-		It("should return the URL of the route", func() {
-			url, err := getRoute(routeClient, routeName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(&route).Build()
+
+			url, err := getRoute(fakeClient, routeName, namespace)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(url).To(Equal("https://example.com"))
 		})
@@ -537,27 +534,29 @@ var _ = Describe("GetRoute", func() {
 
 	Context("when the route does not exist", func() {
 		It("should return an error", func() {
-			url, err := getRoute(routeClient, routeName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+
+			url, err := getRoute(fakeClient, routeName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(url).To(BeEmpty())
 		})
 	})
 
 	Context("when the route has no ingress", func() {
-		BeforeEach(func() {
-			route := &routev1.Route{
+		It("should return an error", func() {
+			route := routev1.Route{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      routeName,
 					Namespace: namespace,
 				},
 				Status: routev1.RouteStatus{},
 			}
-			_, err := routeClient.RouteV1().Routes(namespace).Create(context.Background(), route, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
 
-		It("should return an error", func() {
-			url, err := getRoute(routeClient, routeName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(&route).Build()
+
+			url, err := getRoute(fakeClient, routeName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(url).To(BeEmpty())
 		})

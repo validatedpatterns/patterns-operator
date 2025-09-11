@@ -129,11 +129,6 @@ github.com/argoproj/argo-cd/v3/assets
 github.com/argoproj/argo-cd/v3/common
 github.com/argoproj/argo-cd/v3/pkg/apis/application
 github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1
-github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned
-github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/fake
-github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/scheme
-github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/typed/application/v1alpha1
-github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned/typed/application/v1alpha1/fake
 github.com/argoproj/argo-cd/v3/util
 github.com/argoproj/argo-cd/v3/util/assets
 github.com/argoproj/argo-cd/v3/util/cache
@@ -565,15 +560,6 @@ github.com/opencontainers/image-spec/specs-go/v1
 github.com/openshift/api/config/v1
 github.com/openshift/api/operator/v1
 github.com/openshift/api/route/v1
-# github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e => github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e
-## explicit; go 1.21
-github.com/openshift/client-go/route/applyconfigurations/internal
-github.com/openshift/client-go/route/applyconfigurations/route/v1
-github.com/openshift/client-go/route/clientset/versioned
-github.com/openshift/client-go/route/clientset/versioned/fake
-github.com/openshift/client-go/route/clientset/versioned/scheme
-github.com/openshift/client-go/route/clientset/versioned/typed/route/v1
-github.com/openshift/client-go/route/clientset/versioned/typed/route/v1/fake
 # github.com/operator-framework/api v0.33.0
 ## explicit; go 1.24.4
 github.com/operator-framework/api/pkg/lib/version
@@ -1065,7 +1051,6 @@ k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
 # k8s.io/client-go v12.0.0+incompatible => k8s.io/client-go v0.33.4
 ## explicit; go 1.24.0
-k8s.io/client-go/applyconfigurations
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1
@@ -1121,7 +1106,6 @@ k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/cached/memory
-k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
 k8s.io/client-go/features
 k8s.io/client-go/gentype
@@ -1221,7 +1205,7 @@ k8s.io/client-go/kubernetes/typed/certificates/v1
 k8s.io/client-go/kubernetes/typed/certificates/v1alpha1
 k8s.io/client-go/kubernetes/typed/certificates/v1beta1
 k8s.io/client-go/kubernetes/typed/coordination/v1
-k8s.io/client-go/kubernetes/typed/coordination/v1alpha1
+k8s.io/client-go/kubernetes/typed/coordination/v1alpha2
 k8s.io/client-go/kubernetes/typed/coordination/v1beta1
 k8s.io/client-go/kubernetes/typed/core/v1
 k8s.io/client-go/kubernetes/typed/discovery/v1
@@ -1245,6 +1229,8 @@ k8s.io/client-go/kubernetes/typed/rbac/v1
 k8s.io/client-go/kubernetes/typed/rbac/v1alpha1
 k8s.io/client-go/kubernetes/typed/rbac/v1beta1
 k8s.io/client-go/kubernetes/typed/resource/v1alpha3
+k8s.io/client-go/kubernetes/typed/resource/v1beta1
+k8s.io/client-go/kubernetes/typed/resource/v1beta2
 k8s.io/client-go/kubernetes/typed/scheduling/v1
 k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1
 k8s.io/client-go/kubernetes/typed/scheduling/v1beta1
@@ -1741,7 +1727,6 @@ sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
 # github.com/openshift/api => github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
-# github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e
 # k8s.io/api => k8s.io/api v0.33.4
 # k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.33.4
 # k8s.io/apimachinery => k8s.io/apimachinery v0.33.4
