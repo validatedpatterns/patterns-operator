@@ -571,7 +571,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
-		if haveACMHub(r) {
+		if haveACMHub(r.Client) {
 			return fmt.Errorf("waiting for removal of that acm hub")
 		}
 

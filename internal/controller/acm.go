@@ -35,7 +35,7 @@ var mchGVK = schema.GroupVersionKind{
 	Version: "v1",
 }
 
-func haveACMHub(r *PatternReconciler) bool {
+func haveACMHub(cl client.Client) bool {
 	labelSelector, err := labels.Parse(fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"))
 
 	if err != nil {
@@ -44,7 +44,7 @@ func haveACMHub(r *PatternReconciler) bool {
 	}
 
 	cms := corev1.ConfigMapList{}
-	err = r.List(context.Background(), &cms, &client.ListOptions{
+	err = cl.List(context.Background(), &cms, &client.ListOptions{
 		LabelSelector: labelSelector,
 	})
 
@@ -61,7 +61,7 @@ func haveACMHub(r *PatternReconciler) bool {
 	umch := &unstructured.UnstructuredList{}
 	umch.SetGroupVersionKind(mchGVK)
 
-	err = r.List(context.Background(), umch, &client.ListOptions{Namespace: ns})
+	err = cl.List(context.Background(), umch, &client.ListOptions{Namespace: ns})
 
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
