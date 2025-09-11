@@ -23,15 +23,19 @@ import (
 	"log"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func haveACMHub(r *PatternReconciler) bool {
-	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
+var mchGVK = schema.GroupVersionKind{
+	Group:   "operator.open-cluster-management.io",
+	Kind:    "multiclusterhubs",
+	Version: "v1",
+}
 
+func haveACMHub(r *PatternReconciler) bool {
 	labelSelector, err := labels.Parse(fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"))
 
 	if err != nil {
@@ -54,7 +58,11 @@ func haveACMHub(r *PatternReconciler) bool {
 	}
 	ns := cms.Items[0].Namespace
 
-	umch, err := r.dynamicClient.Resource(gvrMCH).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
+	umch := &unstructured.UnstructuredList{}
+	umch.SetGroupVersionKind(mchGVK)
+
+	err = r.List(context.Background(), umch, &client.ListOptions{Namespace: ns})
+
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
 		return false

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +59,6 @@ type PatternReconciler struct {
 	logger logr.Logger
 
 	config          *rest.Config
-	dynamicClient   dynamic.Interface
 	routeClient     routeclient.Interface
 	operatorClient  operatorclient.OperatorV1Interface
 	driftWatcher    driftWatcher
@@ -595,10 +593,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var err error
 	r.config = mgr.GetConfig()
-
-	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
-		return err
-	}
 
 	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
 		return err
