@@ -39,7 +39,7 @@ import (
 
 // ResourceOperations provides methods to manage k8s resources
 type ResourceOperations interface {
-	ApplyResource(ctx context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy, force, validate, serverSideApply bool, manager string) (string, error)
+	ApplyResource(ctx context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy, force bool, validate bool, serverSideApply bool, manager string) (string, error)
 	ReplaceResource(ctx context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy, force bool) (string, error)
 	CreateResource(ctx context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy, validate bool) (string, error)
 	UpdateResource(ctx context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy) (*unstructured.Unstructured, error)
@@ -95,13 +95,13 @@ func createManifestFile(obj *unstructured.Unstructured, log logr.Logger) (*os.Fi
 	}
 	manifestFile, err := os.CreateTemp(io.TempDir, "")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to generate temp file for manifest: %v", err)
+		return nil, fmt.Errorf("failed to generate temp file for manifest: %w", err)
 	}
 	if _, err = manifestFile.Write(manifestBytes); err != nil {
-		return nil, fmt.Errorf("Failed to write manifest: %v", err)
+		return nil, fmt.Errorf("failed to write manifest: %w", err)
 	}
 	if err = manifestFile.Close(); err != nil {
-		return nil, fmt.Errorf("Failed to close manifest: %v", err)
+		return nil, fmt.Errorf("failed to close manifest: %w", err)
 	}
 
 	err = maybeLogManifest(manifestBytes, log)
@@ -123,7 +123,7 @@ func (k *kubectlResourceOperations) runResourceCommand(ctx context.Context, obj 
 	if obj.GetAPIVersion() == "rbac.authorization.k8s.io/v1" {
 		outReconcile, err := k.rbacReconcile(ctx, obj, manifestFile.Name(), dryRunStrategy)
 		if err != nil {
-			return "", fmt.Errorf("error running rbacReconcile: %s", err)
+			return "", fmt.Errorf("error running rbacReconcile: %w", err)
 		}
 		out = append(out, outReconcile)
 		// We still want to fallthrough and run `kubectl apply` in order set the
@@ -173,7 +173,7 @@ func (k *kubectlServerSideDiffDryRunApplier) runResourceCommand(obj *unstructure
 	stderr := stderrBuf.String()
 
 	if stderr != "" && stdout == "" {
-		err := fmt.Errorf("Server-side dry run apply had non-empty stderr: %s", stderr)
+		err := fmt.Errorf("server-side dry run apply had non-empty stderr: %s", stderr)
 		k.log.Error(err, "server-side diff")
 		return "", err
 	}
@@ -301,7 +301,7 @@ func (k *kubectlResourceOperations) UpdateResource(ctx context.Context, obj *uns
 }
 
 // ApplyResource performs an apply of a unstructured resource
-func (k *kubectlServerSideDiffDryRunApplier) ApplyResource(_ context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy, force, validate, serverSideApply bool, manager string) (string, error) {
+func (k *kubectlServerSideDiffDryRunApplier) ApplyResource(_ context.Context, obj *unstructured.Unstructured, dryRunStrategy cmdutil.DryRunStrategy, force bool, validate bool, serverSideApply bool, manager string) (string, error) {
 	span := k.tracer.StartSpan("ApplyResource")
 	span.SetBaggageItem("kind", obj.GetKind())
 	span.SetBaggageItem("name", obj.GetName())
@@ -357,7 +357,7 @@ func (k *kubectlResourceOperations) ApplyResource(ctx context.Context, obj *unst
 	})
 }
 
-func newApplyOptionsCommon(config *rest.Config, fact cmdutil.Factory, ioStreams genericclioptions.IOStreams, obj *unstructured.Unstructured, fileName string, validate bool, force, serverSideApply bool, dryRunStrategy cmdutil.DryRunStrategy, manager string) (*apply.ApplyOptions, error) {
+func newApplyOptionsCommon(config *rest.Config, fact cmdutil.Factory, ioStreams genericclioptions.IOStreams, obj *unstructured.Unstructured, fileName string, validate bool, force bool, serverSideApply bool, dryRunStrategy cmdutil.DryRunStrategy, manager string) (*apply.ApplyOptions, error) {
 	flags := apply.NewApplyFlags(ioStreams)
 	o := &apply.ApplyOptions{
 		IOStreams:         ioStreams,
@@ -395,7 +395,7 @@ func newApplyOptionsCommon(config *rest.Config, fact cmdutil.Factory, ioStreams 
 		return nil, err
 	}
 
-	o.DeleteOptions.FilenameOptions.Filenames = []string{fileName}
+	o.DeleteOptions.Filenames = []string{fileName}
 	o.Namespace = obj.GetNamespace()
 	o.DeleteOptions.ForceDeletion = force
 	o.DryRunStrategy = dryRunStrategy
@@ -427,6 +427,10 @@ func (k *kubectlServerSideDiffDryRunApplier) newApplyOptions(ioStreams genericcl
 	}
 
 	o.ForceConflicts = true
+
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating options: %w", err)
+	}
 	return o, nil
 }
 
@@ -455,6 +459,10 @@ func (k *kubectlResourceOperations) newApplyOptions(ioStreams genericclioptions.
 
 	if serverSideApply {
 		o.ForceConflicts = true
+	}
+
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating options: %w", err)
 	}
 	return o, nil
 }
@@ -490,6 +498,10 @@ func (k *kubectlResourceOperations) newCreateOptions(ioStreams genericclioptions
 		return printer.PrintObj(obj, o.Out)
 	}
 	o.FilenameOptions.Filenames = []string{fileName}
+
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating options: %w", err)
+	}
 	return o, nil
 }
 
@@ -538,9 +550,16 @@ func (k *kubectlResourceOperations) newReplaceOptions(config *rest.Config, f cmd
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	o.DeleteOptions.FilenameOptions.Filenames = []string{fileName}
+	o.DeleteOptions.Filenames = []string{fileName}
 	o.Namespace = namespace
-	o.DeleteOptions.ForceDeletion = force
+
+	if dryRunStrategy == cmdutil.DryRunNone {
+		o.DeleteOptions.ForceDeletion = force
+	}
+
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating options: %w", err)
+	}
 	return o, nil
 }
 
@@ -570,6 +589,10 @@ func newReconcileOptions(f cmdutil.Factory, kubeClient *kubernetes.Clientset, fi
 		return nil, err
 	}
 	o.PrintObject = printer.PrintObj
+
+	if err := o.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating options: %w", err)
+	}
 	return o, nil
 }
 
