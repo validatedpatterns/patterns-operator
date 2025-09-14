@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	code.gitea.io/sdk/gitea v0.22.0
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/argoproj-labs/argocd-operator v0.15.0-rc1
+	github.com/argoproj-labs/argocd-operator v0.15.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/go-logr/logr v1.4.3
@@ -27,7 +27,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.21.0
 )
 
-require github.com/argoproj/argo-cd/v3 v3.0.14
+require github.com/argoproj/argo-cd/v3 v3.0.16
 
 require (
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20250521000818-c08b0a72c1f1 // indirect
+	github.com/argoproj/gitops-engine v0.7.1-0.20250905153922-d96c3d51e4c4 // indirect
 	github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -65,7 +65,6 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
