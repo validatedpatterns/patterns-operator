@@ -17,6 +17,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
+    operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather:latest
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
   name: patterns-operator.v0.0.0
