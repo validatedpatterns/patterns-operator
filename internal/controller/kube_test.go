@@ -5,19 +5,14 @@ import (
 	"fmt"
 
 	routev1 "github.com/openshift/api/route/v1"
-	routefake "github.com/openshift/client-go/route/clientset/versioned/fake"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
-	discoveryfake "k8s.io/client-go/discovery/fake"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/testing"
-	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,7 +20,7 @@ import (
 
 var _ = Describe("HaveNamespace", func() {
 	var (
-		controllerClient kubeclient.Client
+		controllerClient client.Client
 		namespaceName    string
 	)
 
@@ -502,20 +497,19 @@ var _ = Describe("ObjectYaml", func() {
 
 var _ = Describe("GetRoute", func() {
 	var (
-		routeClient *routefake.Clientset
-		namespace   string
-		routeName   string
+		fakeClient client.Client
+		namespace  string
+		routeName  string
 	)
 
 	BeforeEach(func() {
-		routeClient = routefake.NewSimpleClientset()
 		namespace = "default"
 		routeName = "test-route"
 	})
 
 	Context("when the route exists", func() {
-		BeforeEach(func() {
-			route := &routev1.Route{
+		It("should return the URL of the route", func() {
+			route := routev1.Route{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      routeName,
 					Namespace: namespace,
@@ -528,12 +522,11 @@ var _ = Describe("GetRoute", func() {
 					},
 				},
 			}
-			_, err := routeClient.RouteV1().Routes(namespace).Create(context.Background(), route, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
 
-		It("should return the URL of the route", func() {
-			url, err := getRoute(routeClient, routeName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(&route).Build()
+
+			url, err := getRoute(fakeClient, routeName, namespace)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(url).To(Equal("https://example.com"))
 		})
@@ -541,27 +534,29 @@ var _ = Describe("GetRoute", func() {
 
 	Context("when the route does not exist", func() {
 		It("should return an error", func() {
-			url, err := getRoute(routeClient, routeName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+
+			url, err := getRoute(fakeClient, routeName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(url).To(BeEmpty())
 		})
 	})
 
 	Context("when the route has no ingress", func() {
-		BeforeEach(func() {
-			route := &routev1.Route{
+		It("should return an error", func() {
+			route := routev1.Route{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      routeName,
 					Namespace: namespace,
 				},
 				Status: routev1.RouteStatus{},
 			}
-			_, err := routeClient.RouteV1().Routes(namespace).Create(context.Background(), route, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
 
-		It("should return an error", func() {
-			url, err := getRoute(routeClient, routeName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(&route).Build()
+
+			url, err := getRoute(fakeClient, routeName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(url).To(BeEmpty())
 		})
@@ -570,31 +565,33 @@ var _ = Describe("GetRoute", func() {
 
 var _ = Describe("GetSecret", func() {
 	var (
-		clientset  *kubefake.Clientset
+		fakeClient client.Client
 		namespace  string
 		secretName string
+		secret     *v1.Secret
 	)
 
 	BeforeEach(func() {
-		clientset = kubefake.NewSimpleClientset()
 		namespace = "default"
 		secretName = "test-secret"
+		secret = &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+		}
 	})
 
 	Context("when the secret exists", func() {
 		BeforeEach(func() {
-			secret := &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      secretName,
-					Namespace: namespace,
-				},
-			}
-			_, err := clientset.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
+
 		})
 
 		It("should return the secret", func() {
-			secret, err := getSecret(clientset, secretName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects(secret).Build()
+
+			secret, err := getSecret(fakeClient, secretName, namespace)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(secret).ToNot(BeNil())
 			Expect(secret.Name).To(Equal(secretName))
@@ -603,7 +600,10 @@ var _ = Describe("GetSecret", func() {
 
 	Context("when the secret does not exist", func() {
 		It("should return an error", func() {
-			secret, err := getSecret(clientset, secretName, namespace)
+			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
+				WithRuntimeObjects().Build()
+
+			secret, err := getSecret(fakeClient, secretName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 			Expect(secret).To(BeNil())
@@ -612,92 +612,20 @@ var _ = Describe("GetSecret", func() {
 
 	Context("when there is an error other than NotFound", func() {
 		BeforeEach(func() {
-			clientset.PrependReactor("get", "secrets", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, errors.NewInternalError(fmt.Errorf("internal error"))
-			})
+			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{
+					Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return errors.NewInternalError(fmt.Errorf("internal error"))
+					},
+				}).WithScheme(testEnv.Scheme).Build()
+
 		})
 
 		It("should return an error", func() {
-			secret, err := getSecret(clientset, secretName, namespace)
+			secret, err := getSecret(fakeClient, secretName, namespace)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsInternalError(err)).To(BeTrue())
 			Expect(secret).To(BeNil())
 		})
 	})
-})
-
-// CustomClientset is a wrapper around fake.Clientset that overrides the Discovery method
-type CustomClientset struct {
-	*kubefake.Clientset
-	discovery *discoveryfake.FakeDiscovery
-}
-
-func (c *CustomClientset) Discovery() discovery.DiscoveryInterface {
-	return c.discovery
-}
-
-var _ = Describe("checkAPIVersion", func() {
-	var (
-		clientset *CustomClientset
-	)
-
-	BeforeEach(func() {
-		clientset = &CustomClientset{
-			Clientset: kubefake.NewSimpleClientset(),
-			discovery: &discoveryfake.FakeDiscovery{
-				Fake: &kubefake.NewSimpleClientset().Fake},
-		}
-	})
-
-	It("should return an error when the API group and version do not exist", func() {
-		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
-		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
-	})
-
-	It("should return nil when the API group and version exist", func() {
-		clientset.discovery.Resources = []*metav1.APIResourceList{
-			{
-				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, ArgoCDVersion),
-				APIResources: []metav1.APIResource{},
-			},
-		}
-
-		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("should return an error when the API group exists but the version does not", func() {
-		clientset.discovery.Resources = []*metav1.APIResourceList{
-			{
-				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, "v10"),
-				APIResources: []metav1.APIResource{},
-			},
-		}
-
-		err := checkAPIVersion(clientset, ArgoCDGroup, ArgoCDVersion)
-		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
-	})
-
-	It("should return an error when the API group exists but we query another one", func() {
-		clientset.discovery.Resources = []*metav1.APIResourceList{
-			{
-				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, "v10"),
-				APIResources: []metav1.APIResource{},
-			},
-		}
-
-		err := checkAPIVersion(clientset, "example", "v1")
-		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", "example", "v1")))
-	})
-
-	// FIXME(bandini): Not working yet
-	// It("should return an error when there is an error fetching the API groups", func() {
-	// 	clientset.discovery.PrependReactor("*", "*", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-	// 		return true, nil, kubeerrors.NewInternalError(fmt.Errorf("discovery error"))
-	// 	})
-
-	// 	err := checkAPIVersion(clientset, "example.com", "v1")
-	// 	Expect(err).To(MatchError("failed to get API groups: discovery error"))
-	// })
 })

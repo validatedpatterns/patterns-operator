@@ -29,8 +29,9 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,16 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
-	configclient "github.com/openshift/client-go/config/clientset/versioned"
-	routeclient "github.com/openshift/client-go/route/clientset/versioned"
-	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
-	"k8s.io/client-go/kubernetes"
-
-	//	olmapi "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	v1 "github.com/openshift/api/config/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
-	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
 )
 
 const ReconcileLoopRequeueTime = 180 * time.Second
@@ -62,13 +57,6 @@ type PatternReconciler struct {
 	logger logr.Logger
 
 	config          *rest.Config
-	configClient    configclient.Interface
-	argoClient      argoclient.Interface
-	olmClient       olmclient.Interface
-	fullClient      kubernetes.Interface
-	dynamicClient   dynamic.Interface
-	routeClient     routeclient.Interface
-	operatorClient  operatorclient.OperatorV1Interface
 	driftWatcher    driftWatcher
 	gitOperations   GitOperations
 	giteaOperations GiteaOperations
@@ -77,14 +65,14 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns/finalizers,verbs=update
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list;get
-//+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
-//+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list;watch;get
+//+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;watch;get
+//+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;watch;get
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;delete;update;get;create;patch
 //+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
-//+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list
+//+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;watch;get;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;watch;list;create
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
@@ -188,17 +176,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
+	targetSub, _ := newSubscriptionFromConfigMap(r.Client)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
 
-	sub, _ := getSubscription(r.olmClient, targetSub.Name)
+	sub, _ := getSubscription(r.Client, targetSub.Name)
 	if sub == nil {
-		err = createSubscription(r.olmClient, targetSub)
+		err = createSubscription(r.Client, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
 	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		changed, errSub := updateSubscription(r.olmClient, targetSub, sub)
+		changed, errSub := updateSubscription(r.Client, targetSub, sub)
 		if changed {
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
 		}
@@ -219,13 +207,13 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logOnce("namespace found")
 
 	// Create the trusted-bundle configmap inside the clusterwide namespace
-	errCABundle := createTrustedBundleCM(r.fullClient, getClusterWideArgoNamespace())
+	errCABundle := createTrustedBundleCM(r.Client, getClusterWideArgoNamespace())
 	if errCABundle != nil {
 		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
 	}
 
 	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
-	err = createOrUpdateArgoCD(r.dynamicClient, r.fullClient, ClusterWideArgoName, clusterWideNS)
+	err = createOrUpdateArgoCD(r.Client, ClusterWideArgoName, clusterWideNS)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 	}
@@ -252,14 +240,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	targetApp := newArgoApplication(qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
-	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
+	app, err := getApplication(r.Client, applicationName(qualifiedInstance), clusterWideNS)
 	if app == nil {
 		log.Printf("App not found: %s\n", err.Error())
-		err = createApplication(r.argoClient, targetApp, clusterWideNS)
+		err = createApplication(r.Client, targetApp, clusterWideNS)
 		return r.actionPerformed(qualifiedInstance, "create application", err)
 	} else if ownedBySame(targetApp, app) {
 		// Check values
-		changed, errApp := updateApplication(r.argoClient, targetApp, app, clusterWideNS)
+		changed, errApp := updateApplication(r.Client, targetApp, app, clusterWideNS)
 		if changed {
 			if errApp != nil {
 				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
@@ -316,7 +304,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	// for the namespace to show up and then the pod will take quite a while to retry
 	// with the gitea-admin-secret mounted into it
 	if !haveNamespace(r.Client, GiteaNamespace) {
-		err := createNamespace(r.fullClient, GiteaNamespace)
+		err := createNamespace(r.Client, GiteaNamespace)
 		if err != nil {
 			return fmt.Errorf("error creating %s namespace: %v", GiteaNamespace, err)
 		}
@@ -340,14 +328,14 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
 	giteaApp := newArgoGiteaApplication(input)
 	_ = controllerutil.SetOwnerReference(input, giteaApp, r.Scheme)
-	app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
+	app, err := getApplication(r.Client, GiteaApplicationName, clusterWideNS)
 	if app == nil {
 		log.Printf("Gitea app not found: %s\n", err.Error())
-		err = createApplication(r.argoClient, giteaApp, clusterWideNS)
+		err = createApplication(r.Client, giteaApp, clusterWideNS)
 		return fmt.Errorf("create gitea application: %v", err)
 	} else if ownedBySame(giteaApp, app) {
 		// Check values
-		changed, errApp := updateApplication(r.argoClient, giteaApp, app, clusterWideNS)
+		changed, errApp := updateApplication(r.Client, giteaApp, app, clusterWideNS)
 		if changed {
 			if errApp != nil {
 				input.Status.Version = 1 + input.Status.Version
@@ -366,7 +354,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 
 	// Here we need to call the gitea migration bits
 	// Let's get the GiteaServer route
-	giteaRouteURL, routeErr := getRoute(r.routeClient, GiteaRouteName, GiteaNamespace)
+	giteaRouteURL, routeErr := getRoute(r.Client, GiteaRouteName, GiteaNamespace)
 	if routeErr != nil {
 		return fmt.Errorf("GiteaServer route not ready: %v", routeErr)
 	}
@@ -377,13 +365,13 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	}
 
 	giteaRepoURL := fmt.Sprintf("%s/%s/%s", giteaRouteURL, GiteaAdminUser, upstreamRepoName)
-	secret, secretErr := getSecret(r.fullClient, GiteaAdminSecretName, GiteaNamespace)
+	secret, secretErr := getSecret(r.Client, GiteaAdminSecretName, GiteaNamespace)
 	if secretErr != nil {
 		return fmt.Errorf("error getting gitea Admin Secret: %v", secretErr)
 	}
 
 	// Let's attempt to migrate the repo to Gitea
-	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data["username"]),
+	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.Client, string(secret.Data["username"]),
 		string(secret.Data["password"]),
 		input.Spec.GitConfig.OriginRepo,
 		giteaRouteURL)
@@ -428,50 +416,62 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	// Cluster ID:
 	// oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}'
 	// oc get clusterversion/version -o jsonpath='{.spec.clusterID}'
-	if cv, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{}); err != nil {
+	cv := v1.ClusterVersion{}
+	err := r.Get(context.Background(),
+		types.NamespacedName{Name: "version"}, &cv)
+	if err != nil {
 		return output, err
-	} else {
-		output.Status.ClusterID = string(cv.Spec.ClusterID)
 	}
+
+	output.Status.ClusterID = string(cv.Spec.ClusterID)
 
 	// Cluster platform
 	// oc get Infrastructure.config.openshift.io/cluster  -o jsonpath='{.spec.platformSpec.type}'
-	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), "cluster", metav1.GetOptions{})
+	clusterInfra := v1.Infrastructure{}
+	err = r.Get(context.Background(), client.ObjectKey{
+		Namespace: "",
+		Name:      "cluster",
+	}, &clusterInfra)
+
 	if err != nil {
 		return output, err
-	} else {
-		//   status:
-		//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
-		//    apiServerURL: https://api.beekhof49.blueprints.rhecoeng.com:6443
-		//    controlPlaneTopology: HighlyAvailable
-		//    etcdDiscoveryDomain: ""
-		//    infrastructureName: beekhof49-pqzfb
-		//    infrastructureTopology: HighlyAvailable
-		//    platform: AWS
-		//    platformStatus:
-		//      aws:
-		//        region: ap-southeast-2
-		//      type: AWS
-
-		output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
 	}
+	//   status:
+	//    apiServerInternalURI: https://api-int.beekhof49.blueprints.rhecoeng.com:6443
+	//    apiServerURL: https://api.beekhof49.blueprints.rhecoeng.com:6443
+	//    controlPlaneTopology: HighlyAvailable
+	//    etcdDiscoveryDomain: ""
+	//    infrastructureName: beekhof49-pqzfb
+	//    infrastructureTopology: HighlyAvailable
+	//    platform: AWS
+	//    platformStatus:
+	//      aws:
+	//        region: ap-southeast-2
+	//      type: AWS
+
+	output.Status.ClusterPlatform = string(clusterInfra.Spec.PlatformSpec.Type)
 
 	// Cluster Version
 	// oc get clusterversion/version -o yaml
-	clusterVersions, err := r.configClient.ConfigV1().ClusterVersions().Get(context.Background(), "version", metav1.GetOptions{})
+	clusterVersions := v1.ClusterVersion{}
+	err = r.Get(context.Background(),
+		types.NamespacedName{Name: "version"}, &clusterVersions)
+
 	if err != nil {
 		return output, err
-	} else {
-		v, version_err := getCurrentClusterVersion(clusterVersions)
-		if version_err != nil {
-			return output, version_err
-		}
-		output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 	}
+	v, version_err := getCurrentClusterVersion(&clusterVersions)
+
+	if version_err != nil {
+		return output, version_err
+	}
+	output.Status.ClusterVersion = fmt.Sprintf("%d.%d", v.Major(), v.Minor())
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
-	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
+	clusterIngress := v1.Ingress{}
+	err = r.Get(context.Background(),
+		types.NamespacedName{Name: "cluster"}, &clusterIngress)
 	if err != nil {
 		return output, err
 	}
@@ -546,7 +546,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		targetApp := newArgoApplication(qualifiedInstance)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
-		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance), ns)
+		app, _ := getApplication(r.Client, applicationName(qualifiedInstance), ns)
 		if app == nil {
 			log.Printf("Application has already been removed\n")
 			return nil
@@ -563,11 +563,11 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 		}
-		if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+		if changed, _ := updateApplication(r.Client, targetApp, app, ns); changed {
 			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
-		if haveACMHub(r) {
+		if haveACMHub(r.Client) {
 			return fmt.Errorf("waiting for removal of that acm hub")
 		}
 
@@ -576,7 +576,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 
 		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-		if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
+		if err := removeApplication(r.Client, app); err != nil {
 			return err
 		}
 		return fmt.Errorf("waiting for application %q to be removed", app.Name)
@@ -587,36 +587,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	var err error
 	r.config = mgr.GetConfig()
 
-	if r.configClient, err = configclient.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.argoClient, err = argoclient.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.olmClient, err = olmclient.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.fullClient, err = kubernetes.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.dynamicClient, err = dynamic.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.operatorClient, err = operatorclient.NewForConfig(r.config); err != nil {
-		return err
-	}
-
-	if r.routeClient, err = routeclient.NewForConfig(r.config); err != nil {
-		return err
-	}
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
 	r.giteaOperations = &GiteaOperationsImpl{}
@@ -676,10 +648,12 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	// oc get Applications -A -l validatedpatterns.io/pattern=<pattern-name>
 	//
 	// The VP framework adds the label to each application it creates.
-	applications, err := r.argoClient.ArgoprojV1alpha1().Applications("").List(context.Background(),
-		metav1.ListOptions{
-			LabelSelector: labelFilter,
-		})
+	applications := &argoapi.ApplicationList{}
+	labelSelector, err := labels.Parse(labelFilter)
+	if err != nil {
+		return false, err
+	}
+	err = r.List(context.TODO(), applications, &client.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		return false, err
 	}
@@ -739,7 +713,8 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 }
 
 func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {
-	tokenSecret, err := r.fullClient.CoreV1().Secrets(namespace).Get(context.TODO(), secret, metav1.GetOptions{})
+	tokenSecret := &corev1.Secret{}
+	err := r.Get(context.Background(), types.NamespacedName{Name: secret, Namespace: namespace}, tokenSecret)
 	if err != nil {
 		r.logger.Error(err, fmt.Sprintf("Could not obtain secret %s/%s", namespace, secret))
 		return nil, err
@@ -753,19 +728,22 @@ func (r *PatternReconciler) copyAuthGitSecret(secretNamespace, secretName, destN
 		return err
 	}
 	newSecretCopy := newSecret(destSecretName, destNamespace, sourceSecret, map[string]string{"argocd.argoproj.io/secret-type": "repository"})
-	_, err = r.fullClient.CoreV1().Secrets(destNamespace).Get(context.TODO(), destSecretName, metav1.GetOptions{})
+	oldsecret := &corev1.Secret{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: destSecretName, Namespace: destNamespace}, oldsecret)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			// Resource does not exist, create it
-			_, err = r.fullClient.CoreV1().Secrets(destNamespace).Create(context.TODO(), newSecretCopy, metav1.CreateOptions{})
-			return err
+			err := r.Create(context.Background(), newSecretCopy)
+			if err != nil {
+				return err
+			}
 		}
 		return err
 	}
 
 	// The destination secret already exists so we upate it and return an error if they were different so the reconcile loop can restart
-	updatedSecret, err := r.fullClient.CoreV1().Secrets(destNamespace).Update(context.TODO(), newSecretCopy, metav1.UpdateOptions{})
-	if err == nil && !compareMaps(newSecretCopy.Data, updatedSecret.Data) {
+	err = r.Update(context.Background(), newSecretCopy)
+	if err == nil && !compareMaps(newSecretCopy.Data, oldsecret.Data) {
 		return fmt.Errorf("the secret at %s/%s has been updated", destNamespace, destSecretName)
 	}
 	return err
@@ -783,16 +761,16 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
 	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
 	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
-	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
+	if err = writeConfigMapKeyToFile(r.Client, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
 		fmt.Printf("Error while writing kube-root-ca.crt configmap to file: %v", err)
 	}
-	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
+	if err = writeConfigMapKeyToFile(r.Client, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
 		fmt.Printf("Error while appending trusted-ca-bundle configmap to file: %v", err)
 	}
 
 	gitDir := filepath.Join(p.Status.LocalCheckoutPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		err = cloneRepo(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+		err = cloneRepo(r.Client, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
 		if err != nil {
 			return "cloning pattern repo", err
 		}
@@ -807,13 +785,13 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 			if err != nil {
 				return "failed to remove locally cloned folder", err
 			}
-			err = cloneRepo(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
+			err = cloneRepo(r.Client, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath, gitAuthSecret)
 			if err != nil {
 				return "cloning pattern repo after removal", err
 			}
 		}
 	}
-	if err := checkoutRevision(r.fullClient, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
+	if err := checkoutRevision(r.Client, r.gitOperations, p.Spec.GitConfig.TargetRepo, p.Status.LocalCheckoutPath,
 		p.Spec.GitConfig.TargetRevision, gitAuthSecret); err != nil {
 		return "checkout target revision", err
 	}

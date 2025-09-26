@@ -20,12 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 
+	routev1 "github.com/openshift/api/route/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -86,30 +84,10 @@ func referSameObject(a, b *metav1.OwnerReference) bool {
 	return aGV.Version == bGV.Version && aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name && a.UID == b.UID
 }
 
-func checkAPIVersion(clientset kubernetes.Interface, group, version string) error {
-	// Get the list of API groups available in the cluster
-	apiGroups, err := clientset.Discovery().ServerGroups()
-	if err != nil {
-		return fmt.Errorf("failed to get API groups: %v", err)
-	}
+func getRoute(cl kubeclient.Client, routeName, namespace string) (string, error) {
+	route := routev1.Route{}
 
-	// Iterate through the API groups to find the specified group and version
-	//nolint:gocritic // The range is so small that this is not worth changing
-	for _, apiGroup := range apiGroups.Groups {
-		if apiGroup.Name == group {
-			for _, apiVersion := range apiGroup.Versions {
-				if apiVersion.Version == version {
-					return nil
-				}
-			}
-		}
-	}
-
-	return fmt.Errorf("API version %s/%s not available", group, version)
-}
-
-func getRoute(routeClient routeclient.Interface, routeName, namespace string) (string, error) {
-	route, err := routeClient.RouteV1().Routes(namespace).Get(context.Background(), routeName, metav1.GetOptions{})
+	err := cl.Get(context.Background(), types.NamespacedName{Name: routeName, Namespace: namespace}, &route)
 	if err != nil {
 		return "", err
 	}
@@ -125,12 +103,10 @@ func getRoute(routeClient routeclient.Interface, routeName, namespace string) (s
 }
 
 // Get a Secret instance
-func getSecret(fullClient kubernetes.Interface, name, ns string) (*v1.Secret, error) {
-	secret, err := fullClient.CoreV1().Secrets(ns).Get(context.Background(), name, metav1.GetOptions{})
+func getSecret(cl kubeclient.Client, name, ns string) (*v1.Secret, error) {
+	secret := &v1.Secret{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: name, Namespace: ns}, secret)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, err
-		}
 		return nil, err
 	}
 	return secret, nil

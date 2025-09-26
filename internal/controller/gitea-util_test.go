@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 
 	gomock "go.uber.org/mock/gomock"
-	"k8s.io/client-go/kubernetes/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,7 +15,6 @@ import (
 var _ = Describe("MigrateGiteaRepo", func() {
 	var (
 		mockCtrl         *gomock.Controller
-		mockKubeClient   *fake.Clientset
 		giteaServer      *httptest.Server
 		giteaServerRoute string
 		giteaOperations  GiteaOperations
@@ -23,6 +22,7 @@ var _ = Describe("MigrateGiteaRepo", func() {
 		password         string
 		upstreamURL      string
 		repoName         string
+		fakeClient       client.Client
 	)
 
 	const (
@@ -32,7 +32,6 @@ var _ = Describe("MigrateGiteaRepo", func() {
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
-		mockKubeClient = fake.NewSimpleClientset()
 		giteaOperations = &GiteaOperationsImpl{}
 		username = "user"
 		password = "pass"
@@ -66,7 +65,7 @@ var _ = Describe("MigrateGiteaRepo", func() {
 
 	Context("when the repository does not exist", func() {
 		It("should migrate the repository successfully", func() {
-			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(mockKubeClient, username, password, upstreamURL, giteaServerRoute)
+			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(fakeClient, username, password, upstreamURL, giteaServerRoute)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(success).To(BeTrue())
 			Expect(repositoryURL).To(Equal("https://gitea.example.com/user/repo"))
@@ -98,7 +97,7 @@ var _ = Describe("MigrateGiteaRepo", func() {
 		})
 
 		It("should not migrate the repository and return the existing repository URL", func() {
-			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(mockKubeClient, username, password, upstreamURL, giteaServerRoute)
+			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(fakeClient, username, password, upstreamURL, giteaServerRoute)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(success).To(BeTrue())
 			Expect(repositoryURL).To(Equal("https://gitea.example.com/user/repo"))
@@ -109,7 +108,7 @@ var _ = Describe("MigrateGiteaRepo", func() {
 		It("should return an error", func() {
 			// Use an invalid Gitea server route to simulate client creation failure
 			invalidRoute := "http://invalid-url"
-			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(mockKubeClient, username, password, upstreamURL, invalidRoute)
+			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(fakeClient, username, password, upstreamURL, invalidRoute)
 			Expect(err).To(HaveOccurred())
 			Expect(success).To(BeFalse())
 			Expect(repositoryURL).To(BeEmpty())
@@ -129,7 +128,7 @@ var _ = Describe("MigrateGiteaRepo", func() {
 		})
 
 		It("should return an error", func() {
-			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(mockKubeClient, username, password, upstreamURL, giteaServerRoute)
+			success, repositoryURL, err := giteaOperations.MigrateGiteaRepo(fakeClient, username, password, upstreamURL, giteaServerRoute)
 			Expect(err).To(HaveOccurred())
 			Expect(success).To(BeFalse())
 			Expect(repositoryURL).To(BeEmpty())

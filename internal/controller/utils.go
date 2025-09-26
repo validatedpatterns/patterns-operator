@@ -39,7 +39,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
 )
@@ -212,9 +213,10 @@ func newSecret(name, namespace string, secret map[string][]byte, labels map[stri
 	return k8sSecret
 }
 
-func createNamespace(kubeClient kubernetes.Interface, namespace string) error {
+func createNamespace(cl ctrlclient.Client, namespace string) error {
 	// Create the namespace if it doesn't exist
-	_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+	found := corev1.Namespace{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: namespace}, &found)
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			ns := &corev1.Namespace{
@@ -222,7 +224,7 @@ func createNamespace(kubeClient kubernetes.Interface, namespace string) error {
 					Name: namespace,
 				},
 			}
-			_, err = kubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			err := cl.Create(context.Background(), ns)
 			if err != nil {
 				return err
 			}
@@ -233,7 +235,7 @@ func createNamespace(kubeClient kubernetes.Interface, namespace string) error {
 	return nil
 }
 
-func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) error {
+func createTrustedBundleCM(cl ctrlclient.Client, namespace string) error {
 	name := "trusted-ca-bundle"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -244,10 +246,10 @@ func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) er
 			},
 		},
 	}
-	_, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	err := cl.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &corev1.ConfigMap{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
-			_, err = fullClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
+			err := cl.Create(context.Background(), cm)
 			return err
 		}
 		return err
@@ -267,9 +269,10 @@ func getClusterWideArgoNamespace() string {
 // `key` is the key within the ConfigMap whose value will be written to the file.
 // `filePath` is the path to the file where the value will be written.
 // `append` will append the data to the file
-func writeConfigMapKeyToFile(fullClient kubernetes.Interface, namespace, configMapName, key, filePath string, appendToFile bool) error {
+func writeConfigMapKeyToFile(cl ctrlclient.Client, namespace, configMapName, key, filePath string, appendToFile bool) error {
 	// Get the ConfigMap
-	configMap, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
+	configMap := corev1.ConfigMap{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: configMapName, Namespace: namespace}, &configMap)
 	if err != nil {
 		return fmt.Errorf("error getting ConfigMap %s in namespace %s: %w", configMapName, namespace, err)
 	}
@@ -316,9 +319,10 @@ func hasExperimentalCapability(capabilities, name string) bool {
 // `configMapName` is the name of the ConfigMap.
 // `namespace` is the namespace where the ConfigMap resides.
 // `key` is the key within the ConfigMap whose value will be written to the file.
-func getConfigMapKey(fullClient kubernetes.Interface, namespace, configMapName, key string) (string, error) {
+func getConfigMapKey(cl ctrlclient.Client, namespace, configMapName, key string) (string, error) {
 	// Get the ConfigMap
-	configMap, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
+	configMap := corev1.ConfigMap{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: configMapName, Namespace: namespace}, &configMap)
 	if err != nil {
 		return "", fmt.Errorf("error getting ConfigMap %s in namespace %s: %w", configMapName, namespace, err)
 	}
@@ -331,7 +335,7 @@ func getConfigMapKey(fullClient kubernetes.Interface, namespace, configMapName, 
 	return value, nil
 }
 
-func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
+func getHTTPSTransport(cl ctrlclient.Client) *nethttp.Transport {
 	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
 	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
 	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
@@ -339,13 +343,13 @@ func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
 	var kuberoot = ""
 	var trustedcabundle = ""
 
-	if fullClient != nil {
-		kuberoot, err = getConfigMapKey(fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt")
+	if cl != nil {
+		kuberoot, err = getConfigMapKey(cl, "openshift-config-managed", "kube-root-ca.crt", "ca.crt")
 		if err != nil {
 			fmt.Printf("Could not get kube-root-ca.crt configmap: %v\n", err)
 		}
 
-		trustedcabundle, err = getConfigMapKey(fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt")
+		trustedcabundle, err = getConfigMapKey(cl, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt")
 		if err != nil {
 			fmt.Printf("Could not get trusted-ca-bundle configmap: %v\n", err)
 		}
