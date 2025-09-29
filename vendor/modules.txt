@@ -119,11 +119,11 @@ github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/argoproj-labs/argocd-operator v0.15.0-rc1
-## explicit; go 1.24.4
+# github.com/argoproj-labs/argocd-operator v0.15.0
+## explicit; go 1.24.6
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
-# github.com/argoproj/argo-cd/v3 v3.0.14
+# github.com/argoproj/argo-cd/v3 v3.0.16
 ## explicit; go 1.24.6
 github.com/argoproj/argo-cd/v3/assets
 github.com/argoproj/argo-cd/v3/common
@@ -157,14 +157,16 @@ github.com/argoproj/argo-cd/v3/util/regex
 github.com/argoproj/argo-cd/v3/util/security
 github.com/argoproj/argo-cd/v3/util/versions
 github.com/argoproj/argo-cd/v3/util/workloadidentity
-# github.com/argoproj/gitops-engine v0.7.1-0.20250521000818-c08b0a72c1f1
-## explicit; go 1.22.0
+# github.com/argoproj/gitops-engine v0.7.1-0.20250905153922-d96c3d51e4c4
+## explicit; go 1.23.5
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/api/v1/endpoints
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/util/hash
 github.com/argoproj/gitops-engine/pkg/diff
 github.com/argoproj/gitops-engine/pkg/diff/internal/fieldmanager
 github.com/argoproj/gitops-engine/pkg/health
 github.com/argoproj/gitops-engine/pkg/sync/common
+github.com/argoproj/gitops-engine/pkg/sync/hook
+github.com/argoproj/gitops-engine/pkg/sync/hook/helm
 github.com/argoproj/gitops-engine/pkg/sync/resource
 github.com/argoproj/gitops-engine/pkg/utils/io
 github.com/argoproj/gitops-engine/pkg/utils/json
@@ -266,9 +268,6 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
-# github.com/evanphx/json-patch v5.9.11+incompatible
-## explicit
-github.com/evanphx/json-patch
 # github.com/evanphx/json-patch/v5 v5.9.11
 ## explicit; go 1.18
 github.com/evanphx/json-patch/v5
