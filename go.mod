@@ -14,8 +14,8 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible
 	github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e // release-4.16
-	github.com/operator-framework/api v0.33.0
-	github.com/operator-framework/operator-lifecycle-manager v0.33.0
+	github.com/operator-framework/api v0.34.0
+	github.com/operator-framework/operator-lifecycle-manager v0.35.0
 	github.com/segmentio/analytics-go/v3 v3.3.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.41.0
@@ -147,7 +147,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/cobra v1.9.1 // indirect
+	github.com/spf13/cobra v1.10.1 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/vmihailenco/go-tinylfu v0.2.2 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
