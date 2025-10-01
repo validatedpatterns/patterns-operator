@@ -279,6 +279,8 @@ func (e *Enforcer) SetWatcher(watcher persist.Watcher) error {
 func (e *Enforcer) GetRoleManager() rbac.RoleManager {
 	if e.rmMap != nil && e.rmMap["g"] != nil {
 		return e.rmMap["g"]
+	} else if e.condRmMap != nil && e.condRmMap["g"] != nil {
+		return e.condRmMap["g"]
 	} else {
 		return nil
 	}
@@ -288,6 +290,8 @@ func (e *Enforcer) GetRoleManager() rbac.RoleManager {
 func (e *Enforcer) GetNamedRoleManager(ptype string) rbac.RoleManager {
 	if e.rmMap != nil && e.rmMap[ptype] != nil {
 		return e.rmMap[ptype]
+	} else if e.condRmMap != nil && e.condRmMap[ptype] != nil {
+		return e.condRmMap[ptype]
 	} else {
 		return nil
 	}
@@ -907,6 +911,10 @@ func (e *Enforcer) AddNamedMatchingFunc(ptype, name string, fn rbac.MatchingFunc
 func (e *Enforcer) AddNamedDomainMatchingFunc(ptype, name string, fn rbac.MatchingFunc) bool {
 	if rm, ok := e.rmMap[ptype]; ok {
 		rm.AddDomainMatchingFunc(name, fn)
+		return true
+	}
+	if condRm, ok := e.condRmMap[ptype]; ok {
+		condRm.AddDomainMatchingFunc(name, fn)
 		return true
 	}
 	return false
