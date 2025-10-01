@@ -212,7 +212,7 @@ github.com/casbin/casbin/v2/persist/file-adapter
 github.com/casbin/casbin/v2/rbac
 github.com/casbin/casbin/v2/rbac/default-role-manager
 github.com/casbin/casbin/v2/util
-# github.com/casbin/govaluate v1.3.0
+# github.com/casbin/govaluate v1.10.0
 ## explicit; go 1.13
 github.com/casbin/govaluate
 # github.com/cespare/xxhash/v2 v2.3.0
