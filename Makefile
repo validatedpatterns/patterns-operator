@@ -6,7 +6,7 @@
 VERSION ?= 0.0.4
 OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
-GOLANGCI_VERSION ?= 2.4.0
+GOLANGCI_VERSION ?= 2.5.0
 
 # CI uses a non-writable home dir, make sure .cache is writable
 ifeq ("${HOME}", "/")
