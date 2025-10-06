@@ -3,9 +3,10 @@
 Here be dragons
 
 References:
-- https://sdk.operatorframework.io/docs/building-operators/golang/quickstart/
 
-Follow https://sdk.operatorframework.io/docs/installation/ to install the operator-sdk
+- <https://sdk.operatorframework.io/docs/building-operators/golang/quickstart/>
+
+Follow <https://sdk.operatorframework.io/docs/installation/> to install the operator-sdk
 
 ## Deploy the operator
 
@@ -18,6 +19,7 @@ kubectl create -f config/samples/gitops_v1alpha1_pattern.yaml
 ```
 
 ### Check the status
+
 ```
 kubectl get -f config/samples/gitops_v1alpha1_pattern.yaml -o yaml
 oc get applications -A -w
@@ -46,6 +48,7 @@ Removing the top-level application ensures that Argo won't try to put back anyth
 
 Note that when installing via UI the namespace will be `openshift-operators`
 and not `patterns-operator-system`
+
 ```
 oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
 ```
@@ -129,7 +132,7 @@ before running `make catalog-install`.
 Assuming the previous version was `0.0.1`, start by defining the version,
 creating the 3 images, and pushing them to quay:
 
-```
+```sh
 export USER=replace-me  # Replace user
 export VERSION=0.0.2    # Replace version
 IMAGE_TAG_BASE=quay.io/$USER/patterns-operator CHANNELS=fast make docker-build docker-push bundle bundle-build bundle-push catalog-build catalog-push
@@ -156,6 +159,7 @@ Operator*. Install the operator from the source *Test Patterns Operator*.
 As a first step, make sure you have already cloned the community-operators-prod
 via `git clone git@github.com:$USER/community-operators-prod.git` and that it
 is up-to-date:
+
 ```
 # First make sure community-operators-prod is uptodate
 cd community-operators-prod
