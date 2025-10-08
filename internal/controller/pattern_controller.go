@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,6 +56,8 @@ type PatternReconciler struct {
 	AnalyticsClient VpAnalyticsInterface
 
 	logger logr.Logger
+
+	discoveryClient discovery.DiscoveryInterface
 
 	config          *rest.Config
 	driftWatcher    driftWatcher
@@ -213,7 +216,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
-	err = createOrUpdateArgoCD(r.Client, ClusterWideArgoName, clusterWideNS)
+	err = createOrUpdateArgoCD(r.Client, r.discoveryClient, ClusterWideArgoName, clusterWideNS)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 	}
@@ -592,6 +595,10 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
 	r.giteaOperations = &GiteaOperationsImpl{}
+	var err error
+	if r.discoveryClient, err = discovery.NewDiscoveryClientForConfig(r.config); err != nil {
+		return err
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).

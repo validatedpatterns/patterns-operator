@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 
 	routev1 "github.com/openshift/api/route/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,4 +111,23 @@ func getSecret(cl kubeclient.Client, name, ns string) (*v1.Secret, error) {
 		return nil, err
 	}
 	return secret, nil
+}
+
+func checkAPIVersion(dcl discovery.DiscoveryInterface, group, version string) error {
+	// Get the list of API groups available in the cluster
+	_, apis, err := dcl.ServerGroupsAndResources()
+
+	if err != nil {
+		return fmt.Errorf("failed to get API groups: %v", err)
+	}
+
+	// Iterate through the API groups to find the specified group and version
+	//nolint:gocritic // The range is so small that this is not worth changing
+	for _, apiGroup := range apis {
+		if apiGroup.GroupVersion == fmt.Sprintf("%s/%s", group, version) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("API version %s/%s not available", group, version)
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -323,7 +324,7 @@ func haveArgo(cl client.Client, name, namespace string) (bool, error) {
 	return true, nil
 }
 
-func createOrUpdateArgoCD(cl client.Client, name, namespace string) error {
+func createOrUpdateArgoCD(cl client.Client, dcl discovery.DiscoveryInterface, name, namespace string) error {
 	argo := newArgoCD(name, namespace)
 	var err error
 

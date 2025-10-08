@@ -9,6 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -628,4 +630,60 @@ var _ = Describe("GetSecret", func() {
 			Expect(secret).To(BeNil())
 		})
 	})
+})
+
+var _ = Describe("checkAPIVersion", func() {
+	var (
+		discoveryClient *discoveryfake.FakeDiscovery
+	)
+
+	BeforeEach(func() {
+		discoveryClient = &discoveryfake.FakeDiscovery{
+			Fake: &k8sfake.NewSimpleClientset().Fake,
+		}
+	})
+
+	It("should return an error when the API group and version do not exist", func() {
+		discoveryClient.Fake.Resources = []*metav1.APIResourceList{}
+
+		err := checkAPIVersion(discoveryClient, ArgoCDGroup, ArgoCDVersion)
+		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
+	})
+
+	It("should return nil when the API group and version exist", func() {
+		discoveryClient.Fake.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, ArgoCDVersion),
+				APIResources: []metav1.APIResource{},
+			},
+		}
+
+		err := checkAPIVersion(discoveryClient, ArgoCDGroup, ArgoCDVersion)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return an error when the API group exists but the version does not", func() {
+		discoveryClient.Fake.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, "v10"),
+				APIResources: []metav1.APIResource{},
+			},
+		}
+
+		err := checkAPIVersion(discoveryClient, ArgoCDGroup, ArgoCDVersion)
+		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", ArgoCDGroup, ArgoCDVersion)))
+	})
+
+	It("should return an error when the API group exists but we query another one", func() {
+		discoveryClient.Fake.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, "v10"),
+				APIResources: []metav1.APIResource{},
+			},
+		}
+
+		err := checkAPIVersion(discoveryClient, "example", "v10")
+		Expect(err).To(MatchError(fmt.Sprintf("API version %s/%s not available", "example", "v10")))
+	})
+
 })
