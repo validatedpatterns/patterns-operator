@@ -44,9 +44,9 @@ import (
 
 // Which ArgoCD objects we're creating
 const (
-	ArgoCDGroup    = "argoproj.io"
-	ArgoCDVersion  = "v1beta1"
-	ArgoCDResource = "argocds"
+	ArgoCDGroup   = "argoproj.io"
+	ArgoCDVersion = "v1beta1"
+	ArgoCDKind    = "ArgoCD"
 )
 
 func newArgoCD(name, namespace string) *argooperator.ArgoCD {
@@ -302,63 +302,44 @@ g, admin, role:admin`
 	return &s
 }
 
-func haveArgo(cl client.Client, name, namespace string) (bool, error) {
-	// Using an unstructured object.
-	unstructuredArgo := &unstructured.Unstructured{}
-	unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   ArgoCDGroup,
-		Kind:    ArgoCDResource,
-		Version: ArgoCDVersion,
-	})
-	err := cl.Get(context.Background(), client.ObjectKey{
-		Namespace: namespace,
-		Name:      name,
-	}, unstructuredArgo)
-
-	if err != nil {
-		if kerrors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
 func createOrUpdateArgoCD(cl client.Client, dcl discovery.DiscoveryInterface, name, namespace string) error {
 	argo := newArgoCD(name, namespace)
-	var err error
 
-	foundArgo, err := haveArgo(cl, name, namespace)
+	err := checkAPIVersion(dcl, ArgoCDGroup, ArgoCDVersion)
+
 	if err != nil {
 		return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
 	}
 
-	if !foundArgo {
-		// create it
-		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
-		newArgo := &unstructured.Unstructured{Object: obj}
+	oldArgo, err := getArgoCD(cl, name, namespace)
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			// Create it if it does not exist
+			obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+			newArgo := &unstructured.Unstructured{Object: obj}
 
-		// Using a unstructured object.
+			// Using a unstructured object.
+			newArgo.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   ArgoCDGroup,
+				Kind:    ArgoCDKind,
+				Version: ArgoCDVersion,
+			})
 
-		newArgo.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   ArgoCDGroup,
-			Kind:    ArgoCDResource,
-			Version: ArgoCDVersion,
-		})
-
-		err = cl.Create(context.Background(), newArgo)
-	} else { // update it
-		oldArgo, _ := getArgoCD(cl, name, namespace)
-		argo.SetResourceVersion(oldArgo.GetResourceVersion())
-		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
-		newArgo := &unstructured.Unstructured{Object: obj}
-		newArgo.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   ArgoCDGroup,
-			Kind:    ArgoCDResource,
-			Version: ArgoCDVersion,
-		})
-		err = cl.Update(context.Background(), newArgo)
+			return cl.Create(context.Background(), newArgo)
+		}
+		return err
 	}
+	// Update it if it exist
+	argo.SetResourceVersion(oldArgo.GetResourceVersion())
+	obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+	newArgo := &unstructured.Unstructured{Object: obj}
+	newArgo.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   ArgoCDGroup,
+		Kind:    ArgoCDKind,
+		Version: ArgoCDVersion,
+	})
+	err = cl.Update(context.Background(), newArgo)
+
 	return err
 }
 
@@ -369,7 +350,7 @@ func getArgoCD(cl client.Client, name, namespace string) (*argooperator.ArgoCD, 
 	unstructuredArgo := &unstructured.Unstructured{}
 	unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   ArgoCDGroup,
-		Kind:    ArgoCDResource,
+		Kind:    ArgoCDKind,
 		Version: ArgoCDVersion,
 	})
 	err := cl.Get(context.Background(), client.ObjectKey{

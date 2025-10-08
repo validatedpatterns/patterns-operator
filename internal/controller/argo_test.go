@@ -28,6 +28,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	runtimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -832,10 +836,10 @@ var _ = Describe("NewArgoCD", func() {
 	})
 })
 
-var _ = Describe("haveArgo", func() {
-
+var _ = Describe("CreateOrUpdateArgoCD", func() {
 	var (
-		fakeClient client.Client
+		fakeClient      client.Client
+		discoveryClient *discoveryfake.FakeDiscovery
 
 		name      string
 		namespace string
@@ -844,73 +848,15 @@ var _ = Describe("haveArgo", func() {
 	BeforeEach(func() {
 		name = argoName
 		namespace = argoNS
-	})
-
-	Context("when the ArgoCD instance exists", func() {
-		It("should return true", func() {
-			unstructuredArgo := &unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "argoproj.io/v1beta1",
-					"kind":       "ArgoCD",
-					"metadata": map[string]any{
-						"name":            name,
-						"namespace":       namespace,
-						"resourceVersion": "1",
-					},
-				},
-			}
-			unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
-				Group:   ArgoCDGroup,
-				Kind:    ArgoCDResource,
-				Version: ArgoCDVersion,
-			})
-			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
-				WithRuntimeObjects(unstructuredArgo).Build()
-
-			result, err := haveArgo(fakeClient, name, namespace)
-			Expect(result).To(BeTrue())
-			Expect(err).ToNot(HaveOccurred())
-
-		})
-	})
-
-	Context("when the ArgoCD instance does not exist", func() {
-		It("should return false", func() {
-			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
-				WithRuntimeObjects().Build()
-			result, err := haveArgo(fakeClient, name, namespace)
-			Expect(result).To(BeFalse())
-			Expect(err).ToNot(HaveOccurred())
-
-		})
-	})
-
-	Context("when there is an error retrieving the ArgoCD instance", func() {
-		It("should return false", func() {
-			fakeClient = fake.NewClientBuilder().WithInterceptorFuncs(
-				interceptor.Funcs{Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					return fmt.Errorf("get error")
-				}},
-			).WithScheme(testEnv.Scheme).Build()
-
-			result, err := haveArgo(fakeClient, name, namespace)
-			Expect(result).To(BeFalse())
-			Expect(err).To(HaveOccurred())
-
-		})
-	})
-})
-
-var _ = Describe("CreateOrUpdateArgoCD", func() {
-	var (
-		fakeClient client.Client
-		name       string
-		namespace  string
-	)
-
-	BeforeEach(func() {
-		name = argoName
-		namespace = argoNS
+		discoveryClient = &discoveryfake.FakeDiscovery{
+			Fake: &k8sfake.NewSimpleClientset().Fake,
+		}
+		discoveryClient.Fake.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: fmt.Sprintf("%s/%s", ArgoCDGroup, ArgoCDVersion),
+				APIResources: []metav1.APIResource{},
+			},
+		}
 	})
 
 	Context("when the ArgoCD instance does not exist", func() {
@@ -919,13 +865,13 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
 				WithRuntimeObjects().Build()
 
-			err := createOrUpdateArgoCD(fakeClient, name, namespace)
+			err := createOrUpdateArgoCD(fakeClient, discoveryClient, name, namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			unstructuredArgo := &unstructured.Unstructured{}
 			unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   ArgoCDGroup,
-				Kind:    ArgoCDResource,
+				Kind:    ArgoCDKind,
 				Version: ArgoCDVersion,
 			})
 			err = fakeClient.Get(context.Background(), client.ObjectKey{
@@ -955,20 +901,20 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			}
 			unstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   ArgoCDGroup,
-				Kind:    ArgoCDResource,
+				Kind:    ArgoCDKind,
 				Version: ArgoCDVersion,
 			})
 
 			fakeClient = fake.NewClientBuilder().WithScheme(testEnv.Scheme).
 				WithRuntimeObjects(unstructuredArgo).Build()
 
-			err := createOrUpdateArgoCD(fakeClient, name, namespace)
+			err := createOrUpdateArgoCD(fakeClient, discoveryClient, name, namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedUnstructuredArgo := &unstructured.Unstructured{}
 			updatedUnstructuredArgo.SetGroupVersionKind(schema.GroupVersionKind{
 				Group:   ArgoCDGroup,
-				Kind:    ArgoCDResource,
+				Kind:    ArgoCDKind,
 				Version: ArgoCDVersion,
 			})
 			err = fakeClient.Get(context.Background(), client.ObjectKey{
