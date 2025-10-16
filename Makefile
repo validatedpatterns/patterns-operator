@@ -7,6 +7,8 @@ VERSION ?= 0.0.4
 OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
 GOLANGCI_VERSION ?= 2.5.0
+REGISTRY ?= localhost
+UPLOADREGISTRY ?= quay.io/validatedpatterns
 
 # CI uses a non-writable home dir, make sure .cache is writable
 ifeq ("${HOME}", "/")
@@ -65,6 +67,7 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+OPERATOR_IMG ?= $(OPERATOR_NAME)-operator:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30
 
@@ -147,6 +150,31 @@ clean: ## Remove build artifacts and downloaded tools
 .PHONY: run
 run: apikey manifests generate fmt vet ## Run a controller from your host.
 	GOOS=${GOOS} GOARCH=${GOARCH} hack/build.sh run
+
+
+##@ Conatiner-related tasks
+.PHONY: buildah-manifest
+buildah-manifest: ## creates the buildah manifest for multi-arch images
+	# The rm is needed due to bug https://www.github.com/containers/podman/issues/19757
+	buildah manifest rm "${REGISTRY}/${OPERATOR_IMG}" || /bin/true
+	buildah manifest create "${REGISTRY}/${OPERATOR_IMG}"
+
+.PHONY: podman-build-amd64
+podman-build-amd64: buildah-manifest ## build the container in amd64
+	@echo "Building the operator amd64"
+	buildah build --secret id=apikey,src=$(APIKEYFILE) --platform linux/amd64 --format docker -f Dockerfile -t "${OPERATOR_IMG}-amd64"
+	buildah manifest add --arch=amd64 "${REGISTRY}/${OPERATOR_IMG}" "${REGISTRY}/${OPERATOR_IMG}-amd64"
+
+.PHONY: podman-build-arm64
+podman-build-arm64: buildah-manifest ## build the container in arm64
+	@echo "Building the operator arm64"
+	buildah build --secret id=apikey,src=$(APIKEYFILE) --platform linux/arm64 --build-arg GOARCH="arm64" --format docker -f Dockerfile -t "${OPERATOR_IMG}-arm64"
+	buildah manifest add --arch=arm64 "${REGISTRY}/${OPERATOR_IMG}" "${REGISTRY}/${OPERATOR_IMG}-arm64"
+
+.PHONY: buildah-push
+buildah-push: ## Uploads the container to quay.io/validatedpatterns/${CONTAINER}
+	@echo "Uploading the ${REGISTRY}/${OPERATOR_IMG} container to ${UPLOADREGISTRY}/${OPERATOR_IMG}"
+	buildah manifest push --all "${REGISTRY}/${OPERATOR_IMG}" "docker://${UPLOADREGISTRY}/${OPERATOR_IMG}"
 
 .PHONY: docker-build
 docker-build: apikey ## Build docker image with the manager.
