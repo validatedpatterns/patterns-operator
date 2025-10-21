@@ -20,6 +20,9 @@ metadata:
     operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather:latest
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
+  labels:
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.arm64: supported
   name: patterns-operator.v0.0.0
   namespace: placeholder
 spec:
