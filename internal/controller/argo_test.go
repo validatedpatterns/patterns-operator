@@ -772,7 +772,7 @@ var _ = Describe("NewArgoCD", func() {
 			Expect(spec.ApplicationSet.Resources.Requests[v1.ResourceMemory]).To(Equal(resource.MustParse("512Mi")))
 
 			Expect(spec.Controller.Resources.Limits[v1.ResourceCPU]).To(Equal(resource.MustParse("2")))
-			Expect(spec.Controller.Resources.Limits[v1.ResourceMemory]).To(Equal(resource.MustParse("2Gi")))
+			Expect(spec.Controller.Resources.Limits[v1.ResourceMemory]).To(Equal(resource.MustParse("8Gi")))
 			Expect(spec.Controller.Resources.Requests[v1.ResourceCPU]).To(Equal(resource.MustParse("250m")))
 			Expect(spec.Controller.Resources.Requests[v1.ResourceMemory]).To(Equal(resource.MustParse("1Gi")))
 
