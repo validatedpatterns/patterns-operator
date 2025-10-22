@@ -153,7 +153,7 @@ g, admin, role:admin`
 				Resources: &v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU:    resource.MustParse("2"),
-						v1.ResourceMemory: resource.MustParse("2Gi"),
+						v1.ResourceMemory: resource.MustParse("8Gi"),
 					},
 					Requests: v1.ResourceList{
 						v1.ResourceCPU:    resource.MustParse("250m"),
