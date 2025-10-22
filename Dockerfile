@@ -1,5 +1,6 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
-RUN microdnf install git-core jq tar -y && microdnf clean all
+ARG GO_VERSION=1.24.6
+FROM registry.access.redhat.com/ubi9/go-toolset:${GO_VERSION} AS builder
+ARG GOARCH=amd64
 
 # Build the manager binary
 
@@ -9,18 +10,6 @@ WORKDIR /workspace
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-# use latest Go z release
-ENV GOTOOLCHAIN=auto
-ENV GO_INSTALL_DIR=/golang
-
-# Ensure correct Go version
-RUN export GO_VERSION=$(grep -E "go [[:digit:]]\.[[:digit:]][[:digit:]]" go.mod | awk '{print $2}') && \
-    export GO_FILENAME=$(curl -sL 'https://go.dev/dl/?mode=json&include=all' | jq -r "[.[] | select(.version | startswith(\"go${GO_VERSION}\"))][0].files[] | select(.os == \"linux\" and .arch == \"amd64\") | .filename") && \
-    curl -sL -o go.tar.gz "https://golang.org/dl/${GO_FILENAME}" && \
-    mkdir -p ${GO_INSTALL_DIR} && \
-    tar -C ${GO_INSTALL_DIR} -xzf go.tar.gz && \
-    rm go.tar.gz && ln -sf ${GO_INSTALL_DIR}/go/bin/go /usr/bin/go
-
 # Copy the go sources
 COPY vendor/ vendor/
 COPY cmd/main.go cmd/main.go
@@ -29,11 +18,12 @@ COPY version/ version/
 COPY internal/controller/ internal/controller/
 COPY hack/ hack/
 COPY .git/ .git/
-RUN mkdir /licenses
-COPY LICENSE /licenses
+COPY LICENSE /licenses/
+COPY Makefile .
 
 # Build
-RUN --mount=type=secret,id=apikey hack/build.sh
+USER root
+RUN --mount=type=secret,id=apikey GOARCH=${GOARCH} make build
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
