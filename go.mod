@@ -3,7 +3,7 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 go 1.24.6
 
 require (
-	code.gitea.io/sdk/gitea v0.22.0
+	code.gitea.io/sdk/gitea v0.22.1
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/argoproj-labs/argocd-operator v0.15.0
 	github.com/go-errors/errors v1.5.1
