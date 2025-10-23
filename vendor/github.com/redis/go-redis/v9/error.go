@@ -15,6 +15,19 @@ import (
 // ErrClosed performs any operation on the closed client will return this error.
 var ErrClosed = pool.ErrClosed
 
+// ErrPoolExhausted is returned from a pool connection method
+// when the maximum number of database connections in the pool has been reached.
+var ErrPoolExhausted = pool.ErrPoolExhausted
+
+// ErrPoolTimeout timed out waiting to get a connection from the connection pool.
+var ErrPoolTimeout = pool.ErrPoolTimeout
+
+// ErrCrossSlot is returned when keys are used in the same Redis command and
+// the keys are not in the same hash slot. This error is returned by Redis
+// Cluster and will be returned by the client when TxPipeline or TxPipelined
+// is used on a ClusterClient with keys in different slots.
+var ErrCrossSlot = proto.RedisError("CROSSSLOT Keys in request don't hash to the same slot")
+
 // HasErrorPrefix checks if the err is a Redis error and the message contains a prefix.
 func HasErrorPrefix(err error, prefix string) bool {
 	var rErr Error
@@ -95,10 +108,12 @@ func isRedisError(err error) bool {
 
 func isBadConn(err error, allowTimeout bool, addr string) bool {
 	switch err {
-	case nil:
-		return false
-	case context.Canceled, context.DeadlineExceeded:
-		return true
+		case nil:
+			return false
+		case context.Canceled, context.DeadlineExceeded:
+			return true
+		case pool.ErrConnUnusableTimeout:
+			return true
 	}
 
 	if isRedisError(err) {
