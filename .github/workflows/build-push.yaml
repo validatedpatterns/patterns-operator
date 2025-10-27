@@ -1,0 +1,159 @@
+name: Build (amd64 and arm64) and push to quay registries
+on:
+  push:
+    branches: ["main"]
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
+  pull_request:
+    branches: ["main"]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: localhost
+  NAME: patterns-operator
+  TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref_name == 'main' && 'latest' || github.ref_name) }}
+
+jobs:
+  build-container:
+    strategy:
+      matrix:
+        include:
+          - targetarch: amd64
+            runner: ubuntu-latest
+          - targetarch: arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Build container and save tarball
+        env:
+          TARGETARCH: ${{ matrix.targetarch }}
+          OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
+          KEY: ${{ secrets.API_KEY }}
+        run: |
+          export APIFILE="internal/controller/apikey.txt"
+          trap "rm -f ${APIFILE}" SIGINT EXIT
+
+          if [ -z "${KEY}" ]; then
+              echo "Key is empty"
+              echo '' > "${APIFILE}"
+          else
+              echo "Key is set"
+              echo "${KEY}" > "${APIFILE}"
+          fi
+          make "podman-build-${TARGETARCH}"
+          buildah push "${OPERATOR_IMG}-${TARGETARCH}" "docker-archive:/tmp/image-${TARGETARCH}.tar:${OPERATOR_IMG}-${TARGETARCH}"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.targetarch }}-${{ github.run_id }}
+          path: /tmp/image-${{ matrix.targetarch }}.tar
+          retention-days: 1
+
+  pre-push-check:
+    needs: [build-container]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # We use an env due to https://docs.zizmor.sh/audits/#remediation_18
+      - name: Check that tag version corresponds to metadata version
+        run: |-
+          VERSION=$(yq -r '.spec.version' bundle/manifests/patterns-operator.clusterserviceversion.yaml)
+          if [ "${VERSION}" != "${TAG}" ]; then
+            echo "Version in metadata ${VERSION} whereas tag is different: ${TAG}"
+            exit 1
+          fi
+
+  push-multiarch-manifest:
+    needs: [pre-push-check]
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        include:
+          - upload_registry: quay.io/validatedpatterns
+            legacy: false
+          - upload_registry: quay.io/hybridcloudpatterns
+            legacy: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Download AMD64 image
+        uses: actions/download-artifact@v5
+        with:
+          name: image-amd64-${{ github.run_id }}
+          path: /tmp
+
+      - name: Download ARM64 image
+        uses: actions/download-artifact@v5
+        with:
+          name: image-arm64-${{ github.run_id }}
+          path: /tmp
+
+      - name: Load tarballs into local containers-storage
+        run: |
+          buildah pull docker-archive:/tmp/image-amd64.tar
+          buildah pull docker-archive:/tmp/image-arm64.tar
+
+      - name: Log into Quay
+        env:
+          USERNAME: ${{ matrix.legacy && secrets.LEGACY_QUAY_USERNAME || secrets.QUAY_USERNAME }}
+          PASSWORD: ${{ matrix.legacy && secrets.LEGACY_QUAY_PASSWORD || secrets.QUAY_PASSWORD }}
+        run: |
+          buildah login -u "${USERNAME}" -p "${PASSWORD}" quay.io
+
+      # The compressed manifest in Quay has a different digest than the local so we
+      # need to use skopeo to retrieve the correct digest for signing
+      - name: Create manifest and push to Quay
+        id: manifest-push
+        env:
+          UPLOADREGISTRY: ${{ matrix.upload_registry }}
+          OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
+        run: |
+          make buildah-manifest
+          buildah manifest add --arch=amd64 "${REGISTRY}/${OPERATOR_IMG}" "${REGISTRY}/${OPERATOR_IMG}-amd64"
+          buildah manifest add --arch=arm64 "${REGISTRY}/${OPERATOR_IMG}" "${REGISTRY}/${OPERATOR_IMG}-arm64"
+          make buildah-push
+          DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker://${UPLOADREGISTRY}/${OPERATOR_IMG}")
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        with:
+          cosign-release: "v2.2.4"
+
+      # Cosign expects the docker config.json for registry authentication so we must
+      # copy it from buildah
+      - name: Sign the published Docker image
+        env:
+          DIGEST: ${{ steps.manifest-push.outputs.digest }}
+          UPLOADREGISTRY: ${{ matrix.upload_registry }}
+          OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
+        run: |
+          cat "${XDG_RUNTIME_DIR}/containers/auth.json" > ~/.docker/config.json
+          cosign sign --yes "${UPLOADREGISTRY}/${OPERATOR_IMG}@${DIGEST}"
