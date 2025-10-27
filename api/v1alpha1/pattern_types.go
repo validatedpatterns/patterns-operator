@@ -109,11 +109,6 @@ type GitConfig struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=15,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	OriginRevision string `json:"originRevision,omitempty"`
 
-	// Interval in seconds to poll for drifts between origin and target repositories. Default: 180 seconds
-	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:number","urn:alm:descriptor:com.tectonic.ui:advanced"}
-	// +kubebuilder:default:=180
-	PollInterval int `json:"pollInterval,omitempty"`
-
 	// Optional. FQDN of the git server if automatic parsing from TargetRepo is broken
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=17,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:advanced"}
 	Hostname string `json:"hostname,omitempty"`
