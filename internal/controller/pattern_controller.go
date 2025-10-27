@@ -69,7 +69,6 @@ type PatternReconciler struct {
 	dynamicClient   dynamic.Interface
 	routeClient     routeclient.Interface
 	operatorClient  operatorclient.OperatorV1Interface
-	driftWatcher    driftWatcher
 	gitOperations   GitOperations
 	giteaOperations GiteaOperations
 }
@@ -161,32 +160,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "Updated status with start event sent", nil)
 	}
 
-	gitConfig := qualifiedInstance.Spec.GitConfig
-	// -- Git Drift monitoring
-	// if both git repositories are defined in the pattern's git configuration and the polling interval is not set to disable watching
-	if gitConfig.OriginRepo != "" && gitConfig.TargetRepo != "" && gitConfig.PollInterval != -1 {
-		if !r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-			// start monitoring drifts for this pattern
-			err = r.driftWatcher.add(qualifiedInstance.Name,
-				qualifiedInstance.Namespace,
-				gitConfig.PollInterval)
-			if err != nil {
-				return r.actionPerformed(qualifiedInstance, "add pattern to git drift watcher", err)
-			}
-		} else {
-			err = r.driftWatcher.updateInterval(qualifiedInstance.Name, qualifiedInstance.Namespace, gitConfig.PollInterval)
-			if err != nil {
-				return r.actionPerformed(qualifiedInstance, "update the watch interval to git drift watcher", err)
-			}
-		}
-	} else if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-		// The pattern has been updated an it no longer fulfills the conditions to monitor the drift
-		err = r.driftWatcher.remove(qualifiedInstance.Name, qualifiedInstance.Namespace)
-		if err != nil {
-			return r.actionPerformed(qualifiedInstance, "remove pattern from git drift watcher", err)
-		}
-	}
-
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
@@ -238,7 +211,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// If you specified OriginRepo then we automatically spawn a gitea instance via a special argo gitea application
-	if gitConfig.OriginRepo != "" {
+	if qualifiedInstance.Spec.GitConfig.OriginRepo != "" {
 		giteaErr := r.createGiteaInstance(qualifiedInstance)
 		if giteaErr != nil {
 			return r.actionPerformed(qualifiedInstance, "error created gitea instance", giteaErr)
@@ -514,12 +487,6 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
 	}
 
-	// interval cannot be less than 180 seconds to avoid drowning the API server in requests
-	// value of -1 effectively disables the watch for this pattern.
-	if output.Spec.GitConfig.PollInterval > -1 && output.Spec.GitConfig.PollInterval < 180 {
-		output.Spec.GitConfig.PollInterval = 180
-	}
-
 	localCheckoutPath := getLocalGitPath(output.Spec.GitConfig.TargetRepo)
 	if localCheckoutPath != output.Status.LocalCheckoutPath {
 		_ = DropLocalGitPaths()
@@ -557,12 +524,6 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		if r.driftWatcher.isWatching(qualifiedInstance.Name, qualifiedInstance.Namespace) {
-			// Stop watching for drifts in the pattern's git repositories
-			if err := r.driftWatcher.remove(instance.Name, instance.Namespace); err != nil {
-				return err
-			}
-		}
 		if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
 			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
@@ -617,7 +578,6 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.routeClient, err = routeclient.NewForConfig(r.config); err != nil {
 		return err
 	}
-	r.driftWatcher, _ = newDriftWatcher(r.Client, mgr.GetLogger(), newGitClient())
 	r.gitOperations = &GitOperationsImpl{}
 	r.giteaOperations = &GiteaOperationsImpl{}
 
