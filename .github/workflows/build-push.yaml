@@ -104,13 +104,13 @@ jobs:
           persist-credentials: false
 
       - name: Download AMD64 image
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: image-amd64-${{ github.run_id }}
           path: /tmp
 
       - name: Download ARM64 image
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: image-arm64-${{ github.run_id }}
           path: /tmp
