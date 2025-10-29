@@ -58,8 +58,8 @@ CONTAINER_PLATFORM ?= amd64
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# hybrid-cloud-patterns.io/patterns-operator-bundle:$VERSION and hybrid-cloud-patterns.io/patterns-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/hybridcloudpatterns/$(OPERATOR_NAME)-operator
+# quay.io/validatedpatterns/patterns-operator-bundle:$VERSION and quay.io/validatedpatterns/patterns-operator-catalog:$VERSION.
+IMAGE_TAG_BASE ?= $(UPLOADREGISTRY)/$(OPERATOR_NAME)-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
