@@ -94,13 +94,6 @@ spec:
         path: gitSpec.originRevision
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: 'Interval in seconds to poll for drifts between origin and target
-          repositories. Default: 180 seconds'
-        displayName: Poll Interval
-        path: gitSpec.pollInterval
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:number
-        - urn:alm:descriptor:com.tectonic.ui:advanced
       - description: 'Branch, tag, or commit to deploy.  Does not support short-sha''s.
           Default: HEAD'
         displayName: Target Revision
