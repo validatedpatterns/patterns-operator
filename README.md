@@ -29,8 +29,7 @@ oc get applications -A -w
 
 In order to load the secrets out of band into the vault you can copy the
 `values-secret.yaml.template` inside the pattern's git repo to
-`~/values-secret-<pattern_name>.yaml`, edit the secrets at your discretion and then run `make
-load-secrets`. Otherwise you can access the vault via its network route, login
+`~/values-secret-<pattern_name>.yaml`, edit the secrets at your discretion and then run `make load-secrets`. Otherwise you can access the vault via its network route, login
 via the root token (contained in the `imperative` namespace in the `vaultkeys`
 secret and then add the secrets via the UI (this approach is a bit more work)
 
@@ -202,6 +201,9 @@ Next, create the OperatorHub release, by creating the community operator PR:
 
 ```
 cd ../community-operators-prod
+# Make sure you copy a release-config.yaml from the previous version
+# and also change the version it replaces and make sure the ocp versions you want
+# are all included
 git checkout -b "patterns-operator-v$VERSION"
 git add operators/patterns-operator/$VERSION/
 git commit -s -m "operator patterns-operator ($VERSION)"
@@ -209,7 +211,7 @@ git push <fork-remote> "patterns-operator-v$VERSION"
 
 # Inspect the diff from the previously released version
 cd operators/patterns-operator
-diff -urN $(ls -1rv | grep -v ci.yaml | head -n2 | sort)
+diff -urN $(ls -1rv | grep -v -e ci.yaml -e catalog-templates -e Makefile | head -n2 | sort)
 
 # Now create a PR against https://github.com/redhat-openshift-ecosystem/community-operators-prod
 # Use the web interface so you can fill in the web template
