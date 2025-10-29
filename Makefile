@@ -303,7 +303,7 @@ bundle-build: ## Build the bundle image.
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	docker push $(BUNDLE_IMG)
 
 .PHONY: csv-date
 csv-date: ## Set createdAt date in the CSV.
@@ -362,7 +362,7 @@ catalog-build: opm ## Build an OLM catalog image (for testing).
 
 .PHONY: catalog-push
 catalog-push: ## Push the OLM catalog image (for testing).
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	docker push $(CATALOG_IMG)
 
 .PHONY: catalog-install
 catalog-install: config/samples/pattern-catalog-$(VERSION).yaml ## Install the OLM catalog on a cluster (for testing).

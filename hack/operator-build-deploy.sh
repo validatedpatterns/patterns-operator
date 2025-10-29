@@ -6,6 +6,7 @@ NS="openshift-operators"
 OPERATOR="patterns-operator"
 VERSION="${VERSION:-6.6.6}"
 REGISTRY="${REGISTRY:-kuemper.int.rhx/bandini}"
+UPLOADREGISTRY="${UPLOADREGISTRY:-kuemper.int.rhx/bandini}"
 
 wait_for_resource() {
     local resource_type=$1  # Either "packagemanifest", "operator", or "csv"
@@ -74,7 +75,7 @@ if [ $ret -ne 0 ]; then
     exit 1
 fi
 
-make VERSION=${VERSION} IMAGE_TAG_BASE=${REGISTRY}/patterns-operator CHANNELS=fast USE_IMAGE_DIGESTS="" \
+make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" IMAGE_TAG_BASE=${REGISTRY}/patterns-operator CHANNELS=fast USE_IMAGE_DIGESTS="" \
     manifests bundle generate docker-build docker-push bundle-build bundle-push catalog-build \
     catalog-push catalog-install
 
