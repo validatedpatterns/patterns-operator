@@ -55,7 +55,7 @@ jobs:
           buildah push "${OPERATOR_IMG}-${TARGETARCH}" "docker-archive:/tmp/image-${TARGETARCH}.tar:${OPERATOR_IMG}-${TARGETARCH}"
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: image-${{ matrix.targetarch }}-${{ github.run_id }}
           path: /tmp/image-${{ matrix.targetarch }}.tar
