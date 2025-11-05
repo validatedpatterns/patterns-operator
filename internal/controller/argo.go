@@ -1048,3 +1048,18 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 	}
 	return false
 }
+
+func syncApplicationWithPrune(client argoclient.Interface, app *argoapi.Application, namespace string) error {
+	app.Operation = &argoapi.Operation{
+		Sync: &argoapi.SyncOperation{
+			Prune: true,
+		},
+	}
+
+	_, err := client.ArgoprojV1alpha1().Applications(namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to sync application %q with prune: %w", app.Name, err)
+	}
+
+	return nil
+}
