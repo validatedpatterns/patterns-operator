@@ -162,13 +162,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
-
 	sub, _ := getSubscription(r.olmClient, targetSub.Name)
 	if sub == nil {
 		err = createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if ownedBySame(targetSub, sub) {
+	} else if owner, ok := sub.Labels["app.kubernetes.io/managed-by"]; ok && owner == "patterns-operator" {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
 		changed, errSub := updateSubscription(r.olmClient, targetSub, sub)
@@ -528,6 +526,10 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
+		if err := syncApplicationWithPrune(r.argoClient, app, ns); err != nil {
+			return err
+		}
+
 		if haveACMHub(r) {
 			return fmt.Errorf("waiting for removal of that acm hub")
 		}
@@ -604,7 +606,8 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	}
 	if duration != nil {
 		log.Printf("Requeueing\n")
-		return reconcile.Result{RequeueAfter: *duration}, err
+		// Return nil error when we have a duration to avoid exponential backoff
+		return reconcile.Result{RequeueAfter: *duration}, nil
 	}
 	return reconcile.Result{}, err
 }
