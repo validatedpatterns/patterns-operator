@@ -41,6 +41,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	configv1 "github.com/openshift/api/config/v1"
 )
@@ -414,4 +415,18 @@ func IntOrZero(secret map[string][]byte, key string) (int64, error) {
 	}
 
 	return strconv.ParseInt(string(val), 10, 64)
+}
+
+// Gets the configmap for the Patterns Operator. (Used as an owner reference for the operator itself.)
+func GetOperatorConfigmap() (*corev1.ConfigMap, error) {
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config: %s", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call NewForConfig: %s", err)
+	}
+
+	return clientset.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
 }

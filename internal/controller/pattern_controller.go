@@ -162,11 +162,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
+	if operatorConfigMap, err := GetOperatorConfigmap(); err == nil {
+		if err := controllerutil.SetOwnerReference(operatorConfigMap, targetSub, r.Scheme); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error setting owner of gitops subscription", err)
+		}
+	} else {
+		return r.actionPerformed(qualifiedInstance, "error getting operator configmap", err)
+	}
+
 	sub, _ := getSubscription(r.olmClient, targetSub.Name)
 	if sub == nil {
 		err = createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if owner, ok := sub.Labels["app.kubernetes.io/managed-by"]; ok && owner == "patterns-operator" {
+	} else if ownedBySame(targetSub, sub) {
 		// Check version/channel etc
 		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
 		changed, errSub := updateSubscription(r.olmClient, targetSub, sub)
