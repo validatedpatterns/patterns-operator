@@ -73,6 +73,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GitOpsDefaultPackageName,
 			Namespace: SubscriptionNamespace,
+			Labels:    map[string]string{"app.kubernetes.io/managed-by": "patterns-operator"},
 		},
 		Spec: spec,
 	}
