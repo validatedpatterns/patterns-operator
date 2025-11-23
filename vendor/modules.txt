@@ -1732,7 +1732,7 @@ k8s.io/kubernetes/pkg/apis/storage/v1alpha1
 k8s.io/kubernetes/pkg/apis/storage/v1beta1
 k8s.io/kubernetes/pkg/features
 k8s.io/kubernetes/pkg/util/parsers
-# k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
+# k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 ## explicit; go 1.18
 k8s.io/utils/buffer
 k8s.io/utils/clock
