@@ -6,7 +6,7 @@
 VERSION ?= 0.0.4
 OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
-GOLANGCI_VERSION ?= 2.5.0
+GOLANGCI_VERSION ?= 2.6.2
 REGISTRY ?= localhost
 UPLOADREGISTRY ?= quay.io/validatedpatterns
 
