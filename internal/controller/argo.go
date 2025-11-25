@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -1049,17 +1050,24 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 	return false
 }
 
-func syncApplicationWithPrune(client argoclient.Interface, app *argoapi.Application, namespace string) error {
+// syncApplicationWithPrune syncs the application with prune and force options if such a sync is not already in progress.
+// Returns true if a sync with prune and force is already in progress, false otherwise
+func syncApplicationWithPrune(client argoclient.Interface, app *argoapi.Application, namespace string) (bool, error) {
+	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
+		return true, nil
+	}
+
 	app.Operation = &argoapi.Operation{
 		Sync: &argoapi.SyncOperation{
-			Prune: true,
+			Prune:       true,
+			SyncOptions: []string{"Force=true"},
 		},
 	}
 
 	_, err := client.ArgoprojV1alpha1().Applications(namespace).Update(context.Background(), app, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to sync application %q with prune: %w", app.Name, err)
+		return false, fmt.Errorf("failed to sync application %q with prune: %w", app.Name, err)
 	}
 
-	return nil
+	return true, nil
 }
