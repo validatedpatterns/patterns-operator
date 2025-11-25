@@ -162,7 +162,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
+	operatorConfigMap, err := GetOperatorConfigmap()
+	if err == nil {
+		if err := controllerutil.SetOwnerReference(operatorConfigMap, targetSub, r.Scheme); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error setting owner of gitops subscription", err)
+		}
+	} else {
+		return r.actionPerformed(qualifiedInstance, "error getting operator configmap", err)
+	}
 
 	sub, _ := getSubscription(r.olmClient, targetSub.Name)
 	if sub == nil {
@@ -176,7 +183,20 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
 		}
 	} else {
-		logOnce("The gitops subscription is not owned by us, leaving untouched")
+		// Historically the subscription was owned by the pattern, not the operator. If this is the case,
+		// we update the owner reference to the operator itself.
+		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, sub, r.Scheme); err == nil {
+			if err := controllerutil.SetOwnerReference(operatorConfigMap, sub, r.Scheme); err != nil {
+				return r.actionPerformed(qualifiedInstance, "error setting patterns operator owner reference of gitops subscription", err)
+			}
+			// Persist the updated ownerReferences on the Subscription
+			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), sub, metav1.UpdateOptions{}); err != nil {
+				return r.actionPerformed(qualifiedInstance, "error updating gitops subscription owner references", err)
+			}
+			return r.actionPerformed(qualifiedInstance, "updated patterns operator owner reference of gitops subscription", nil)
+		} else {
+			logOnce("The gitops subscription is not owned by us, leaving untouched")
+		}
 	}
 	logOnce("subscription found")
 
@@ -528,6 +548,16 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return fmt.Errorf("updated application %q for removal", app.Name)
 		}
 
+		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+			inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
+			if err != nil {
+				return err
+			}
+			if inProgress {
+				return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+			}
+		}
+
 		if haveACMHub(r) {
 			return fmt.Errorf("waiting for removal of that acm hub")
 		}
@@ -604,7 +634,8 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	}
 	if duration != nil {
 		log.Printf("Requeueing\n")
-		return reconcile.Result{RequeueAfter: *duration}, err
+		// Return nil error when we have a duration to avoid exponential backoff
+		return reconcile.Result{RequeueAfter: *duration}, nil
 	}
 	return reconcile.Result{}, err
 }
