@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"crypto/rand"
@@ -403,4 +404,14 @@ func IsCommonSlimmed(patternPath string) bool {
 		return false
 	}
 	return true
+}
+
+// IntOrZero retrieves an integer value from a map by key.
+func IntOrZero(secret map[string][]byte, key string) (int64, error) {
+	val, present := secret[key]
+	if !present {
+		return 0, nil
+	}
+
+	return strconv.ParseInt(string(val), 10, 64)
 }
