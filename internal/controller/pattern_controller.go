@@ -17,15 +17,21 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/samber/lo"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -544,33 +550,103 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
-			return fmt.Errorf("updated application %q for removal", app.Name)
+		// Initialize deletion phase if not set
+		if qualifiedInstance.Status.DeletionPhase == "" {
+			log.Printf("Initializing deletion phase: deletingSpokeApps")
+			qualifiedInstance.Status.DeletionPhase = "deletingSpokeApps"
+			if err := r.Client.Status().Update(context.TODO(), qualifiedInstance); err != nil {
+				return fmt.Errorf("failed to update deletion phase: %w", err)
+			}
+			// Re-fetch to get updated status
+			if err := r.Get(context.TODO(), client.ObjectKeyFromObject(qualifiedInstance), qualifiedInstance); err != nil {
+				return fmt.Errorf("failed to re-fetch pattern after phase update: %w", err)
+			}
 		}
 
-		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
-			inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
+		// Phase 1: Delete applications from spoke clusters
+		if qualifiedInstance.Status.DeletionPhase == "deletingSpokeApps" {
+			log.Printf("Deletion phase: deletingSpokeApps - checking if all child applications are gone from spoke")
+
+			// Update application with deletePattern=2 to trigger spoke deletion
+			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+				return fmt.Errorf("updated application %q for spoke deletion", app.Name)
+			}
+			if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+				inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
+				if err != nil {
+					return err
+				}
+				if inProgress {
+					return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+				}
+			}
+
+			// Check if all child applications are gone from spoke
+			allGone, err := r.checkChildApplicationsGone(qualifiedInstance)
 			if err != nil {
+				return fmt.Errorf("error checking child applications: %w", err)
+			}
+
+			if !allGone {
+				log.Printf("Waiting for all child applications to be deleted from spoke clusters")
+				return fmt.Errorf("waiting for child applications to be deleted from spoke clusters")
+			}
+
+			// All child applications are gone, now transition to phase 2
+			// The app-of-apps removal from spoke is handled by the helm chart when deletePattern=2
+			log.Printf("All child applications are gone, transitioning to deletingHubApps phase")
+			qualifiedInstance.Status.DeletionPhase = "deletingHubApps"
+			if err := r.Client.Status().Update(context.TODO(), qualifiedInstance); err != nil {
+				return fmt.Errorf("failed to update deletion phase to deletingHubApps: %w", err)
+			}
+		}
+
+		// Phase 2: Delete applications from hub
+		if qualifiedInstance.Status.DeletionPhase == "deletingHubApps" {
+			log.Printf("Deletion phase: deletingHubApps - deleting from hub")
+
+			// Delete managed clusters (excluding local-cluster)
+			// These must be removed before hub deletion can proceed because ACM won't delete properly if they exist
+			if haveACMHub(r) {
+				deletedCount, err := r.deleteManagedClusters(context.TODO())
+				if err != nil {
+					return fmt.Errorf("failed to delete managed clusters: %w", err)
+				}
+
+				if deletedCount > 0 {
+					log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
+					return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
+				}
+
+				return fmt.Errorf("No managed clusters found (excluding local-cluster), waiting for removal of acm hub before proceeding with hub deletion")
+
+			}
+
+			// Update application with deletePattern=1 to trigger hub deletion
+			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+				return fmt.Errorf("updated application %q for hub deletion", app.Name)
+			}
+
+			if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+				inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
+				if err != nil {
+					return err
+				}
+				if inProgress {
+					return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+				}
+			}
+
+			if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+				return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
+			}
+
+			log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
+			if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
 				return err
 			}
-			if inProgress {
-				return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
-			}
+			return fmt.Errorf("waiting for application %q to be removed", app.Name)
 		}
-
-		if haveACMHub(r) {
-			return fmt.Errorf("waiting for removal of that acm hub")
-		}
-
-		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
-			return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
-		}
-
-		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-		if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
-			return err
-		}
-		return fmt.Errorf("waiting for application %q to be removed", app.Name)
 	}
 
 	return nil
@@ -727,6 +803,171 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	}
 
 	return false, nil
+}
+
+// getBearerToken gets a bearer token for authentication, trying multiple methods:
+// 1. Read from service account token file (in-cluster)
+// 2. Use BearerToken from rest.Config (local dev with kubeconfig)
+// 3. Create a token using TokenRequest API (fallback)
+func (r *PatternReconciler) getBearerToken(ctx context.Context) (string, error) {
+	// Method 1: Try reading from service account token file (in-cluster)
+	tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token"
+	if tokenBytes, err := os.ReadFile(tokenPath); err == nil {
+		return string(tokenBytes), nil
+	}
+
+	// Method 2: Try using BearerToken from rest.Config (local dev)
+	if r.config != nil && r.config.BearerToken != "" {
+		return r.config.BearerToken, nil
+	}
+
+	// If all methods fail, try to get token from any available service account
+	// This is a fallback for local development
+	return "", fmt.Errorf("failed to get bearer token: tried service account file, rest.Config BearerToken, and TokenRequest API")
+}
+
+// checkChildApplicationsGone checks if all child applications (excluding the app-of-apps) are gone from spoke clusters
+// The operator runs on the hub cluster and needs to check spoke clusters through ACM Search Service
+// Returns true if all child applications are gone, false otherwise
+func (r *PatternReconciler) checkChildApplicationsGone(p *api.Pattern) (bool, error) {
+	// Determine if we're running in-cluster or locally
+	// Check if service account token file exists (indicates in-cluster)
+	tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token"
+	_, inCluster := os.Stat(tokenPath)
+
+	var searchURL string
+	if inCluster == nil {
+		// Running in-cluster: use cluster.local endpoint
+		searchNamespace := "open-cluster-management" // Default namespace for ACM
+		searchURL = fmt.Sprintf("https://search-search-api.%s.svc.cluster.local:4010/searchapi/graphql", searchNamespace)
+	} else {
+		// Running locally: use localhost with port-forward or environment variable
+		// User should run: kubectl port-forward -n open-cluster-management svc/search-search-api 4010:4010
+		searchURL = os.Getenv("ACM_SEARCH_API_URL")
+		if searchURL == "" {
+			// Default to localhost if env var not set (assumes port-forward)
+			searchURL = "https://localhost:4010/searchapi/graphql"
+		}
+		log.Printf("Using local search API endpoint: %s (set ACM_SEARCH_API_URL env var to override)", searchURL)
+	}
+	// TODO fix token
+	// the service account token of the operator does not list all applications, only the local cluster ones
+	// the service account token for the search api, works well
+	var token string
+	if r.config != nil && r.config.BearerToken != "" {
+		token = r.config.BearerToken
+	} else {
+		token = os.Getenv("ACM_SEARCH_API_TOKEN")
+	}
+
+	// Build GraphQL query to search for Applications
+	query := map[string]any{
+		"operationName": "searchResult",
+		"query":         "query searchResult($input: [SearchInput]) { searchResult: search(input: $input) { items related { kind items } } }",
+		"variables": map[string]any{
+			"input": []map[string]any{
+				{
+					"filters": []map[string]any{
+						{
+							"property": "apigroup",
+							"values":   []string{"argoproj.io"},
+						},
+
+						{
+							"property": "kind",
+							"values":   []string{"Application"},
+						},
+					},
+					"relatedKinds": []string{"Application"},
+					"limit":        20000,
+				},
+			},
+		},
+	}
+
+	// Marshal query to JSON
+	queryJSON, err := json.Marshal(query)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal GraphQL query: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequest("POST", searchURL, bytes.NewBuffer(queryJSON))
+	if err != nil {
+		return false, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	// Create HTTP client
+	// Use insecure TLS (self-signed certs)
+	var client *http.Client
+	if inCluster == nil {
+		// In-cluster: HTTPS with insecure TLS
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+	} else {
+		// Local: HTTPs (no TLS)
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+	}
+	// Make the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to make HTTP request to search service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Check HTTP status
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("search service returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response
+	var searchResponse map[string]any
+	if err := json.Unmarshal(body, &searchResponse); err != nil {
+		return false, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	raw := searchResponse["data"].(map[string]any)["searchResult"].([]any)[0].(map[string]any)["items"].([]any)
+
+	// Convert []any → []map[string]any
+	items := lo.Map(raw, func(i any, _ int) map[string]any {
+		return i.(map[string]any)
+	})
+
+	// Filter out local-cluster apps and app of apps
+	remote_apps := lo.Filter(items, func(item map[string]any, _ int) bool {
+		return item["cluster"] != "local-cluster" && item["namespace"] != getClusterWideArgoNamespace()
+	})
+	remote_app_names := lo.Map(remote_apps, func(item map[string]any, _ int) string {
+		return item["name"].(string)
+	})
+
+	if len(remote_app_names) != 0 {
+		return false, fmt.Errorf("Cluster apps still exists: %s", remote_app_names)
+	}
+
+	return true, nil
 }
 
 func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {

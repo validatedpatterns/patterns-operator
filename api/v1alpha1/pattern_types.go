@@ -206,6 +206,10 @@ type PatternStatus struct {
 	AnalyticsUUID string `json:"analyticsUUID,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	LocalCheckoutPath string `json:"path,omitempty"`
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	// DeletionPhase tracks the current phase of pattern deletion
+	// Values: "" (not deleting), "deletingSpokeApps" (phase 1: delete apps from spoke), "deletingHubApps" (phase 2: delete apps from hub)
+	DeletionPhase string `json:"deletionPhase,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
