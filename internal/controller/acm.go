@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -63,4 +64,70 @@ func haveACMHub(r *PatternReconciler) bool {
 		return false
 	}
 	return true
+}
+
+// listManagedClusters lists all ManagedCluster resources (excluding local-cluster)
+// Returns a list of cluster names and an error
+func (r *PatternReconciler) listManagedClusters(ctx context.Context) ([]string, error) {
+	gvrMC := schema.GroupVersionResource{
+		Group:    "cluster.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "managedclusters",
+	}
+
+	// ManagedCluster is a cluster-scoped resource, so no namespace needed
+	mcList, err := r.dynamicClient.Resource(gvrMC).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ManagedClusters: %w", err)
+	}
+
+	var clusterNames []string
+	for _, item := range mcList.Items {
+		name := item.GetName()
+		// Exclude local-cluster (hub cluster)
+		if name != "local-cluster" {
+			clusterNames = append(clusterNames, name)
+		}
+	}
+
+	return clusterNames, nil
+}
+
+// deleteManagedClusters deletes all ManagedCluster resources (excluding local-cluster)
+// Returns the number of clusters deleted and an error
+func (r *PatternReconciler) deleteManagedClusters(ctx context.Context) (int, error) {
+	gvrMC := schema.GroupVersionResource{
+		Group:    "cluster.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "managedclusters",
+	}
+
+	// ManagedCluster is a cluster-scoped resource, so no namespace needed
+	mcList, err := r.dynamicClient.Resource(gvrMC).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list ManagedClusters: %w", err)
+	}
+
+	deletedCount := 0
+	for _, item := range mcList.Items {
+		name := item.GetName()
+		// Exclude local-cluster (hub cluster)
+		if name == "local-cluster" {
+			continue
+		}
+
+		// Delete the managed cluster
+		err := r.dynamicClient.Resource(gvrMC).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			// If already deleted, that's fine
+			if kerrors.IsNotFound(err) {
+				continue
+			}
+			return deletedCount, fmt.Errorf("failed to delete ManagedCluster %q: %w", name, err)
+		}
+		log.Printf("Deleted ManagedCluster: %q", name)
+		deletedCount++
+	}
+
+	return deletedCount, nil
 }

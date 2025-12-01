@@ -28,7 +28,10 @@ require (
 	sigs.k8s.io/controller-runtime v0.21.0
 )
 
-require github.com/argoproj/argo-cd/v3 v3.0.19
+require (
+	github.com/argoproj/argo-cd/v3 v3.0.19
+	github.com/samber/lo v1.52.0
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect

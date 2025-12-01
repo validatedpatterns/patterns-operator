@@ -513,9 +513,16 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		}
 	}
 	if !p.DeletionTimestamp.IsZero() {
+		// Determine deletePattern value based on deletion phase
+		// Phase 1 (deletingSpokeApps): deletePattern = "2" (delete apps from spoke)
+		// Phase 2 (deletingHubApps): deletePattern = "1" (delete apps from hub)
+		deletePatternValue := "2" // default to spoke deletion
+		if p.Status.DeletionPhase == "deletingHubApps" {
+			deletePatternValue = "1"
+		}
 		parameters = append(parameters, argoapi.HelmParameter{
 			Name:        "global.deletePattern",
-			Value:       "1",
+			Value:       deletePatternValue,
 			ForceString: true,
 		})
 	}

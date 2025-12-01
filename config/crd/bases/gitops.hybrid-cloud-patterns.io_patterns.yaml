@@ -224,6 +224,11 @@ spec:
                   - type
                   type: object
                 type: array
+              deletionPhase:
+                description: |-
+                  DeletionPhase tracks the current phase of pattern deletion
+                  Values: "" (not deleting), "deletingSpokeApps" (phase 1: delete apps from spoke), "deletingHubApps" (phase 2: delete apps from hub)
+                type: string
               lastError:
                 description: Last error encountered by the pattern
                 type: string
