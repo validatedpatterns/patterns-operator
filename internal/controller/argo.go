@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -425,9 +426,16 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		}
 	}
 	if !p.DeletionTimestamp.IsZero() {
+		// Determine deletePattern value based on deletion phase
+		// Phase 1 (deletingSpokeApps): deletePattern = "2" (delete apps from spoke)
+		// Phase 2 (deletingHubApps): deletePattern = "1" (delete apps from hub)
+		deletePatternValue := "2" // default to spoke deletion
+		if p.Status.DeletionPhase == api.DeletingHubApps {
+			deletePatternValue = "1"
+		}
 		parameters = append(parameters, argoapi.HelmParameter{
 			Name:        "global.deletePattern",
-			Value:       "1",
+			Value:       deletePatternValue,
 			ForceString: true,
 		})
 	}
@@ -960,4 +968,40 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 		}
 	}
 	return false
+}
+
+// syncApplicationWithPrune syncs the application with prune and force options if such a sync is not already in progress.
+// Returns true if a sync with prune and force is already in progress, false otherwise
+func syncApplicationWithPrune(client argoclient.Interface, app *argoapi.Application) (bool, error) {
+	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
+		return true, nil
+	}
+
+	app.Operation = &argoapi.Operation{
+		Sync: &argoapi.SyncOperation{
+			Prune:       true,
+			SyncOptions: []string{"Force=true"},
+		},
+	}
+
+	_, err := client.ArgoprojV1alpha1().Applications(app.Namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to sync application %q with prune: %w", app.Name, err)
+	}
+
+	return true, nil
+}
+
+// returns the child applications owned by the app-of-apps parentApp
+func getChildApplications(client argoclient.Interface, parentApp *argoapi.Application) ([]argoapi.Application, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", parentApp.Name),
+	}
+
+	appList, err := client.ArgoprojV1alpha1().Applications("").List(context.Background(), listOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list child applications of %s: %w", parentApp.Name, err)
+	}
+
+	return appList.Items, nil
 }
