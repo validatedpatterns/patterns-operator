@@ -583,7 +583,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			}
 
 			// Check if all child applications are gone from spoke
-			allGone, err := r.checkChildApplicationsGone(qualifiedInstance)
+			allGone, err := r.checkSpokeChildApplicationsGone(qualifiedInstance)
 			if err != nil {
 				return fmt.Errorf("error checking child applications: %w", err)
 			}
@@ -806,62 +806,34 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	return false, nil
 }
 
-// getBearerToken gets a bearer token for authentication, trying multiple methods:
-// 1. Read from service account token file (in-cluster)
-// 2. Use BearerToken from rest.Config (local dev with kubeconfig)
-// 3. Create a token using TokenRequest API (fallback)
-func (r *PatternReconciler) getBearerToken(ctx context.Context) (string, error) {
-	// Method 1: Try reading from service account token file (in-cluster)
-	tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token"
-	if tokenBytes, err := os.ReadFile(tokenPath); err == nil {
-		return string(tokenBytes), nil
-	}
-
-	// Method 2: Try using BearerToken from rest.Config (local dev)
-	if r.config != nil && r.config.BearerToken != "" {
-		return r.config.BearerToken, nil
-	}
-
-	// If all methods fail, try to get token from any available service account
-	// This is a fallback for local development
-	return "", fmt.Errorf("failed to get bearer token: tried service account file, rest.Config BearerToken, and TokenRequest API")
-}
-
-// checkChildApplicationsGone checks if all child applications (excluding the app-of-apps) are gone from spoke clusters
+// checkSpokeChildApplicationsGone checks if all child applications (excluding the app-of-apps) are gone from spoke clusters
 // The operator runs on the hub cluster and needs to check spoke clusters through ACM Search Service
 // Returns true if all child applications are gone, false otherwise
-func (r *PatternReconciler) checkChildApplicationsGone(p *api.Pattern) (bool, error) {
-	// Determine if we're running in-cluster or locally
-	// Check if service account token file exists (indicates in-cluster)
-	tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token"
-	_, inCluster := os.Stat(tokenPath)
+func (r *PatternReconciler) checkSpokeChildApplicationsGone(p *api.Pattern) (bool, error) {
 
-	var searchURL string
-	if inCluster == nil {
-		// Running in-cluster: use cluster.local endpoint
+	// Running locally: use localhost with env var set to "https://localhost:4010/searchapi/graphql" and port-forward
+	// User should run: kubectl port-forward -n open-cluster-management svc/search-search-api 4010:4010
+	searchURL := os.Getenv("ACM_SEARCH_API_URL")
+	if searchURL == "" {
 		searchNamespace := "open-cluster-management" // Default namespace for ACM
 		searchURL = fmt.Sprintf("https://search-search-api.%s.svc.cluster.local:4010/searchapi/graphql", searchNamespace)
-	} else {
-		// Running locally: use localhost with port-forward or environment variable
-		// User should run: kubectl port-forward -n open-cluster-management svc/search-search-api 4010:4010
-		searchURL = os.Getenv("ACM_SEARCH_API_URL")
-		if searchURL == "" {
-			// Default to localhost if env var not set (assumes port-forward)
-			searchURL = "https://localhost:4010/searchapi/graphql"
-		}
-		log.Printf("Using local search API endpoint: %s (set ACM_SEARCH_API_URL env var to override)", searchURL)
 	}
-	// TODO fix token
-	// the service account token of the operator does not list all applications, only the local cluster ones
-	// the service account token for the search api, works well
-	var token string
-	if r.config != nil && r.config.BearerToken != "" {
-		token = r.config.BearerToken
-	} else {
-		token = os.Getenv("ACM_SEARCH_API_TOKEN")
+
+	token := os.Getenv("ACM_SEARCH_API_TOKEN")
+	if token == "" {
+		var tokenBytes []byte
+		var err error
+
+		tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token"
+
+		if tokenBytes, err = os.ReadFile(tokenPath); err != nil {
+			return false, fmt.Errorf("failed to read serviceaccount token: %w", err)
+		}
+		token = string(tokenBytes)
 	}
 
 	// Build GraphQL query to search for Applications
+	// Filter out local-cluster apps and app of apps (based on namespace)
 	query := map[string]any{
 		"operationName": "searchResult",
 		"query":         "query searchResult($input: [SearchInput]) { searchResult: search(input: $input) { items related { kind items } } }",
@@ -873,10 +845,17 @@ func (r *PatternReconciler) checkChildApplicationsGone(p *api.Pattern) (bool, er
 							"property": "apigroup",
 							"values":   []string{"argoproj.io"},
 						},
-
 						{
 							"property": "kind",
 							"values":   []string{"Application"},
+						},
+						{
+							"property": "cluster",
+							"values":   []string{"!local-cluster"},
+						},
+						{
+							"property": "namespace",
+							"values":   []string{fmt.Sprintf("!%s", getClusterWideArgoNamespace())},
 						},
 					},
 					"relatedKinds": []string{"Application"},
@@ -905,26 +884,14 @@ func (r *PatternReconciler) checkChildApplicationsGone(p *api.Pattern) (bool, er
 
 	// Create HTTP client
 	// Use insecure TLS (self-signed certs)
-	var client *http.Client
-	if inCluster == nil {
-		// In-cluster: HTTPS with insecure TLS
-		client = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
 			},
-		}
-	} else {
-		// Local: HTTPs (no TLS)
-		client = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
+		},
 	}
+
 	// Make the request
 	resp, err := client.Do(req)
 	if err != nil {
@@ -956,11 +923,7 @@ func (r *PatternReconciler) checkChildApplicationsGone(p *api.Pattern) (bool, er
 		return i.(map[string]any)
 	})
 
-	// Filter out local-cluster apps and app of apps
-	remote_apps := lo.Filter(items, func(item map[string]any, _ int) bool {
-		return item["cluster"] != "local-cluster" && item["namespace"] != getClusterWideArgoNamespace()
-	})
-	remote_app_names := lo.Map(remote_apps, func(item map[string]any, _ int) string {
+	remote_app_names := lo.Map(items, func(item map[string]any, _ int) string {
 		return item["name"].(string)
 	})
 
