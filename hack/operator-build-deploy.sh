@@ -84,7 +84,7 @@ wait_for_resource "operator" "${OPERATOR}" "${NS}"
 
 while true; do
     set +e
-    INSTALLED_CSV=$(oc get subscription "${OPERATOR}" -n "${NS}" -o jsonpath='{.status.installedCSV}')
+    INSTALLED_CSV=$(oc get subscriptions.operators.coreos.com "${OPERATOR}" -n "${NS}" -o jsonpath='{.status.installedCSV}')
     if [ -z "${INSTALLED_CSV}" ]; then
         sleep 10
     else
