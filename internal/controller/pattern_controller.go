@@ -95,6 +95,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
 //+kubebuilder:rbac:groups="route.openshift.io",namespace=vp-gitea,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="view.open-cluster-management.io",resources=managedclusterviews,verbs=create
+//+kubebuilder:rbac:groups="cluster.open-cluster-management.io",resources=managedclusters,verbs=list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
