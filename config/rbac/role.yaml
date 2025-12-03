@@ -45,6 +45,13 @@ rules:
   - patch
   - update
 - apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclusters
+  verbs:
+  - delete
+  - list
+- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions
