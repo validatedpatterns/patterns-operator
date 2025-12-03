@@ -619,16 +619,11 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 					return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
 				}
 
-				return fmt.Errorf("No managed clusters found (excluding local-cluster), waiting for removal of acm hub before proceeding with hub deletion")
+				// Update application with deletePattern=1 to trigger hub deletion
+				if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+					return fmt.Errorf("updated application %q for hub deletion", app.Name)
+				}
 
-			}
-
-			// Update application with deletePattern=1 to trigger hub deletion
-			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
-				return fmt.Errorf("updated application %q for hub deletion", app.Name)
-			}
-
-			if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
 				inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
 				if err != nil {
 					return err
@@ -636,10 +631,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				if inProgress {
 					return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
 				}
-			}
 
-			if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
-				return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
+				return fmt.Errorf("waiting for removal of that acm hub")
 			}
 
 			log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
