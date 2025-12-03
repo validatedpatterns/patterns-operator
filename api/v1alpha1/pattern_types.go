@@ -209,7 +209,7 @@ type PatternStatus struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	// DeletionPhase tracks the current phase of pattern deletion
 	// Values: "" (not deleting), "deletingSpokeApps" (phase 1: delete apps from spoke), "deletingHubApps" (phase 2: delete apps from hub)
-	DeletionPhase string `json:"deletionPhase,omitempty"`
+	DeletionPhase PatternDeletionPhase `json:"deletionPhase,omitempty"`
 }
 
 // See: https://book.kubebuilder.io/reference/markers/crd.html
@@ -264,6 +264,14 @@ const (
 	Progressing  PatternConditionType = "Progressing"
 	Missing      PatternConditionType = "Missing"
 	Suspended    PatternConditionType = "Suspended"
+)
+
+type PatternDeletionPhase string
+
+const (
+	InitializeDeletion PatternDeletionPhase = ""
+	DeletingSpokeApps  PatternDeletionPhase = "DeletingSpokeApps"
+	DeletingHubApps    PatternDeletionPhase = "DeletingHubApps"
 )
 
 func init() {

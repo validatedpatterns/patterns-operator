@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/samber/lo"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -524,6 +523,102 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	return output, nil
 }
 
+func (r *PatternReconciler) updateDeletionPhase(instance *api.Pattern, phase api.PatternDeletionPhase) error {
+	log.Printf("Updating deletion phase to '%s'", phase)
+	instance.Status.DeletionPhase = phase
+	if err := r.Client.Status().Update(context.TODO(), instance); err != nil {
+		return fmt.Errorf("failed to update deletion phase: %w", err)
+	}
+
+	// Re-fetch to get updated status
+	if err := r.Get(context.TODO(), client.ObjectKeyFromObject(instance), instance); err != nil {
+		return fmt.Errorf("failed to re-fetch pattern after phase update: %w", err)
+	}
+
+	return nil
+}
+
+func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, app *argoapi.Application, namespace string) error {
+	log.Printf("Deletion phase: %s - checking if all child applications are gone from spoke", api.DeletingSpokeApps)
+
+	// Update application with deletePattern=2 to trigger spoke deletion
+	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+		return fmt.Errorf("updated application %q for spoke deletion", app.Name)
+	}
+	if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+		inProgress, err := syncApplicationWithPrune(r.argoClient, app)
+		if err != nil {
+			return err
+		}
+		if inProgress {
+			return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+		}
+	}
+
+	childApps, err := getChildApplications(r.argoClient, app)
+	if err != nil {
+		return err
+	} else {
+		for _, childApp := range childApps {
+			if _, err := syncApplicationWithPrune(r.argoClient, &childApp); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Check if all child applications are gone from spoke
+	allGone, err := r.checkSpokeChildApplicationsGone(instance)
+	if err != nil {
+		return fmt.Errorf("error checking child applications: %w", err)
+	}
+
+	if !allGone {
+		log.Printf("Waiting for all child applications to be deleted from spoke clusters")
+		return fmt.Errorf("waiting for child applications to be deleted from spoke clusters")
+	}
+
+	return nil
+}
+
+func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, namespace string) error {
+	log.Printf("Deletion phase: %s - deleting from hub", api.DeletingHubApps)
+
+	// Delete managed clusters (excluding local-cluster)
+	// These must be removed before hub deletion can proceed because ACM won't delete properly if they exist
+	if haveACMHub(r) {
+		deletedCount, err := r.deleteManagedClusters(context.TODO())
+		if err != nil {
+			return fmt.Errorf("failed to delete managed clusters: %w", err)
+		}
+
+		if deletedCount > 0 {
+			log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
+			return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
+		}
+
+		// Update application with deletePattern=1 to trigger hub deletion
+		if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+			return fmt.Errorf("updated application %q for hub deletion", app.Name)
+		}
+
+		inProgress, err := syncApplicationWithPrune(r.argoClient, app)
+		if err != nil {
+			return err
+		}
+		if inProgress {
+			return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+		}
+
+		return fmt.Errorf("waiting for removal of that acm hub")
+	}
+
+	log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
+	if err := removeApplication(r.argoClient, app.Name, namespace); err != nil {
+		return err
+	}
+	return fmt.Errorf("waiting for application %q to be removed", app.Name)
+}
+
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	// Add finalizer when object is created
 	log.Printf("Finalizing pattern object")
@@ -553,94 +648,36 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 
 		// Initialize deletion phase if not set
-		if qualifiedInstance.Status.DeletionPhase == "" {
-			log.Printf("Initializing deletion phase: deletingSpokeApps")
-			qualifiedInstance.Status.DeletionPhase = "deletingSpokeApps"
-			if err := r.Client.Status().Update(context.TODO(), qualifiedInstance); err != nil {
-				return fmt.Errorf("failed to update deletion phase: %w", err)
-			}
-			// Re-fetch to get updated status
-			if err := r.Get(context.TODO(), client.ObjectKeyFromObject(qualifiedInstance), qualifiedInstance); err != nil {
-				return fmt.Errorf("failed to re-fetch pattern after phase update: %w", err)
+		if qualifiedInstance.Status.DeletionPhase == api.InitializeDeletion {
+			log.Printf("Initializing deletion phase")
+			if haveACMHub(r) {
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeletingSpokeApps); err != nil {
+					return err
+				}
+			} else {
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeletingHubApps); err != nil {
+					return err
+				}
 			}
 		}
 
 		// Phase 1: Delete applications from spoke clusters
-		if qualifiedInstance.Status.DeletionPhase == "deletingSpokeApps" {
-			log.Printf("Deletion phase: deletingSpokeApps - checking if all child applications are gone from spoke")
-
-			// Update application with deletePattern=2 to trigger spoke deletion
-			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
-				return fmt.Errorf("updated application %q for spoke deletion", app.Name)
-			}
-			if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
-				inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
-				if err != nil {
-					return err
-				}
-				if inProgress {
-					return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
-				}
+		if qualifiedInstance.Status.DeletionPhase == api.DeletingSpokeApps {
+			if err := r.deleteSpokeApps(qualifiedInstance, targetApp, app, ns); err != nil {
+				return err
 			}
 
-			// Check if all child applications are gone from spoke
-			allGone, err := r.checkSpokeChildApplicationsGone(qualifiedInstance)
-			if err != nil {
-				return fmt.Errorf("error checking child applications: %w", err)
-			}
-
-			if !allGone {
-				log.Printf("Waiting for all child applications to be deleted from spoke clusters")
-				return fmt.Errorf("waiting for child applications to be deleted from spoke clusters")
-			}
-
-			// All child applications are gone, now transition to phase 2
-			// The app-of-apps removal from spoke is handled by the helm chart when deletePattern=2
-			log.Printf("All child applications are gone, transitioning to deletingHubApps phase")
-			qualifiedInstance.Status.DeletionPhase = "deletingHubApps"
-			if err := r.Client.Status().Update(context.TODO(), qualifiedInstance); err != nil {
-				return fmt.Errorf("failed to update deletion phase to deletingHubApps: %w", err)
+			log.Printf("All child applications are gone, transitioning to %s phase", api.DeletingHubApps)
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeletingHubApps); err != nil {
+				return err
 			}
 		}
 
 		// Phase 2: Delete applications from hub
-		if qualifiedInstance.Status.DeletionPhase == "deletingHubApps" {
-			log.Printf("Deletion phase: deletingHubApps - deleting from hub")
-
-			// Delete managed clusters (excluding local-cluster)
-			// These must be removed before hub deletion can proceed because ACM won't delete properly if they exist
-			if haveACMHub(r) {
-				deletedCount, err := r.deleteManagedClusters(context.TODO())
-				if err != nil {
-					return fmt.Errorf("failed to delete managed clusters: %w", err)
-				}
-
-				if deletedCount > 0 {
-					log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
-					return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
-				}
-
-				// Update application with deletePattern=1 to trigger hub deletion
-				if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
-					return fmt.Errorf("updated application %q for hub deletion", app.Name)
-				}
-
-				inProgress, err := syncApplicationWithPrune(r.argoClient, app, ns)
-				if err != nil {
-					return err
-				}
-				if inProgress {
-					return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
-				}
-
-				return fmt.Errorf("waiting for removal of that acm hub")
-			}
-
-			log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-			if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
+		if qualifiedInstance.Status.DeletionPhase == api.DeletingHubApps {
+			if err := r.deleteHubApps(targetApp, app, ns); err != nil {
 				return err
 			}
-			return fmt.Errorf("waiting for application %q to be removed", app.Name)
 		}
 	}
 
@@ -905,24 +942,31 @@ func (r *PatternReconciler) checkSpokeChildApplicationsGone(p *api.Pattern) (boo
 	}
 
 	// Parse JSON response
-	var searchResponse map[string]any
+	type SearchAPIResponse struct {
+		Data struct {
+			SearchResult []struct {
+				Items []struct {
+					Name      string `json:"name"`
+					Namespace string `json:"namespace"`
+					Cluster   string `json:"cluster"`
+				} `json:"items"`
+			} `json:"searchResult"`
+		} `json:"data"`
+	}
+	var searchResponse SearchAPIResponse
 	if err := json.Unmarshal(body, &searchResponse); err != nil {
 		return false, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
-	raw := searchResponse["data"].(map[string]any)["searchResult"].([]any)[0].(map[string]any)["items"].([]any)
-
-	// Convert []any → []map[string]any
-	items := lo.Map(raw, func(i any, _ int) map[string]any {
-		return i.(map[string]any)
-	})
-
-	remote_app_names := lo.Map(items, func(item map[string]any, _ int) string {
-		return item["name"].(string)
-	})
+	var remote_app_names []string
+	if searchResult := searchResponse.Data.SearchResult; len(searchResult) > 0 {
+		for _, item := range searchResult[0].Items {
+			remote_app_names = append(remote_app_names, fmt.Sprintf("%s/%s in %s", item.Namespace, item.Name, item.Cluster))
+		}
+	}
 
 	if len(remote_app_names) != 0 {
-		return false, fmt.Errorf("Cluster apps still exists: %s", remote_app_names)
+		return false, fmt.Errorf("spoke cluster apps still exist: %s", remote_app_names)
 	}
 
 	return true, nil
