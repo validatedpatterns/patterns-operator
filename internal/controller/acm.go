@@ -35,15 +35,6 @@ func haveACMHub(r *PatternReconciler) bool {
 		log.Printf("Error obtaining hub: %s\n", err)
 		return false
 	}
-	// var mangedClusters []string
-	// mangedClusters, err = r.listManagedClusters(context.Background())
-	// if err != nil {
-	// 	log.Printf("error obtaining managed clusters: %s\n", err)
-	// 	return false
-	// }
-	// if len(mangedClusters) == 0 {
-	// 	return false
-	// }
 	return true
 }
 
