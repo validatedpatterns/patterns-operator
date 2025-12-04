@@ -30,39 +30,20 @@ import (
 func haveACMHub(r *PatternReconciler) bool {
 	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
-	serverNamespace := ""
-
-	cms, err := r.fullClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-	})
-	if (err != nil || len(cms.Items) == 0) && serverNamespace != "" {
-		cms, err = r.fullClient.CoreV1().ConfigMaps(serverNamespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-		})
-	}
-	if err != nil || len(cms.Items) == 0 {
-		cms, err = r.fullClient.CoreV1().ConfigMaps("open-cluster-management").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-		})
-	}
-	if err != nil {
-		log.Printf("config map error: %s\n", err.Error())
-		return false
-	}
-	if len(cms.Items) == 0 {
-		log.Printf("No config map\n")
-		return false
-	}
-	ns := cms.Items[0].Namespace
-
-	umch, err := r.dynamicClient.Resource(gvrMCH).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
+	_, err := r.dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Get(context.Background(), "multiclusterhub", metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
 		return false
-	} else if len(umch.Items) == 0 {
-		log.Printf("No hub in %s\n", ns)
-		return false
 	}
+	// var mangedClusters []string
+	// mangedClusters, err = r.listManagedClusters(context.Background())
+	// if err != nil {
+	// 	log.Printf("error obtaining managed clusters: %s\n", err)
+	// 	return false
+	// }
+	// if len(mangedClusters) == 0 {
+	// 	return false
+	// }
 	return true
 }
 
