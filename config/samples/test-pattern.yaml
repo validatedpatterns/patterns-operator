@@ -1,0 +1,13 @@
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: Pattern
+metadata:
+  name: test-pattern-infra-params
+  namespace: default
+spec:
+  clusterGroupName: test-group
+  gitSpec:
+    targetRepo: "https://github.com/validatedpatterns/multicloud-gitops"
+    targetRevision: "main"
+  multiSourceConfig:
+    enabled: false
+    helmRepoUrl: "https://charts.validatedpatterns.io/"
