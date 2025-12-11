@@ -30,6 +30,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,6 +41,7 @@ import (
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
+	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
@@ -223,7 +225,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, ret, err)
 	}
 
-	targetApp := newArgoApplication(qualifiedInstance)
+	// Fetch infrastructure for cluster API server URL and control plane topology
+	infra := &configv1.Infrastructure{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, infra); err != nil {
+		// If infrastructure cannot be fetched, continue with nil (handled in newApplicationParameters)
+		log.Printf("Warning: Could not fetch infrastructure object: %v. Parameters global.clusterAPIServerURL and global.controlPlaneTopology will not be set.", err)
+		infra = nil
+	} else {
+		log.Printf("Successfully fetched infrastructure: APIServerURL=%s, ControlPlaneTopology=%s", infra.Status.APIServerURL, infra.Status.ControlPlaneTopology)
+	}
+
+	targetApp := newArgoApplication(qualifiedInstance, infra)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
 	if app == nil {
@@ -510,7 +522,15 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		}
 		ns := getClusterWideArgoNamespace()
 
-		targetApp := newArgoApplication(qualifiedInstance)
+		// Fetch infrastructure for cluster API server URL and control plane topology
+		infra := &configv1.Infrastructure{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infra); err != nil {
+			// If infrastructure cannot be fetched, continue with nil (handled in newApplicationParameters)
+			log.Printf("Warning: Could not fetch infrastructure object during finalization: %v. Parameters global.clusterAPIServerURL and global.controlPlaneTopology will not be set.", err)
+			infra = nil
+		}
+
+		targetApp := newArgoApplication(qualifiedInstance, infra)
 		_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
 
 		app, _ := getApplication(r.argoClient, applicationName(qualifiedInstance), ns)
