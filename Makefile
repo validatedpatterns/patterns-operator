@@ -9,6 +9,7 @@ GOFLAGS=-mod=vendor
 GOLANGCI_VERSION ?= 2.6.2
 REGISTRY ?= localhost
 UPLOADREGISTRY ?= quay.io/validatedpatterns
+GOLANGCI_IMG ?= docker.io/golangci/golangci-lint
 
 # CI uses a non-writable home dir, make sure .cache is writable
 ifeq ("${HOME}", "/")
@@ -178,7 +179,7 @@ buildah-push: ## Uploads the container to quay.io/validatedpatterns/${OPERATOR_I
 
 .PHONY: golangci-lint
 golangci-lint: apikey ## Run golangci-lint locally
-	podman run --pull=newer --rm -v $(PWD):/app:rw,z -w /app golangci/golangci-lint:v$(GOLANGCI_VERSION) golangci-lint run -v
+	podman run --pull=newer --rm -v $(PWD):/app:rw,z -w /app $(GOLANGCI_IMG):v$(GOLANGCI_VERSION) golangci-lint run -v
 
 ##@ Legacy docker tasks
 .PHONY: docker-build
