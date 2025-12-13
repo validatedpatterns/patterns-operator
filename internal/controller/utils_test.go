@@ -457,6 +457,210 @@ var _ = Describe("GetPatternConditionByType", func() {
 	})
 })
 
+var _ = Describe("IntOrZero", func() {
+	var (
+		secret         map[string][]byte
+		key            string
+		expectedResult int64
+	)
+
+	Context("when the secret map is nil", func() {
+		BeforeEach(func() {
+			secret = nil
+			expectedResult = int64(0)
+		})
+		It("should return 0 for the result", func() {
+			result, err := IntOrZero(secret, key)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when an invalid key is selected from the secret map", func() {
+		BeforeEach(func() {
+			key = "key"
+			secret = map[string][]byte{
+				key: []byte("123"),
+			}
+			expectedResult = int64(0)
+		})
+		It("should return 0 for the result", func() {
+			result, err := IntOrZero(secret, "invalid-key")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when the secret map is properly populated and a value is selected", func() {
+		BeforeEach(func() {
+			key = "key"
+			secret = map[string][]byte{
+				key: []byte("123"),
+			}
+			expectedResult = int64(123)
+		})
+		It("should return the correct integer value", func() {
+			result, err := IntOrZero(secret, key)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when the secret map contains invalid integers", func() {
+		BeforeEach(func() {
+			key = "key"
+			secret = map[string][]byte{
+				key: []byte("invalid"),
+			}
+		})
+		It("an error should be reported", func() {
+			_, err := IntOrZero(secret, key)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+})
+
+var _ = Describe("detectGitAuthType", func() {
+	var (
+		secret         map[string][]byte
+		expectedResult GitAuthenticationBackend
+	)
+
+	Context("When a secret containing no authentication details is provided", func() {
+		BeforeEach(func() {
+			secret = nil
+			expectedResult = GitAuthNone
+		})
+		It("should return GitAuthNone", func() {
+			result := detectGitAuthType(secret)
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when a username and password is provided", func() {
+		BeforeEach(func() {
+			secret = map[string][]byte{
+				"username": []byte("myusername"),
+				"password": []byte("mypassword"),
+			}
+			expectedResult = GitAuthPassword
+		})
+		It("should return GitAuthPassword", func() {
+			result := detectGitAuthType(secret)
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when a SSH private key is provided", func() {
+		BeforeEach(func() {
+			secret = map[string][]byte{
+				"sshPrivateKey": []byte("ssh-key-data"),
+			}
+			expectedResult = GitAuthSsh
+		})
+		It("should return GitAuthSsh", func() {
+			result := detectGitAuthType(secret)
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+	Context("when a GitHub App is provided", func() {
+		BeforeEach(func() {
+			secret = map[string][]byte{
+				"githubAppID":             []byte("github-app-id"),
+				"githubAppInstallationID": []byte("github-app-installation-id"),
+				"githubAppPrivateKey":     []byte("github-app-private-key"),
+			}
+			expectedResult = GitAuthGitHubApp
+		})
+		It("should return GitAuthGitHubApp", func() {
+			result := detectGitAuthType(secret)
+			Expect(result).To(Equal(expectedResult))
+		})
+	})
+
+})
+
+var _ = Describe("getGitHubAppAuthTransport", func() {
+	var (
+		clientset *fake.Clientset
+		secret    map[string][]byte
+	)
+
+	BeforeEach(func() {
+		clientset = fake.NewSimpleClientset()
+		secret = map[string][]byte{
+			"githubAppPrivateKey": []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAuuCWq9FEvSUw9fhuQzs8D+fE/GHLTruKVxlWwECKhju/5yrf
+Eougt6DGQXDDpPY8PtW9aDd45/8iIJJuCPrTU8poDN52qhI0VQPYqyMDcHJZQcXX
+pfyCrwTrJf5o++l9sOP6IVZBIZTGtiKOPJNE04K/5UebCQ7mwDgPOdT7tXxmFzcO
+1PW+uSq8XRF8PfvMDVAub04X9sm8TNGhkd5yoR9fXFRNjRvzBgc0uikvIVv7HyY2
+HF1sk1MyC9qW0WpiiRPFoEnLh2m+qCnmlZUzeP8fmKZsCLmJazzFcjhX+ExU80fd
+sNxpMfRO+hDenVFTOuJpSa6h88LY7GPBBsy8DQIDAQABAoIBAQC3Mi/CY7XVDj5/
+AnllIw5wMS7kkyHxHtwxIj/u29ZwXOZ1QYvI7GQzX0K7KEZC0rigiHvTTH4UQAI+
+mA2SdADy5Ts3UmZVtt7icJDYw8w9UXu6hK4wo+egl1vFtS9JtM1ouTSdtabHusdK
+CXoSW/RevJBNvfJ34MnIqawTb30JnSrIWpnwASx4jfjj8vT+jcAGiNDCIptwQN1a
+YHGsfmKt3OW0avu9r8Y5W+dgZLDXtEy7/jrVQRNiCNMZBc3WFNWcHzAOJbQfax3v
+EOGkypI0lqD7CDUo7bFDL/D5FtCvKC8IgPfQ84x6kUObHcxHnQZra6VZ3I0IlMMg
+adBrvIlBAoGBANtXFe8xzPvGCYwpwMuI7FSafKL7vGAh/OQDjgL/hATxEghMTggD
+bLFHgp56UojaRCq3HtuBXzocUPyXdk+CiqX/Zj4+5O8fFGlS5PRVOhafOViYIyE4
+11FZvR3rgFWq5TQ5tQMtRUHeq6WbMMnfZjciOGGt3kG5k2jnqrQU6jaVAoGBANoc
+g0PjOHWTgus506e0Lkowel7NojFF5Gt5t/zoyexYCDm43FwvIW8uV/SdDEU9uXaG
+05TlPGdKFaAqQ9kHSE/O0yrd4GCLDQmt3I1++GqD+JVzJ8uPhQhN7vxfOz3RVQ9+
+DOk/7NGRBgdueUdRXMjg4NscEsfzupuZJglL82mZAoGAG/uTP83hselFBI27G/xe
+8jg3WG+3S6hqZAiUEIvaourCey6I8frF3iQaZO+EIhN+iNiN5kEuDfLY3jDQljo4
+SA86UwyhFmSnrPw3W3iYDZTIsyXNrYpb5fQF7ZBC8ir4TN5j2oDnCg1HZrxS0B5h
+Iv2JpeSRq17qkIKlw427h7UCgYBmtD5rXTdcxhVDxnsP4Rxa+vDka1gQc6TXpv0o
+LkXG8L0O0SmSju7jd6MbIEiC4knOsjY3SqpiyNPeE4jXTUKTsgRljwz06QU+pYvR
+ZRR8s5/+X7dBd1dhTbFXTVCMD2JKZUSXIO7Wz79TCIY7OujB/oJjKpj9ZptcYYUz
+o3v/IQKBgQCLPnHN78nJsuaRGPL2Ypg8Ku/u4xQPA//ng0cF6d2TIDXLpBKbtUOQ
+Gt2KENSCnHhtaj/RnMlG4I2RVTUTkKn5u81cY+XuGbvjVt2MDCcTniRzOiTkHXgO
+9lJ+GXjeWhXo+wKlT5YX4s0U8AZIQNQU/Rtrx8vGu9d1SbKiF7Mnlw==
+-----END RSA PRIVATE KEY-----`),
+		}
+	})
+
+	Context("When empty values are provided", func() {
+		BeforeEach(func() {
+			secret = map[string][]byte{}
+		})
+
+		It("a an error should be returned", func() {
+			transport, err := getGitHubAppAuthTransport(clientset, secret)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to initialize GitHub installation transport"))
+			Expect(transport).To(BeNil())
+		})
+	})
+
+	Context("When the default values are provided", func() {
+
+		It("no errors should be returned", func() {
+			transport, err := getGitHubAppAuthTransport(clientset, secret)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(transport).ToNot(BeNil())
+		})
+		It("default github API address should be present", func() {
+			transport, err := getGitHubAppAuthTransport(clientset, secret)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(transport.BaseURL).To(Equal("https://api.github.com"))
+		})
+	})
+
+	Context("When a custom GitHub Enterprise Address is provided", func() {
+		JustBeforeEach(func() {
+			secret["githubAppEnterpriseBaseUrl"] = []byte("https://github.mycompany.com/api/v3")
+		})
+
+		It("custom github API address should be present", func() {
+			transport, err := getGitHubAppAuthTransport(clientset, secret)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(transport.BaseURL).To(Equal("https://github.mycompany.com/api/v3"))
+		})
+	})
+})
+
 var _ = Describe("GetCurrentClusterVersion", func() {
 	var (
 		clusterVersion *configv1.ClusterVersion

@@ -17,11 +17,13 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 	nethttp "net/http"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"path/filepath"
 
@@ -35,17 +37,21 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
+
 	argogit "github.com/argoproj/argo-cd/v3/util/git"
 )
 
 type GitAuthenticationBackend uint
 
 const (
-	GitAuthNone     GitAuthenticationBackend = 0
-	GitAuthPassword GitAuthenticationBackend = 1
-	GitAuthSsh      GitAuthenticationBackend = 2
+	GitAuthNone      GitAuthenticationBackend = 0
+	GitAuthPassword  GitAuthenticationBackend = 1
+	GitAuthSsh       GitAuthenticationBackend = 2
+	GitAuthGitHubApp GitAuthenticationBackend = 3
 )
 
+const ContextTimeout = 15 * time.Second
 const GitCustomCAFile = "/tmp/vp-git-cas.pem"
 const GitHEAD = "HEAD"
 const VPTmpFolder = "vp"
@@ -176,7 +182,7 @@ func checkoutRevision(fullClient kubernetes.Interface, gitOps GitOperations, url
 	if repo == nil { // we mocked the above OpenRepository
 		return nil
 	}
-	foptions, err := getFetchOptions(url, secret)
+	foptions, err := getFetchOptions(fullClient, url, secret)
 	if err != nil {
 		return err
 	}
@@ -235,7 +241,7 @@ func cloneRepo(fullClient kubernetes.Interface, gitOps GitOperations, url, direc
 	}
 	fmt.Printf("git clone %s into %s\n", url, directory)
 
-	options, err := getCloneOptions(url, secret)
+	options, err := getCloneOptions(fullClient, url, secret)
 	if err != nil {
 		return err
 	}
@@ -259,7 +265,7 @@ func cloneRepo(fullClient kubernetes.Interface, gitOps GitOperations, url, direc
 	return nil
 }
 
-func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, error) {
+func getFetchOptions(fullClient kubernetes.Interface, url string, secret map[string][]byte) (*git.FetchOptions, error) {
 	var foptions = &git.FetchOptions{
 		RemoteName:      "origin",
 		Force:           true,
@@ -275,12 +281,19 @@ func getFetchOptions(url string, secret map[string][]byte) (*git.FetchOptions, e
 			return nil, err
 		}
 		foptions.Auth = publicKey
+	case GitAuthGitHubApp:
+		gitHubAppAuth, err := getGitHubAppAuth(fullClient, secret)
+		if err != nil {
+			return nil, err
+		}
+
+		foptions.Auth = gitHubAppAuth
 	}
 
 	return foptions, nil
 }
 
-func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, error) {
+func getCloneOptions(fullClient kubernetes.Interface, url string, secret map[string][]byte) (*git.CloneOptions, error) {
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
 		URL:          url,
@@ -300,6 +313,13 @@ func getCloneOptions(url string, secret map[string][]byte) (*git.CloneOptions, e
 			return nil, err
 		}
 		options.Auth = publicKey
+	case GitAuthGitHubApp:
+		gitHubAppAuth, err := getGitHubAppAuth(fullClient, secret)
+		if err != nil {
+			return nil, err
+		}
+
+		options.Auth = gitHubAppAuth
 	}
 
 	return options, nil
@@ -333,6 +353,62 @@ func getSshPublicKey(url string, secret map[string][]byte) (*ssh.PublicKeys, err
 	return publicKey, nil
 }
 
+func getGitHubAppAuthTransport(fullClient kubernetes.Interface, secret map[string][]byte) (*ghinstallation.Transport, error) {
+	baseURL := "https://api.github.com"
+
+	if githubAppEnterpriseBaseUrl := getField(secret, "githubAppEnterpriseBaseUrl"); githubAppEnterpriseBaseUrl != nil {
+		baseURL = strings.TrimSuffix(string(githubAppEnterpriseBaseUrl), "/")
+	}
+
+	transport := getHTTPSTransport(fullClient)
+
+	githubAppID, err := IntOrZero(secret, "githubAppID")
+	if err != nil {
+		return nil, err
+	}
+
+	githubAppInstallationID, err := IntOrZero(secret, "githubAppInstallationID")
+	if err != nil {
+		return nil, err
+	}
+
+	itr, err := ghinstallation.New(transport,
+		githubAppID,
+		githubAppInstallationID,
+		getField(secret, "githubAppPrivateKey"),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize GitHub installation transport: %w", err)
+	}
+
+	itr.BaseURL = baseURL
+
+	return itr, nil
+}
+
+func getGitHubAppAuth(fullClient kubernetes.Interface, secret map[string][]byte) (*http.BasicAuth, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
+	defer cancel()
+
+	// Obtain GitHub Transport
+	itr, err := getGitHubAppAuthTransport(fullClient, secret)
+	if err != nil {
+		return nil, err
+	}
+	accessToken, err := itr.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not get GitHub App installation token: %w", err)
+	}
+
+	auth := &http.BasicAuth{
+		Username: "x-access-token",
+		Password: accessToken,
+	}
+
+	return auth, nil
+}
+
 // This returns the user prefix in git urls like:
 // git@github.com:/foo/bar or "" when not found
 func getUserFromURL(url string) string {
@@ -362,14 +438,27 @@ func repoHash(directory string) (string, error) {
 // if a secret has
 // returns "" if a secret could not be parse, "ssh" if it is an ssh auth, and "password" if a username + pass auth
 func detectGitAuthType(secret map[string][]byte) GitAuthenticationBackend {
+	// SSH
 	if _, ok := secret["sshPrivateKey"]; ok {
 		return GitAuthSsh
 	}
+
+	// Username + Password
 	_, hasUser := secret["username"]
 	_, hasPassword := secret["password"]
 	if hasUser && hasPassword {
 		return GitAuthPassword
 	}
+
+	// GitHub App
+	_, hasGithubAppID := secret["githubAppID"]
+	_, hasGithubAppInstallationID := secret["githubAppInstallationID"]
+	_, hasGithubAppPrivateKey := secret["githubAppPrivateKey"]
+	if hasGithubAppID && hasGithubAppInstallationID && hasGithubAppPrivateKey {
+		return GitAuthGitHubApp
+	}
+
+	// None
 	return GitAuthNone
 }
 
