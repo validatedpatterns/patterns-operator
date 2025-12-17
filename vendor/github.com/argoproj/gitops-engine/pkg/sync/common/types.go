@@ -16,12 +16,9 @@ const (
 	AnnotationKeyHook = "argocd.argoproj.io/hook"
 	// AnnotationKeyHookDeletePolicy is the policy of deleting a hook
 	AnnotationKeyHookDeletePolicy = "argocd.argoproj.io/hook-delete-policy"
-	AnnotationDeletionApproved    = "argocd.argoproj.io/deletion-approved"
 
 	// Sync option that disables dry run in resource is missing in the cluster
 	SyncOptionSkipDryRunOnMissingResource = "SkipDryRunOnMissingResource=true"
-	// Sync option that disables dry run for applying resources
-	SyncOptionSkipDryRun = "SkipDryRun=true"
 	// Sync option that disables resource pruning
 	SyncOptionDisablePrune = "Prune=false"
 	// Sync option that disables resource validation
@@ -30,20 +27,8 @@ const (
 	SyncOptionPruneLast = "PruneLast=true"
 	// Sync option that enables use of replace or create command instead of apply
 	SyncOptionReplace = "Replace=true"
-	// Sync option that enables use of --force flag, delete and re-create
-	SyncOptionForce = "Force=true"
 	// Sync option that enables use of --server-side flag instead of client-side
 	SyncOptionServerSideApply = "ServerSideApply=true"
-	// Sync option that disables use of --server-side flag instead of client-side
-	SyncOptionDisableServerSideApply = "ServerSideApply=false"
-	// Sync option that disables resource deletion
-	SyncOptionDisableDeletion = "Delete=false"
-	// Sync option that sync only out of sync resources
-	SyncOptionApplyOutOfSyncOnly = "ApplyOutOfSyncOnly=true"
-	// Sync option that requires confirmation before deleting the resource
-	SyncOptionDeleteRequireConfirm = "Delete=confirm"
-	// Sync option that requires confirmation before deleting the resource
-	SyncOptionPruneRequireConfirm = "Prune=confirm"
 )
 
 type PermissionValidator func(un *unstructured.Unstructured, res *metav1.APIResource) error
@@ -118,6 +103,7 @@ func NewHookType(t string) (HookType, bool) {
 			t == string(HookTypePostSync) ||
 			t == string(HookTypeSyncFail) ||
 			t == string(HookTypeSkip)
+
 }
 
 type HookDeletePolicy string
@@ -138,10 +124,6 @@ func NewHookDeletePolicy(p string) (HookDeletePolicy, bool) {
 type ResourceSyncResult struct {
 	// holds associated resource key
 	ResourceKey kube.ResourceKey
-	// Images holds the images associated with the resource. These images are collected on a best-effort basis
-	// from fields used by known workload resources. This does not necessarily reflect the exact list of images
-	// used by workloads in the application.
-	Images []string
 	// holds resource version
 	Version string
 	// holds the execution order
