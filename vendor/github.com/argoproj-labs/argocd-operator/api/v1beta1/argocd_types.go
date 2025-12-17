@@ -268,6 +268,12 @@ type ArgoCDDexSpec struct {
 
 	// Env lets you specify environment variables for Dex.
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Volumes adds volumes to the dex server container
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// VolumeMounts adds volumeMounts to the dex server container
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 // ArgoCDGrafanaSpec defines the desired state for the Grafana component.
@@ -759,6 +765,7 @@ type ArgoCDSSOSpec struct {
 	Dex *ArgoCDDexSpec `json:"dex,omitempty"`
 
 	// Keycloak contains the configuration for Argo CD keycloak authentication
+	// Removed: This field is no longer supported and the related functionality has been removed.
 	Keycloak *ArgoCDKeycloakSpec `json:"keycloak,omitempty"`
 }
 
@@ -772,6 +779,32 @@ type KustomizeVersionSpec struct {
 	Version string `json:"version,omitempty"`
 	// Path is the path to a configured kustomize version on the filesystem of your repo server.
 	Path string `json:"path,omitempty"`
+}
+
+// LocalUserSpec is used to specify information about an ArgoCD local user to be created by the operator.
+type LocalUserSpec struct {
+	// Name of the local user
+	Name string `json:"name"`
+
+	// Enabled defines whether or not this local user is enabled. Default is
+	// true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ApiKey defines whether or not the user is configured to use an ArgoCD API
+	// key. Default is true
+	ApiKey *bool `json:"apiKey,omitempty"`
+
+	// Login defines whether or not the user is configured to be able to login. Default is false
+	Login bool `json:"login,omitempty"`
+
+	// TokenLifetime defines the how long the token issued to this user is valid
+	// for. An empty string or the value 0 indicates an infinite lifetime.
+	// Examples: "30m", "8760h"
+	TokenLifetime string `json:"tokenLifetime,omitempty"`
+
+	// AutoRenewToken specifies if a new token is to be issued once the existing
+	// one has expired. Default is true
+	AutoRenewToken *bool `json:"autoRenewToken,omitempty"`
 }
 
 // ArgoCDMonitoringSpec is used to configure workload status monitoring for a given Argo CD instance.
@@ -869,6 +902,9 @@ type ArgoCDSpec struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Kustomize Build Options'",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	KustomizeVersions []KustomizeVersionSpec `json:"kustomizeVersions,omitempty"`
 
+	// LocalUsers is a listing of local users to be created by the operator for the purpose of issuing ArgoCD API keys.
+	LocalUsers []LocalUserSpec `json:"localUsers,omitempty"`
+
 	// OIDCConfig is the OIDC configuration as an alternative to dex.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="OIDC Config'",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	OIDCConfig string `json:"oidcConfig,omitempty"`
@@ -960,6 +996,18 @@ type ArgoCDSpec struct {
 
 	// ArgoCDAgent defines configurations for the ArgoCD Agent component.
 	ArgoCDAgent *ArgoCDAgentSpec `json:"argoCDAgent,omitempty"`
+
+	// NamespaceManagement defines the list of namespaces that Argo CD is allowed to manage.
+	NamespaceManagement []ManagedNamespaces `json:"namespaceManagement,omitempty"`
+}
+
+// NamespaceManagement defines the namespace management settings
+type ManagedNamespaces struct {
+	// Name of the namespace or pattern to be managed
+	Name string `json:"name"`
+
+	// Whether the namespace can be managed by ArgoCD
+	AllowManagedBy bool `json:"allowManagedBy"`
 }
 
 const (
@@ -1066,6 +1114,10 @@ type Banner struct {
 	Content string `json:"content"`
 	// URL defines an optional URL to be used as banner message link
 	URL string `json:"url,omitempty"`
+	// Permanent defines if the banner should be displayed permanently or only for a certain period of time
+	Permanent bool `json:"permanent,omitempty"`
+	// Position defines the position of the banner in the UI
+	Position string `json:"position,omitempty"`
 }
 
 // ArgoCDTLSSpec defines the TLS options for ArgCD.
