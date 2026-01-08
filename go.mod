@@ -14,7 +14,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.3
 	github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible
-	github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e // release-4.16
+	github.com/openshift/client-go 48f4ccfc4e13 // release-4.16
 	github.com/operator-framework/api v0.33.0
 	github.com/operator-framework/operator-lifecycle-manager v0.33.0
 	github.com/segmentio/analytics-go/v3 v3.3.0
@@ -210,7 +210,7 @@ replace (
 	// Usually not needed unless we have newer k8s.io deps and argocd still uses an old gitops-engine
 	// github.com/argoproj/gitops-engine => github.com/argoproj/gitops-engine v0.0.0-20240905010810-bd7681ae3f8b
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
-	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e
+	github.com/openshift/client-go => github.com/openshift/client-go 48f4ccfc4e13
 	// Caused by Argo importing 'k8s.io/api'
 	// Override all the v0.0.0 entries
 	k8s.io/api => k8s.io/api v0.33.4
