@@ -12,7 +12,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.3
-	github.com/onsi/gomega v1.38.3
+	github.com/onsi/gomega v1.39.0
 	github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible
 	github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e // release-4.16
 	github.com/operator-framework/api v0.33.0
