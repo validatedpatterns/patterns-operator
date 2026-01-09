@@ -94,7 +94,7 @@ var _ = Describe("Argo Pattern", func() {
 			TargetRevision: pattern.Spec.GitConfig.TargetRevision,
 			Helm: &argoapi.ApplicationSourceHelm{
 				ValueFiles:              newApplicationValueFiles(pattern, ""),
-				Parameters:              newApplicationParameters(pattern),
+				Parameters:              newApplicationParameters(pattern, nil),
 				Values:                  newApplicationValues(pattern),
 				IgnoreMissingValueFiles: true,
 			},
@@ -137,7 +137,7 @@ var _ = Describe("Argo Pattern", func() {
 				// This is needed to debug any failures as gomega truncates the diff output
 				format.MaxDepth = 100
 				format.MaxLength = 0
-				Expect(newArgoApplication(pattern)).To(Equal(argoApp))
+				Expect(newArgoApplication(pattern, nil)).To(Equal(argoApp))
 			})
 		})
 		Context("Default multi source", func() {
@@ -160,7 +160,7 @@ var _ = Describe("Argo Pattern", func() {
 					*appSource,
 				}
 				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref")
-				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
+				Expect(newMultiSourceApplication(pattern, nil)).To(Equal(multiSourceArgoApp))
 			})
 		})
 		Context("multiSource with MultiSourceClusterGroupChartGitRevision set", func() {
@@ -184,7 +184,7 @@ var _ = Describe("Argo Pattern", func() {
 					*appSource,
 				}
 				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref")
-				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
+				Expect(newMultiSourceApplication(pattern, nil)).To(Equal(multiSourceArgoApp))
 			})
 		})
 	})
@@ -405,7 +405,7 @@ var _ = Describe("Argo Pattern", func() {
 				}
 			})
 			It("Test default newApplicationParameters", func() {
-				Expect(newApplicationParameters(pattern)).To(Equal(append(appParameters,
+				Expect(newApplicationParameters(pattern, nil)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
 						Value:       "false",
@@ -439,7 +439,7 @@ var _ = Describe("Argo Pattern", func() {
 						Value: "test2value",
 					},
 				}
-				Expect(newApplicationParameters(pattern)).To(Equal(append(appParameters,
+				Expect(newApplicationParameters(pattern, nil)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
 						Value:       "false",
@@ -472,7 +472,7 @@ var _ = Describe("Argo Pattern", func() {
 			It("Test newApplicationParameters with multiSource", func() {
 				tmpBool := true
 				pattern.Spec.MultiSourceConfig.Enabled = &tmpBool
-				Expect(newApplicationParameters(pattern)).To(Equal(append(appParameters,
+				Expect(newApplicationParameters(pattern, nil)).To(Equal(append(appParameters,
 					argoapi.HelmParameter{
 						Name:        "global.multiSourceSupport",
 						Value:       "true",
@@ -500,7 +500,7 @@ var _ = Describe("Argo Pattern", func() {
 			var sources []argoapi.ApplicationSource
 
 			BeforeEach(func() {
-				multiSourceArgoApp = newMultiSourceApplication(pattern)
+				multiSourceArgoApp = newMultiSourceApplication(pattern, nil)
 				sources = multiSourceArgoApp.Spec.Sources
 			})
 			It("compareSource() function identical", func() {
