@@ -100,6 +100,10 @@ type GitConfig struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=16
 	TargetRevision string `json:"targetRevision,omitempty"`
 
+	// Path within git repo where values files are located. Default: repository root
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=17
+	TargetPath string `json:"targetPath,omitempty"`
+
 	// Upstream git repo containing the pattern to deploy. Used when in-cluster fork to point to the upstream pattern repository.
 	// Takes precedence over TargetRepo
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=14,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldDependency:gitSpec.inClusterGitServer:true"}

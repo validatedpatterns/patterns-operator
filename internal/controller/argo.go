@@ -457,6 +457,10 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Value: p.Spec.GitConfig.TargetRevision,
 		},
 		{
+			Name:  "global.targetPath",
+			Value: p.Spec.GitConfig.TargetPath,
+		},
+		{
 			Name:  "global.hubClusterDomain",
 			Value: p.Status.AppClusterDomain,
 		},
@@ -544,6 +548,14 @@ func convertArgoHelmParametersToMap(params []argoapi.HelmParameter) map[string]a
 }
 
 func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
+	basePath := p.Spec.GitConfig.TargetPath
+	if basePath != "" {
+		if prefix != "" {
+			prefix = fmt.Sprintf("%s/%s", prefix, basePath)
+		} else {
+			prefix = basePath
+		}
+	}
 	files := []string{
 		fmt.Sprintf("%s/values-global.yaml", prefix),
 		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Spec.ClusterGroupName),
@@ -755,6 +767,7 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	valuesSource := &argoapi.ApplicationSource{
 		RepoURL:        p.Spec.GitConfig.TargetRepo,
 		TargetRevision: p.Spec.GitConfig.TargetRevision,
+		Path:           p.Spec.GitConfig.TargetPath,
 		Ref:            "patternref",
 	}
 	sources = append(sources, *valuesSource)
