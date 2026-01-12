@@ -514,15 +514,21 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 	}
 	if !p.DeletionTimestamp.IsZero() {
 		// Determine deletePattern value based on deletion phase
-		// Phase 1 (deletingSpokeApps): deletePattern = "2" (delete apps from spoke)
-		// Phase 2 (deletingHubApps): deletePattern = "1" (delete apps from hub)
-		deletePatternValue := "2" // default to spoke deletion
-		if p.Status.DeletionPhase == api.DeletingHubApps {
-			deletePatternValue = "1"
+
+		// Phase 1: Delete child applications from spoke clusters: DeleteSpokeChildApps
+		// Phase 2: Delete app of apps from spoke: DeleteSpoke
+		// Phase 3: Delete applications from hub: DeleteHubChildApps
+		// Phase 4: Delete app of apps from hub: DeleteHub
+
+		deletePatternValue := p.Status.DeletionPhase // default to the phase on the pattern object
+
+		// If we need to clean up child apps from the hub, we change it (clustergroup chart app creation logic)
+		if p.Status.DeletionPhase == api.DeleteHubChildApps {
+			deletePatternValue = "DeleteChildApps"
 		}
 		parameters = append(parameters, argoapi.HelmParameter{
 			Name:        "global.deletePattern",
-			Value:       deletePatternValue,
+			Value:       string(deletePatternValue),
 			ForceString: true,
 		})
 	}

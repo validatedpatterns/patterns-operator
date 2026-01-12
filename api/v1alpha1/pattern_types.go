@@ -269,9 +269,11 @@ const (
 type PatternDeletionPhase string
 
 const (
-	InitializeDeletion PatternDeletionPhase = ""
-	DeletingSpokeApps  PatternDeletionPhase = "DeletingSpokeApps"
-	DeletingHubApps    PatternDeletionPhase = "DeletingHubApps"
+	InitializeDeletion   PatternDeletionPhase = ""
+	DeleteSpokeChildApps PatternDeletionPhase = "DeleteSpokeChildApps"
+	DeleteSpoke          PatternDeletionPhase = "DeleteSpoke"
+	DeleteHubChildApps   PatternDeletionPhase = "DeleteHubChildApps"
+	DeleteHub            PatternDeletionPhase = "DeleteHub"
 )
 
 func init() {

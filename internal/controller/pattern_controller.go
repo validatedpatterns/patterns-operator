@@ -539,32 +539,32 @@ func (r *PatternReconciler) updateDeletionPhase(instance *api.Pattern, phase api
 }
 
 func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, app *argoapi.Application, namespace string) error {
-	log.Printf("Deletion phase: %s - checking if all child applications are gone from spoke", api.DeletingSpokeApps)
+	log.Printf("Deletion phase: %s - checking if all child applications are gone from spoke", api.DeleteSpokeChildApps)
 
-	// Update application with deletePattern=2 to trigger spoke deletion
+	// Update application with deletePattern=DeleteSpokeChildApps to trigger spoke child deletion
 	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
-		return fmt.Errorf("updated application %q for spoke deletion", app.Name)
+		return fmt.Errorf("updated application %q for spoke child deletion", app.Name)
 	}
-	if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
-		inProgress, err := syncApplicationWithPrune(r.argoClient, app)
-		if err != nil {
-			return err
-		}
-		if inProgress {
-			return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
-		}
-	}
+	// if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
+	// 	inProgress, err := syncApplicationWithPrune(r.argoClient, app)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if inProgress {
+	// 		return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+	// 	}
+	// }
 
-	childApps, err := getChildApplications(r.argoClient, app)
-	if err != nil {
-		return err
-	} else {
-		for _, childApp := range childApps {
-			if _, err := syncApplicationWithPrune(r.argoClient, &childApp); err != nil {
-				return err
-			}
-		}
-	}
+	// childApps, err := getChildApplications(r.argoClient, app)
+	// if err != nil {
+	// 	return err
+	// } else {
+	// 	for _, childApp := range childApps {
+	// 		if _, err := syncApplicationWithPrune(r.argoClient, &childApp); err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// }
 
 	// Check if all child applications are gone from spoke
 	allGone, err := r.checkSpokeChildApplicationsGone(instance)
@@ -573,7 +573,7 @@ func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, ap
 	}
 
 	if !allGone {
-		log.Printf("Waiting for all child applications to be deleted from spoke clusters")
+		// log.Printf("Waiting for all child applications to be deleted from spoke clusters")
 		return fmt.Errorf("waiting for child applications to be deleted from spoke clusters")
 	}
 
@@ -581,11 +581,22 @@ func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, ap
 }
 
 func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, namespace string) error {
-	log.Printf("Deletion phase: %s - deleting from hub", api.DeletingHubApps)
+	log.Printf("Deletion phase: %s - deleting child apps from hub", api.DeleteHubChildApps)
 
+	childApps, err := getChildApplications(r.argoClient, app)
+	if err != nil {
+		return fmt.Errorf("failed to get child applications: %w", err)
+	}
+
+	if len(childApps) == 0 {
+		return nil
+	}
 	// Delete managed clusters (excluding local-cluster)
 	// These must be removed before hub deletion can proceed because ACM won't delete properly if they exist
-	if haveACMHub(r) {
+	// we do not care about the error, since we might be on a standalone cluster
+	managedClusters, _ := r.listManagedClusters(context.Background())
+
+	if len(managedClusters) > 0 {
 		deletedCount, err := r.deleteManagedClusters(context.TODO())
 		if err != nil {
 			return fmt.Errorf("failed to delete managed clusters: %w", err)
@@ -595,27 +606,22 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 			log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
 			return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
 		}
-
-		// Update application with deletePattern=1 to trigger hub deletion
-		if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
-			return fmt.Errorf("updated application %q for hub deletion", app.Name)
-		}
-
-		inProgress, err := syncApplicationWithPrune(r.argoClient, app)
-		if err != nil {
-			return err
-		}
-		if inProgress {
-			return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
-		}
-
-		return fmt.Errorf("waiting for removal of that acm hub")
 	}
 
-	log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-	if err := removeApplication(r.argoClient, app.Name, namespace); err != nil {
+	// Update application with deletePattern=DeleteHubChildApps to trigger hub child app deletion
+	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+		return fmt.Errorf("updated application %q for hub deletion", app.Name)
+	}
+
+	inProgress, err := syncApplicationWithPrune(r.argoClient, app)
+	if err != nil {
 		return err
 	}
+	if inProgress {
+		return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
+	}
+
+	// return nil //fmt.Errorf("waiting for removal of that acm hub")
 	return fmt.Errorf("waiting for application %q to be removed", app.Name)
 }
 
@@ -651,31 +657,56 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		if qualifiedInstance.Status.DeletionPhase == api.InitializeDeletion {
 			log.Printf("Initializing deletion phase")
 			if haveACMHub(r) {
-				if err := r.updateDeletionPhase(qualifiedInstance, api.DeletingSpokeApps); err != nil {
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpokeChildApps); err != nil {
 					return err
 				}
 			} else {
-				if err := r.updateDeletionPhase(qualifiedInstance, api.DeletingHubApps); err != nil {
+				// There is no acm/spoke, we can directly start cleaning up child apps (from hub)
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHubChildApps); err != nil {
 					return err
 				}
 			}
 		}
 
-		// Phase 1: Delete applications from spoke clusters
-		if qualifiedInstance.Status.DeletionPhase == api.DeletingSpokeApps {
+		// Phase 1: Delete child applications from spoke clusters
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteSpokeChildApps {
 			if err := r.deleteSpokeApps(qualifiedInstance, targetApp, app, ns); err != nil {
 				return err
 			}
 
-			log.Printf("All child applications are gone, transitioning to %s phase", api.DeletingHubApps)
-			if err := r.updateDeletionPhase(qualifiedInstance, api.DeletingHubApps); err != nil {
+			log.Printf("All child applications are gone, transitioning to %s phase", api.DeleteSpoke)
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpoke); err != nil {
 				return err
 			}
 		}
 
-		// Phase 2: Delete applications from hub
-		if qualifiedInstance.Status.DeletionPhase == api.DeletingHubApps {
+		// Phase 2: Delete app of apps from spoke
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteSpoke {
+			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+				return fmt.Errorf("updated application %q for spoke app of apps deletion", app.Name)
+			}
+			// TODO: move the above to a fn, write some check to see if app of app is really gone from spoke
+			log.Printf("App of apps are gone from spokes, transitioning to %s phase", api.DeleteHubChildApps)
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpoke); err != nil {
+				return err
+			}
+		}
+
+		// Phase 3: Delete applications from hub
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteHubChildApps {
 			if err := r.deleteHubApps(targetApp, app, ns); err != nil {
+				return err
+			}
+
+			log.Printf("Apps are gone from hub, transitioning to %s phase", api.DeleteHub)
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHub); err != nil {
+				return err
+			}
+		}
+		// Phase 4: Delete app of apps from hub
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteHub {
+			log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
+			if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
 				return err
 			}
 		}
