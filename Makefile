@@ -6,10 +6,10 @@
 VERSION ?= 0.0.4
 OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
-GOLANGCI_VERSION ?= 2.7.2
 REGISTRY ?= localhost
 UPLOADREGISTRY ?= quay.io/validatedpatterns
 GOLANGCI_IMG ?= docker.io/golangci/golangci-lint
+GOLANGCI_VERSION ?= 2.8.0
 
 # CI uses a non-writable home dir, make sure .cache is writable
 ifeq ("${HOME}", "/")
