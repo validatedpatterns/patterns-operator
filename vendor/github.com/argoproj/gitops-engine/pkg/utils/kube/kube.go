@@ -4,7 +4,6 @@ package kube
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -13,9 +12,9 @@ import (
 
 	"github.com/go-logr/logr"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -89,8 +88,8 @@ func GetResourceKey(obj *unstructured.Unstructured) ResourceKey {
 	return NewResourceKey(gvk.Group, gvk.Kind, obj.GetNamespace(), obj.GetName())
 }
 
-func GetObjectRef(obj *unstructured.Unstructured) corev1.ObjectReference {
-	return corev1.ObjectReference{
+func GetObjectRef(obj *unstructured.Unstructured) v1.ObjectReference {
+	return v1.ObjectReference{
 		UID:        obj.GetUID(),
 		APIVersion: obj.GetAPIVersion(),
 		Kind:       obj.GetKind(),
@@ -103,17 +102,17 @@ func GetObjectRef(obj *unstructured.Unstructured) corev1.ObjectReference {
 func TestConfig(config *rest.Config) error {
 	kubeclientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("REST config invalid: %w", err)
+		return fmt.Errorf("REST config invalid: %s", err)
 	}
 	_, err = kubeclientset.ServerVersion()
 	if err != nil {
-		return fmt.Errorf("REST config invalid: %w", err)
+		return fmt.Errorf("REST config invalid: %s", err)
 	}
 	return nil
 }
 
 // ToUnstructured converts a concrete K8s API type to a un unstructured object
-func ToUnstructured(obj any) (*unstructured.Unstructured, error) {
+func ToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 	uObj, err := runtime.NewTestUnstructuredConverter(equality.Semantic).ToUnstructured(obj)
 	if err != nil {
 		return nil, err
@@ -122,7 +121,7 @@ func ToUnstructured(obj any) (*unstructured.Unstructured, error) {
 }
 
 // MustToUnstructured converts a concrete K8s API type to a un unstructured object and panics if not successful
-func MustToUnstructured(obj any) *unstructured.Unstructured {
+func MustToUnstructured(obj interface{}) *unstructured.Unstructured {
 	uObj, err := ToUnstructured(obj)
 	if err != nil {
 		panic(err)
@@ -181,7 +180,7 @@ func IsCRD(obj *unstructured.Unstructured) bool {
 // See: https://github.com/ksonnet/ksonnet/blob/master/utils/client.go
 func ServerResourceForGroupVersionKind(disco discovery.DiscoveryInterface, gvk schema.GroupVersionKind, verb string) (*metav1.APIResource, error) {
 	// default is to return a not found for the requested resource
-	retErr := apierrors.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, "")
+	retErr := apierr.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, "")
 	resources, err := disco.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
 	if err != nil {
 		return nil, err
@@ -190,10 +189,11 @@ func ServerResourceForGroupVersionKind(disco discovery.DiscoveryInterface, gvk s
 		if r.Kind == gvk.Kind {
 			if isSupportedVerb(&r, verb) {
 				return &r, nil
+			} else {
+				// We have a match, but the API does not support the action
+				// that was requested. Memorize this.
+				retErr = apierr.NewMethodNotSupported(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, verb)
 			}
-			// We have a match, but the API does not support the action
-			// that was requested. Memorize this.
-			retErr = apierrors.NewMethodNotSupported(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, verb)
 		}
 	}
 	return nil, retErr
@@ -205,17 +205,14 @@ var (
 	// See ApplyOpts::Run()
 	// cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 	kubectlApplyPatchErrOutRegexp = regexp.MustCompile(`(?s)^error when applying patch:.*\nfor: "\S+": `)
-
-	kubectlErrOutMapRegexp = regexp.MustCompile(`map\[.*\]`)
 )
 
 // cleanKubectlOutput makes the error output of kubectl a little better to read
 func cleanKubectlOutput(s string) string {
 	s = strings.TrimSpace(s)
 	s = kubectlErrOutRegexp.ReplaceAllString(s, "")
-	s = kubectlErrOutMapRegexp.ReplaceAllString(s, "")
 	s = kubectlApplyPatchErrOutRegexp.ReplaceAllString(s, "")
-	s = strings.ReplaceAll(s, "; if you choose to ignore these errors, turn validation off with --validate=false", "")
+	s = strings.Replace(s, "; if you choose to ignore these errors, turn validation off with --validate=false", "", -1)
 	return s
 }
 
@@ -227,12 +224,6 @@ func WriteKubeConfig(restConfig *rest.Config, namespace, filename string) error 
 
 // NewKubeConfig converts a clientcmdapi.Config (kubeconfig) from a rest.Config
 func NewKubeConfig(restConfig *rest.Config, namespace string) *clientcmdapi.Config {
-	var proxyUrl string
-	if restConfig.Proxy != nil {
-		if u, err := restConfig.Proxy(nil); err == nil {
-			proxyUrl = u.String()
-		}
-	}
 	return &clientcmdapi.Config{
 		CurrentContext: restConfig.Host,
 		Contexts: map[string]*clientcmdapi.Context{
@@ -245,11 +236,10 @@ func NewKubeConfig(restConfig *rest.Config, namespace string) *clientcmdapi.Conf
 		Clusters: map[string]*clientcmdapi.Cluster{
 			restConfig.Host: {
 				Server:                   restConfig.Host,
-				TLSServerName:            restConfig.ServerName,
-				InsecureSkipTLSVerify:    restConfig.Insecure,
-				CertificateAuthority:     restConfig.CAFile,
-				CertificateAuthorityData: restConfig.CAData,
-				ProxyURL:                 proxyUrl,
+				TLSServerName:            restConfig.TLSClientConfig.ServerName,
+				InsecureSkipTLSVerify:    restConfig.TLSClientConfig.Insecure,
+				CertificateAuthority:     restConfig.TLSClientConfig.CAFile,
+				CertificateAuthorityData: restConfig.TLSClientConfig.CAData,
 			},
 		},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -263,20 +253,20 @@ func NewKubeConfig(restConfig *rest.Config, namespace string) *clientcmdapi.Conf
 func newAuthInfo(restConfig *rest.Config) *clientcmdapi.AuthInfo {
 	authInfo := clientcmdapi.AuthInfo{}
 	haveCredentials := false
-	if restConfig.CertFile != "" {
-		authInfo.ClientCertificate = restConfig.CertFile
+	if restConfig.TLSClientConfig.CertFile != "" {
+		authInfo.ClientCertificate = restConfig.TLSClientConfig.CertFile
 		haveCredentials = true
 	}
-	if len(restConfig.CertData) > 0 {
-		authInfo.ClientCertificateData = restConfig.CertData
+	if len(restConfig.TLSClientConfig.CertData) > 0 {
+		authInfo.ClientCertificateData = restConfig.TLSClientConfig.CertData
 		haveCredentials = true
 	}
-	if restConfig.KeyFile != "" {
-		authInfo.ClientKey = restConfig.KeyFile
+	if restConfig.TLSClientConfig.KeyFile != "" {
+		authInfo.ClientKey = restConfig.TLSClientConfig.KeyFile
 		haveCredentials = true
 	}
-	if len(restConfig.KeyData) > 0 {
-		authInfo.ClientKeyData = restConfig.KeyData
+	if len(restConfig.TLSClientConfig.KeyData) > 0 {
+		authInfo.ClientKeyData = restConfig.TLSClientConfig.KeyData
 		haveCredentials = true
 	}
 	if restConfig.Username != "" {
@@ -315,7 +305,7 @@ func SplitYAML(yamlData []byte) ([]*unstructured.Unstructured, error) {
 	for _, yml := range ymls {
 		u := &unstructured.Unstructured{}
 		if err := yaml.Unmarshal([]byte(yml), u); err != nil {
-			return objs, fmt.Errorf("failed to unmarshal manifest: %w", err)
+			return objs, fmt.Errorf("failed to unmarshal manifest: %v", err)
 		}
 		objs = append(objs, u)
 	}
@@ -334,10 +324,10 @@ func SplitYAMLToString(yamlData []byte) ([]string, error) {
 	for {
 		ext := runtime.RawExtension{}
 		if err := d.Decode(&ext); err != nil {
-			if errors.Is(err, io.EOF) {
+			if err == io.EOF {
 				break
 			}
-			return objs, fmt.Errorf("failed to unmarshal manifest: %w", err)
+			return objs, fmt.Errorf("failed to unmarshal manifest: %v", err)
 		}
 		ext.Raw = bytes.TrimSpace(ext.Raw)
 		if len(ext.Raw) == 0 || bytes.Equal(ext.Raw, []byte("null")) {
@@ -407,63 +397,20 @@ func GetDeploymentReplicas(u *unstructured.Unstructured) *int64 {
 	return &val
 }
 
-func GetResourceImages(u *unstructured.Unstructured) []string {
-	var containers []any
-	var found bool
-	var err error
-	var images []string
-
-	containerPaths := [][]string{
-		// Resources without template, like pods
-		{"spec", "containers"},
-		// Resources with template, like deployments
-		{"spec", "template", "spec", "containers"},
-		// Cronjobs
-		{"spec", "jobTemplate", "spec", "template", "spec", "containers"},
-	}
-
-	for _, path := range containerPaths {
-		containers, found, err = unstructured.NestedSlice(u.Object, path...)
-		if found && err == nil {
-			break
-		}
-	}
-
-	if !found || err != nil {
-		return nil
-	}
-
-	for _, container := range containers {
-		containerMap, ok := container.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		image, found, err := unstructured.NestedString(containerMap, "image")
-		if !found || err != nil {
-			continue
-		}
-
-		images = append(images, image)
-	}
-
-	return images
-}
-
 // RetryUntilSucceed keep retrying given action with specified interval until action succeed or specified context is done.
 func RetryUntilSucceed(ctx context.Context, interval time.Duration, desc string, log logr.Logger, action func() error) {
-	pollErr := wait.PollUntilContextCancel(ctx, interval, true, func(_ context.Context) (bool /*done*/, error) {
-		log.V(1).Info("Start " + desc)
+	pollErr := wait.PollImmediateUntil(interval, func() (bool /*done*/, error) {
+		log.V(1).Info(fmt.Sprintf("Start %s", desc))
 		err := action()
 		if err == nil {
-			log.V(1).Info("Completed " + desc)
+			log.V(1).Info(fmt.Sprintf("Completed %s", desc))
 			return true, nil
 		}
 		log.V(1).Info(fmt.Sprintf("Failed to %s: %+v, retrying in %v", desc, err, interval))
 		return false, nil
-	})
+	}, ctx.Done())
 	if pollErr != nil {
 		// The only error that can happen here is wait.ErrWaitTimeout if ctx is done.
-		log.V(1).Info("Stop retrying " + desc)
+		log.V(1).Info(fmt.Sprintf("Stop retrying %s", desc))
 	}
 }
