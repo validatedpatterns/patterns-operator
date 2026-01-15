@@ -492,7 +492,6 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Name:  "global.multiSourceRepoUrl",
 			Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
 		},
-
 		{
 			Name:  "global.experimentalCapabilities",
 			Value: p.Spec.ExperimentalCapabilities,
@@ -516,6 +515,20 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Name:        "global.deletePattern",
 			Value:       "1",
 			ForceString: true,
+		})
+	}
+	// We only pass the clustergroup git helm values when the corresponding spec parameters
+	// are non empty, no point in cluttering the helm charts otherwise
+	if p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl != "" {
+		parameters = append(parameters, argoapi.HelmParameter{
+			Name:  "global.clusterGroupGitRepoUrl",
+			Value: p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl,
+		})
+	}
+	if p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision != "" {
+		parameters = append(parameters, argoapi.HelmParameter{
+			Name:  "global.clusterGroupChartGitRevision",
+			Value: p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision,
 		})
 	}
 	return parameters

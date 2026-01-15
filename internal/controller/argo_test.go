@@ -184,6 +184,16 @@ var _ = Describe("Argo Pattern", func() {
 					*appSource,
 				}
 				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref")
+				multiSourceArgoApp.Spec.Sources[1].Helm.Parameters = append(multiSourceArgoApp.Spec.Sources[1].Helm.Parameters,
+					argoapi.HelmParameter{
+						Name:  "global.clusterGroupGitRepoUrl",
+						Value: "https://github.com/validatedpatterns/clustergroup-chart",
+					},
+					argoapi.HelmParameter{
+						Name:  "global.clusterGroupChartGitRevision",
+						Value: "testbranch",
+					},
+				)
 				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
