@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	configv1 "github.com/openshift/api/config/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -434,7 +435,7 @@ func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.
 	return argo, err
 }
 
-func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
+func newApplicationParameters(p *api.Pattern, infra *configv1.Infrastructure) []argoapi.HelmParameter {
 	parameters := []argoapi.HelmParameter{
 		{
 			Name:  "global.pattern",
@@ -497,6 +498,20 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Name:  "global.experimentalCapabilities",
 			Value: p.Spec.ExperimentalCapabilities,
 		},
+	}
+	if infra != nil {
+		log.Printf("Adding infrastructure parameters: clusterAPIServerURL=%s, controlPlaneTopology=%s", infra.Status.APIServerURL, infra.Status.ControlPlaneTopology)
+		parameters = append(parameters, argoapi.HelmParameter{
+			Name:  "global.clusterAPIServerURL",
+			Value: infra.Status.APIServerURL,
+		},
+			argoapi.HelmParameter{
+				Name:  "global.controlPlaneTopology",
+				Value: string(infra.Status.ControlPlaneTopology),
+			},
+		)
+	} else {
+		log.Printf("Warning: infra is nil, skipping infrastructure parameters (global.clusterAPIServerURL and global.controlPlaneTopology)")
 	}
 	parameters = append(parameters, argoapi.HelmParameter{
 		Name:  "global.multiSourceTargetRevision",
@@ -578,7 +593,7 @@ func newApplicationValues(p *api.Pattern) string {
 //     libraries. E.g. a string '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
 //     will be converted to '/overrides/values-AWS.yaml'
 //  4. We return the list of templated strings back as an array
-func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
+func getSharedValueFiles(p *api.Pattern, prefix string, infra *configv1.Infrastructure) ([]string, error) {
 	gitDir := p.Status.LocalCheckoutPath
 	if _, err := os.Stat(gitDir); err != nil {
 		return nil, fmt.Errorf("%s path does not exist", gitDir)
@@ -608,7 +623,7 @@ func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("type assertion failed at index %d: Not a string", i)
 		}
-		valueMap := convertArgoHelmParametersToMap(newApplicationParameters(p))
+		valueMap := convertArgoHelmParametersToMap(newApplicationParameters(p, infra))
 		templatedString, err := helmTpl(str, valueFiles, valueMap)
 
 		// we only log an error, but try to keep going
@@ -682,9 +697,9 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 	return spec
 }
 
-func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
+func commonApplicationSourceHelm(p *api.Pattern, prefix string, infra *configv1.Infrastructure) *argoapi.ApplicationSourceHelm {
 	valueFiles := newApplicationValueFiles(p, prefix)
-	sharedValueFiles, err := getSharedValueFiles(p, prefix)
+	sharedValueFiles, err := getSharedValueFiles(p, prefix, infra)
 	if err != nil {
 		fmt.Printf("Could not fetch sharedValueFiles: %s", err)
 	}
@@ -694,7 +709,7 @@ func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.Applica
 		ValueFiles: valueFiles,
 
 		// Parameters is a list of Helm parameters which are passed to the helm template command upon manifest generation
-		Parameters: newApplicationParameters(p),
+		Parameters: newApplicationParameters(p, infra),
 
 		// This is to be able to pass down the extraParams to the single applications
 		Values: newApplicationValues(p),
@@ -731,7 +746,7 @@ func newArgoOperatorApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *
 	return &app
 }
 
-func newSourceApplication(p *api.Pattern) *argoapi.Application {
+func newSourceApplication(p *api.Pattern, infra *configv1.Infrastructure) *argoapi.Application {
 	// Argo uses...
 	// r := regexp.MustCompile("(/|:)")
 	// root := filepath.Join(os.TempDir(), r.ReplaceAllString(NormalizeGitURL(rawRepoURL), "_"))
@@ -740,7 +755,7 @@ func newSourceApplication(p *api.Pattern) *argoapi.Application {
 		RepoURL:        p.Spec.GitConfig.TargetRepo,
 		Path:           "common/clustergroup",
 		TargetRevision: p.Spec.GitConfig.TargetRevision,
-		Helm:           commonApplicationSourceHelm(p, ""),
+		Helm:           commonApplicationSourceHelm(p, "", infra),
 	}
 	spec := commonApplicationSpec(p, []argoapi.ApplicationSource{source})
 
@@ -748,7 +763,7 @@ func newSourceApplication(p *api.Pattern) *argoapi.Application {
 	return newArgoOperatorApplication(p, spec)
 }
 
-func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
+func newMultiSourceApplication(p *api.Pattern, infra *configv1.Infrastructure) *argoapi.Application {
 	sources := []argoapi.ApplicationSource{}
 	var baseSource *argoapi.ApplicationSource
 
@@ -768,14 +783,14 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 			RepoURL:        p.Spec.MultiSourceConfig.HelmRepoUrl,
 			Chart:          "clustergroup",
 			TargetRevision: getClusterGroupChartVersion(p),
-			Helm:           commonApplicationSourceHelm(p, "$patternref"),
+			Helm:           commonApplicationSourceHelm(p, "$patternref", infra),
 		}
 	} else {
 		baseSource = &argoapi.ApplicationSource{
 			RepoURL:        p.Spec.MultiSourceConfig.ClusterGroupGitRepoUrl,
 			Path:           ".",
 			TargetRevision: p.Spec.MultiSourceConfig.ClusterGroupChartGitRevision,
-			Helm:           commonApplicationSourceHelm(p, "$patternref"),
+			Helm:           commonApplicationSourceHelm(p, "$patternref", infra),
 		}
 	}
 	sources = append(sources, *baseSource)
@@ -799,14 +814,14 @@ func getClusterGroupChartVersion(p *api.Pattern) string {
 	return clusterGroupChartVersion
 }
 
-func newArgoApplication(p *api.Pattern) *argoapi.Application {
+func newArgoApplication(p *api.Pattern, infra *configv1.Infrastructure) *argoapi.Application {
 	// -- ArgoCD Application
 	var targetApp *argoapi.Application
 
 	if *p.Spec.MultiSourceConfig.Enabled {
-		targetApp = newMultiSourceApplication(p)
+		targetApp = newMultiSourceApplication(p, infra)
 	} else {
-		targetApp = newSourceApplication(p)
+		targetApp = newSourceApplication(p, infra)
 	}
 
 	return targetApp
