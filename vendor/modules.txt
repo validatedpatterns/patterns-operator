@@ -528,7 +528,7 @@ github.com/kylelemons/godebug/pretty
 # github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 ## explicit
 github.com/liggitt/tabwriter
-# github.com/lufia/plan9stats v0.0.0-20250827001030-24949be3fa54
+# github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3
 ## explicit; go 1.21
 github.com/lufia/plan9stats
 # github.com/mitchellh/copystructure v1.2.0
