@@ -1063,16 +1063,16 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 	return false
 }
 
-// syncApplicationWithPrune syncs the application with prune and force options if such a sync is not already in progress.
+// syncApplication syncs the application with prune and force options if such a sync is not already in progress.
 // Returns true if a sync with prune and force is already in progress, false otherwise
-func syncApplicationWithPrune(client argoclient.Interface, app *argoapi.Application) (bool, error) {
-	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
+func syncApplication(client argoclient.Interface, app *argoapi.Application, withPrune bool) (bool, error) {
+	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune == withPrune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
 		return true, nil
 	}
 
 	app.Operation = &argoapi.Operation{
 		Sync: &argoapi.SyncOperation{
-			Prune:       true,
+			Prune:       withPrune,
 			SyncOptions: []string{"Force=true"},
 		},
 	}
