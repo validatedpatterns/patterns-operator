@@ -9,14 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/google/go-github/v66/github"
+	giturls "github.com/chainguard-dev/git-urls"
+	"github.com/google/go-github/v69/github"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -31,7 +34,7 @@ import (
 	"github.com/argoproj/argo-cd/v3/common"
 	argoutils "github.com/argoproj/argo-cd/v3/util"
 	certutil "github.com/argoproj/argo-cd/v3/util/cert"
-	argoioutils "github.com/argoproj/argo-cd/v3/util/io"
+	utilio "github.com/argoproj/argo-cd/v3/util/io"
 	"github.com/argoproj/argo-cd/v3/util/workloadidentity"
 )
 
@@ -43,6 +46,10 @@ var (
 
 	// In memory cache for storing Azure tokens
 	azureTokenCache *gocache.Cache
+
+	// installationIdCache caches installation IDs for organizations to avoid redundant API calls.
+	githubInstallationIdCache      *gocache.Cache
+	githubInstallationIdCacheMutex sync.RWMutex // For bulk API call coordination
 )
 
 const (
@@ -66,6 +73,7 @@ func init() {
 	// oauth2.TokenSource handles fetching new Tokens once they are expired. The oauth2.TokenSource itself does not expire.
 	googleCloudTokenSource = gocache.New(gocache.NoExpiration, 0)
 	azureTokenCache = gocache.New(gocache.NoExpiration, 0)
+	githubInstallationIdCache = gocache.New(60*time.Minute, 60*time.Minute)
 }
 
 type NoopCredsStore struct{}
@@ -142,17 +150,13 @@ type HTTPSCreds struct {
 	clientCertData string
 	// Client certificate key to use
 	clientCertKey string
-	// HTTP/HTTPS proxy used to access repository
-	proxy string
-	// list of targets that shouldn't use the proxy, applies only if the proxy is set
-	noProxy string
 	// temporal credentials store
 	store CredsStore
 	// whether to force usage of basic auth
 	forceBasicAuth bool
 }
 
-func NewHTTPSCreds(username string, password string, bearerToken string, clientCertData string, clientCertKey string, insecure bool, proxy string, noProxy string, store CredsStore, forceBasicAuth bool) GenericHTTPSCreds {
+func NewHTTPSCreds(username string, password string, bearerToken string, clientCertData string, clientCertKey string, insecure bool, store CredsStore, forceBasicAuth bool) GenericHTTPSCreds {
 	return HTTPSCreds{
 		username,
 		password,
@@ -160,8 +164,6 @@ func NewHTTPSCreds(username string, password string, bearerToken string, clientC
 		insecure,
 		clientCertData,
 		clientCertKey,
-		proxy,
-		noProxy,
 		store,
 		forceBasicAuth,
 	}
@@ -252,7 +254,7 @@ func (creds HTTPSCreds) Environ() (io.Closer, []string, error) {
 	}
 	nonce := creds.store.Add(text.FirstNonEmpty(creds.username, githubAccessTokenUsername), creds.password)
 	env = append(env, creds.store.Environ(nonce)...)
-	return argoioutils.NewCloser(func() error {
+	return utilio.NewCloser(func() error {
 		creds.store.Remove(nonce)
 		return httpCloser.Close()
 	}), env, nil
@@ -277,13 +279,11 @@ type SSHCreds struct {
 	sshPrivateKey string
 	caPath        string
 	insecure      bool
-	store         CredsStore
 	proxy         string
-	noProxy       string
 }
 
-func NewSSHCreds(sshPrivateKey string, caPath string, insecureIgnoreHostKey bool, store CredsStore, proxy string, noProxy string) SSHCreds {
-	return SSHCreds{sshPrivateKey, caPath, insecureIgnoreHostKey, store, proxy, noProxy}
+func NewSSHCreds(sshPrivateKey string, caPath string, insecureIgnoreHostKey bool, proxy string) SSHCreds {
+	return SSHCreds{sshPrivateKey, caPath, insecureIgnoreHostKey, proxy}
 }
 
 // GetUserInfo returns empty strings for user info.
@@ -382,7 +382,6 @@ type GitHubAppCreds struct {
 	appInstallId   int64
 	privateKey     string
 	baseURL        string
-	repoURL        string
 	clientCertData string
 	clientCertKey  string
 	insecure       bool
@@ -392,8 +391,8 @@ type GitHubAppCreds struct {
 }
 
 // NewGitHubAppCreds provide github app credentials
-func NewGitHubAppCreds(appID int64, appInstallId int64, privateKey string, baseURL string, repoURL string, clientCertData string, clientCertKey string, insecure bool, proxy string, noProxy string, store CredsStore) GenericHTTPSCreds {
-	return GitHubAppCreds{appID: appID, appInstallId: appInstallId, privateKey: privateKey, baseURL: baseURL, repoURL: repoURL, clientCertData: clientCertData, clientCertKey: clientCertKey, insecure: insecure, proxy: proxy, noProxy: noProxy, store: store}
+func NewGitHubAppCreds(appID int64, appInstallId int64, privateKey string, baseURL string, clientCertData string, clientCertKey string, insecure bool, proxy string, noProxy string, store CredsStore) GenericHTTPSCreds {
+	return GitHubAppCreds{appID: appID, appInstallId: appInstallId, privateKey: privateKey, baseURL: baseURL, clientCertData: clientCertData, clientCertKey: clientCertKey, insecure: insecure, proxy: proxy, noProxy: noProxy, store: store}
 }
 
 func (g GitHubAppCreds) Environ() (io.Closer, []string, error) {
@@ -455,7 +454,7 @@ func (g GitHubAppCreds) Environ() (io.Closer, []string, error) {
 	}
 	nonce := g.store.Add(githubAccessTokenUsername, token)
 	env = append(env, g.store.Environ(nonce)...)
-	return argoioutils.NewCloser(func() error {
+	return utilio.NewCloser(func() error {
 		g.store.Remove(nonce)
 		return httpCloser.Close()
 	}), env, nil
@@ -534,7 +533,7 @@ func (g GitHubAppCreds) getAppTransport() (*ghinstallation.AppsTransport, error)
 func (g GitHubAppCreds) getInstallationTransport() (*ghinstallation.Transport, error) {
 	// Compute hash of creds for lookup in cache
 	h := sha256.New()
-	_, err := h.Write([]byte(fmt.Sprintf("%s %d %d %s", g.privateKey, g.appID, g.appInstallId, g.baseURL)))
+	_, err := fmt.Fprintf(h, "%s %d %d %s", g.privateKey, g.appID, g.appInstallId, g.baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get get SHA256 hash for GitHub app credentials: %w", err)
 	}
@@ -585,6 +584,199 @@ func (g GitHubAppCreds) GetClientCertKey() string {
 	return g.clientCertKey
 }
 
+// GitHub App installation discovery cache and helper
+
+// DiscoverGitHubAppInstallationID discovers the GitHub App installation ID for a given organization.
+// It queries the GitHub API to list all installations for the app and returns the installation ID
+// for the matching organization. Results are cached to avoid redundant API calls.
+// An optional HTTP client can be provided for custom transport (e.g., for metrics tracking).
+func DiscoverGitHubAppInstallationID(ctx context.Context, appId int64, privateKey, enterpriseBaseURL, org string, httpClient ...*http.Client) (int64, error) {
+	domain, err := domainFromBaseURL(enterpriseBaseURL)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get domain from base URL: %w", err)
+	}
+	org = strings.ToLower(org)
+	// Check cache first
+	cacheKey := fmt.Sprintf("%s:%s:%d", strings.ToLower(org), domain, appId)
+	if id, found := githubInstallationIdCache.Get(cacheKey); found {
+		return id.(int64), nil
+	}
+
+	// Use provided HTTP client or default
+	var transport http.RoundTripper
+	if len(httpClient) > 0 && httpClient[0] != nil && httpClient[0].Transport != nil {
+		transport = httpClient[0].Transport
+	} else {
+		transport = http.DefaultTransport
+	}
+
+	// Create GitHub App transport
+	rt, err := ghinstallation.NewAppsTransport(transport, appId, []byte(privateKey))
+	if err != nil {
+		return 0, fmt.Errorf("failed to create GitHub app transport: %w", err)
+	}
+
+	if enterpriseBaseURL != "" {
+		rt.BaseURL = enterpriseBaseURL
+	}
+
+	// Create GitHub client
+	var client *github.Client
+	clientTransport := &http.Client{Transport: rt}
+	if enterpriseBaseURL == "" {
+		client = github.NewClient(clientTransport)
+	} else {
+		client, err = github.NewClient(clientTransport).WithEnterpriseURLs(enterpriseBaseURL, enterpriseBaseURL)
+		if err != nil {
+			return 0, fmt.Errorf("failed to create GitHub enterprise client: %w", err)
+		}
+	}
+
+	// List all installations and cache them
+	var allInstallations []*github.Installation
+	opts := &github.ListOptions{PerPage: 100}
+
+	// Lock for the entire loop to avoid multiple concurrent API calls on startup
+	githubInstallationIdCacheMutex.Lock()
+	defer githubInstallationIdCacheMutex.Unlock()
+
+	// Check cache again inside the write lock in case another goroutine already fetched it
+	if id, found := githubInstallationIdCache.Get(cacheKey); found {
+		return id.(int64), nil
+	}
+
+	for {
+		installations, resp, err := client.Apps.ListInstallations(ctx, opts)
+		if err != nil {
+			return 0, fmt.Errorf("failed to list installations: %w", err)
+		}
+
+		allInstallations = append(allInstallations, installations...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	// Cache all installation IDs
+	for _, installation := range allInstallations {
+		if installation.Account != nil && installation.Account.Login != nil && installation.ID != nil {
+			githubInstallationIdCache.Set(cacheKey, *installation.ID, gocache.DefaultExpiration)
+		}
+	}
+
+	// Return the installation ID for the requested org
+	if id, found := githubInstallationIdCache.Get(cacheKey); found {
+		return id.(int64), nil
+	}
+	return 0, fmt.Errorf("installation not found for org: %s", org)
+}
+
+// domainFromBaseURL extracts the host (domain) from the given GitHub base URL.
+// Supports HTTP(S), SSH URLs, and git@host:org/repo forms.
+// Returns an error if a domain cannot be extracted.
+func domainFromBaseURL(baseURL string) (string, error) {
+	if baseURL == "" {
+		return "github.com", nil
+	}
+
+	// --- 1. SSH-style Git URL: git@github.com:org/repo.git ---
+	if strings.Contains(baseURL, "@") && strings.Contains(baseURL, ":") && !strings.Contains(baseURL, "://") {
+		parts := strings.SplitN(baseURL, "@", 2)
+		right := parts[len(parts)-1]             // github.com:org/repo
+		host := strings.SplitN(right, ":", 2)[0] // github.com
+		if host != "" {
+			return host, nil
+		}
+		return "", fmt.Errorf("failed to extract host from SSH-style URL: %q", baseURL)
+	}
+
+	// --- 2. Ensure scheme so url.Parse works ---
+	if !strings.HasPrefix(baseURL, "http://") &&
+		!strings.HasPrefix(baseURL, "https://") &&
+		!strings.HasPrefix(baseURL, "ssh://") {
+		baseURL = "https://" + baseURL
+	}
+
+	// --- 3. Standard URL parse ---
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse URL %q: %w", baseURL, err)
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("URL %q parsed but host is empty", baseURL)
+	}
+
+	host := parsed.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return host, nil
+}
+
+// ExtractOrgFromRepoURL extracts the organization/owner name from a GitHub repository URL.
+// Supports formats:
+//   - HTTPS: https://github.com/org/repo.git
+//   - SSH: git@github.com:org/repo.git
+//   - SSH with port: git@github.com:22/org/repo.git or ssh://git@github.com:22/org/repo.git
+func ExtractOrgFromRepoURL(repoURL string) (string, error) {
+	if repoURL == "" {
+		return "", errors.New("repo URL is empty")
+	}
+
+	// Handle edge case: ssh://git@host:org/repo (malformed but used in practice)
+	// This format mixes ssh:// prefix with colon notation instead of using a slash.
+	// Convert it to git@host:org/repo which git-urls can parse correctly.
+	// We distinguish this from the valid ssh://git@host:22/org/repo (with port number).
+	if strings.HasPrefix(repoURL, "ssh://git@") {
+		remainder := strings.TrimPrefix(repoURL, "ssh://")
+		if colonIdx := strings.Index(remainder, ":"); colonIdx != -1 {
+			afterColon := remainder[colonIdx+1:]
+			slashIdx := strings.Index(afterColon, "/")
+
+			// Check if what follows the colon is a port number
+			isPort := false
+			if slashIdx > 0 {
+				if _, err := strconv.Atoi(afterColon[:slashIdx]); err == nil {
+					isPort = true
+				}
+			}
+
+			// If not a port, it's the malformed format - strip ssh:// prefix
+			if !isPort && slashIdx != 0 {
+				repoURL = remainder
+			}
+		}
+	}
+
+	// Use git-urls library to parse all Git URL formats
+	parsed, err := giturls.Parse(repoURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse repository URL %q: %w", repoURL, err)
+	}
+
+	// Clean the path: remove leading/trailing slashes and .git suffix
+	path := strings.Trim(parsed.Path, "/")
+	path = strings.TrimSuffix(path, ".git")
+
+	if path == "" {
+		return "", fmt.Errorf("repository URL %q does not contain a path", repoURL)
+	}
+
+	// Extract the first path component (organization/owner)
+	// Path format is typically "org/repo" or "org/repo/subpath"
+	if idx := strings.Index(path, "/"); idx > 0 {
+		org := path[:idx]
+		// Normalize to lowercase for case-insensitive comparison
+		return strings.ToLower(org), nil
+	}
+
+	// If there's no slash, the entire path might be just the org (unusual but handle it)
+	// This would fail validation later, but let's return it
+	return "", fmt.Errorf("could not extract organization from repository URL %q: path %q does not contain org/repo format", repoURL, path)
+}
+
 var _ Creds = GoogleCloudCreds{}
 
 // GoogleCloudCreds to authenticate to Google Cloud Source repositories
@@ -625,7 +817,7 @@ func (c GoogleCloudCreds) Environ() (io.Closer, []string, error) {
 	nonce := c.store.Add(username, token)
 	env := c.store.Environ(nonce)
 
-	return argoioutils.NewCloser(func() error {
+	return utilio.NewCloser(func() error {
 		c.store.Remove(nonce)
 		return NopCloser{}.Close()
 	}), env, nil
@@ -721,7 +913,7 @@ func (creds AzureWorkloadIdentityCreds) Environ() (io.Closer, []string, error) {
 	env := creds.store.Environ(nonce)
 	env = append(env, fmt.Sprintf("%s=Authorization: Bearer %s", bearerAuthHeaderEnv, token))
 
-	return argoioutils.NewCloser(func() error {
+	return utilio.NewCloser(func() error {
 		creds.store.Remove(nonce)
 		return nil
 	}), env, nil
