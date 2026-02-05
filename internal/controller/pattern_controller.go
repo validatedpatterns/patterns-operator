@@ -191,7 +191,11 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	} else {
 		// Historically the subscription was owned by the pattern, not the operator. If this is the case,
-		// we update the owner reference to the operator itself.
+		// we update the owner reference to the operator itself. When the subscription is owned by the pattern,
+		// deleting the pattern removes the subscription and some, but not all, argo resources. This causes
+		// subsequent pattern installations to try to start argo in namespaced mode and any charts requiring
+		// cluster-wide access, like Vault, will fail to install. Having the subscription owned by the operator
+		// allows subsequent pattern installations to reuse the openshift gitops operator already on the cluster.
 		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, sub, r.Scheme); err == nil {
 			if err := controllerutil.SetOwnerReference(operatorConfigMap, sub, r.Scheme); err != nil {
 				return r.actionPerformed(qualifiedInstance, "error setting patterns operator owner reference of gitops subscription", err)
