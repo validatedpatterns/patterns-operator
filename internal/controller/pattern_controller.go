@@ -538,7 +538,7 @@ func (r *PatternReconciler) updateDeletionPhase(instance *api.Pattern, phase api
 	return nil
 }
 
-func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, app *argoapi.Application, namespace string) error {
+func (r *PatternReconciler) deleteSpokeApps(targetApp, app *argoapi.Application, namespace string) error {
 	log.Printf("Deletion phase: %s - checking if all child applications are gone from spoke", api.DeleteSpokeChildApps)
 
 	// Update application with deletePattern=DeleteSpokeChildApps to trigger spoke child deletion
@@ -546,8 +546,7 @@ func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, ap
 		return fmt.Errorf("updated application %q for spoke child deletion", app.Name)
 	}
 
-	//FIXME
-	if _, err := syncApplication(r.argoClient, app, false); err != nil {
+	if err := syncApplication(r.argoClient, app, false); err != nil {
 		return err
 	}
 
@@ -556,8 +555,8 @@ func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, ap
 		return err
 	}
 
-	for _, childApp := range childApps {
-		if _, err := syncApplication(r.argoClient, &childApp, false); err != nil {
+	for _, childApp := range childApps { //nolint:gocritic // rangeValCopy: each iteration copies 992 bytes
+		if err := syncApplication(r.argoClient, &childApp, false); err != nil {
 			return err
 		}
 	}
@@ -569,7 +568,6 @@ func (r *PatternReconciler) deleteSpokeApps(instance *api.Pattern, targetApp, ap
 	}
 
 	if !allGone {
-		// log.Printf("Waiting for all child applications to be deleted from spoke clusters")
 		return fmt.Errorf("waiting for child applications to be deleted from spoke clusters")
 	}
 
@@ -609,13 +607,9 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 		return fmt.Errorf("updated application %q for hub deletion", app.Name)
 	}
 
-	_, err = syncApplication(r.argoClient, app, true)
-	if err != nil {
+	if err := syncApplication(r.argoClient, app, true); err != nil {
 		return err
 	}
-	// if inProgress {
-	// 	return fmt.Errorf("sync with prune and force is already in progress for application %q", app.Name)
-	// }
 
 	return fmt.Errorf("waiting %d hub child applications to be removed", len(childApps))
 }
@@ -662,12 +656,12 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				}
 			}
 
-			return fmt.Errorf("Initialized deletion phase, requeue now...")
+			return fmt.Errorf("initialized deletion phase, requeueing now")
 		}
 
 		// Phase 1: Delete child applications from spoke clusters
 		if qualifiedInstance.Status.DeletionPhase == api.DeleteSpokeChildApps {
-			if err := r.deleteSpokeApps(qualifiedInstance, targetApp, app, ns); err != nil {
+			if err := r.deleteSpokeApps(targetApp, app, ns); err != nil {
 				return err
 			}
 
@@ -675,7 +669,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 
-			return fmt.Errorf("All child applications are gone, transitioning to %s phase", api.DeleteSpoke)
+			return fmt.Errorf("all child applications are gone, transitioning to %s phase", api.DeleteSpoke)
 		}
 
 		// Phase 2: Delete app of apps from spoke
@@ -684,7 +678,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return fmt.Errorf("updated application %q for spoke app of apps deletion", app.Name)
 			}
 
-			if _, err := syncApplication(r.argoClient, app, false); err != nil {
+			if err := syncApplication(r.argoClient, app, false); err != nil {
 				return err
 			}
 
@@ -694,8 +688,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			}
 
 			// We need to prune policies from acm, to initiate app of apps removal from spoke
-			for _, childApp := range childApps {
-				if _, err := syncApplication(r.argoClient, &childApp, true); err != nil {
+			for _, childApp := range childApps { //nolint:gocritic // rangeValCopy: each iteration copies 992 bytes
+				if err := syncApplication(r.argoClient, &childApp, true); err != nil {
 					return err
 				}
 			}
@@ -709,7 +703,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 
-			return fmt.Errorf("App of apps are gone from spokes, transitioning to %s phase", api.DeleteHubChildApps)
+			return fmt.Errorf("app of apps are gone from spokes, transitioning to %s phase", api.DeleteHubChildApps)
 		}
 
 		// Phase 3: Delete applications from hub
@@ -722,11 +716,11 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 				return err
 			}
 
-			return fmt.Errorf("Apps are gone from hub, transitioning to %s phase", api.DeleteHub)
+			return fmt.Errorf("apps are gone from hub, transitioning to %s phase", api.DeleteHub)
 		}
 		// Phase 4: Delete app of apps from hub
 		if qualifiedInstance.Status.DeletionPhase == api.DeleteHub {
-			log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
+			log.Printf("removing the application, and cascading to anything instantiated by ArgoCD")
 			if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
 				return err
 			}
@@ -894,7 +888,6 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 // The operator runs on the hub cluster and needs to check spoke clusters through ACM Search Service
 // Returns true if all child applications are gone, false otherwise
 func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, error) {
-
 	// Running locally: use localhost with env var set to "https://localhost:4010/searchapi/graphql" and port-forward
 	// User should run: kubectl port-forward -n open-cluster-management svc/search-search-api 4010:4010
 	searchURL := os.Getenv("ACM_SEARCH_API_URL")
@@ -908,7 +901,7 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 		var tokenBytes []byte
 		var err error
 
-		tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token"
+		tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
 
 		if tokenBytes, err = os.ReadFile(tokenPath); err != nil {
 			return false, fmt.Errorf("failed to read serviceaccount token: %w", err)
@@ -920,7 +913,7 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	// Filter out local-cluster apps and app of apps (based on namespace)
 	ns := []string{fmt.Sprintf("!%s", getClusterWideArgoNamespace())}
 	if appOfApps {
-		ns = []string{fmt.Sprintf("%s", getClusterWideArgoNamespace())}
+		ns = []string{getClusterWideArgoNamespace()}
 	}
 	query := map[string]any{
 		"operationName": "searchResult",
@@ -960,7 +953,7 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequest("POST", searchURL, bytes.NewBuffer(queryJSON))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", searchURL, bytes.NewBuffer(queryJSON))
 	if err != nil {
 		return false, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
@@ -972,16 +965,16 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 
 	// Create HTTP client
 	// Use insecure TLS (self-signed certs)
-	client := &http.Client{
+	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec
 			},
 		},
 	}
 
 	// Make the request
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("failed to make HTTP request to search service: %w", err)
 	}

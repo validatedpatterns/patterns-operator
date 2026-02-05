@@ -1064,10 +1064,10 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 }
 
 // syncApplication syncs the application with prune and force options if such a sync is not already in progress.
-// Returns true if a sync with prune and force is already in progress, false otherwise
-func syncApplication(client argoclient.Interface, app *argoapi.Application, withPrune bool) (bool, error) {
+// Returns nil if a sync is already in progress, error otherwise
+func syncApplication(client argoclient.Interface, app *argoapi.Application, withPrune bool) error {
 	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune == withPrune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
-		return true, nil
+		return nil
 	}
 
 	app.Operation = &argoapi.Operation{
@@ -1079,10 +1079,10 @@ func syncApplication(client argoclient.Interface, app *argoapi.Application, with
 
 	_, err := client.ArgoprojV1alpha1().Applications(app.Namespace).Update(context.Background(), app, metav1.UpdateOptions{})
 	if err != nil {
-		return false, fmt.Errorf("failed to sync application %q with prune: %w", app.Name, err)
+		return fmt.Errorf("failed to sync application %q with 'prune: %t': %w", app.Name, withPrune, err)
 	}
 
-	return true, nil
+	return nil
 }
 
 // returns the child applications owned by the app-of-apps parentApp
