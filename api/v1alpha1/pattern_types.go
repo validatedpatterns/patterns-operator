@@ -208,7 +208,8 @@ type PatternStatus struct {
 	LocalCheckoutPath string `json:"path,omitempty"`
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	// DeletionPhase tracks the current phase of pattern deletion
-	// Values: "" (not deleting), "DeleteSpokeChildApps" (Phase 1: Delete child applications from spoke clusters), "DeleteSpoke" (Phase 2: Delete app of apps from spoke), "DeleteHubChildApps" (Phase 3: Delete applications from hub), "DeleteHub" (Phase 4: Delete app of apps from hub)
+	// Values: "" (not deleting), "DeleteSpokeChildApps" (Phase 1: Delete child applications from spoke clusters), "DeleteSpoke" (Phase 2: Delete app of apps from spoke),
+	// 				 "DeleteHubChildApps" (Phase 3: Delete applications from hub), "DeleteHub" (Phase 4: Delete app of apps from hub)
 	DeletionPhase PatternDeletionPhase `json:"deletionPhase,omitempty"`
 }
 
