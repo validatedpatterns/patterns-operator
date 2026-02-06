@@ -17,9 +17,14 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,6 +93,8 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
 //+kubebuilder:rbac:groups="route.openshift.io",namespace=vp-gitea,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="view.open-cluster-management.io",resources=managedclusterviews,verbs=create
+//+kubebuilder:rbac:groups="cluster.open-cluster-management.io",resources=managedclusters,verbs=list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -162,7 +169,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetSub, r.Scheme)
+	operatorConfigMap, err := GetOperatorConfigmap()
+	if err == nil {
+		if err := controllerutil.SetOwnerReference(operatorConfigMap, targetSub, r.Scheme); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error setting owner of gitops subscription", err)
+		}
+	} else {
+		return r.actionPerformed(qualifiedInstance, "error getting operator configmap", err)
+	}
 
 	sub, _ := getSubscription(r.olmClient, targetSub.Name)
 	if sub == nil {
@@ -176,7 +190,24 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
 		}
 	} else {
-		logOnce("The gitops subscription is not owned by us, leaving untouched")
+		// Historically the subscription was owned by the pattern, not the operator. If this is the case,
+		// we update the owner reference to the operator itself. When the subscription is owned by the pattern,
+		// deleting the pattern removes the subscription and some, but not all, argo resources. This causes
+		// subsequent pattern installations to try to start argo in namespaced mode and any charts requiring
+		// cluster-wide access, like Vault, will fail to install. Having the subscription owned by the operator
+		// allows subsequent pattern installations to reuse the openshift gitops operator already on the cluster.
+		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, sub, r.Scheme); err == nil {
+			if err := controllerutil.SetOwnerReference(operatorConfigMap, sub, r.Scheme); err != nil {
+				return r.actionPerformed(qualifiedInstance, "error setting patterns operator owner reference of gitops subscription", err)
+			}
+			// Persist the updated ownerReferences on the Subscription
+			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), sub, metav1.UpdateOptions{}); err != nil {
+				return r.actionPerformed(qualifiedInstance, "error updating gitops subscription owner references", err)
+			}
+			return r.actionPerformed(qualifiedInstance, "updated patterns operator owner reference of gitops subscription", nil)
+		} else {
+			logOnce("The gitops subscription is not owned by us, leaving untouched")
+		}
 	}
 	logOnce("subscription found")
 
@@ -496,6 +527,97 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 	return output, nil
 }
 
+func (r *PatternReconciler) updateDeletionPhase(instance *api.Pattern, phase api.PatternDeletionPhase) error {
+	log.Printf("Updating deletion phase to '%s'", phase)
+	instance.Status.DeletionPhase = phase
+	if err := r.Client.Status().Update(context.TODO(), instance); err != nil {
+		return fmt.Errorf("failed to update deletion phase: %w", err)
+	}
+
+	// Re-fetch to get updated status
+	if err := r.Get(context.TODO(), client.ObjectKeyFromObject(instance), instance); err != nil {
+		return fmt.Errorf("failed to re-fetch pattern after phase update: %w", err)
+	}
+
+	return nil
+}
+
+func (r *PatternReconciler) deleteSpokeApps(targetApp, app *argoapi.Application, namespace string) error {
+	log.Printf("Deletion phase: %s - checking if all child applications are gone from spoke", api.DeleteSpokeChildApps)
+
+	// Update application with deletePattern=DeleteSpokeChildApps to trigger spoke child deletion
+	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+		return fmt.Errorf("updated application %q for spoke child deletion", app.Name)
+	}
+
+	if err := syncApplication(r.argoClient, app, false); err != nil {
+		return err
+	}
+
+	childApps, err := getChildApplications(r.argoClient, app)
+	if err != nil {
+		return err
+	}
+
+	for _, childApp := range childApps { //nolint:gocritic // rangeValCopy: each iteration copies 992 bytes
+		if err := syncApplication(r.argoClient, &childApp, false); err != nil {
+			return err
+		}
+	}
+
+	// Check if all child applications are gone from spoke
+	allGone, err := r.checkSpokeApplicationsGone(false)
+	if err != nil {
+		return fmt.Errorf("error checking child applications: %w", err)
+	}
+
+	if !allGone {
+		return fmt.Errorf("waiting for child applications to be deleted from spoke clusters")
+	}
+
+	return nil
+}
+
+func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, namespace string) error {
+	log.Printf("Deletion phase: %s - deleting child apps from hub", api.DeleteHubChildApps)
+
+	childApps, err := getChildApplications(r.argoClient, app)
+	if err != nil {
+		return fmt.Errorf("failed to get child applications: %w", err)
+	}
+
+	if len(childApps) == 0 {
+		return nil
+	}
+	// Delete managed clusters (excluding local-cluster)
+	// These must be removed before hub deletion can proceed because ACM won't delete properly if they exist
+	// we do not care about the error, since we might be on a standalone cluster
+	managedClusters, _ := r.listManagedClusters(context.Background())
+
+	if len(managedClusters) > 0 {
+		deletedCount, err := r.deleteManagedClusters(context.TODO())
+		if err != nil {
+			return fmt.Errorf("failed to delete managed clusters: %w", err)
+		}
+
+		if deletedCount > 0 {
+			log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
+			return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
+		}
+	}
+
+	// Update application with deletePattern=DeleteHubChildApps to trigger hub child app deletion
+	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+		return fmt.Errorf("updated application %q for hub deletion", app.Name)
+	}
+
+	if err := syncApplication(r.argoClient, app, true); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("waiting %d hub child applications to be removed", len(childApps))
+}
+
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	// Add finalizer when object is created
 	log.Printf("Finalizing pattern object")
@@ -524,23 +646,89 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			return nil
 		}
 
-		if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
-			return fmt.Errorf("updated application %q for removal", app.Name)
+		// Initialize deletion phase if not set
+		if qualifiedInstance.Status.DeletionPhase == api.InitializeDeletion {
+			log.Printf("Initializing deletion phase")
+			if haveACMHub(r) {
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpokeChildApps); err != nil {
+					return err
+				}
+			} else {
+				// There is no acm/spoke, we can directly start cleaning up child apps (from hub)
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHubChildApps); err != nil {
+					return err
+				}
+			}
+
+			return fmt.Errorf("initialized deletion phase, requeueing now")
 		}
 
-		if haveACMHub(r) {
-			return fmt.Errorf("waiting for removal of that acm hub")
+		// Phase 1: Delete child applications from spoke clusters
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteSpokeChildApps {
+			if err := r.deleteSpokeApps(targetApp, app, ns); err != nil {
+				return err
+			}
+
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpoke); err != nil {
+				return err
+			}
+
+			return fmt.Errorf("all child applications are gone, transitioning to %s phase", api.DeleteSpoke)
 		}
 
-		if app.Status.Sync.Status == argoapi.SyncStatusCodeOutOfSync {
-			return fmt.Errorf("application %q is still %s", app.Name, argoapi.SyncStatusCodeOutOfSync)
+		// Phase 2: Delete app of apps from spoke
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteSpoke {
+			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+				return fmt.Errorf("updated application %q for spoke app of apps deletion", app.Name)
+			}
+
+			if err := syncApplication(r.argoClient, app, false); err != nil {
+				return err
+			}
+
+			childApps, err := getChildApplications(r.argoClient, app)
+			if err != nil {
+				return err
+			}
+
+			// We need to prune policies from acm, to initiate app of apps removal from spoke
+			for _, childApp := range childApps { //nolint:gocritic // rangeValCopy: each iteration copies 992 bytes
+				if err := syncApplication(r.argoClient, &childApp, true); err != nil {
+					return err
+				}
+			}
+
+			// Check if app of apps are gone from spoke
+			if _, err = r.checkSpokeApplicationsGone(true); err != nil {
+				return fmt.Errorf("error checking applications: %w", err)
+			}
+
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHubChildApps); err != nil {
+				return err
+			}
+
+			return fmt.Errorf("app of apps are gone from spokes, transitioning to %s phase", api.DeleteHubChildApps)
 		}
 
-		log.Printf("Removing the application, and cascading to anything instantiated by ArgoCD")
-		if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
-			return err
+		// Phase 3: Delete applications from hub
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteHubChildApps {
+			if err := r.deleteHubApps(targetApp, app, ns); err != nil {
+				return err
+			}
+
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHub); err != nil {
+				return err
+			}
+
+			return fmt.Errorf("apps are gone from hub, transitioning to %s phase", api.DeleteHub)
 		}
-		return fmt.Errorf("waiting for application %q to be removed", app.Name)
+		// Phase 4: Delete app of apps from hub
+		if qualifiedInstance.Status.DeletionPhase == api.DeleteHub {
+			log.Printf("removing the application, and cascading to anything instantiated by ArgoCD")
+			if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -604,7 +792,8 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 	}
 	if duration != nil {
 		log.Printf("Requeueing\n")
-		return reconcile.Result{RequeueAfter: *duration}, err
+		// Return nil error when we have a duration to avoid exponential backoff
+		return reconcile.Result{RequeueAfter: *duration}, nil
 	}
 	return reconcile.Result{}, err
 }
@@ -696,6 +885,145 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	}
 
 	return false, nil
+}
+
+// checkSpokeApplicationsGone checks if all applications are gone from spoke clusters
+// passing appOfApps true will check the app of app instead of child apps
+// The operator runs on the hub cluster and needs to check spoke clusters through ACM Search Service
+// Returns true if all child applications are gone, false otherwise
+func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, error) {
+	// Running locally: use localhost with env var set to "https://localhost:4010/searchapi/graphql" and port-forward
+	// User should run: kubectl port-forward -n open-cluster-management svc/search-search-api 4010:4010
+	searchURL := os.Getenv("ACM_SEARCH_API_URL")
+	if searchURL == "" {
+		searchNamespace := "open-cluster-management" // Default namespace for ACM
+		searchURL = fmt.Sprintf("https://search-search-api.%s.svc.cluster.local:4010/searchapi/graphql", searchNamespace)
+	}
+
+	token := os.Getenv("ACM_SEARCH_API_TOKEN")
+	if token == "" {
+		var tokenBytes []byte
+		var err error
+
+		tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
+
+		if tokenBytes, err = os.ReadFile(tokenPath); err != nil {
+			return false, fmt.Errorf("failed to read serviceaccount token: %w", err)
+		}
+		token = string(tokenBytes)
+	}
+
+	// Build GraphQL query to search for Applications
+	// Filter out local-cluster apps and app of apps (based on namespace)
+	ns := []string{fmt.Sprintf("!%s", getClusterWideArgoNamespace())}
+	if appOfApps {
+		ns = []string{getClusterWideArgoNamespace()}
+	}
+	query := map[string]any{
+		"operationName": "searchResult",
+		"query":         "query searchResult($input: [SearchInput]) { searchResult: search(input: $input) { items related { kind items } } }",
+		"variables": map[string]any{
+			"input": []map[string]any{
+				{
+					"filters": []map[string]any{
+						{
+							"property": "apigroup",
+							"values":   []string{"argoproj.io"},
+						},
+						{
+							"property": "kind",
+							"values":   []string{"Application"},
+						},
+						{
+							"property": "cluster",
+							"values":   []string{"!local-cluster"},
+						},
+						{
+							"property": "namespace",
+							"values":   ns,
+						},
+					},
+					"relatedKinds": []string{"Application"},
+					"limit":        20000,
+				},
+			},
+		},
+	}
+
+	// Marshal query to JSON
+	queryJSON, err := json.Marshal(query)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal GraphQL query: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(context.Background(), "POST", searchURL, bytes.NewBuffer(queryJSON))
+	if err != nil {
+		return false, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	// Create HTTP client
+	// Use insecure TLS (self-signed certs)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, //nolint:gosec
+			},
+		},
+	}
+
+	// Make the request
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to make HTTP request to search service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Check HTTP status
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("search service returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response
+	type SearchAPIResponse struct {
+		Data struct {
+			SearchResult []struct {
+				Items []struct {
+					Name      string `json:"name"`
+					Namespace string `json:"namespace"`
+					Cluster   string `json:"cluster"`
+				} `json:"items"`
+			} `json:"searchResult"`
+		} `json:"data"`
+	}
+	var searchResponse SearchAPIResponse
+	if err := json.Unmarshal(body, &searchResponse); err != nil {
+		return false, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	var remote_app_names []string
+	if searchResult := searchResponse.Data.SearchResult; len(searchResult) > 0 {
+		for _, item := range searchResult[0].Items {
+			remote_app_names = append(remote_app_names, fmt.Sprintf("%s/%s in %s", item.Namespace, item.Name, item.Cluster))
+		}
+	}
+
+	if len(remote_app_names) != 0 {
+		return false, fmt.Errorf("spoke cluster apps still exist: %s", remote_app_names)
+	}
+
+	return true, nil
 }
 
 func (r *PatternReconciler) authGitFromSecret(namespace, secret string) (map[string][]byte, error) {

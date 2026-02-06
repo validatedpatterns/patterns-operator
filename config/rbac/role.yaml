@@ -45,6 +45,13 @@ rules:
   - patch
   - update
 - apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclusters
+  verbs:
+  - delete
+  - list
+- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions
@@ -104,6 +111,12 @@ rules:
   - list
   - patch
   - update
+- apiGroups:
+  - view.open-cluster-management.io
+  resources:
+  - managedclusterviews
+  verbs:
+  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

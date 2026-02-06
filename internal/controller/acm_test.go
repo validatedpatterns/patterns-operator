@@ -43,29 +43,17 @@ var _ = Describe("HaveACMHub", func() {
 
 	Context("when the ACM Hub exists", func() {
 		BeforeEach(func() {
-			configMap := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-configmap",
-					Namespace: "default",
-					Labels: map[string]string{
-						"ocm-configmap-type": "image-manifest",
-					},
-				},
-			}
-			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), configMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-
 			hub := &unstructured.Unstructured{
 				Object: map[string]any{
 					"apiVersion": "operator.open-cluster-management.io/v1",
 					"kind":       "MultiClusterHub",
 					"metadata": map[string]any{
-						"name":      "test-hub",
-						"namespace": "default",
+						"name":      "multiclusterhub",
+						"namespace": "open-cluster-management",
 					},
 				},
 			}
-			_, err = dynamicClient.Resource(gvrMCH).Namespace("default").Create(context.Background(), hub, metav1.CreateOptions{})
+			_, err := dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Create(context.Background(), hub, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 		})
 

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -512,9 +513,22 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		}
 	}
 	if !p.DeletionTimestamp.IsZero() {
+		// Determine deletePattern value based on deletion phase
+
+		// Phase 1: Delete child applications from spoke clusters: DeleteSpokeChildApps
+		// Phase 2: Delete app of apps from spoke: DeleteSpoke
+		// Phase 3: Delete applications from hub: DeleteHubChildApps
+		// Phase 4: Delete app of apps from hub: DeleteHub
+
+		deletePatternValue := p.Status.DeletionPhase // default to the phase on the pattern object
+
+		// If we need to clean up child apps from the hub, we change it (clustergroup chart app creation logic)
+		if p.Status.DeletionPhase == api.DeleteHubChildApps {
+			deletePatternValue = "DeleteChildApps"
+		}
 		parameters = append(parameters, argoapi.HelmParameter{
 			Name:        "global.deletePattern",
-			Value:       "1",
+			Value:       string(deletePatternValue),
 			ForceString: true,
 		})
 	}
@@ -1047,4 +1061,40 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 		}
 	}
 	return false
+}
+
+// syncApplication syncs the application with prune and force options if such a sync is not already in progress.
+// Returns nil if a sync is already in progress, error otherwise
+func syncApplication(client argoclient.Interface, app *argoapi.Application, withPrune bool) error {
+	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune == withPrune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
+		return nil
+	}
+
+	app.Operation = &argoapi.Operation{
+		Sync: &argoapi.SyncOperation{
+			Prune:       withPrune,
+			SyncOptions: []string{"Force=true"},
+		},
+	}
+
+	_, err := client.ArgoprojV1alpha1().Applications(app.Namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to sync application %q with 'prune: %t': %w", app.Name, withPrune, err)
+	}
+
+	return nil
+}
+
+// returns the child applications owned by the app-of-apps parentApp
+func getChildApplications(client argoclient.Interface, parentApp *argoapi.Application) ([]argoapi.Application, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", parentApp.Name),
+	}
+
+	appList, err := client.ArgoprojV1alpha1().Applications("").List(context.Background(), listOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list child applications of %s: %w", parentApp.Name, err)
+	}
+
+	return appList.Items, nil
 }

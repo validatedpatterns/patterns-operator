@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -29,38 +30,76 @@ import (
 func haveACMHub(r *PatternReconciler) bool {
 	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
-	serverNamespace := ""
-
-	cms, err := r.fullClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-	})
-	if (err != nil || len(cms.Items) == 0) && serverNamespace != "" {
-		cms, err = r.fullClient.CoreV1().ConfigMaps(serverNamespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-		})
-	}
-	if err != nil || len(cms.Items) == 0 {
-		cms, err = r.fullClient.CoreV1().ConfigMaps("open-cluster-management").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%v = %v", "ocm-configmap-type", "image-manifest"),
-		})
-	}
-	if err != nil {
-		log.Printf("config map error: %s\n", err.Error())
-		return false
-	}
-	if len(cms.Items) == 0 {
-		log.Printf("No config map\n")
-		return false
-	}
-	ns := cms.Items[0].Namespace
-
-	umch, err := r.dynamicClient.Resource(gvrMCH).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
+	_, err := r.dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Get(context.Background(), "multiclusterhub", metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
 		return false
-	} else if len(umch.Items) == 0 {
-		log.Printf("No hub in %s\n", ns)
-		return false
 	}
 	return true
+}
+
+// listManagedClusters lists all ManagedCluster resources (excluding local-cluster)
+// Returns a list of cluster names and an error
+func (r *PatternReconciler) listManagedClusters(ctx context.Context) ([]string, error) {
+	gvrMC := schema.GroupVersionResource{
+		Group:    "cluster.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "managedclusters",
+	}
+
+	// ManagedCluster is a cluster-scoped resource, so no namespace needed
+	mcList, err := r.dynamicClient.Resource(gvrMC).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ManagedClusters: %w", err)
+	}
+
+	var clusterNames []string
+	for _, item := range mcList.Items {
+		name := item.GetName()
+		// Exclude local-cluster (hub cluster)
+		if name != "local-cluster" {
+			clusterNames = append(clusterNames, name)
+		}
+	}
+
+	return clusterNames, nil
+}
+
+// deleteManagedClusters deletes all ManagedCluster resources (excluding local-cluster)
+// Returns the number of clusters deleted and an error
+func (r *PatternReconciler) deleteManagedClusters(ctx context.Context) (int, error) {
+	gvrMC := schema.GroupVersionResource{
+		Group:    "cluster.open-cluster-management.io",
+		Version:  "v1",
+		Resource: "managedclusters",
+	}
+
+	// ManagedCluster is a cluster-scoped resource, so no namespace needed
+	mcList, err := r.dynamicClient.Resource(gvrMC).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list ManagedClusters: %w", err)
+	}
+
+	deletedCount := 0
+	for _, item := range mcList.Items {
+		name := item.GetName()
+		// Exclude local-cluster (hub cluster)
+		if name == "local-cluster" {
+			continue
+		}
+
+		// Delete the managed cluster
+		err := r.dynamicClient.Resource(gvrMC).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			// If already deleted, that's fine
+			if kerrors.IsNotFound(err) {
+				continue
+			}
+			return deletedCount, fmt.Errorf("failed to delete ManagedCluster %q: %w", name, err)
+		}
+		log.Printf("Deleted ManagedCluster: %q", name)
+		deletedCount++
+	}
+
+	return deletedCount, nil
 }
