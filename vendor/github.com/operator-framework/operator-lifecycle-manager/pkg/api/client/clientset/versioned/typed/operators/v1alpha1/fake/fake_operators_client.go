@@ -29,19 +29,19 @@ type FakeOperatorsV1alpha1 struct {
 }
 
 func (c *FakeOperatorsV1alpha1) CatalogSources(namespace string) v1alpha1.CatalogSourceInterface {
-	return newFakeCatalogSources(c, namespace)
+	return &FakeCatalogSources{c, namespace}
 }
 
 func (c *FakeOperatorsV1alpha1) ClusterServiceVersions(namespace string) v1alpha1.ClusterServiceVersionInterface {
-	return newFakeClusterServiceVersions(c, namespace)
+	return &FakeClusterServiceVersions{c, namespace}
 }
 
 func (c *FakeOperatorsV1alpha1) InstallPlans(namespace string) v1alpha1.InstallPlanInterface {
-	return newFakeInstallPlans(c, namespace)
+	return &FakeInstallPlans{c, namespace}
 }
 
 func (c *FakeOperatorsV1alpha1) Subscriptions(namespace string) v1alpha1.SubscriptionInterface {
-	return newFakeSubscriptions(c, namespace)
+	return &FakeSubscriptions{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
