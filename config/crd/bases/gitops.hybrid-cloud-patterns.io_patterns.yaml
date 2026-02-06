@@ -107,6 +107,10 @@ spec:
                     description: (DEPRECATED) Branch, tag or commit in the upstream
                       git repository. Does not support short-sha's. Default to HEAD
                     type: string
+                  targetPath:
+                    description: 'Path within git repo where values files are located.
+                      Default: repository root'
+                    type: string
                   targetRepo:
                     description: Git repo containing the pattern to deploy. Must use
                       https/http or, for ssh, git@server:foo/bar.git

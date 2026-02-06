@@ -187,6 +187,34 @@ var _ = Describe("Argo Pattern", func() {
 				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
+		Context("multiSource with targetPath set", func() {
+			It("Returns an argo application with path in values source", func() {
+				format.MaxDepth = 100
+				format.MaxLength = 0
+				pattern.Spec.GitConfig.TargetPath = "envs/dev"
+				tmpTrue := true
+				pattern.Spec.MultiSourceConfig.Enabled = &tmpTrue
+				multiSourceArgoApp = argoApp.DeepCopy()
+				multiSourceArgoApp.Spec.Source = nil
+				multiSourceArgoApp.Spec.Sources = []argoapi.ApplicationSource{
+					{
+						RepoURL:        pattern.Spec.GitConfig.TargetRepo,
+						TargetRevision: pattern.Spec.GitConfig.TargetRevision,
+						Path:           "envs/dev",
+						Ref:            "patternref",
+					},
+					{
+						RepoURL:        pattern.Spec.MultiSourceConfig.HelmRepoUrl,
+						Chart:          "clustergroup",
+						Path:           "",
+						TargetRevision: pattern.Spec.MultiSourceConfig.ClusterGroupChartVersion,
+						Helm:           commonApplicationSourceHelm(pattern, "$patternref"),
+					},
+				}
+				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
+				pattern.Spec.GitConfig.TargetPath = ""
+			})
+		})
 	})
 
 	Describe("Testing newApplicationValueFiles function", func() {
@@ -240,6 +268,23 @@ var _ = Describe("Argo Pattern", func() {
 				Expect(valueFiles).To(Equal(append(prefixArray(defaultValueFiles, "myprefix"),
 					"myprefix/test1.yaml",
 					"myprefix/test2.yaml")))
+			})
+		})
+
+		Context("With targetPath set", func() {
+			BeforeEach(func() {
+				pattern.Spec.GitConfig.TargetPath = "envs/dev"
+			})
+			AfterEach(func() {
+				pattern.Spec.GitConfig.TargetPath = ""
+			})
+			It("Returns values with targetPath prefix", func() {
+				valueFiles := newApplicationValueFiles(pattern, "")
+				Expect(valueFiles).To(Equal(prefixArray(defaultValueFiles, "envs/dev")))
+			})
+			It("Returns values with combined prefix and targetPath", func() {
+				valueFiles := newApplicationValueFiles(pattern, "$patternref")
+				Expect(valueFiles).To(Equal(prefixArray(defaultValueFiles, "$patternref/envs/dev")))
 			})
 		})
 	})
@@ -366,6 +411,10 @@ var _ = Describe("Argo Pattern", func() {
 						Name:        "global.targetRevision",
 						Value:       "main",
 						ForceString: false,
+					},
+					{
+						Name:  "global.targetPath",
+						Value: "",
 					},
 					{
 						Name:        "global.hubClusterDomain",
