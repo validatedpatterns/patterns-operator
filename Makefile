@@ -253,7 +253,7 @@ endif
 
 .PHONY: controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
+	go build -o $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION) sigs.k8s.io/controller-tools/cmd/controller-gen
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.

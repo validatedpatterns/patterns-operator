@@ -29,19 +29,19 @@ type FakeOperatorsV1 struct {
 }
 
 func (c *FakeOperatorsV1) OLMConfigs() v1.OLMConfigInterface {
-	return newFakeOLMConfigs(c)
+	return &FakeOLMConfigs{c}
 }
 
 func (c *FakeOperatorsV1) Operators() v1.OperatorInterface {
-	return newFakeOperators(c)
+	return &FakeOperators{c}
 }
 
 func (c *FakeOperatorsV1) OperatorConditions(namespace string) v1.OperatorConditionInterface {
-	return newFakeOperatorConditions(c, namespace)
+	return &FakeOperatorConditions{c, namespace}
 }
 
 func (c *FakeOperatorsV1) OperatorGroups(namespace string) v1.OperatorGroupInterface {
-	return newFakeOperatorGroups(c, namespace)
+	return &FakeOperatorGroups{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
