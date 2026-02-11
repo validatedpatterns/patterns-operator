@@ -29,7 +29,7 @@ type FakeOperatorsV2 struct {
 }
 
 func (c *FakeOperatorsV2) OperatorConditions(namespace string) v2.OperatorConditionInterface {
-	return newFakeOperatorConditions(c, namespace)
+	return &FakeOperatorConditions{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
