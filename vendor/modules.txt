@@ -778,8 +778,8 @@ github.com/spf13/pflag
 # github.com/tklauser/go-sysconf v0.3.15
 ## explicit; go 1.23.0
 github.com/tklauser/go-sysconf
-# github.com/tklauser/numcpus v0.10.0
-## explicit; go 1.23.0
+# github.com/tklauser/numcpus v0.11.0
+## explicit; go 1.24.0
 github.com/tklauser/numcpus
 # github.com/vmihailenco/go-tinylfu v0.2.2
 ## explicit; go 1.15
