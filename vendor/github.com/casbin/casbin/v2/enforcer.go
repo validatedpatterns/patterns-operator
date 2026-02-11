@@ -568,6 +568,7 @@ func (e *Enforcer) EnableAcceptJsonRequest(acceptJsonRequest bool) {
 
 // BuildRoleLinks manually rebuild the role inheritance relations.
 func (e *Enforcer) BuildRoleLinks() error {
+	e.invalidateMatcherMap()
 	if e.rmMap == nil {
 		return errors.New("rmMap is nil")
 	}
@@ -658,7 +659,8 @@ func (e *Enforcer) enforce(matcher string, explains *[]string, rvals ...interfac
 	if matcher == "" {
 		expString = e.model["m"][mType].Value
 	} else {
-		expString = util.RemoveComments(util.EscapeAssertion(matcher))
+		// For custom matchers provided at runtime, escape backslashes in string literals
+		expString = util.EscapeStringLiterals(util.RemoveComments(util.EscapeAssertion(matcher)))
 	}
 
 	rTokens := make(map[string]int, len(e.model["r"][rType].Tokens))
