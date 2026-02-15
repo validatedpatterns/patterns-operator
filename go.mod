@@ -8,7 +8,7 @@ require (
 	github.com/argoproj-labs/argocd-operator v0.15.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/go-errors/errors v1.5.1
-	github.com/go-git/go-git/v5 v5.16.4
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.4
