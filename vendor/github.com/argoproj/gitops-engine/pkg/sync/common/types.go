@@ -20,8 +20,6 @@ const (
 
 	// Sync option that disables dry run in resource is missing in the cluster
 	SyncOptionSkipDryRunOnMissingResource = "SkipDryRunOnMissingResource=true"
-	// Sync option that disables dry run for applying resources
-	SyncOptionSkipDryRun = "SkipDryRun=true"
 	// Sync option that disables resource pruning
 	SyncOptionDisablePrune = "Prune=false"
 	// Sync option that disables resource validation
@@ -44,6 +42,13 @@ const (
 	SyncOptionDeleteRequireConfirm = "Delete=confirm"
 	// Sync option that requires confirmation before deleting the resource
 	SyncOptionPruneRequireConfirm = "Prune=confirm"
+	// Sync option that enables client-side apply migration
+	SyncOptionClientSideApplyMigration = "ClientSideApplyMigration=true"
+	// Sync option that disables client-side apply migration
+	SyncOptionDisableClientSideApplyMigration = "ClientSideApplyMigration=false"
+
+	// Default field manager for client-side apply migration
+	DefaultClientSideApplyMigrationManager = "kubectl-client-side-apply"
 )
 
 type PermissionValidator func(un *unstructured.Unstructured, res *metav1.APIResource) error
