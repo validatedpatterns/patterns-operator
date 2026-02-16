@@ -3,7 +3,7 @@ module github.com/hybrid-cloud-patterns/patterns-operator
 go 1.24.6
 
 require (
-	code.gitea.io/sdk/gitea v0.22.1
+	code.gitea.io/sdk/gitea v0.23.2
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/argoproj-labs/argocd-operator v0.15.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
@@ -11,8 +11,8 @@ require (
 	github.com/go-git/go-git/v5 v5.16.5
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
-	github.com/onsi/ginkgo/v2 v2.27.4
-	github.com/onsi/gomega v1.39.0
+	github.com/onsi/ginkgo/v2 v2.28.1
+	github.com/onsi/gomega v1.39.1
 	github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible
 	github.com/openshift/client-go v0.0.0-20240115204758-e6bf7d631d5e // release-4.16
 	github.com/operator-framework/api v0.33.0
@@ -108,7 +108,7 @@ require (
 	github.com/google/go-github/v66 v66.0.0 // indirect
 	github.com/google/go-github/v75 v75.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/pprof v0.0.0-20250923004556-9e5a51aed1e8 // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
@@ -185,7 +185,7 @@ require (
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
+	golang.org/x/tools v0.41.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
