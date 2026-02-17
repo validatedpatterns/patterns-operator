@@ -784,6 +784,8 @@ var _ = Describe("NewArgoCD", func() {
 
 			Expect(spec.RBAC.Policy).ToNot(BeNil())
 			Expect(spec.RBAC.Scopes).ToNot(BeNil())
+
+			Expect(spec.ResourceTrackingMethod).To(Equal("annotation"))
 		})
 
 		It("should have the correct init containers", func() {
