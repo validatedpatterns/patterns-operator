@@ -916,14 +916,8 @@ func updateApplication(client argoclient.Interface, target, current *argoapi.App
 	} else if target == nil {
 		return false, fmt.Errorf("target application was nil")
 	}
-	if current.Spec.Sources == nil {
-		if compareSource(target.Spec.Source, current.Spec.Source) {
-			return false, nil
-		}
-	} else {
-		if compareSources(target.Spec.Sources, current.Spec.Sources) {
-			return false, nil
-		}
+	if compareApplication(current, target) {
+		return false, nil
 	}
 
 	spec := current.Spec.DeepCopy()
@@ -938,8 +932,79 @@ func removeApplication(client argoclient.Interface, name, namespace string) erro
 	return client.ArgoprojV1alpha1().Applications(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
+func compareApplication(goal, actual *argoapi.Application) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
+	if !compareSource(goal.Spec.Source, actual.Spec.Source) {
+		return false
+	}
+	if !compareSources(goal.Spec.Sources, actual.Spec.Sources) {
+		return false
+	}
+	if !compareSyncPolicy(goal.Spec.SyncPolicy, actual.Spec.SyncPolicy) {
+		return false
+	}
+	return true
+}
+
+func compareSyncPolicy(goal, actual *argoapi.SyncPolicy) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
+	if !compareAutomatedSyncPolicy(goal.Automated, actual.Automated) {
+		return false
+	}
+	if !compareSyncOptions(goal.SyncOptions, actual.SyncOptions) {
+		return false
+	}
+	return true
+}
+
+func compareAutomatedSyncPolicy(goal, actual *argoapi.SyncPolicyAutomated) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
+	if goal.Prune != actual.Prune {
+		log.Printf("SyncPolicy Prune changed %t -> %t\n", actual.Prune, goal.Prune)
+		return false
+	}
+	return true
+}
+
+func compareSyncOptions(goal, actual argoapi.SyncOptions) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
+	if len(goal) != len(actual) {
+		return false
+	}
+	for i, gS := range goal {
+		if gS != actual[i] {
+			log.Printf("SyncOption at position %d changed: %s -> %s\n", i, actual[i], gS)
+			return false
+		}
+	}
+	return true
+}
+
 func compareSource(goal, actual *argoapi.ApplicationSource) bool {
-	if goal == nil || actual == nil {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
 		return false
 	}
 	if goal.RepoURL != actual.RepoURL {
@@ -971,7 +1036,10 @@ func compareSource(goal, actual *argoapi.ApplicationSource) bool {
 }
 
 func compareSources(goal, actual argoapi.ApplicationSources) bool {
-	if actual == nil || goal == nil {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
 		return false
 	}
 	if len(actual) != len(goal) {
@@ -1000,49 +1068,46 @@ func compareHelmSource(goal, actual *argoapi.ApplicationSourceHelm) bool {
 	return true
 }
 
-func compareHelmParameter(goal argoapi.HelmParameter, actual []argoapi.HelmParameter) bool {
-	for _, param := range actual {
-		if goal.Name == param.Name {
-			if goal.Value == param.Value {
-				return true
-			}
-			log.Printf("Parameter %q changed: %q -> %q", goal.Name, param.Value, goal.Value)
-			return false
-		}
-	}
-	log.Printf("Parameter %q not found", goal.Name)
-	return false
-}
-
 func compareHelmParameters(goal, actual []argoapi.HelmParameter) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
 	if len(goal) != len(actual) {
 		return false
 	}
-
-	for _, gP := range goal {
-		if !compareHelmParameter(gP, actual) {
+	for i, gP := range goal {
+		if gP.Name != actual[i].Name {
+			log.Printf("Helm parameter at position %d changed: %s -> %s\n", i, actual[i].Name, gP.Name)
+			return false
+		}
+		if gP.Value != actual[i].Value {
+			log.Printf("Helm parameter %s changed: %s -> %s\n", actual[i].Name, actual[i].Value, gP.Value)
+			return false
+		}
+		if gP.ForceString != actual[i].ForceString {
+			log.Printf("ForceString for Helm parameter %s changed: %t -> %t\n", actual[i].Name, actual[i].ForceString, gP.ForceString)
 			return false
 		}
 	}
 	return true
 }
 
-func compareHelmValueFile(goal string, actual []string) bool {
-	for _, value := range actual {
-		if goal == value {
-			return true
-		}
-	}
-	log.Printf("Values file %q not found", goal)
-	return false
-}
-
 func compareHelmValueFiles(goal, actual []string) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
 	if len(goal) != len(actual) {
 		return false
 	}
-	for _, gV := range goal {
-		if !compareHelmValueFile(gV, actual) {
+	for i, gV := range goal {
+		if gV != actual[i] {
+			log.Printf("ValueFile at position %d changed: %s -> %s\n", i, actual[i], gV)
 			return false
 		}
 	}

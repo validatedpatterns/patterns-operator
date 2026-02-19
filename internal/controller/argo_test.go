@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
+	"strings"
 
 	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
@@ -295,6 +297,15 @@ var _ = Describe("Argo Pattern", func() {
 				sameGoal := goal
 				Expect(compareHelmValueFiles(goal, sameGoal)).To(BeTrue())
 			})
+			It("Compare Helm Value Files with different order", func() {
+				sortedGoal := make([]string, len(goal))
+				reversedGoal := make([]string, len(goal))
+				_ = copy(sortedGoal, goal)
+				_ = copy(reversedGoal, goal)
+				slices.Sort(sortedGoal)
+				slices.Reverse(reversedGoal)
+				Expect(compareHelmValueFiles(sortedGoal, reversedGoal)).To(BeFalse())
+			})
 		})
 
 		Context("Compare Helm Parameters", func() {
@@ -304,6 +315,19 @@ var _ = Describe("Argo Pattern", func() {
 			It("Compare same Helm Parameters", func() {
 				sameGoalHelm := goalHelm
 				Expect(compareHelmParameters(goalHelm, sameGoalHelm)).To(BeTrue())
+			})
+			It("Compare Helm Parameters with different order", func() {
+				sortedGoalHelm := make([]argoapi.HelmParameter, len(goalHelm))
+				reversedGoalHelm := make([]argoapi.HelmParameter, len(goalHelm))
+				_ = copy(sortedGoalHelm, goalHelm)
+				_ = copy(reversedGoalHelm, goalHelm)
+				slices.SortFunc(sortedGoalHelm, func(a, b argoapi.HelmParameter) int {
+					return strings.Compare(a.Name, b.Name)
+				})
+				slices.SortFunc(reversedGoalHelm, func(a, b argoapi.HelmParameter) int {
+					return strings.Compare(a.Name, b.Name) * -1
+				})
+				Expect(compareHelmParameters(sortedGoalHelm, reversedGoalHelm)).To(BeFalse())
 			})
 			It("Test updateHelmParameter non existing Parameter", func() {
 				nonexistantParam := api.PatternParameter{
@@ -528,6 +552,90 @@ var _ = Describe("Argo Pattern", func() {
 			})
 
 		})
+
+		Context("Compare SyncPolicy", func() {
+			var multiSourceArgoApp *argoapi.Application
+			var syncPolicy *argoapi.SyncPolicy
+
+			BeforeEach(func() {
+				multiSourceArgoApp = newMultiSourceApplication(pattern)
+				syncPolicy = multiSourceArgoApp.Spec.SyncPolicy
+			})
+			It("compareSyncPolicy() function identical", func() {
+				Expect(compareSyncPolicy(syncPolicy, syncPolicy)).To(BeTrue())
+			})
+			It("compareSyncPolicy() function differing", func() {
+				syncPolicyChanged := &argoapi.SyncPolicy{}
+				Expect(compareSyncPolicy(syncPolicy, syncPolicyChanged)).To(BeFalse())
+			})
+			It("compareSyncPolicy() function with nil arg1", func() {
+				Expect(compareSyncPolicy(syncPolicy, nil)).To(BeFalse())
+			})
+			It("compareSyncPolicy() function with nil arg2", func() {
+				Expect(compareSyncPolicy(nil, syncPolicy)).To(BeFalse())
+			})
+
+		})
+
+		Context("Compare AutomatedSyncPolicy", func() {
+			var multiSourceArgoApp *argoapi.Application
+			var automatedSyncPolicy *argoapi.SyncPolicyAutomated
+
+			BeforeEach(func() {
+				multiSourceArgoApp = newMultiSourceApplication(pattern)
+				automatedSyncPolicy = multiSourceArgoApp.Spec.SyncPolicy.Automated
+			})
+			It("compareAutomatedSyncPolicy() function identical", func() {
+				Expect(compareAutomatedSyncPolicy(automatedSyncPolicy, automatedSyncPolicy)).To(BeTrue())
+			})
+			It("should return false and log the appropriate message", func() {
+				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
+				automatedSyncPolicyChanged.Prune = true
+				logBuffer := new(bytes.Buffer)
+				log.SetOutput(logBuffer)
+				defer log.SetOutput(os.Stderr)
+
+				result := compareAutomatedSyncPolicy(automatedSyncPolicy, automatedSyncPolicyChanged)
+				Expect(result).To(BeFalse())
+				Expect(logBuffer.String()).To(ContainSubstring("SyncPolicy Prune changed true -> false"))
+			})
+			It("compareAutomatedSyncPolicy() function with nil arg1", func() {
+				Expect(compareAutomatedSyncPolicy(automatedSyncPolicy, nil)).To(BeFalse())
+			})
+			It("compareAutomatedSyncPolicy() function with nil arg2", func() {
+				Expect(compareAutomatedSyncPolicy(nil, automatedSyncPolicy)).To(BeFalse())
+			})
+
+		})
+
+		Context("Compare SyncOptions", func() {
+			var multiSourceArgoApp *argoapi.Application
+			var syncOptions argoapi.SyncOptions
+
+			BeforeEach(func() {
+				multiSourceArgoApp = newMultiSourceApplication(pattern)
+				syncOptions = multiSourceArgoApp.Spec.SyncPolicy.SyncOptions
+			})
+			It("compareSyncOptions() function identical", func() {
+				Expect(compareSyncOptions(syncOptions, syncOptions)).To(BeTrue())
+			})
+			It("compareSyncOptions() function differing", func() {
+				syncOptionsChanged := append(syncOptions, "key=value")
+				Expect(compareSyncOptions(syncOptions, syncOptionsChanged)).To(BeFalse())
+			})
+			It("Compare SyncOptions with different order", func() {
+				syncOptions1 := []string{"opt1=value1", "opt2=value2"}
+				syncOptions2 := []string{"opt2=value2", "opt1=value1"}
+				Expect(compareSyncOptions(syncOptions1, syncOptions2)).To(BeFalse())
+			})
+			It("compareSyncOptions() function with nil arg1", func() {
+				Expect(compareSyncOptions(syncOptions, nil)).To(BeFalse())
+			})
+			It("compareSyncOptions() function with nil arg2", func() {
+				Expect(compareSyncOptions(nil, syncOptions)).To(BeFalse())
+			})
+
+		})
 	})
 })
 
@@ -651,93 +759,6 @@ var _ = Describe("NewApplicationValues", func() {
 			result := newApplicationValues(pattern)
 			expected := "extraParametersNested:\n  param-1: value-1\n  param_2: value_2\n"
 			Expect(result).To(Equal(expected))
-		})
-	})
-})
-
-var _ = Describe("CompareHelmValueFile", func() {
-	var (
-		goal   string
-		actual []string
-	)
-
-	Context("when the goal value is in the actual slice", func() {
-		BeforeEach(func() {
-			goal = "value1"
-			actual = []string{"value1", "value2", "value3"}
-		})
-
-		It("should return true", func() {
-			result := compareHelmValueFile(goal, actual)
-			Expect(result).To(BeTrue())
-		})
-	})
-
-	Context("when the goal value is not in the actual slice", func() {
-		BeforeEach(func() {
-			goal = "value4"
-			actual = []string{"value1", "value2", "value3"}
-		})
-
-		It("should return false and log the appropriate message", func() {
-			logBuffer := new(bytes.Buffer)
-			log.SetOutput(logBuffer)
-			defer log.SetOutput(os.Stderr)
-
-			result := compareHelmValueFile(goal, actual)
-			Expect(result).To(BeFalse())
-			Expect(logBuffer.String()).To(ContainSubstring("Values file \"value4\" not found"))
-		})
-	})
-
-	Context("when the actual slice is empty", func() {
-		BeforeEach(func() {
-			goal = "value1"
-			actual = []string{}
-		})
-
-		It("should return false and log the appropriate message", func() {
-			logBuffer := new(bytes.Buffer)
-			log.SetOutput(logBuffer)
-			defer log.SetOutput(os.Stderr)
-
-			result := compareHelmValueFile(goal, actual)
-			Expect(result).To(BeFalse())
-			Expect(logBuffer.String()).To(ContainSubstring("Values file \"value1\" not found"))
-		})
-	})
-
-	Context("when the goal value is empty", func() {
-		BeforeEach(func() {
-			goal = ""
-			actual = []string{"value1", "value2", "value3"}
-		})
-
-		It("should return false and log the appropriate message", func() {
-			logBuffer := new(bytes.Buffer)
-			log.SetOutput(logBuffer)
-			defer log.SetOutput(os.Stderr)
-
-			result := compareHelmValueFile(goal, actual)
-			Expect(result).To(BeFalse())
-			Expect(logBuffer.String()).To(ContainSubstring("Values file \"\" not found"))
-		})
-	})
-
-	Context("when both the goal value and the actual slice are empty", func() {
-		BeforeEach(func() {
-			goal = ""
-			actual = []string{}
-		})
-
-		It("should return false and log the appropriate message", func() {
-			logBuffer := new(bytes.Buffer)
-			log.SetOutput(logBuffer)
-			defer log.SetOutput(os.Stderr)
-
-			result := compareHelmValueFile(goal, actual)
-			Expect(result).To(BeFalse())
-			Expect(logBuffer.String()).To(ContainSubstring("Values file \"\" not found"))
 		})
 	})
 })
