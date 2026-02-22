@@ -744,7 +744,7 @@ github.com/segmentio/analytics-go/v3
 # github.com/segmentio/backo-go v1.0.0
 ## explicit
 github.com/segmentio/backo-go
-# github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
+# github.com/sergi/go-diff v1.4.0
 ## explicit; go 1.13
 github.com/sergi/go-diff/diffmatchpatch
 # github.com/shirou/gopsutil/v3 v3.24.5
