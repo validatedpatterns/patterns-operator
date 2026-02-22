@@ -599,6 +599,28 @@ var _ = Describe("Argo Pattern", func() {
 				Expect(result).To(BeFalse())
 				Expect(logBuffer.String()).To(ContainSubstring("SyncPolicy Prune changed true -> false"))
 			})
+			It("should return false and log the appropriate message", func() {
+				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
+				automatedSyncPolicyChanged.AllowEmpty = true
+				logBuffer := new(bytes.Buffer)
+				log.SetOutput(logBuffer)
+				defer log.SetOutput(os.Stderr)
+
+				result := compareAutomatedSyncPolicy(automatedSyncPolicy, automatedSyncPolicyChanged)
+				Expect(result).To(BeFalse())
+				Expect(logBuffer.String()).To(ContainSubstring("SyncPolicy AllowEmpty changed true -> false"))
+			})
+			It("should return false and log the appropriate message", func() {
+				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
+				automatedSyncPolicyChanged.SelfHeal = true
+				logBuffer := new(bytes.Buffer)
+				log.SetOutput(logBuffer)
+				defer log.SetOutput(os.Stderr)
+
+				result := compareAutomatedSyncPolicy(automatedSyncPolicy, automatedSyncPolicyChanged)
+				Expect(result).To(BeFalse())
+				Expect(logBuffer.String()).To(ContainSubstring("SyncPolicy SelfHeal changed true -> false"))
+			})
 			It("compareAutomatedSyncPolicy() function with nil arg1", func() {
 				Expect(compareAutomatedSyncPolicy(automatedSyncPolicy, nil)).To(BeFalse())
 			})

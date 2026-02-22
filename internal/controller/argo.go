@@ -978,6 +978,14 @@ func compareAutomatedSyncPolicy(goal, actual *argoapi.SyncPolicyAutomated) bool 
 		log.Printf("SyncPolicy Prune changed %t -> %t\n", actual.Prune, goal.Prune)
 		return false
 	}
+	if goal.AllowEmpty != actual.AllowEmpty {
+		log.Printf("SyncPolicy AllowEmpty changed %t -> %t\n", actual.AllowEmpty, goal.AllowEmpty)
+		return false
+	}
+	if goal.SelfHeal != actual.SelfHeal {
+		log.Printf("SyncPolicy SelfHeal changed %t -> %t\n", actual.SelfHeal, goal.SelfHeal)
+		return false
+	}
 	return true
 }
 
