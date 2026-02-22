@@ -527,6 +527,9 @@ github.com/kevinburke/ssh_config
 github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/race
 github.com/klauspost/compress/s2
+# github.com/klauspost/cpuid/v2 v2.3.0
+## explicit; go 1.22
+github.com/klauspost/cpuid/v2
 # github.com/kylelemons/godebug v1.1.0
 ## explicit; go 1.11
 github.com/kylelemons/godebug/diff
@@ -683,8 +686,8 @@ github.com/patrickmn/go-cache
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 github.com/peterbourgon/diskv
-# github.com/pjbgf/sha1cd v0.3.2
-## explicit; go 1.21
+# github.com/pjbgf/sha1cd v0.5.0
+## explicit; go 1.22
 github.com/pjbgf/sha1cd
 github.com/pjbgf/sha1cd/internal
 github.com/pjbgf/sha1cd/ubc
