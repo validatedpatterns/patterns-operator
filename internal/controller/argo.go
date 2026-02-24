@@ -335,6 +335,7 @@ health_status.message = "An install plan for a subscription is pending installat
 return health_status`,
 				},
 			},
+			ResourceTrackingMethod: "annotation",
 			Server: argooperator.ArgoCDServerSpec{
 				Autoscale: argooperator.ArgoCDServerAutoscaleSpec{
 					Enabled: false,
