@@ -4,7 +4,8 @@
     "properties": {
       "id": "patterns",
       "name": "%plugin__console-plugin-template~Patterns%",
-      "perspective": "admin"
+      "perspective": "admin",
+      "insertBefore": "workloads"
     }
   },
   {
