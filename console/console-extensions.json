@@ -1,20 +1,28 @@
 [
   {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "patterns",
+      "name": "%plugin__console-plugin-template~Patterns%",
+      "perspective": "admin"
+    }
+  },
+  {
     "type": "console.page/route",
     "properties": {
       "exact": true,
-      "path": "/example",
+      "path": "/patterns",
       "component": { "$codeRef": "ExamplePage" }
     }
   },
   {
     "type": "console.navigation/href",
     "properties": {
-      "id": "example",
-      "name": "%plugin__console-plugin-template~Plugin Example%",
-      "href": "/example",
+      "id": "patterns",
+      "name": "%plugin__console-plugin-template~Patterns%",
+      "href": "/patterns",
       "perspective": "admin",
-      "section": "home"
+      "section": "patterns"
     }
   }
 ]
