@@ -37,6 +37,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - argoproj.io
   resources:
   - applications

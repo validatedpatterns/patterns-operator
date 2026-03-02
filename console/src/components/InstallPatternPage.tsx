@@ -41,7 +41,6 @@ export default function InstallPatternPage() {
   const [success, setSuccess] = React.useState(false);
 
   const [patternName, setPatternName] = React.useState('');
-  const [namespace, setNamespace] = React.useState('');
   const [clusterGroupName, setClusterGroupName] = React.useState('hub');
   const [targetRepo, setTargetRepo] = React.useState('');
   const [targetRevision, setTargetRevision] = React.useState('main');
@@ -50,7 +49,6 @@ export default function InstallPatternPage() {
     fetchPattern(name)
       .then((pattern: Pattern) => {
         setPatternName(pattern.name);
-        setNamespace(pattern.name);
         setTargetRepo(pattern.repo_url || '');
         setLoading(false);
       })
@@ -71,7 +69,9 @@ export default function InstallPatternPage() {
           kind: 'Pattern',
           metadata: {
             name: patternName,
-            namespace,
+            // FIXME(bandini): we need a way to override this for the time when we move our operator to
+            // another namespace
+            namespace: 'openshift-operators',
           },
           spec: {
             clusterGroupName,
@@ -137,14 +137,6 @@ export default function InstallPatternPage() {
                 isRequired
                 value={patternName}
                 onChange={(_event, value) => setPatternName(value)}
-              />
-            </FormGroup>
-            <FormGroup label={t('Namespace')} isRequired fieldId="pattern-namespace">
-              <TextInput
-                id="pattern-namespace"
-                isRequired
-                value={namespace}
-                onChange={(_event, value) => setNamespace(value)}
               />
             </FormGroup>
             <FormGroup label={t('Cluster Group Name')} isRequired fieldId="pattern-cluster-group">
