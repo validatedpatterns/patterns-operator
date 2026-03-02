@@ -1,7 +1,7 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { useHistory, useParams } from 'react-router-dom';
+import { useHistory, useRouteMatch } from 'react-router-dom';
 import {
   ActionGroup,
   Alert,
@@ -31,7 +31,8 @@ const PatternModel = {
 export default function InstallPatternPage() {
   const { t } = useTranslation('plugin__console-plugin-template');
   const history = useHistory();
-  const { name } = useParams<{ name: string }>();
+  const match = useRouteMatch<{ name: string }>('/patterns/install/:name');
+  const name = match?.params?.name;
 
   const [loading, setLoading] = React.useState(true);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
