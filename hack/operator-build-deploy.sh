@@ -75,7 +75,7 @@ if [ $ret -ne 0 ]; then
 fi
 
 make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" CHANNELS=fast USE_IMAGE_DIGESTS="" \
-    manifests bundle generate docker-build docker-push console-build console-push bundle-build bundle-push catalog-build \
+    manifests bundle generate docker-build docker-push console-build console-push pattern-catalog-build pattern-catalog-push bundle-build bundle-push catalog-build \
     catalog-push catalog-install
 
 # If the operator already exists in openshift-operators, keep using that namespace;

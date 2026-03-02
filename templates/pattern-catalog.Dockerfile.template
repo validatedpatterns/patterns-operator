@@ -1,0 +1,24 @@
+FROM registry.access.redhat.com/ubi9/nginx-120:latest
+LABEL \
+    com.redhat.openshift.versions="${SUPPORTED_OCP_VERSIONS}" \
+    com.redhat.component="Pattern Catalog image for OpenShift Pattern Operator" \
+    description="This is the pattern catalog for the OpenShift Pattern Operator" \
+    io.k8s.display-name="Pattern Catalog image for OpenShift Pattern Operator" \
+    io.k8s.description="" \
+    io.openshift.tags="openshift,patterns" \
+    distribution-scope="public" \
+    name="patterns-operator-pattern-catalog" \
+    summary="Pattern Catalog" \
+    release="v${VERSION}" \
+    version="v${VERSION}" \
+    maintainer="https://groups.google.com/g/validatedpatterns" \
+    url="https://github.com/validatedpatterns/patterns-operator.git" \
+    vendor="Red Hat" \
+    License="Apache License 2.0"
+
+COPY pattern-catalog/catalog/ /usr/share/nginx/html/
+RUN mkdir licenses
+COPY LICENSE licenses/
+USER 1001
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
