@@ -1,40 +1,153 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { Content, PageSection, Title } from '@patternfly/react-core';
-import { CheckCircleIcon } from '@patternfly/react-icons';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Gallery,
+  Label,
+  PageSection,
+  Spinner,
+  Title,
+} from '@patternfly/react-core';
+import { ExternalLinkAltIcon } from '@patternfly/react-icons';
+import { fetchAllPatterns } from '../api';
+import { Pattern } from '../types';
 import './example.css';
 
-export default function ExamplePage() {
+const TIER_COLORS: Record<string, 'green' | 'blue' | 'grey'> = {
+  maintained: 'green',
+  tested: 'blue',
+  sandbox: 'grey',
+};
+
+function getCloudProviders(pattern: Pattern): string[] {
+  const compute = pattern.requirements?.hub?.compute;
+  if (!compute) return [];
+  return Object.keys(compute).map((k) => k.toUpperCase());
+}
+
+export default function PatternCatalogPage() {
   const { t } = useTranslation('plugin__console-plugin-template');
+  const [patterns, setPatterns] = React.useState<Pattern[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetchAllPatterns()
+      .then((data) => {
+        setPatterns(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err?.message || String(err));
+        setLoading(false);
+      });
+  }, []);
 
   return (
     <>
       <Helmet>
-        <title data-test="example-page-title">{t('Hello, Plugin!')}</title>
+        <title data-test="example-page-title">{t('Pattern Catalog')}</title>
       </Helmet>
       <PageSection>
-        <Title headingLevel="h1">{t('Hello, Plugin!')}</Title>
+        <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
       </PageSection>
       <PageSection>
-        <Content component="p">
-          <span className="console-plugin-template__nice">
-            <CheckCircleIcon /> {t('Success!')}
-          </span>{' '}
-          {t('Your plugin is working.')}
-        </Content>
-        <Content component="p">
-          {t(
-            'This is a custom page contributed by the console plugin template. The extension that adds the page is declared in console-extensions.json in the project root along with the corresponding nav item. Update console-extensions.json to change or add extensions. Code references in console-extensions.json must have a corresponding property',
-          )}
-          <code>{t('exposedModules')}</code>{' '}
-          {t('in package.json mapping the reference to the module.')}
-        </Content>
-        <Content component="p">
-          {t('After cloning this project, replace references to')}{' '}
-          <code>{t('console-template-plugin')}</code>{' '}
-          {t('and other plugin metadata in package.json with values for your plugin.')}
-        </Content>
+        {loading && <Spinner aria-label={t('Loading patterns')} />}
+        {error && (
+          <Alert variant="danger" title={t('Failed to load pattern catalog')}>
+            {error}
+          </Alert>
+        )}
+        {!loading && !error && (
+          <Gallery hasGutter minWidths={{ default: '300px' }}>
+            {patterns.map((pattern) => (
+              <Card key={pattern.name} className="patterns-operator__card">
+                <CardHeader>
+                  <Label color={TIER_COLORS[pattern.tier] || 'grey'}>
+                    {pattern.tier}
+                  </Label>
+                </CardHeader>
+                <CardTitle>{pattern.display_name}</CardTitle>
+                <CardBody>
+                  <div className="patterns-operator__card-field">
+                    <strong>{t('Organization')}:</strong> {pattern.org}
+                  </div>
+                  {getCloudProviders(pattern).length > 0 && (
+                    <div className="patterns-operator__card-field">
+                      <strong>{t('Cloud Providers')}:</strong>{' '}
+                      {getCloudProviders(pattern).join(', ')}
+                    </div>
+                  )}
+                  <div className="patterns-operator__card-field">
+                    <strong>{t('Owners')}:</strong>{' '}
+                    {pattern.owners?.join(', ')}
+                  </div>
+                </CardBody>
+                <CardFooter className="patterns-operator__card-footer">
+                  {pattern.docs_url && (
+                    <Button
+                      variant="link"
+                      component="a"
+                      href={pattern.docs_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      icon={<ExternalLinkAltIcon />}
+                      iconPosition="end"
+                    >
+                      {t('Docs')}
+                    </Button>
+                  )}
+                  {pattern.repo_url && (
+                    <Button
+                      variant="link"
+                      component="a"
+                      href={pattern.repo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      icon={<ExternalLinkAltIcon />}
+                      iconPosition="end"
+                    >
+                      {t('Repo')}
+                    </Button>
+                  )}
+                  {pattern.issues_url && (
+                    <Button
+                      variant="link"
+                      component="a"
+                      href={pattern.issues_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      icon={<ExternalLinkAltIcon />}
+                      iconPosition="end"
+                    >
+                      {t('Issues')}
+                    </Button>
+                  )}
+                  {pattern.ci_url && (
+                    <Button
+                      variant="link"
+                      component="a"
+                      href={pattern.ci_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      icon={<ExternalLinkAltIcon />}
+                      iconPosition="end"
+                    >
+                      {t('CI')}
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            ))}
+          </Gallery>
+        )}
       </PageSection>
     </>
   );

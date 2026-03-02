@@ -1,0 +1,26 @@
+apiVersion: v1
+data:
+  nginx.conf: |
+    error_log /dev/stdout info;
+    events {}
+    http {
+      access_log         /dev/stdout;
+      include            /etc/nginx/mime.types;
+      default_type       application/octet-stream;
+      keepalive_timeout  65;
+      types {
+        text/yaml         yaml yml;
+      }
+      server {
+        listen              9444 ssl;
+        listen              [::]:9444 ssl;
+        ssl_certificate     /var/cert/tls.crt;
+        ssl_certificate_key /var/cert/tls.key;
+        root                /usr/share/nginx/html;
+      }
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: patterns-operator-pattern-catalog
+  name: patterns-operator-pattern-catalog

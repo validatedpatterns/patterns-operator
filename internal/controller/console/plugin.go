@@ -40,6 +40,13 @@ const (
 	ServiceName = "patterns-operator-console-plugin"
 	// ServicePort is the port of the console plugin Service and must match the port of the Service in /bundle/manifests!
 	ServicePort = 9443
+
+	// PatternCatalogServiceName is the name of the pattern-catalog Service
+	PatternCatalogServiceName = "patterns-operator-pattern-catalog"
+	// PatternCatalogServicePort is the port of the pattern-catalog Service (TLS)
+	PatternCatalogServicePort = 9444
+	// PatternCatalogProxyAlias is the proxy alias used in console plugin proxy configuration
+	PatternCatalogProxyAlias = "pattern-catalog"
 )
 
 // +kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=get;list;watch;create;update;patch;delete
@@ -102,6 +109,20 @@ func newConsolePlugin(namespace string) *consolev1.ConsolePlugin {
 					Namespace: namespace,
 					Port:      ServicePort,
 					BasePath:  "/",
+				},
+			},
+			Proxy: []consolev1.ConsolePluginProxy{
+				{
+					Alias:         PatternCatalogProxyAlias,
+					Authorization: consolev1.None,
+					Endpoint: consolev1.ConsolePluginProxyEndpoint{
+						Type: consolev1.ProxyTypeService,
+						Service: &consolev1.ConsolePluginProxyServiceConfig{
+							Name:      PatternCatalogServiceName,
+							Namespace: namespace,
+							Port:      PatternCatalogServicePort,
+						},
+					},
 				},
 			},
 		},
