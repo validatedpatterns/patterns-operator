@@ -41,4 +41,6 @@ export interface Pattern {
   external_requirements?: unknown;
   org: string;
   spoke?: unknown;
+  /** The catalog directory key used to fetch this pattern. */
+  catalogKey?: string;
 }

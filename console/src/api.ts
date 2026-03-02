@@ -20,6 +20,11 @@ export async function fetchPattern(name: string): Promise<Pattern> {
 
 export async function fetchAllPatterns(): Promise<Pattern[]> {
   const catalog = await fetchCatalog();
-  const patterns = await Promise.all(catalog.patterns.map(fetchPattern));
+  const patterns = await Promise.all(
+    catalog.patterns.map(async (key) => {
+      const pattern = await fetchPattern(key);
+      return { ...pattern, catalogKey: key };
+    }),
+  );
   return patterns;
 }

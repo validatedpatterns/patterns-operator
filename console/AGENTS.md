@@ -73,7 +73,7 @@ return <h1>{t('Hello, World!')}</h1>;
 ```
 src/
   components/          # React components
-    ExamplePage.tsx   # Example page component
+    PatternCatalogPage.tsx  # Pattern catalog page component
     *.css            # Component styles (scoped with plugin prefix)
 console-extensions.json # Plugin extension declarations
 package.json           # Plugin metadata in consolePlugin section

@@ -13,7 +13,15 @@
     "properties": {
       "exact": true,
       "path": "/patterns",
-      "component": { "$codeRef": "ExamplePage" }
+      "component": { "$codeRef": "PatternCatalogPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/patterns/install/:name",
+      "component": { "$codeRef": "InstallPatternPage" }
     }
   },
   {

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
+import { useHistory } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -18,7 +19,7 @@ import {
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 import { fetchAllPatterns } from '../api';
 import { Pattern } from '../types';
-import './example.css';
+import './PatternCatalogPage.css';
 
 const TIER_COLORS: Record<string, 'green' | 'blue' | 'grey'> = {
   maintained: 'green',
@@ -34,6 +35,7 @@ function getCloudProviders(pattern: Pattern): string[] {
 
 export default function PatternCatalogPage() {
   const { t } = useTranslation('plugin__console-plugin-template');
+  const history = useHistory();
   const [patterns, setPatterns] = React.useState<Pattern[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function PatternCatalogPage() {
   return (
     <>
       <Helmet>
-        <title data-test="example-page-title">{t('Pattern Catalog')}</title>
+        <title data-test="pattern-catalog-page-title">{t('Pattern Catalog')}</title>
       </Helmet>
       <PageSection>
         <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
@@ -91,6 +93,12 @@ export default function PatternCatalogPage() {
                   </div>
                 </CardBody>
                 <CardFooter className="patterns-operator__card-footer">
+                  <Button
+                    variant="primary"
+                    onClick={() => history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)}
+                  >
+                    {t('Install')}
+                  </Button>
                   {pattern.docs_url && (
                     <Button
                       variant="link"

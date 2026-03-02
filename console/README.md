@@ -49,7 +49,7 @@ plugin name in the `consolePlugin` declaration of [package.json](package.json).
   "displayName": "My Plugin",
   "description": "Enjoy this shiny, new console plugin!",
   "exposedModules": {
-    "ExamplePage": "./components/ExamplePage"
+    "PatternCatalogPage": "./components/PatternCatalogPage"
   },
   "dependencies": {
     "@console/pluginAPI": "*"
@@ -60,7 +60,7 @@ plugin name in the `consolePlugin` declaration of [package.json](package.json).
 The template adds a single example page in the Home navigation section. The
 extension is declared in the [console-extensions.json](console-extensions.json)
 file and the React component is declared in
-[src/components/ExamplePage.tsx](src/components/ExamplePage.tsx).
+[src/components/PatternCatalogPage.tsx](src/components/PatternCatalogPage.tsx).
 
 You can run the plugin using a local development environment or build an image
 to deploy it to a cluster.
