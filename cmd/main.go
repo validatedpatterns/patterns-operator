@@ -113,6 +113,9 @@ func main() {
 		if err := console.EnablePlugin(ctx, mgr.GetClient()); err != nil {
 			setupLog.Error(err, "unable to enable console plugin")
 		}
+		if err := console.UpdateCatalogImageIfOverridden(ctx, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+			setupLog.Error(err, "unable to apply catalog image override")
+		}
 		return nil
 	})); err != nil {
 		setupLog.Error(err, "unable to add console plugin runnable")

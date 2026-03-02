@@ -83,6 +83,12 @@ const (
 	GiteaDefaultPasswordLen = 15
 )
 
+// Pattern Catalog
+const (
+	// PatternCatalogDefaultImage is empty, meaning the image deployed by kustomize/OLM is used
+	PatternCatalogDefaultImage = ""
+)
+
 // Experimental Capabilities that can be enabled
 // Currently none
 
@@ -96,6 +102,7 @@ var DefaultPatternOperatorConfig = map[string]string{
 	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
 	"gitea.chartVersion":         GiteaDefaultChartVersion,
 	"analytics.enabled":          "true",
+	"catalog.image":              PatternCatalogDefaultImage,
 }
 
 type GitOpsConfig map[string]string
