@@ -4,12 +4,14 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.4
+SUPPORTED_OCP_VERSIONS ?= v4.20-v4.21
 OPERATOR_NAME ?= patterns
 GOFLAGS=-mod=vendor
 REGISTRY ?= localhost
 UPLOADREGISTRY ?= quay.io/validatedpatterns
 GOLANGCI_IMG ?= docker.io/golangci/golangci-lint
 GOLANGCI_VERSION ?= 2.11.3
+
 
 # CI uses a non-writable home dir, make sure .cache is writable
 ifeq ("${HOME}", "/")
@@ -69,6 +71,13 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 OPERATOR_IMG ?= $(OPERATOR_NAME)-operator:$(VERSION)
+
+# always release the console with the same tag as the operator and the other way around!
+# Image base URL of the console plugin
+CONSOLE_PLUGIN_IMAGE_BASE ?= $(IMAGE_TAG_BASE)-console
+CONSOLE_PLUGIN_IMAGE ?= $(CONSOLE_PLUGIN_IMAGE_BASE):$(VERSION)
+CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30
 
@@ -205,11 +214,14 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd config/console-plugin && $(KUSTOMIZE) edit set image console-plugin=${CONSOLE_PLUGIN_IMAGE}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/console-plugin | kubectl apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/console-plugin | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
@@ -293,6 +305,7 @@ endef
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/console-plugin && $(KUSTOMIZE) edit set image console-plugin=$(CONSOLE_PLUGIN_IMAGE)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-fixes bundle-date
 	./hack/set_openshift_minimum_version.sh
@@ -351,6 +364,22 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
+
+# Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
+.PHONY: generate-dockerfile-console-plugin
+generate-dockerfile-console-plugin:
+	VERSION=$(VERSION) SUPPORTED_OCP_VERSIONS=$(SUPPORTED_OCP_VERSIONS) envsubst < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
+
+.PHONY: console-build
+console-build: generate-dockerfile-console-plugin ## Build the console image
+	@echo "Building console image with cache optimization..."
+	@podman pull $(CONSOLE_PLUGIN_IMAGE_BASE):latest 2>/dev/null || true
+	podman build -f $(CURPATH)/$(CONSOLE_PLUGIN_DOCKERFILE) -t ${CONSOLE_PLUGIN_IMAGE} .
+	podman tag ${CONSOLE_PLUGIN_IMAGE} $(CONSOLE_PLUGIN_IMAGE_BASE):latest
+
+.PHONY: console-push
+console-push: ## Push the console image
+	podman push $(CONSOLE_PLUGIN_IMAGE)
 
 # Build an OLM catalog image by adding the bundle image to a simple catalog using the
 # operator package manager tool, 'opm'. For more information see:

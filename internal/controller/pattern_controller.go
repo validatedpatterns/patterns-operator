@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/hybrid-cloud-patterns/patterns-operator/internal/controller/console"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,6 +167,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
 		return reconcile.Result{}, nil
+	}
+
+	// Ensure console plugin is registered and enabled
+	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
+		r.logger.Error(err, "failed to create/update console plugin")
+	}
+	if err := console.EnablePlugin(ctx, r.Client); err != nil {
+		r.logger.Error(err, "failed to enable console plugin")
 	}
 
 	// -- Fill in defaults (changes made to a copy and not persisted)

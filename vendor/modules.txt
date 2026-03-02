@@ -619,10 +619,11 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/openshift/api v3.9.1-0.20190916204813-cdbe64fb0c91+incompatible => github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
+# github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
 ## explicit; go 1.21
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
+github.com/openshift/api/console/v1
 github.com/openshift/api/operator/v1
 github.com/openshift/api/operator/v1alpha1
 github.com/openshift/api/route/v1

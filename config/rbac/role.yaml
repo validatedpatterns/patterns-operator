@@ -86,6 +86,15 @@ rules:
   - list
   - patch
   - update
+  - consoleplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - gitops.hybrid-cloud-patterns.io
   resources:
@@ -119,6 +128,15 @@ rules:
   verbs:
   - get
   - list
+- apiGroups:
+  - operator.openshift.io
+  resources:
+  - consoles
+  verbs:
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - operator.openshift.io
   resources:

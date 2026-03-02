@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: patterns-operator-console-plugin
+  name: patterns-operator-console-plugin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: patterns-operator-console-plugin
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: patterns-operator-console-plugin
+    spec:
+      containers:
+      - image: console-plugin
+        name: patterns-operator-console-plugin
+        ports:
+        - containerPort: 9443
+          name: https
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /var/cert
+          name: console-plugin-cert
+          readOnly: true
+        - mountPath: /etc/nginx/nginx.conf
+          name: nginx-conf
+          readOnly: true
+          subPath: nginx.conf
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      securityContext:
+        runAsNonRoot: true
+      volumes:
+      - name: console-plugin-cert
+        secret:
+          defaultMode: 420
+          secretName: patterns-operator-console-plugin-cert
+      - name: nginx-conf
+        configMap:
+          defaultMode: 420
+          name: patterns-operator-console-plugin

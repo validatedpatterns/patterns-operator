@@ -34,3 +34,5 @@
 # Govulncheck stuff
 govulncheck.results
 /database
+
+*Dockerfile
