@@ -124,32 +124,6 @@ export default function PatternCatalogPage() {
                       {t('Repo')}
                     </Button>
                   )}
-                  {pattern.issues_url && (
-                    <Button
-                      variant="link"
-                      component="a"
-                      href={pattern.issues_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      icon={<ExternalLinkAltIcon />}
-                      iconPosition="end"
-                    >
-                      {t('Issues')}
-                    </Button>
-                  )}
-                  {pattern.ci_url && (
-                    <Button
-                      variant="link"
-                      component="a"
-                      href={pattern.ci_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      icon={<ExternalLinkAltIcon />}
-                      iconPosition="end"
-                    >
-                      {t('CI')}
-                    </Button>
-                  )}
                 </CardFooter>
               </Card>
             ))}
