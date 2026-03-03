@@ -13,12 +13,22 @@ import {
   Gallery,
   Label,
   PageSection,
+  Popover,
   Spinner,
   Title,
 } from '@patternfly/react-core';
-import { ExternalLinkAltIcon } from '@patternfly/react-icons';
+import { ExternalLinkAltIcon, InfoCircleIcon } from '@patternfly/react-icons';
 import { fetchAllPatterns } from '../api';
 import { Pattern } from '../types';
+import { useClusterInfo } from '../cluster-api';
+import {
+  checkPatternCompatibility,
+  getCompatibilityColor,
+  getCompatibilityLabel,
+  getInstallButtonText,
+  getInstallButtonVariant,
+} from '../compatibility';
+import CompatibilityDetails from './CompatibilityDetails';
 import './PatternCatalogPage.css';
 
 const TIER_COLORS: Record<string, 'green' | 'blue' | 'grey'> = {
@@ -39,6 +49,9 @@ export default function PatternCatalogPage() {
   const [patterns, setPatterns] = React.useState<Pattern[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Fetch cluster information for compatibility checking
+  const [clusterInfo, clusterLoading, clusterError] = useClusterInfo();
 
   React.useEffect(() => {
     fetchAllPatterns()
@@ -69,35 +82,79 @@ export default function PatternCatalogPage() {
         )}
         {!loading && !error && (
           <Gallery hasGutter minWidths={{ default: '300px' }}>
-            {patterns.map((pattern) => (
-              <Card key={pattern.name} className="patterns-operator__card">
-                <CardHeader>
-                  <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
-                </CardHeader>
-                <CardTitle>{pattern.display_name}</CardTitle>
-                <CardBody>
-                  <div className="patterns-operator__card-field">
-                    <strong>{t('Organization')}:</strong> {pattern.org}
-                  </div>
-                  {getCloudProviders(pattern).length > 0 && (
+            {patterns.map((pattern) => {
+              // Calculate compatibility for this pattern
+              const compatibilityResult = clusterInfo
+                ? checkPatternCompatibility(pattern, clusterInfo)
+                : null;
+
+              return (
+                <Card key={pattern.name} className="patterns-operator__card">
+                  <CardHeader>
+                    <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
+                  </CardHeader>
+                  <CardTitle>{pattern.display_name}</CardTitle>
+                  <CardBody>
                     <div className="patterns-operator__card-field">
-                      <strong>{t('Cloud Providers')}:</strong>{' '}
-                      {getCloudProviders(pattern).join(', ')}
+                      <strong>{t('Organization')}:</strong> {pattern.org}
                     </div>
-                  )}
-                  <div className="patterns-operator__card-field">
-                    <strong>{t('Owners')}:</strong> {pattern.owners?.join(', ')}
-                  </div>
-                </CardBody>
-                <CardFooter className="patterns-operator__card-footer">
-                  <Button
-                    variant="primary"
-                    onClick={() =>
-                      history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
-                    }
-                  >
-                    {t('Install')}
-                  </Button>
+                    {getCloudProviders(pattern).length > 0 && (
+                      <div className="patterns-operator__card-field">
+                        <strong>{t('Cloud Providers')}:</strong>{' '}
+                        {getCloudProviders(pattern).join(', ')}
+                      </div>
+                    )}
+                    <div className="patterns-operator__card-field">
+                      <strong>{t('Owners')}:</strong> {pattern.owners?.join(', ')}
+                    </div>
+                    {/* Compatibility status display */}
+                    {clusterInfo && compatibilityResult && (
+                      <div className="patterns-operator__card-field">
+                        <strong>{t('Compatibility')}:</strong>{' '}
+                        <div className="patterns-operator__compatibility-status">
+                          <Label color={getCompatibilityColor(compatibilityResult.status)}>
+                            {getCompatibilityLabel(compatibilityResult.status)}
+                          </Label>
+                          <Popover
+                            headerContent={t('Compatibility Details')}
+                            bodyContent={
+                              <CompatibilityDetails
+                                result={compatibilityResult}
+                                clusterInfo={clusterInfo}
+                                pattern={pattern}
+                              />
+                            }
+                            position="right"
+                            maxWidth="600px"
+                          >
+                            <InfoCircleIcon className="patterns-operator__info-icon" />
+                          </Popover>
+                        </div>
+                      </div>
+                    )}
+                    {/* Show loading or error state for cluster compatibility */}
+                    {clusterLoading && (
+                      <div className="patterns-operator__card-field">
+                        <strong>{t('Compatibility')}:</strong>{' '}
+                        <span>{t('Checking...')}</span>
+                      </div>
+                    )}
+                    {clusterError && (
+                      <div className="patterns-operator__card-field">
+                        <strong>{t('Compatibility')}:</strong>{' '}
+                        <Label color="orange">{t('Check Failed')}</Label>
+                      </div>
+                    )}
+                  </CardBody>
+                  <CardFooter className="patterns-operator__card-footer">
+                    <Button
+                      variant={compatibilityResult ? getInstallButtonVariant(compatibilityResult.status) : 'primary'}
+                      onClick={() =>
+                        history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
+                      }
+                    >
+                      {compatibilityResult ? getInstallButtonText(compatibilityResult.status) : t('Install')}
+                    </Button>
                   {pattern.docs_url && (
                     <Button
                       variant="link"
@@ -125,8 +182,9 @@ export default function PatternCatalogPage() {
                     </Button>
                   )}
                 </CardFooter>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </Gallery>
         )}
       </PageSection>

@@ -15,7 +15,9 @@ import {
 } from '@patternfly/react-core';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import { fetchPattern, fetchSecretTemplate } from '../api';
-import { SecretTemplate, SecretFormData } from '../types';
+import { SecretTemplate, SecretFormData, Pattern } from '../types';
+import { useClusterInfo } from '../cluster-api';
+import { checkPatternCompatibility } from '../compatibility';
 
 const PatternModel = {
   apiGroup: 'gitops.hybrid-cloud-patterns.io',
@@ -48,19 +50,24 @@ export default function InstallPatternPage() {
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
 
+  const [pattern, setPattern] = React.useState<Pattern | null>(null);
   const [patternName, setPatternName] = React.useState('');
   const [clusterGroupName, setClusterGroupName] = React.useState('hub');
   const [targetRepo, setTargetRepo] = React.useState('');
   const [targetRevision, setTargetRevision] = React.useState('main');
 
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
+
+  // Fetch cluster information for compatibility checking
+  const [clusterInfo, clusterLoading, clusterError] = useClusterInfo();
   const secretData = locationState?.secretData || null;
 
   React.useEffect(() => {
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
-      .then(([pattern, template]) => {
-        setPatternName(pattern.name);
-        setTargetRepo(pattern.repo_url || '');
+      .then(([patternData, template]) => {
+        setPattern(patternData);
+        setPatternName(patternData.name);
+        setTargetRepo(patternData.repo_url || '');
         setSecretTemplate(template);
 
         // Update secret template if returned from secrets page
@@ -169,6 +176,30 @@ export default function InstallPatternPage() {
         {secretData && secretTemplate && (
           <Alert variant="info" title={t('Secrets Configured')} isInline>
             {t('Secret configuration has been provided for this pattern installation.')}
+          </Alert>
+        )}
+        {/* Compatibility warning */}
+        {pattern && clusterInfo && !clusterLoading && (() => {
+          const compatibilityResult = checkPatternCompatibility(pattern, clusterInfo);
+          return compatibilityResult.status !== 'compatible' && (
+            <Alert
+              variant={compatibilityResult.status === 'insufficient' ? 'warning' : 'info'}
+              title={t('Cluster Compatibility Notice')}
+              isInline
+            >
+              <p>{compatibilityResult.reason}</p>
+              {compatibilityResult.status === 'insufficient' && (
+                <p>{t('Installation may fail or require cluster scaling. Consider upgrading your cluster resources before proceeding.')}</p>
+              )}
+              {compatibilityResult.status === 'unknown' && (
+                <p>{t('Please verify that your cluster meets the pattern requirements before proceeding with installation.')}</p>
+              )}
+            </Alert>
+          );
+        })()}
+        {clusterError && (
+          <Alert variant="warning" title={t('Unable to Check Cluster Compatibility')} isInline>
+            {t('Could not verify cluster compatibility: {{error}}', { error: clusterError })}
           </Alert>
         )}
         {!success && (

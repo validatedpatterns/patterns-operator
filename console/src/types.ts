@@ -79,3 +79,38 @@ export interface SecretFormData {
     [fieldName: string]: string | File | null;
   };
 }
+
+// Cluster compatibility checking types
+export interface ClusterNode {
+  name: string;
+  instanceType?: string;
+  cloudProvider?: string;
+  roles: string[]; // 'master', 'worker'
+  ready: boolean;
+  vcpus?: number;
+  memory?: number;
+}
+
+export interface ClusterInfo {
+  nodes: ClusterNode[];
+  cloudProvider?: 'aws' | 'gcp' | 'azure' | 'baremetal' | 'unknown';
+  workerNodes: ClusterNode[];
+  controlPlaneNodes: ClusterNode[];
+  isBaremetal: boolean;
+  totalWorkerNodes: number;
+  totalControlPlaneNodes: number;
+}
+
+export type CompatibilityStatus = 'compatible' | 'insufficient' | 'unknown' | 'error';
+
+export interface CompatibilityResult {
+  status: CompatibilityStatus;
+  reason: string;
+  details?: {
+    requiredCompute?: { replicas: number; type: string };
+    requiredControlPlane?: { replicas: number; type: string };
+    actualCompute?: { count: number; types: string[] };
+    actualControlPlane?: { count: number; types: string[] };
+    cloudProviderMatch?: boolean;
+  };
+}

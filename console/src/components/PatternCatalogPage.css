@@ -7,3 +7,49 @@
   flex-wrap: wrap;
   gap: var(--pf-v6-global--spacer--sm);
 }
+
+.patterns-operator__compatibility-status {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-v6-global--spacer--xs);
+  margin-top: var(--pf-v6-global--spacer--xs);
+}
+
+.patterns-operator__info-icon {
+  margin-left: var(--pf-v6-global--spacer--xs);
+  color: var(--pf-v6-global--palette--blue-300);
+  cursor: pointer;
+}
+
+.patterns-operator__info-icon:hover {
+  color: var(--pf-v6-global--palette--blue-400);
+}
+
+.patterns-operator__compatibility-details {
+  max-width: 400px;
+}
+
+.patterns-operator__compatibility-details .pf-v6-c-description-list__group {
+  margin-bottom: var(--pf-v6-global--spacer--sm);
+}
+
+.patterns-operator__compatibility-details .pf-v6-c-description-list__term {
+  font-weight: var(--pf-v6-global--FontWeight--bold);
+}
+
+.patterns-operator__compatibility-details .pf-v6-c-list {
+  margin-top: var(--pf-v6-global--spacer--xs);
+}
+
+.patterns-operator__compatibility-details .pf-v6-c-list .pf-v6-c-list {
+  margin-left: var(--pf-v6-global--spacer--md);
+}
+
+.patterns-operator__compatibility-details code {
+  font-family: var(--pf-v6-global--FontFamily--monospace);
+  font-size: var(--pf-v6-global--FontSize--sm);
+  background-color: var(--pf-v6-global--palette--black-150);
+  color: var(--pf-v6-global--palette--black-900);
+  padding: var(--pf-v6-global--spacer--2xs) var(--pf-v6-global--spacer--xs);
+  border-radius: var(--pf-v6-global--BorderRadius--sm);
+}
