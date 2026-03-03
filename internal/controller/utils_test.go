@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -39,6 +40,22 @@ import (
 	"k8s.io/client-go/testing"
 	//+kubebuilder:scaffold:imports
 )
+
+// Self-signed test CA certificate for getHTTPSTransport tests
+var testCACert = []byte(`-----BEGIN CERTIFICATE-----
+MIICEzCCAXygAwIBAgIQMIMChMLGrR+QvmQvpwAU6zAKBggqhkjOPQQDAzASMRAw
+DgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYwMDAw
+WjASMRAwDgYDVQQKEwdBY21lIENvMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE7Jdx
+McVMDPH0GQKXW9z+Xa0+H/GVvOdxDeGR5dEWBq4eFTkJ5x7+h/bfaSeQGVCBm/s
+ZBeXnOJtIG01kv6mBcExZ6YGXpeLdpaIuKsFr7TMjjQ4L/HTPgwIvTAUUoYEo4GG
+MIGDMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAPBgNVHRMB
+Af8EBTADAQH/MB0GA1UdDgQWBBRWbLiq20RFEfwvuGBEdFaxdkQiMDAsBgNVHREE
+JTAjgglsb2NhbGhvc3SHBH8AAAGHEAAAAAAAAAAAAAAAAAAAAAEKHBR0ZXN0MBIG
+A1UdEAQLMAmCB3Rlc3RjYTAKBggqhkjOPQQDAwNnADBkAjBK9MEtFB6VYkOngzWd
+Ft0LstEoFkHkWJxgSZ8WlKnmPPKQee3ZIB3JkKRfV2Y80cICMANZmsSy1HTRrbXI
+Jfc+jIf39GhvPMfxR3BBfrIvdBH2oKC1PNi6N1iFYrPiKaMs6A==
+-----END CERTIFICATE-----
+`)
 
 var testCases = []struct {
 	inputURL     string
@@ -1847,5 +1864,649 @@ var _ = Describe("DropLocalGitPaths", func() {
 	It("should not error if folder does not exist", func() {
 		err := DropLocalGitPaths()
 		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("getPatternConditionByStatus", func() {
+	var conditions []api.PatternCondition
+
+	BeforeEach(func() {
+		conditions = []api.PatternCondition{
+			{
+				Type:   api.GitInSync,
+				Status: corev1.ConditionTrue,
+			},
+			{
+				Type:   api.Degraded,
+				Status: corev1.ConditionFalse,
+			},
+			{
+				Type:   api.Progressing,
+				Status: corev1.ConditionUnknown,
+			},
+		}
+	})
+
+	Context("when condition with given status exists", func() {
+		It("should return the index and the condition for ConditionTrue", func() {
+			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionTrue)
+			Expect(idx).To(Equal(0))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Type).To(Equal(api.GitInSync))
+		})
+
+		It("should return the index and the condition for ConditionFalse", func() {
+			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionFalse)
+			Expect(idx).To(Equal(1))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Type).To(Equal(api.Degraded))
+		})
+
+		It("should return the index and the condition for ConditionUnknown", func() {
+			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionUnknown)
+			Expect(idx).To(Equal(2))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Type).To(Equal(api.Progressing))
+		})
+	})
+
+	Context("when condition with given status does not exist", func() {
+		It("should return -1 and nil", func() {
+			// All statuses are accounted for, so create a new slice with only one status
+			limited := []api.PatternCondition{
+				{Type: api.GitInSync, Status: corev1.ConditionTrue},
+			}
+			idx, cond := getPatternConditionByStatus(limited, corev1.ConditionFalse)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when conditions slice is nil", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByStatus(nil, corev1.ConditionTrue)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when conditions slice is empty", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByStatus([]api.PatternCondition{}, corev1.ConditionTrue)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when multiple conditions have the same status", func() {
+		It("should return the first matching index", func() {
+			dupes := []api.PatternCondition{
+				{Type: api.GitInSync, Status: corev1.ConditionTrue},
+				{Type: api.Synced, Status: corev1.ConditionTrue},
+			}
+			idx, cond := getPatternConditionByStatus(dupes, corev1.ConditionTrue)
+			Expect(idx).To(Equal(0))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Type).To(Equal(api.GitInSync))
+		})
+	})
+})
+
+var _ = Describe("getPatternConditionByType", func() {
+	var conditions []api.PatternCondition
+
+	BeforeEach(func() {
+		conditions = []api.PatternCondition{
+			{
+				Type:    api.GitInSync,
+				Status:  corev1.ConditionTrue,
+				Message: "in sync",
+			},
+			{
+				Type:    api.Degraded,
+				Status:  corev1.ConditionFalse,
+				Message: "not degraded",
+			},
+			{
+				Type:    api.Progressing,
+				Status:  corev1.ConditionTrue,
+				Message: "progressing",
+			},
+		}
+	})
+
+	Context("when condition with given type exists", func() {
+		It("should return the index and the condition for GitInSync", func() {
+			idx, cond := getPatternConditionByType(conditions, api.GitInSync)
+			Expect(idx).To(Equal(0))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Message).To(Equal("in sync"))
+		})
+
+		It("should return the index and the condition for Degraded", func() {
+			idx, cond := getPatternConditionByType(conditions, api.Degraded)
+			Expect(idx).To(Equal(1))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Status).To(Equal(corev1.ConditionFalse))
+		})
+
+		It("should return the index and the condition for Progressing", func() {
+			idx, cond := getPatternConditionByType(conditions, api.Progressing)
+			Expect(idx).To(Equal(2))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Message).To(Equal("progressing"))
+		})
+	})
+
+	Context("when condition with given type does not exist", func() {
+		It("should return -1 and nil for Missing type", func() {
+			idx, cond := getPatternConditionByType(conditions, api.Missing)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+
+		It("should return -1 and nil for Suspended type", func() {
+			idx, cond := getPatternConditionByType(conditions, api.Suspended)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when conditions slice is nil", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByType(nil, api.GitInSync)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when conditions slice is empty", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByType([]api.PatternCondition{}, api.GitInSync)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("getClusterWideArgoNamespace", func() {
+	It("should return the ApplicationNamespace constant", func() {
+		ns := getClusterWideArgoNamespace()
+		Expect(ns).To(Equal(ApplicationNamespace))
+		Expect(ns).To(Equal("openshift-gitops"))
+	})
+})
+
+var _ = Describe("writeConfigMapKeyToFile", func() {
+	var (
+		kubeClient kubernetes.Interface
+		tmpDir     string
+	)
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+		tmpDir = createTempDir("vp-writecm-test")
+	})
+
+	AfterEach(func() {
+		cleanupTempDir(tmpDir)
+	})
+
+	Context("when the ConfigMap and key exist", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"my-key": "my-value-content",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should write the value to a file (truncate mode)", func() {
+			filePath := filepath.Join(tmpDir, "output.txt")
+			err := writeConfigMapKeyToFile(kubeClient, "default", "test-cm", "my-key", filePath, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal("my-value-content\n"))
+		})
+
+		It("should append the value to a file (append mode)", func() {
+			filePath := filepath.Join(tmpDir, "output.txt")
+			// Write initial content
+			err := os.WriteFile(filePath, []byte("existing-content\n"), 0600)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = writeConfigMapKeyToFile(kubeClient, "default", "test-cm", "my-key", filePath, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal("existing-content\nmy-value-content\n"))
+		})
+
+		It("should overwrite existing content in truncate mode", func() {
+			filePath := filepath.Join(tmpDir, "output.txt")
+			err := os.WriteFile(filePath, []byte("old-content\n"), 0600)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = writeConfigMapKeyToFile(kubeClient, "default", "test-cm", "my-key", filePath, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal("my-value-content\n"))
+		})
+	})
+
+	Context("when the ConfigMap does not exist", func() {
+		It("should return an error", func() {
+			filePath := filepath.Join(tmpDir, "output.txt")
+			err := writeConfigMapKeyToFile(kubeClient, "default", "nonexistent-cm", "my-key", filePath, false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error getting ConfigMap"))
+		})
+	})
+
+	Context("when the key does not exist in the ConfigMap", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"other-key": "other-value",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return an error about missing key", func() {
+			filePath := filepath.Join(tmpDir, "output.txt")
+			err := writeConfigMapKeyToFile(kubeClient, "default", "test-cm", "missing-key", filePath, false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("key missing-key not found"))
+		})
+	})
+})
+
+var _ = Describe("getConfigMapKey", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+	})
+
+	Context("when ConfigMap and key exist", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"ca.crt": "certificate-data-here",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return the value", func() {
+			val, err := getConfigMapKey(kubeClient, "default", "test-cm", "ca.crt")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal("certificate-data-here"))
+		})
+	})
+
+	Context("when the ConfigMap does not exist", func() {
+		It("should return an error", func() {
+			_, err := getConfigMapKey(kubeClient, "default", "nonexistent", "key")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error getting ConfigMap"))
+		})
+	})
+
+	Context("when the key does not exist", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "default",
+				},
+				Data: map[string]string{
+					"other-key": "value",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("default").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return an error about missing key", func() {
+			_, err := getConfigMapKey(kubeClient, "default", "test-cm", "missing-key")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("key missing-key not found"))
+		})
+	})
+})
+
+var _ = Describe("getHTTPSTransport", func() {
+	Context("with nil client", func() {
+		It("should return a transport with system cert pool", func() {
+			transport := getHTTPSTransport(nil)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig).ToNot(BeNil())
+			Expect(transport.TLSClientConfig.MinVersion).To(Equal(uint16(tls.VersionTLS12)))
+		})
+	})
+
+	Context("with a fake client and no configmaps", func() {
+		It("should return a transport falling back to system certs", func() {
+			kubeClient := fake.NewSimpleClientset()
+			transport := getHTTPSTransport(kubeClient)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig).ToNot(BeNil())
+		})
+	})
+
+	Context("with a fake client and kube-root-ca.crt configmap", func() {
+		It("should use the CA data from the configmap", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-root-ca.crt",
+					Namespace: "openshift-config-managed",
+				},
+				Data: map[string]string{
+					"ca.crt": string(testCACert),
+				},
+			}
+			kubeClient := fake.NewSimpleClientset(cm)
+			transport := getHTTPSTransport(kubeClient)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig).ToNot(BeNil())
+			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
+		})
+	})
+
+	Context("with both kube-root-ca and trusted-ca-bundle", func() {
+		It("should merge both CA bundles", func() {
+			cm1 := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-root-ca.crt",
+					Namespace: "openshift-config-managed",
+				},
+				Data: map[string]string{
+					"ca.crt": string(testCACert),
+				},
+			}
+			cm2 := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "trusted-ca-bundle",
+					Namespace: "openshift-config-managed",
+				},
+				Data: map[string]string{
+					"ca-bundle.crt": string(testCACert),
+				},
+			}
+			kubeClient := fake.NewSimpleClientset(cm1, cm2)
+			transport := getHTTPSTransport(kubeClient)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
+		})
+	})
+})
+
+var _ = Describe("IsCommonSlimmed", func() {
+	var tmpDir string
+
+	BeforeEach(func() {
+		tmpDir = createTempDir("vp-slimmed-test")
+	})
+
+	AfterEach(func() {
+		cleanupTempDir(tmpDir)
+	})
+
+	Context("when common/operator-install directory exists", func() {
+		It("should return false (not slimmed)", func() {
+			err := os.MkdirAll(filepath.Join(tmpDir, "common", "operator-install"), 0755)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(IsCommonSlimmed(tmpDir)).To(BeFalse())
+		})
+	})
+
+	Context("when common/operator-install directory does not exist", func() {
+		It("should return true (slimmed)", func() {
+			Expect(IsCommonSlimmed(tmpDir)).To(BeTrue())
+		})
+	})
+
+	Context("when common directory exists but operator-install does not", func() {
+		It("should return true (slimmed)", func() {
+			err := os.MkdirAll(filepath.Join(tmpDir, "common"), 0755)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(IsCommonSlimmed(tmpDir)).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("IntOrZero", func() {
+	Context("when the key exists and has a valid integer value", func() {
+		It("should return the integer value", func() {
+			secret := map[string][]byte{
+				"appID": []byte("12345"),
+			}
+			val, err := IntOrZero(secret, "appID")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(12345)))
+		})
+	})
+
+	Context("when the key does not exist", func() {
+		It("should return 0", func() {
+			secret := map[string][]byte{}
+			val, err := IntOrZero(secret, "appID")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(0)))
+		})
+	})
+
+	Context("when the key exists but has an invalid value", func() {
+		It("should return an error", func() {
+			secret := map[string][]byte{
+				"appID": []byte("not-a-number"),
+			}
+			_, err := IntOrZero(secret, "appID")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when the key exists with a negative value", func() {
+		It("should return the negative integer", func() {
+			secret := map[string][]byte{
+				"appID": []byte("-42"),
+			}
+			val, err := IntOrZero(secret, "appID")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(-42)))
+		})
+	})
+
+	Context("when the key exists with a zero value", func() {
+		It("should return 0", func() {
+			secret := map[string][]byte{
+				"appID": []byte("0"),
+			}
+			val, err := IntOrZero(secret, "appID")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(0)))
+		})
+	})
+
+	Context("when the key exists with an empty string value", func() {
+		It("should return an error", func() {
+			secret := map[string][]byte{
+				"appID": []byte(""),
+			}
+			_, err := IntOrZero(secret, "appID")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("DefaultRandRead", func() {
+	It("should fill the buffer with random bytes", func() {
+		buf := make([]byte, 32)
+		n, err := DefaultRandRead(buf)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(n).To(Equal(32))
+		// Verify not all zeros (extremely unlikely with random data)
+		allZeros := true
+		for _, b := range buf {
+			if b != 0 {
+				allZeros = false
+				break
+			}
+		}
+		Expect(allZeros).To(BeFalse())
+	})
+
+	It("should fill different buffers with different data", func() {
+		buf1 := make([]byte, 32)
+		buf2 := make([]byte, 32)
+		_, err1 := DefaultRandRead(buf1)
+		_, err2 := DefaultRandRead(buf2)
+		Expect(err1).ToNot(HaveOccurred())
+		Expect(err2).ToNot(HaveOccurred())
+		Expect(buf1).ToNot(Equal(buf2))
+	})
+})
+
+var _ = Describe("logOnce", func() {
+	It("should not panic when called multiple times with same message", func() {
+		// Reset the logKeys map for a clean test
+		logKeys = map[string]bool{}
+		Expect(func() {
+			logOnce("test message for logOnce")
+			logOnce("test message for logOnce")
+			logOnce("test message for logOnce")
+		}).ToNot(Panic())
+	})
+
+	It("should record the message in the logKeys map", func() {
+		logKeys = map[string]bool{}
+		logOnce("unique log message")
+		Expect(logKeys).To(HaveKey("unique log message"))
+		Expect(logKeys["unique log message"]).To(BeTrue())
+	})
+
+	It("should handle multiple different messages", func() {
+		logKeys = map[string]bool{}
+		logOnce("message one")
+		logOnce("message two")
+		Expect(logKeys).To(HaveKey("message one"))
+		Expect(logKeys).To(HaveKey("message two"))
+		Expect(logKeys).To(HaveLen(2))
+	})
+})
+
+var _ = Describe("createNamespace", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+	})
+
+	Context("when the namespace does not exist", func() {
+		It("should create it", func() {
+			err := createNamespace(kubeClient, "new-namespace")
+			Expect(err).ToNot(HaveOccurred())
+
+			ns, err := kubeClient.CoreV1().Namespaces().Get(context.Background(), "new-namespace", metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ns.Name).To(Equal("new-namespace"))
+		})
+	})
+
+	Context("when the namespace already exists", func() {
+		BeforeEach(func() {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "existing-ns"}}
+			_, err := kubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should not return an error", func() {
+			err := createNamespace(kubeClient, "existing-ns")
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when there is an API error", func() {
+		It("should return the error", func() {
+			fakeClient := fake.NewSimpleClientset()
+			fakeClient.PrependReactor("get", "namespaces", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("internal error"))
+			})
+			err := createNamespace(fakeClient, "error-ns")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("createTrustedBundleCM", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+	})
+
+	Context("when the configmap does not exist", func() {
+		It("should create it with the correct labels", func() {
+			err := createTrustedBundleCM(kubeClient, "test-namespace")
+			Expect(err).ToNot(HaveOccurred())
+
+			cm, err := kubeClient.CoreV1().ConfigMaps("test-namespace").Get(context.Background(), "trusted-ca-bundle", metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Labels).To(HaveKeyWithValue("config.openshift.io/inject-trusted-cabundle", "true"))
+		})
+	})
+
+	Context("when the configmap already exists", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "trusted-ca-bundle",
+					Namespace: "test-namespace",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-namespace").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should not return an error", func() {
+			err := createTrustedBundleCM(kubeClient, "test-namespace")
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when there is a get error other than NotFound", func() {
+		It("should return the error", func() {
+			fakeClient := fake.NewSimpleClientset()
+			fakeClient.PrependReactor("get", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, kubeerrors.NewInternalError(fmt.Errorf("internal error"))
+			})
+			err := createTrustedBundleCM(fakeClient, "test-namespace")
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })

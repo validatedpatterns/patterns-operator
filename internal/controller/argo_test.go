@@ -1851,3 +1851,377 @@ var _ = Describe("ConvertArgoHelmParametersToMap", func() {
 		})
 	})
 })
+
+var _ = Describe("newApplicationValues", func() {
+	It("should return extraParametersNested YAML with all extra parameters", func() {
+		pattern := &api.Pattern{
+			Spec: api.PatternSpec{
+				ExtraParameters: []api.PatternParameter{
+					{Name: "global.extraParam1", Value: "extraValue1"},
+					{Name: "global.extraParam2", Value: "extraValue2"},
+				},
+			},
+		}
+		result := newApplicationValues(pattern)
+		Expect(result).To(ContainSubstring("extraParametersNested:"))
+		Expect(result).To(ContainSubstring("global.extraParam1: extraValue1"))
+		Expect(result).To(ContainSubstring("global.extraParam2: extraValue2"))
+	})
+
+	It("should return only the header when no extra parameters exist", func() {
+		pattern := &api.Pattern{
+			Spec: api.PatternSpec{
+				ExtraParameters: []api.PatternParameter{},
+			},
+		}
+		result := newApplicationValues(pattern)
+		Expect(result).To(Equal("extraParametersNested:\n"))
+	})
+
+	It("should handle a single extra parameter", func() {
+		pattern := &api.Pattern{
+			Spec: api.PatternSpec{
+				ExtraParameters: []api.PatternParameter{
+					{Name: "key", Value: "value"},
+				},
+			},
+		}
+		result := newApplicationValues(pattern)
+		Expect(result).To(Equal("extraParametersNested:\n  key: value\n"))
+	})
+})
+
+var _ = Describe("removeApplication", func() {
+	Context("when the application exists", func() {
+		It("should delete the application without error", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-app",
+					Namespace: "openshift-gitops",
+				},
+			}
+			argoClient := argoclient.NewSimpleClientset(app)
+
+			err := removeApplication(argoClient, "test-app", "openshift-gitops")
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify the application is gone
+			_, err = argoClient.ArgoprojV1alpha1().Applications("openshift-gitops").Get(
+				context.Background(), "test-app", metav1.GetOptions{})
+			Expect(err).To(HaveOccurred())
+			Expect(kerrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	Context("when the application does not exist", func() {
+		It("should return an error", func() {
+			argoClient := argoclient.NewSimpleClientset()
+			err := removeApplication(argoClient, "nonexistent", "openshift-gitops")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("newArgoGiteaApplication", func() {
+	var pattern *api.Pattern
+
+	BeforeEach(func() {
+		tmpFalse := false
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pattern",
+				Namespace: "default",
+			},
+			Spec: api.PatternSpec{
+				ClusterGroupName: "hub",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/test/repo",
+					TargetRevision: "main",
+				},
+				GitOpsConfig: &api.GitOpsConfig{
+					ManualSync: false,
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled: &tmpFalse,
+				},
+			},
+			Status: api.PatternStatus{
+				AppClusterDomain: "apps.example.com",
+				ClusterPlatform:  "AWS",
+				ClusterVersion:   "4.14.0",
+			},
+		}
+		PatternsOperatorConfig = GitOpsConfig{}
+	})
+
+	It("should create the Gitea application with correct name", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Name).To(Equal(GiteaApplicationName))
+		Expect(app.Namespace).To(Equal(getClusterWideArgoNamespace()))
+	})
+
+	It("should set the pattern label", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Labels).To(HaveKeyWithValue("validatedpatterns.io/pattern", "test-pattern"))
+	})
+
+	It("should set the destination namespace to GiteaNamespace", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Spec.Destination.Namespace).To(Equal(GiteaNamespace))
+	})
+
+	It("should set destination to in-cluster", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Spec.Destination.Name).To(Equal("in-cluster"))
+	})
+
+	It("should set the project to default", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Spec.Project).To(Equal("default"))
+	})
+
+	It("should include helm parameters for gitea admin secret and console href", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Spec.Source).ToNot(BeNil())
+		Expect(app.Spec.Source.Helm).ToNot(BeNil())
+
+		params := app.Spec.Source.Helm.Parameters
+		paramMap := make(map[string]string)
+		for _, p := range params {
+			paramMap[p.Name] = p.Value
+		}
+		Expect(paramMap).To(HaveKeyWithValue("gitea.admin.existingSecret", GiteaAdminSecretName))
+		Expect(paramMap).To(HaveKey("gitea.console.href"))
+		Expect(paramMap["gitea.console.href"]).To(ContainSubstring("apps.example.com"))
+		Expect(paramMap).To(HaveKey("gitea.config.server.ROOT_URL"))
+	})
+
+	It("should have the foreground propagation finalizer", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(controllerutil.ContainsFinalizer(app, argoapi.ForegroundPropagationPolicyFinalizer)).To(BeTrue())
+	})
+
+	It("should set a sync policy when not manual sync", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Spec.SyncPolicy).ToNot(BeNil())
+		Expect(app.Spec.SyncPolicy.Automated).ToNot(BeNil())
+	})
+
+	It("should have nil sync policy when manual sync is enabled", func() {
+		pattern.Spec.GitOpsConfig.ManualSync = true
+		app := newArgoGiteaApplication(pattern)
+		Expect(app.Spec.SyncPolicy).To(BeNil())
+	})
+})
+
+var _ = Describe("newArgoCD", func() {
+	It("should create an ArgoCD with the correct name and namespace", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Name).To(Equal("test-argo"))
+		Expect(argo.Namespace).To(Equal("test-ns"))
+	})
+
+	It("should have the argoproj.io/finalizer", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Finalizers).To(ContainElement("argoproj.io/finalizer"))
+	})
+
+	It("should have HA disabled", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.HA.Enabled).To(BeFalse())
+	})
+
+	It("should have monitoring disabled", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.Monitoring.Enabled).To(BeFalse())
+	})
+
+	It("should have notifications disabled", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.Notifications.Enabled).To(BeFalse())
+	})
+
+	It("should have SSO configured with Dex provider", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.SSO).ToNot(BeNil())
+		Expect(argo.Spec.SSO.Provider).To(Equal(argooperator.SSOProviderTypeDex))
+		Expect(argo.Spec.SSO.Dex).ToNot(BeNil())
+		Expect(argo.Spec.SSO.Dex.OpenShiftOAuth).To(BeTrue())
+	})
+
+	It("should have server route enabled with reencrypt TLS", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.Server.Route.Enabled).To(BeTrue())
+		Expect(argo.Spec.Server.Route.TLS).ToNot(BeNil())
+		Expect(argo.Spec.Server.Route.TLS.Termination).To(Equal(routev1.TLSTerminationReencrypt))
+	})
+
+	It("should have resource exclusions for tekton", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("tekton.dev"))
+		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("TaskRun"))
+		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("PipelineRun"))
+	})
+
+	It("should have resource health checks for Subscription", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
+		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("Subscription"))
+	})
+
+	It("should have init containers for CA cert fetching", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.Repo.InitContainers).To(HaveLen(1))
+		Expect(argo.Spec.Repo.InitContainers[0].Name).To(Equal("fetch-ca"))
+	})
+
+	It("should have correct RBAC policy", func() {
+		argo := newArgoCD("test-argo", "test-ns")
+		Expect(argo.Spec.RBAC.Policy).ToNot(BeNil())
+		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
+	})
+})
+
+var _ = Describe("commonSyncPolicy", func() {
+	It("should return automated sync policy when not deleting and not manual", func() {
+		pattern := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitOpsConfig: &api.GitOpsConfig{ManualSync: false},
+			},
+		}
+		policy := commonSyncPolicy(pattern)
+		Expect(policy).ToNot(BeNil())
+		Expect(policy.Automated).ToNot(BeNil())
+		Expect(policy.Automated.Prune).To(BeFalse())
+	})
+
+	It("should return nil sync policy when manual sync is enabled", func() {
+		pattern := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitOpsConfig: &api.GitOpsConfig{ManualSync: true},
+			},
+		}
+		policy := commonSyncPolicy(pattern)
+		Expect(policy).To(BeNil())
+	})
+})
+
+var _ = Describe("applicationName", func() {
+	It("should return pattern name combined with cluster group name", func() {
+		pattern := &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-pattern"},
+			Spec:       api.PatternSpec{ClusterGroupName: "hub"},
+		}
+		Expect(applicationName(pattern)).To(Equal("my-pattern-hub"))
+	})
+
+	It("should handle different cluster group names", func() {
+		pattern := &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "industrial-edge"},
+			Spec:       api.PatternSpec{ClusterGroupName: "factory"},
+		}
+		Expect(applicationName(pattern)).To(Equal("industrial-edge-factory"))
+	})
+})
+
+var _ = Describe("syncApplication", func() {
+	Context("when no sync is in progress", func() {
+		It("should set the sync operation with prune", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-app",
+					Namespace: "openshift-gitops",
+				},
+			}
+			argoFakeClient := argoclient.NewSimpleClientset(app)
+
+			err := syncApplication(argoFakeClient, app, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(app.Operation).ToNot(BeNil())
+			Expect(app.Operation.Sync).ToNot(BeNil())
+			Expect(app.Operation.Sync.Prune).To(BeTrue())
+			Expect(app.Operation.Sync.SyncOptions).To(ContainElement("Force=true"))
+		})
+
+		It("should set the sync operation without prune", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-app",
+					Namespace: "openshift-gitops",
+				},
+			}
+			argoFakeClient := argoclient.NewSimpleClientset(app)
+
+			err := syncApplication(argoFakeClient, app, false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(app.Operation).ToNot(BeNil())
+			Expect(app.Operation.Sync.Prune).To(BeFalse())
+		})
+	})
+
+	Context("when a matching sync is already in progress", func() {
+		It("should return nil without updating", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-app",
+					Namespace: "openshift-gitops",
+				},
+				Operation: &argoapi.Operation{
+					Sync: &argoapi.SyncOperation{
+						Prune:       true,
+						SyncOptions: []string{"Force=true"},
+					},
+				},
+			}
+			argoFakeClient := argoclient.NewSimpleClientset(app)
+
+			err := syncApplication(argoFakeClient, app, true)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("getChildApplications", func() {
+	Context("when child applications exist", func() {
+		It("should return the child applications", func() {
+			parentApp := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-app",
+					Namespace: "openshift-gitops",
+				},
+			}
+			childApp := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "child-app",
+					Namespace: "openshift-gitops",
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": "parent-app",
+					},
+				},
+			}
+			argoFakeClient := argoclient.NewSimpleClientset(parentApp, childApp)
+
+			children, err := getChildApplications(argoFakeClient, parentApp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(children).To(HaveLen(1))
+			Expect(children[0].Name).To(Equal("child-app"))
+		})
+	})
+
+	Context("when no child applications exist", func() {
+		It("should return an empty list", func() {
+			parentApp := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-app",
+					Namespace: "openshift-gitops",
+				},
+			}
+			argoFakeClient := argoclient.NewSimpleClientset(parentApp)
+
+			children, err := getChildApplications(argoFakeClient, parentApp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(children).To(BeEmpty())
+		})
+	})
+})

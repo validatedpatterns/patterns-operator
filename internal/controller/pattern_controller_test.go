@@ -164,3 +164,268 @@ func buildTestApplicationInfoArray() []api.PatternApplicationInfo {
 
 	return applications
 }
+
+var _ = Describe("pattern controller - preValidation", func() {
+	var reconciler *PatternReconciler
+
+	BeforeEach(func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler = newFakeReconciler(nsOperators, buildPatternManifest())
+	})
+
+	It("should pass with valid https target and origin repos", func() {
+		p := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitConfig: api.GitConfig{
+					TargetRepo: "https://github.com/test/repo",
+					OriginRepo: "https://github.com/upstream/repo",
+				},
+			},
+		}
+		err := reconciler.preValidation(p)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should pass with valid ssh target repo", func() {
+		p := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitConfig: api.GitConfig{
+					TargetRepo: "git@github.com:test/repo.git",
+				},
+			},
+		}
+		err := reconciler.preValidation(p)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should fail when target repo is empty", func() {
+		p := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitConfig: api.GitConfig{
+					TargetRepo: "",
+				},
+			},
+		}
+		err := reconciler.preValidation(p)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("TargetRepo cannot be empty"))
+	})
+
+	It("should fail with invalid origin repo URL", func() {
+		p := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitConfig: api.GitConfig{
+					OriginRepo: "invalid-url",
+					TargetRepo: "https://github.com/test/repo",
+				},
+			},
+		}
+		err := reconciler.preValidation(p)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should fail with invalid target repo URL", func() {
+		p := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitConfig: api.GitConfig{
+					TargetRepo: "invalid-url",
+				},
+			},
+		}
+		err := reconciler.preValidation(p)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should pass when origin repo is empty but target repo is valid", func() {
+		p := &api.Pattern{
+			Spec: api.PatternSpec{
+				GitConfig: api.GitConfig{
+					OriginRepo: "",
+					TargetRepo: "https://github.com/test/repo",
+				},
+			},
+		}
+		err := reconciler.preValidation(p)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("pattern controller - applyDefaults", func() {
+	var reconciler *PatternReconciler
+
+	BeforeEach(func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler = newFakeReconciler(nsOperators, buildPatternManifest())
+	})
+
+	It("should set cluster info from configClient", func() {
+		p := buildPatternManifest()
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Status.ClusterPlatform).To(Equal("AWS"))
+		Expect(output.Status.ClusterVersion).To(Equal("4.10"))
+	})
+
+	It("should set the cluster domain from ingress", func() {
+		p := buildPatternManifest()
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Status.AppClusterDomain).To(Equal("hello.world"))
+	})
+
+	It("should default TargetRevision to HEAD when empty", func() {
+		p := buildPatternManifest()
+		p.Spec.GitConfig.TargetRevision = ""
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.GitConfig.TargetRevision).To(Equal(GitHEAD))
+	})
+
+	It("should preserve TargetRevision when set", func() {
+		p := buildPatternManifest()
+		p.Spec.GitConfig.TargetRevision = "v1.0.0"
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.GitConfig.TargetRevision).To(Equal("v1.0.0"))
+	})
+
+	It("should default OriginRevision to HEAD when empty", func() {
+		p := buildPatternManifest()
+		p.Spec.GitConfig.OriginRevision = ""
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.GitConfig.OriginRevision).To(Equal(GitHEAD))
+	})
+
+	It("should default MultiSourceConfig.Enabled to true when nil", func() {
+		p := buildPatternManifest()
+		p.Spec.MultiSourceConfig.Enabled = nil
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.MultiSourceConfig.Enabled).ToNot(BeNil())
+		Expect(*output.Spec.MultiSourceConfig.Enabled).To(BeTrue())
+	})
+
+	It("should default ClusterGroupName to 'default' when empty", func() {
+		p := buildPatternManifest()
+		p.Spec.ClusterGroupName = ""
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.ClusterGroupName).To(Equal("default"))
+	})
+
+	It("should default HelmRepoUrl when empty", func() {
+		p := buildPatternManifest()
+		p.Spec.MultiSourceConfig.HelmRepoUrl = ""
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.MultiSourceConfig.HelmRepoUrl).To(Equal("https://charts.validatedpatterns.io/"))
+	})
+
+	It("should initialize GitOpsConfig when nil", func() {
+		p := buildPatternManifest()
+		p.Spec.GitOpsConfig = nil
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.GitOpsConfig).ToNot(BeNil())
+	})
+
+	It("should extract hostname from TargetRepo when Hostname is empty", func() {
+		p := buildPatternManifest()
+		p.Spec.GitConfig.Hostname = ""
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.GitConfig.Hostname).To(Equal("target.url"))
+	})
+
+	It("should preserve hostname when already set", func() {
+		p := buildPatternManifest()
+		p.Spec.GitConfig.Hostname = "custom.hostname.io"
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.GitConfig.Hostname).To(Equal("custom.hostname.io"))
+	})
+
+	It("should set LocalCheckoutPath", func() {
+		p := buildPatternManifest()
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Status.LocalCheckoutPath).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("pattern controller - postValidation", func() {
+	It("should always return nil", func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler := newFakeReconciler(nsOperators, buildPatternManifest())
+		p := buildPatternManifest()
+		err := reconciler.postValidation(p)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("pattern controller - buildPatternManifest helpers", func() {
+	It("should create a pattern with the correct name", func() {
+		p := buildPatternManifest()
+		Expect(p.Name).To(Equal(foo))
+	})
+
+	It("should create a pattern with the correct namespace", func() {
+		p := buildPatternManifest()
+		Expect(p.Namespace).To(Equal(namespace))
+	})
+
+	It("should include the pattern finalizer", func() {
+		p := buildPatternManifest()
+		Expect(p.Finalizers).To(ContainElement(api.PatternFinalizer))
+	})
+
+	It("should set the git config", func() {
+		p := buildPatternManifest()
+		Expect(p.Spec.GitConfig.OriginRepo).To(Equal(originURL))
+		Expect(p.Spec.GitConfig.TargetRepo).To(Equal(targetURL))
+	})
+
+	It("should set the cluster platform status", func() {
+		p := buildPatternManifest()
+		Expect(p.Status.ClusterPlatform).To(Equal("AWS"))
+		Expect(p.Status.ClusterVersion).To(Equal("1.2.3"))
+	})
+})
+
+var _ = Describe("pattern controller - reconciler creation", func() {
+	It("should create a reconciler with all required clients", func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler := newFakeReconciler(nsOperators, buildPatternManifest())
+		Expect(reconciler).ToNot(BeNil())
+		Expect(reconciler.Client).ToNot(BeNil())
+		Expect(reconciler.Scheme).ToNot(BeNil())
+		Expect(reconciler.olmClient).ToNot(BeNil())
+		Expect(reconciler.fullClient).ToNot(BeNil())
+		Expect(reconciler.configClient).ToNot(BeNil())
+		Expect(reconciler.operatorClient).ToNot(BeNil())
+		Expect(reconciler.AnalyticsClient).ToNot(BeNil())
+		Expect(reconciler.gitOperations).ToNot(BeNil())
+	})
+})
+
+var _ = Describe("pattern controller - fetching pattern", func() {
+	It("should be able to get the pattern after creation", func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler := newFakeReconciler(nsOperators, buildPatternManifest())
+		p := &api.Pattern{}
+		err := reconciler.Client.Get(context.Background(), patternNamespaced, p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(p.Name).To(Equal(foo))
+		Expect(p.Namespace).To(Equal(namespace))
+	})
+
+	It("should return error for nonexistent pattern", func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler := newFakeReconciler(nsOperators, buildPatternManifest())
+		p := &api.Pattern{}
+		err := reconciler.Client.Get(context.Background(),
+			types.NamespacedName{Name: "nonexistent", Namespace: namespace}, p)
+		Expect(err).To(HaveOccurred())
+	})
+})
