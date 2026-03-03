@@ -17,7 +17,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { fetchPattern, fetchSecretTemplate } from '../api';
-import { Pattern, SecretTemplate, SecretFormData } from '../types';
+import { Pattern, SecretTemplate, SecretFormData, SecretDefinition, SecretField } from '../types';
 import { GenerateField } from './SecretForm/GenerateField';
 import { PromptField } from './SecretForm/PromptField';
 import { FileField } from './SecretForm/FileField';
@@ -38,6 +38,7 @@ export default function SecretFormPage() {
   const [pattern, setPattern] = React.useState<Pattern | null>(null);
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
+  const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
@@ -48,13 +49,19 @@ export default function SecretFormPage() {
         // Initialize form data
         if (templateData) {
           const initialData: SecretFormData = {};
-          templateData.secrets.forEach((secret) => {
+          const initialExpanded: Record<string, boolean> = {};
+
+          templateData.secrets.forEach((secret, index) => {
             initialData[secret.name] = {};
             secret.fields.forEach((field) => {
               initialData[secret.name][field.name] = '';
             });
+            // Expand the first section by default
+            initialExpanded[secret.name] = index === 0;
           });
+
           setSecretFormData(initialData);
+          setExpandedSections(initialExpanded);
         }
 
         setLoading(false);
@@ -88,6 +95,13 @@ export default function SecretFormPage() {
   const handleSkip = () => {
     // Navigate back to install page without secrets
     history.push(`/patterns/install/${name}`);
+  };
+
+  const toggleSection = (sectionName: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionName]: !prev[sectionName],
+    }));
   };
 
   const getFieldType = (field: SecretField): 'generate' | 'prompt' | 'file' | 'ini' | 'static' => {
@@ -165,11 +179,12 @@ export default function SecretFormPage() {
       </PageSection>
       <PageSection>
         <Form className="patterns-operator__secret-form">
-          {secretTemplate.secrets.map((secret, index) => (
+          {secretTemplate.secrets.map((secret) => (
             <ExpandableSection
               key={secret.name}
               toggleText={secret.name}
-              isExpanded={index === 0} // First section expanded by default
+              isExpanded={expandedSections[secret.name] || false}
+              onToggle={() => toggleSection(secret.name)}
               className="patterns-operator__secret-section"
             >
               <Card>
