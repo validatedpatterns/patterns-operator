@@ -72,9 +72,7 @@ export default function PatternCatalogPage() {
             {patterns.map((pattern) => (
               <Card key={pattern.name} className="patterns-operator__card">
                 <CardHeader>
-                  <Label color={TIER_COLORS[pattern.tier] || 'grey'}>
-                    {pattern.tier}
-                  </Label>
+                  <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
                 </CardHeader>
                 <CardTitle>{pattern.display_name}</CardTitle>
                 <CardBody>
@@ -88,14 +86,15 @@ export default function PatternCatalogPage() {
                     </div>
                   )}
                   <div className="patterns-operator__card-field">
-                    <strong>{t('Owners')}:</strong>{' '}
-                    {pattern.owners?.join(', ')}
+                    <strong>{t('Owners')}:</strong> {pattern.owners?.join(', ')}
                   </div>
                 </CardBody>
                 <CardFooter className="patterns-operator__card-footer">
                   <Button
                     variant="primary"
-                    onClick={() => history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)}
+                    onClick={() =>
+                      history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
+                    }
                   >
                     {t('Install')}
                   </Button>

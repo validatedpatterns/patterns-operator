@@ -44,3 +44,38 @@ export interface Pattern {
   /** The catalog directory key used to fetch this pattern. */
   catalogKey?: string;
 }
+
+export interface SecretTemplate {
+  version: string;
+  backingStore?: string;
+  vaultPolicies?: Record<string, string>;
+  secrets: SecretDefinition[];
+}
+
+export interface SecretDefinition {
+  name: string;
+  vaultMount?: string;
+  vaultPrefixes?: string[];
+  fields: SecretField[];
+}
+
+export interface SecretField {
+  name: string;
+  onMissingValue?: 'generate' | 'prompt' | 'error';
+  vaultPolicy?: string;
+  value?: string | null;
+  description?: string;
+  path?: string;
+  base64?: boolean;
+  ini_file?: string;
+  ini_section?: string;
+  ini_key?: string;
+  prompt?: string;
+  override?: boolean;
+}
+
+export interface SecretFormData {
+  [secretName: string]: {
+    [fieldName: string]: string | File | null;
+  };
+}

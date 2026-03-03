@@ -1,6 +1,6 @@
 import { consoleFetch } from '@openshift-console/dynamic-plugin-sdk';
 import { load } from 'js-yaml';
-import { Catalog, Pattern } from './types';
+import { Catalog, Pattern, SecretTemplate } from './types';
 
 const PROXY_BASE = '/api/proxy/plugin/patterns-operator-console-plugin/pattern-catalog';
 
@@ -27,4 +27,12 @@ export async function fetchAllPatterns(): Promise<Pattern[]> {
     }),
   );
   return patterns;
+}
+
+export async function fetchSecretTemplate(name: string): Promise<SecretTemplate | null> {
+  try {
+    return await fetchYAML<SecretTemplate>(`${PROXY_BASE}/${name}/values-secret.yaml.template`);
+  } catch {
+    return null; // Template doesn't exist
+  }
 }

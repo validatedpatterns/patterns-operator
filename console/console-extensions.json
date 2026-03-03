@@ -25,6 +25,14 @@
     }
   },
   {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/patterns/install/:name/secrets",
+      "component": { "$codeRef": "SecretFormPage" }
+    }
+  },
+  {
     "type": "console.navigation/href",
     "properties": {
       "id": "patterns",

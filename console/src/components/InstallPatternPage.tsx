@@ -14,8 +14,8 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
-import { fetchPattern } from '../api';
-import { Pattern } from '../types';
+import { fetchPattern, fetchSecretTemplate } from '../api';
+import { SecretTemplate, SecretFormData } from '../types';
 
 const PatternModel = {
   apiGroup: 'gitops.hybrid-cloud-patterns.io',
@@ -34,6 +34,14 @@ export default function InstallPatternPage() {
   const match = useRouteMatch<{ name: string }>('/patterns/install/:name');
   const name = match?.params?.name;
 
+  // Get secret data from navigation state (when returning from secrets page)
+  const locationState = history.location.state as
+    | {
+        secretData?: SecretFormData;
+        secretTemplate?: SecretTemplate;
+      }
+    | undefined;
+
   const [loading, setLoading] = React.useState(true);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -45,42 +53,71 @@ export default function InstallPatternPage() {
   const [targetRepo, setTargetRepo] = React.useState('');
   const [targetRevision, setTargetRevision] = React.useState('main');
 
+  const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
+  const secretData = locationState?.secretData || null;
+
   React.useEffect(() => {
-    fetchPattern(name)
-      .then((pattern: Pattern) => {
+    Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
+      .then(([pattern, template]) => {
         setPatternName(pattern.name);
         setTargetRepo(pattern.repo_url || '');
+        setSecretTemplate(template);
+
+        // Update secret template if returned from secrets page
+        if (locationState?.secretTemplate) {
+          setSecretTemplate(locationState.secretTemplate);
+        }
+
         setLoading(false);
       })
       .catch((err) => {
         setFetchError(err?.message || String(err));
         setLoading(false);
       });
-  }, [name]);
+  }, [name, locationState]);
 
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await k8sCreate({
-        model: PatternModel,
-        data: {
-          apiVersion: 'gitops.hybrid-cloud-patterns.io/v1alpha1',
-          kind: 'Pattern',
-          metadata: {
-            name: patternName,
-            // FIXME(bandini): we need a way to override this for the time when we move our operator to
-            // another namespace
-            namespace: 'openshift-operators',
-          },
-          spec: {
-            clusterGroupName,
-            gitSpec: {
-              targetRepo,
-              targetRevision,
-            },
+      const patternData: {
+        apiVersion: string;
+        kind: string;
+        metadata: { name: string; namespace: string };
+        spec: {
+          clusterGroupName: string;
+          gitSpec: { targetRepo: string; targetRevision: string };
+          secretsConfig?: { template: string; values: string };
+        };
+      } = {
+        apiVersion: 'gitops.hybrid-cloud-patterns.io/v1alpha1',
+        kind: 'Pattern',
+        metadata: {
+          name: patternName,
+          // FIXME(bandini): we need a way to override this for the time when we move our operator to
+          // another namespace
+          namespace: 'openshift-operators',
+        },
+        spec: {
+          clusterGroupName,
+          gitSpec: {
+            targetRepo,
+            targetRevision,
           },
         },
+      };
+
+      // Include secret configuration if provided
+      if (secretData && secretTemplate) {
+        patternData.spec.secretsConfig = {
+          template: btoa(JSON.stringify(secretTemplate)),
+          values: btoa(JSON.stringify(secretData)),
+        };
+      }
+
+      await k8sCreate({
+        model: PatternModel,
+        data: patternData,
       });
       setSuccess(true);
     } catch (err) {
@@ -129,8 +166,18 @@ export default function InstallPatternPage() {
             {submitError}
           </Alert>
         )}
+        {secretData && secretTemplate && (
+          <Alert variant="info" title={t('Secrets Configured')} isInline>
+            {t('Secret configuration has been provided for this pattern installation.')}
+          </Alert>
+        )}
         {!success && (
-          <Form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+          >
             <FormGroup label={t('Name')} isRequired fieldId="pattern-name">
               <TextInput
                 id="pattern-name"
@@ -164,6 +211,14 @@ export default function InstallPatternPage() {
               />
             </FormGroup>
             <ActionGroup>
+              {secretTemplate && (
+                <Button
+                  variant="secondary"
+                  onClick={() => history.push(`/patterns/install/${name}/secrets`)}
+                >
+                  {secretData ? t('Reconfigure Secrets') : t('Configure Secrets')}
+                </Button>
+              )}
               <Button
                 variant="primary"
                 type="submit"
