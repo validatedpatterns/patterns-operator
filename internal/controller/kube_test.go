@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	discoveryfake "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/client-go/kubernetes/scheme"
@@ -700,4 +701,167 @@ var _ = Describe("checkAPIVersion", func() {
 	// 	err := checkAPIVersion(clientset, "example.com", "v1")
 	// 	Expect(err).To(MatchError("failed to get API groups: discovery error"))
 	// })
+})
+
+var _ = Describe("ObjectYaml", func() {
+	Context("with a valid object", func() {
+		It("should return valid YAML", func() {
+			obj := map[string]string{"name": "test", "value": "hello"}
+			result, err := objectYaml(obj)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(ContainSubstring("name: test"))
+			Expect(result).To(ContainSubstring("value: hello"))
+		})
+	})
+
+	Context("with a nil object", func() {
+		It("should return null YAML", func() {
+			result, err := objectYaml(nil)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(ContainSubstring("null"))
+		})
+	})
+})
+
+var _ = Describe("ReferSameObject", func() {
+	Context("when references point to same object", func() {
+		It("should return true", func() {
+			ref1 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test-cm",
+				UID:        "uid-123",
+			}
+			ref2 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test-cm",
+				UID:        "uid-123",
+			}
+			Expect(referSameObject(ref1, ref2)).To(BeTrue())
+		})
+	})
+
+	Context("when references point to different objects", func() {
+		It("should return false for different names", func() {
+			ref1 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test-cm-1",
+				UID:        "uid-123",
+			}
+			ref2 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test-cm-2",
+				UID:        "uid-123",
+			}
+			Expect(referSameObject(ref1, ref2)).To(BeFalse())
+		})
+
+		It("should return false for different UIDs", func() {
+			ref1 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test-cm",
+				UID:        "uid-123",
+			}
+			ref2 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test-cm",
+				UID:        "uid-456",
+			}
+			Expect(referSameObject(ref1, ref2)).To(BeFalse())
+		})
+
+		It("should return false for different kinds", func() {
+			ref1 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test",
+				UID:        "uid-123",
+			}
+			ref2 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Secret",
+				Name:       "test",
+				UID:        "uid-123",
+			}
+			Expect(referSameObject(ref1, ref2)).To(BeFalse())
+		})
+	})
+
+	Context("with invalid API versions", func() {
+		It("should return false for invalid goal APIVersion", func() {
+			ref1 := &metav1.OwnerReference{
+				APIVersion: "invalid//version",
+				Kind:       "ConfigMap",
+				Name:       "test",
+				UID:        "uid-123",
+			}
+			ref2 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test",
+				UID:        "uid-123",
+			}
+			Expect(referSameObject(ref1, ref2)).To(BeFalse())
+		})
+
+		It("should return false for invalid actual APIVersion", func() {
+			ref1 := &metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       "test",
+				UID:        "uid-123",
+			}
+			ref2 := &metav1.OwnerReference{
+				APIVersion: "invalid//version",
+				Kind:       "ConfigMap",
+				Name:       "test",
+				UID:        "uid-123",
+			}
+			Expect(referSameObject(ref1, ref2)).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("GetSecret", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = kubefake.NewSimpleClientset()
+	})
+
+	Context("when the secret exists", func() {
+		BeforeEach(func() {
+			secret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-secret",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"key": []byte("value"),
+				},
+			}
+			_, err := kubeClient.CoreV1().Secrets("default").Create(context.Background(), secret, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return the secret", func() {
+			secret, err := getSecret(kubeClient, "test-secret", "default")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secret).ToNot(BeNil())
+			Expect(string(secret.Data["key"])).To(Equal("value"))
+		})
+	})
+
+	Context("when the secret does not exist", func() {
+		It("should return an error", func() {
+			secret, err := getSecret(kubeClient, "nonexistent", "default")
+			Expect(err).To(HaveOccurred())
+			Expect(secret).To(BeNil())
+		})
+	})
 })

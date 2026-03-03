@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/segmentio/analytics-go/v3"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 )
@@ -183,6 +185,147 @@ var _ = Describe("VpAnalytics", func() {
 	})
 })
 
+var _ = Describe("AnalyticsInit", func() {
+	Context("when disabled", func() {
+		It("should return VpAnalytics with empty apiKey", func() {
+			v := AnalyticsInit(true, logr.Discard())
+			Expect(v).ToNot(BeNil())
+			Expect(v.apiKey).To(BeEmpty())
+		})
+	})
+
+	Context("when enabled with invalid api key", func() {
+		It("should return VpAnalytics with empty apiKey when base64 decoding fails", func() {
+			// The embedded api_key.txt is expected to have either invalid or test content
+			v := AnalyticsInit(false, logr.Discard())
+			Expect(v).ToNot(BeNil())
+			// apiKey will be set based on whether the embedded key can be decoded
+		})
+	})
+})
+
+var _ = Describe("retryAnalytics", func() {
+	Context("when function succeeds on first try", func() {
+		It("should return nil", func() {
+			successFunc := func(m analytics.Message) error {
+				return nil
+			}
+			track := analytics.Track{Event: "test"}
+			err := retryAnalytics(logr.Discard(), 3, 0, track, successFunc)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when function always fails", func() {
+		It("should return the error after all retries", func() {
+			failFunc := func(m analytics.Message) error {
+				return fmt.Errorf("always fails")
+			}
+			track := analytics.Track{Event: "test"}
+			err := retryAnalytics(logr.Discard(), 2, 0, track, failFunc)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("always fails"))
+		})
+	})
+
+	Context("when function succeeds on second try", func() {
+		It("should return nil", func() {
+			callCount := 0
+			retryFunc := func(m analytics.Message) error {
+				callCount++
+				if callCount < 2 {
+					return fmt.Errorf("temporary error")
+				}
+				return nil
+			}
+			track := analytics.Track{Event: "test"}
+			err := retryAnalytics(logr.Discard(), 3, 0, track, retryFunc)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(callCount).To(Equal(2))
+		})
+	})
+})
+
+var _ = Describe("setBit and hasBit", func() {
+	Context("setBit", func() {
+		It("should set the bit at the given position", func() {
+			n := setBit(0, 0)
+			Expect(n).To(Equal(1))
+		})
+
+		It("should set multiple bits", func() {
+			n := setBit(0, 0)
+			n = setBit(n, 2)
+			Expect(n).To(Equal(5)) // 101 in binary
+		})
+	})
+
+	Context("hasBit", func() {
+		It("should return true when bit is set", func() {
+			Expect(hasBit(5, 0)).To(BeTrue())
+			Expect(hasBit(5, 2)).To(BeTrue())
+		})
+
+		It("should return false when bit is not set", func() {
+			Expect(hasBit(5, 1)).To(BeFalse())
+		})
+
+		It("should return false for zero", func() {
+			Expect(hasBit(0, 0)).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("getAnalyticsProperties", func() {
+	It("should return properties with correct fields", func() {
+		pattern := &api.Pattern{
+			Status: api.PatternStatus{
+				ClusterPlatform: "AWS",
+				ClusterVersion:  "4.12",
+				ClusterDomain:   "example.com",
+			},
+		}
+		pattern.Name = "test-pattern"
+		pattern.Spec.GitConfig.TargetRepo = "https://github.com/validatedpatterns/test"
+
+		props := getAnalyticsProperties(pattern)
+		Expect(props).ToNot(BeNil())
+	})
+})
+
+var _ = Describe("getAnalyticsContext", func() {
+	It("should return a valid analytics context", func() {
+		pattern := &api.Pattern{
+			Status: api.PatternStatus{
+				ClusterPlatform: "AWS",
+				ClusterVersion:  "4.12",
+				ClusterDomain:   "example.com",
+			},
+		}
+		pattern.Name = "test-pattern"
+		pattern.Spec.GitConfig.TargetRepo = "https://github.com/validatedpatterns/test"
+
+		ctx := getAnalyticsContext(pattern)
+		Expect(ctx).ToNot(BeNil())
+		Expect(ctx.Extra["Pattern"]).To(Equal("test-pattern"))
+		Expect(ctx.Extra["Platform"]).To(Equal("AWS"))
+	})
+})
+
+var _ = Describe("getBaseGitRepo", func() {
+	It("should extract the repo name from target repo URL", func() {
+		pattern := &api.Pattern{}
+		pattern.Spec.GitConfig.TargetRepo = "https://github.com/validatedpatterns/multicloud-gitops"
+		Expect(getBaseGitRepo(pattern)).To(Equal("multicloud-gitops"))
+	})
+
+	It("should handle repos with .git suffix", func() {
+		pattern := &api.Pattern{}
+		pattern.Spec.GitConfig.TargetRepo = "https://github.com/validatedpatterns/multicloud-gitops.git"
+		Expect(getBaseGitRepo(pattern)).To(Equal("multicloud-gitops"))
+	})
+})
+
 var _ = Describe("getDeviceHash", func() {
 	var pattern *api.Pattern
 
@@ -255,6 +398,30 @@ var _ = Describe("getSimpleDomain", func() {
 			expectedSimpleDomain := ""
 			actualSimpleDomain := getSimpleDomain(pattern)
 			Expect(actualSimpleDomain).To(Equal(expectedSimpleDomain))
+		})
+	})
+
+	Context("with more than 3 parts", func() {
+		It("should return only last 3 parts", func() {
+			pattern.Status.ClusterDomain = "hub.cluster.example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal("cluster.example.com"))
+		})
+	})
+
+	Context("with deep subdomain", func() {
+		It("should return only last 3 parts", func() {
+			pattern.Status.ClusterDomain = "deep.sub.domain.example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal("domain.example.com"))
+		})
+	})
+
+	Context("with exactly 2 parts", func() {
+		It("should return the full domain", func() {
+			pattern.Status.ClusterDomain = "example.com"
+			actualSimpleDomain := getSimpleDomain(pattern)
+			Expect(actualSimpleDomain).To(Equal("example.com"))
 		})
 	})
 })

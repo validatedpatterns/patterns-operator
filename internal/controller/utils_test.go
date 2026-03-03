@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/go-errors/errors"
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -1270,5 +1271,585 @@ var _ = Describe("createNamespace", func() {
 		err := createNamespace(kubeClient, namespace)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("internal error"))
+	})
+})
+
+var _ = Describe("hasExperimentalCapability", func() {
+	Context("when capability exists in comma-separated list", func() {
+		It("should return true", func() {
+			Expect(hasExperimentalCapability("cap1,cap2,cap3", "cap2")).To(BeTrue())
+		})
+	})
+
+	Context("when capability does not exist", func() {
+		It("should return false", func() {
+			Expect(hasExperimentalCapability("cap1,cap2,cap3", "cap4")).To(BeFalse())
+		})
+	})
+
+	Context("with empty capabilities string", func() {
+		It("should return false", func() {
+			Expect(hasExperimentalCapability("", "cap1")).To(BeFalse())
+		})
+	})
+
+	Context("with single capability", func() {
+		It("should return true if matches", func() {
+			Expect(hasExperimentalCapability("cap1", "cap1")).To(BeTrue())
+		})
+	})
+
+	Context("with whitespace around capabilities", func() {
+		It("should handle trimmed comparison", func() {
+			Expect(hasExperimentalCapability("cap1, cap2, cap3", "cap2")).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("getHTTPSTransport", func() {
+	Context("with nil client", func() {
+		It("should return transport with system certs", func() {
+			transport := getHTTPSTransport(nil)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig).ToNot(BeNil())
+		})
+	})
+
+	Context("with fake client with no configmaps", func() {
+		It("should return transport with system certs", func() {
+			kubeClient := fake.NewSimpleClientset()
+			transport := getHTTPSTransport(kubeClient)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig).ToNot(BeNil())
+		})
+	})
+
+	Context("with fake client with cert configmaps", func() {
+		It("should return transport with custom certs", func() {
+			kubeClient := fake.NewSimpleClientset()
+			// Create kube-root-ca configmap
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-root-ca.crt",
+					Namespace: "openshift-config-managed",
+				},
+				Data: map[string]string{
+					"ca.crt": "-----BEGIN CERTIFICATE-----\nMIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw\nDgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow\nEjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLU3\njSayahkJYT5/UqIqViZFMVh16yrQ1mOA8V/k3H8Pk/DL1tJ1yXYEptzhKELNJIjp\nzUv0jVJHPnLGVaikzlKjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr\nBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1\nNDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2wpSek3WdNcr\njSuvziv6OERWSEZObKHVIJl/Cj9SWWECIGB/W0PCjZjKXBzgoW0OzXRiDP/WRxW6\nfrNHC7GJcIqs\n-----END CERTIFICATE-----\n",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("openshift-config-managed").Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			transport := getHTTPSTransport(kubeClient)
+			Expect(transport).ToNot(BeNil())
+			Expect(transport.TLSClientConfig.RootCAs).ToNot(BeNil())
+		})
+	})
+})
+
+var _ = Describe("compareMaps", func() {
+	Context("with identical maps", func() {
+		It("should return true", func() {
+			m1 := map[string][]byte{"key1": []byte("val1"), "key2": []byte("val2")}
+			m2 := map[string][]byte{"key1": []byte("val1"), "key2": []byte("val2")}
+			Expect(compareMaps(m1, m2)).To(BeTrue())
+		})
+	})
+
+	Context("with different lengths", func() {
+		It("should return false", func() {
+			m1 := map[string][]byte{"key1": []byte("val1")}
+			m2 := map[string][]byte{"key1": []byte("val1"), "key2": []byte("val2")}
+			Expect(compareMaps(m1, m2)).To(BeFalse())
+		})
+	})
+
+	Context("with different values", func() {
+		It("should return false", func() {
+			m1 := map[string][]byte{"key1": []byte("val1")}
+			m2 := map[string][]byte{"key1": []byte("val2")}
+			Expect(compareMaps(m1, m2)).To(BeFalse())
+		})
+	})
+
+	Context("with different keys", func() {
+		It("should return false", func() {
+			m1 := map[string][]byte{"key1": []byte("val1")}
+			m2 := map[string][]byte{"key2": []byte("val1")}
+			Expect(compareMaps(m1, m2)).To(BeFalse())
+		})
+	})
+
+	Context("with empty maps", func() {
+		It("should return true", func() {
+			m1 := map[string][]byte{}
+			m2 := map[string][]byte{}
+			Expect(compareMaps(m1, m2)).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("GenerateRandomPassword", func() {
+	Context("with default random reader", func() {
+		It("should generate a password of expected length", func() {
+			password, err := GenerateRandomPassword(15, DefaultRandRead)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(password).ToNot(BeEmpty())
+			// base64 encoded 15 bytes = 20 chars
+			Expect(len(password)).To(Equal(20))
+		})
+	})
+
+	Context("with failing random reader", func() {
+		It("should return an error", func() {
+			failReader := func(b []byte) (int, error) {
+				return 0, fmt.Errorf("random read failed")
+			}
+			_, err := GenerateRandomPassword(15, failReader)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("random read failed"))
+		})
+	})
+})
+
+var _ = Describe("writeConfigMapKeyToFile", func() {
+	var kubeClient kubernetes.Interface
+	var td string
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+		td = createTempDir("vp-write-cm-test")
+	})
+	AfterEach(func() {
+		cleanupTempDir(td)
+	})
+
+	Context("when configmap exists and key is found", func() {
+		It("should write the value to the file", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cm", Namespace: "test-ns"},
+				Data:       map[string]string{"ca.crt": "cert-data"},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			filePath := filepath.Join(td, "ca.crt")
+			err = writeConfigMapKeyToFile(kubeClient, "test-ns", "test-cm", "ca.crt", filePath, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal("cert-data\n"))
+		})
+	})
+
+	Context("when configmap does not exist", func() {
+		It("should return an error", func() {
+			filePath := filepath.Join(td, "ca.crt")
+			err := writeConfigMapKeyToFile(kubeClient, "test-ns", "nonexistent", "ca.crt", filePath, false)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when key does not exist in configmap", func() {
+		It("should return an error", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cm", Namespace: "test-ns"},
+				Data:       map[string]string{"other-key": "data"},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			filePath := filepath.Join(td, "ca.crt")
+			err = writeConfigMapKeyToFile(kubeClient, "test-ns", "test-cm", "ca.crt", filePath, false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("key ca.crt not found"))
+		})
+	})
+
+	Context("when appending to file", func() {
+		It("should append the content", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cm", Namespace: "test-ns"},
+				Data:       map[string]string{"ca.crt": "cert-data"},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			filePath := filepath.Join(td, "ca.crt")
+			err = os.WriteFile(filePath, []byte("existing-data\n"), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = writeConfigMapKeyToFile(kubeClient, "test-ns", "test-cm", "ca.crt", filePath, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			content, err := os.ReadFile(filePath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(ContainSubstring("existing-data"))
+			Expect(string(content)).To(ContainSubstring("cert-data"))
+		})
+	})
+})
+
+var _ = Describe("getConfigMapKey", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+	})
+
+	Context("when configmap and key exist", func() {
+		It("should return the value", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cm", Namespace: "test-ns"},
+				Data:       map[string]string{"mykey": "myvalue"},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			val, err := getConfigMapKey(kubeClient, "test-ns", "test-cm", "mykey")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal("myvalue"))
+		})
+	})
+
+	Context("when configmap does not exist", func() {
+		It("should return an error", func() {
+			_, err := getConfigMapKey(kubeClient, "test-ns", "nonexistent", "mykey")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when key does not exist", func() {
+		It("should return an error", func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cm", Namespace: "test-ns"},
+				Data:       map[string]string{"otherkey": "othervalue"},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-ns").Create(context.TODO(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = getConfigMapKey(kubeClient, "test-ns", "test-cm", "mykey")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("key mykey not found"))
+		})
+	})
+})
+
+var _ = Describe("createTrustedBundleCM", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+	})
+
+	Context("when configmap does not exist", func() {
+		It("should create it", func() {
+			err := createTrustedBundleCM(kubeClient, "test-ns")
+			Expect(err).ToNot(HaveOccurred())
+
+			cm, err := kubeClient.CoreV1().ConfigMaps("test-ns").Get(context.TODO(), "trusted-ca-bundle", metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Labels["config.openshift.io/inject-trusted-cabundle"]).To(Equal("true"))
+		})
+	})
+
+	Context("when configmap already exists", func() {
+		It("should not error", func() {
+			err := createTrustedBundleCM(kubeClient, "test-ns")
+			Expect(err).ToNot(HaveOccurred())
+
+			// Call again
+			err = createTrustedBundleCM(kubeClient, "test-ns")
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("logOnce", func() {
+	BeforeEach(func() {
+		// Reset the logKeys map before each test
+		logKeys = map[string]bool{}
+	})
+
+	It("should log a message the first time", func() {
+		logOnce("test message")
+		Expect(logKeys).To(HaveKey("test message"))
+	})
+
+	It("should not add duplicate entries", func() {
+		logOnce("duplicate message")
+		logOnce("duplicate message")
+		Expect(logKeys).To(HaveLen(1))
+	})
+
+	It("should handle different messages", func() {
+		logOnce("message 1")
+		logOnce("message 2")
+		Expect(logKeys).To(HaveLen(2))
+	})
+})
+
+var _ = Describe("IsCommonSlimmed", func() {
+	var td string
+
+	BeforeEach(func() {
+		td = createTempDir("vp-slimmed-test")
+	})
+	AfterEach(func() {
+		cleanupTempDir(td)
+	})
+
+	Context("when common/operator-install exists", func() {
+		It("should return false (not slimmed)", func() {
+			err := os.MkdirAll(filepath.Join(td, "common", "operator-install"), 0755)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(IsCommonSlimmed(td)).To(BeFalse())
+		})
+	})
+
+	Context("when common/operator-install does not exist", func() {
+		It("should return true (slimmed)", func() {
+			Expect(IsCommonSlimmed(td)).To(BeTrue())
+		})
+	})
+
+	Context("when path does not exist", func() {
+		It("should return true (slimmed)", func() {
+			Expect(IsCommonSlimmed("/nonexistent/path")).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("IntOrZero", func() {
+	Context("when key exists with valid integer", func() {
+		It("should return the integer value", func() {
+			secret := map[string][]byte{"count": []byte("42")}
+			val, err := IntOrZero(secret, "count")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(42)))
+		})
+	})
+
+	Context("when key does not exist", func() {
+		It("should return 0", func() {
+			secret := map[string][]byte{}
+			val, err := IntOrZero(secret, "missing")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(0)))
+		})
+	})
+
+	Context("when key exists with invalid integer", func() {
+		It("should return an error", func() {
+			secret := map[string][]byte{"count": []byte("not-a-number")}
+			_, err := IntOrZero(secret, "count")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when key exists with negative integer", func() {
+		It("should return the negative value", func() {
+			secret := map[string][]byte{"count": []byte("-5")}
+			val, err := IntOrZero(secret, "count")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(val).To(Equal(int64(-5)))
+		})
+	})
+})
+
+var _ = Describe("getClusterWideArgoNamespace", func() {
+	It("should return the ApplicationNamespace", func() {
+		Expect(getClusterWideArgoNamespace()).To(Equal(ApplicationNamespace))
+	})
+})
+
+var _ = Describe("getPatternConditionByStatus", func() {
+	var conditions []api.PatternCondition
+
+	BeforeEach(func() {
+		conditions = []api.PatternCondition{
+			{
+				Type:   api.Synced,
+				Status: corev1.ConditionTrue,
+			},
+			{
+				Type:   api.Degraded,
+				Status: corev1.ConditionFalse,
+			},
+		}
+	})
+
+	Context("when conditions is nil", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByStatus(nil, corev1.ConditionTrue)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when condition exists", func() {
+		It("should return the index and condition", func() {
+			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionTrue)
+			Expect(idx).To(Equal(0))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Type).To(Equal(api.Synced))
+		})
+	})
+
+	Context("when condition does not exist", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionUnknown)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("getPatternConditionByType", func() {
+	var conditions []api.PatternCondition
+
+	BeforeEach(func() {
+		conditions = []api.PatternCondition{
+			{
+				Type:   api.Synced,
+				Status: corev1.ConditionTrue,
+			},
+			{
+				Type:   api.Degraded,
+				Status: corev1.ConditionFalse,
+			},
+		}
+	})
+
+	Context("when conditions is nil", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByType(nil, api.Synced)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+
+	Context("when condition type exists", func() {
+		It("should return the index and condition", func() {
+			idx, cond := getPatternConditionByType(conditions, api.Degraded)
+			Expect(idx).To(Equal(1))
+			Expect(cond).ToNot(BeNil())
+			Expect(cond.Status).To(Equal(corev1.ConditionFalse))
+		})
+	})
+
+	Context("when condition type does not exist", func() {
+		It("should return -1 and nil", func() {
+			idx, cond := getPatternConditionByType(conditions, api.Unknown)
+			Expect(idx).To(Equal(-1))
+			Expect(cond).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("parseAndReturnVersion", func() {
+	Context("with a valid version string", func() {
+		It("should return the parsed version", func() {
+			v, err := parseAndReturnVersion("4.12.5")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(v).ToNot(BeNil())
+			Expect(v.Major()).To(Equal(uint64(4)))
+			Expect(v.Minor()).To(Equal(uint64(12)))
+			Expect(v.Patch()).To(Equal(uint64(5)))
+		})
+	})
+
+	Context("with an invalid version string", func() {
+		It("should return an error", func() {
+			_, err := parseAndReturnVersion("not-a-version")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("with empty string", func() {
+		It("should return an error", func() {
+			_, err := parseAndReturnVersion("")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("getCurrentClusterVersion", func() {
+	Context("with completed history entry", func() {
+		It("should return the completed version", func() {
+			cv := &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					History: []configv1.UpdateHistory{
+						{Version: "4.13.5", State: "Partial"},
+						{Version: "4.13.4", State: "Completed"},
+					},
+					Desired: configv1.Release{Version: "4.13.5"},
+				},
+			}
+			v, err := getCurrentClusterVersion(cv)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(v.String()).To(Equal("4.13.4"))
+		})
+	})
+
+	Context("with no completed history", func() {
+		It("should fall back to desired version", func() {
+			cv := &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					History: []configv1.UpdateHistory{
+						{Version: "4.13.5", State: "Partial"},
+					},
+					Desired: configv1.Release{Version: "4.13.5"},
+				},
+			}
+			v, err := getCurrentClusterVersion(cv)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(v.String()).To(Equal("4.13.5"))
+		})
+	})
+
+	Context("with empty history", func() {
+		It("should fall back to desired version", func() {
+			cv := &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					Desired: configv1.Release{Version: "4.12.0"},
+				},
+			}
+			v, err := getCurrentClusterVersion(cv)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(v.String()).To(Equal("4.12.0"))
+		})
+	})
+})
+
+var _ = Describe("newSecret", func() {
+	It("should create a secret with correct properties", func() {
+		data := map[string][]byte{"key": []byte("value")}
+		labels := map[string]string{"app": "test"}
+		s := newSecret("my-secret", "my-ns", data, labels)
+		Expect(s.Name).To(Equal("my-secret"))
+		Expect(s.Namespace).To(Equal("my-ns"))
+		Expect(s.Data).To(Equal(data))
+		Expect(s.Labels).To(Equal(labels))
+	})
+})
+
+var _ = Describe("DropLocalGitPaths", func() {
+	It("should remove the vp temp folder", func() {
+		td := filepath.Join(os.TempDir(), VPTmpFolder, "test-drop")
+		err := os.MkdirAll(td, 0755)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = DropLocalGitPaths()
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = os.Stat(td)
+		Expect(os.IsNotExist(err)).To(BeTrue())
+	})
+
+	It("should not error if folder does not exist", func() {
+		err := DropLocalGitPaths()
+		Expect(err).ToNot(HaveOccurred())
 	})
 })

@@ -108,3 +108,208 @@ var _ = Describe("HaveACMHub", func() {
 		})
 	})
 })
+
+var _ = Describe("ListManagedClusters", func() {
+	var (
+		patternReconciler *PatternReconciler
+		dynamicClient     *dynamicfake.FakeDynamicClient
+		gvrMC             schema.GroupVersionResource
+	)
+
+	BeforeEach(func() {
+		gvrMC = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}
+
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			gvrMC: "ManagedClusterList",
+		})
+
+		patternReconciler = &PatternReconciler{
+			dynamicClient: dynamicClient,
+		}
+	})
+
+	Context("when there are managed clusters", func() {
+		BeforeEach(func() {
+			for _, name := range []string{"local-cluster", "spoke-1", "spoke-2"} {
+				mc := &unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "cluster.open-cluster-management.io/v1",
+						"kind":       "ManagedCluster",
+						"metadata": map[string]any{
+							"name": name,
+						},
+					},
+				}
+				_, err := dynamicClient.Resource(gvrMC).Create(context.Background(), mc, metav1.CreateOptions{})
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+
+		It("should return all clusters except local-cluster", func() {
+			clusters, err := patternReconciler.listManagedClusters(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(clusters).To(HaveLen(2))
+			Expect(clusters).To(ContainElement("spoke-1"))
+			Expect(clusters).To(ContainElement("spoke-2"))
+			Expect(clusters).ToNot(ContainElement("local-cluster"))
+		})
+	})
+
+	Context("when there are no managed clusters", func() {
+		It("should return empty list", func() {
+			clusters, err := patternReconciler.listManagedClusters(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(clusters).To(BeEmpty())
+		})
+	})
+
+	Context("when only local-cluster exists", func() {
+		BeforeEach(func() {
+			mc := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "cluster.open-cluster-management.io/v1",
+					"kind":       "ManagedCluster",
+					"metadata": map[string]any{
+						"name": "local-cluster",
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvrMC).Create(context.Background(), mc, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return empty list", func() {
+			clusters, err := patternReconciler.listManagedClusters(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(clusters).To(BeEmpty())
+		})
+	})
+
+	Context("when there is an error listing", func() {
+		BeforeEach(func() {
+			dynamicClient.PrependReactor("list", "managedclusters", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("list error")
+			})
+		})
+
+		It("should return an error", func() {
+			_, err := patternReconciler.listManagedClusters(context.Background())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to list ManagedClusters"))
+		})
+	})
+})
+
+var _ = Describe("DeleteManagedClusters", func() {
+	var (
+		patternReconciler *PatternReconciler
+		dynamicClient     *dynamicfake.FakeDynamicClient
+		gvrMC             schema.GroupVersionResource
+	)
+
+	BeforeEach(func() {
+		gvrMC = schema.GroupVersionResource{Group: "cluster.open-cluster-management.io", Version: "v1", Resource: "managedclusters"}
+
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			gvrMC: "ManagedClusterList",
+		})
+
+		patternReconciler = &PatternReconciler{
+			dynamicClient: dynamicClient,
+		}
+	})
+
+	Context("when there are managed clusters to delete", func() {
+		BeforeEach(func() {
+			for _, name := range []string{"local-cluster", "spoke-1", "spoke-2"} {
+				mc := &unstructured.Unstructured{
+					Object: map[string]any{
+						"apiVersion": "cluster.open-cluster-management.io/v1",
+						"kind":       "ManagedCluster",
+						"metadata": map[string]any{
+							"name": name,
+						},
+					},
+				}
+				_, err := dynamicClient.Resource(gvrMC).Create(context.Background(), mc, metav1.CreateOptions{})
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+
+		It("should delete all clusters except local-cluster", func() {
+			count, err := patternReconciler.deleteManagedClusters(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(2))
+		})
+	})
+
+	Context("when there are no managed clusters", func() {
+		It("should return 0", func() {
+			count, err := patternReconciler.deleteManagedClusters(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(0))
+		})
+	})
+
+	Context("when only local-cluster exists", func() {
+		BeforeEach(func() {
+			mc := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "cluster.open-cluster-management.io/v1",
+					"kind":       "ManagedCluster",
+					"metadata": map[string]any{
+						"name": "local-cluster",
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvrMC).Create(context.Background(), mc, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return 0", func() {
+			count, err := patternReconciler.deleteManagedClusters(context.Background())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(count).To(Equal(0))
+		})
+	})
+
+	Context("when listing fails", func() {
+		BeforeEach(func() {
+			dynamicClient.PrependReactor("list", "managedclusters", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("list error")
+			})
+		})
+
+		It("should return an error", func() {
+			_, err := patternReconciler.deleteManagedClusters(context.Background())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to list ManagedClusters"))
+		})
+	})
+
+	Context("when delete fails", func() {
+		BeforeEach(func() {
+			mc := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "cluster.open-cluster-management.io/v1",
+					"kind":       "ManagedCluster",
+					"metadata": map[string]any{
+						"name": "spoke-1",
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvrMC).Create(context.Background(), mc, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			dynamicClient.PrependReactor("delete", "managedclusters", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("delete error")
+			})
+		})
+
+		It("should return an error", func() {
+			_, err := patternReconciler.deleteManagedClusters(context.Background())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to delete ManagedCluster"))
+		})
+	})
+})

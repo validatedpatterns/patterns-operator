@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -974,6 +975,824 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(argoCD.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
+		})
+	})
+})
+
+var _ = Describe("CompareApplication", func() {
+	var pattern *api.Pattern
+	BeforeEach(func() {
+		tmpFalse := false
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
+			TypeMeta:   metav1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+			Spec: api.PatternSpec{
+				ClusterGroupName: "foogroup",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
+					TargetRevision: "main",
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled:                  &tmpFalse,
+					HelmRepoUrl:              "https://charts.validatedpatterns.io/",
+					ClusterGroupChartVersion: "0.0.*",
+				},
+				GitOpsConfig: &api.GitOpsConfig{
+					ManualSync: false,
+				},
+			},
+			Status: api.PatternStatus{
+				ClusterPlatform:  "AWS",
+				ClusterVersion:   "4.12",
+				ClusterName:      "barcluster",
+				AppClusterDomain: "apps.hub-cluster.validatedpatterns.io",
+				ClusterDomain:    "hub-cluster.validatedpatterns.io",
+			},
+		}
+	})
+
+	Context("when both applications are nil", func() {
+		It("should return true", func() {
+			Expect(compareApplication(nil, nil)).To(BeTrue())
+		})
+	})
+
+	Context("when one application is nil and the other is not", func() {
+		It("should return false when goal is nil", func() {
+			app := newArgoApplication(pattern)
+			Expect(compareApplication(nil, app)).To(BeFalse())
+		})
+		It("should return false when actual is nil", func() {
+			app := newArgoApplication(pattern)
+			Expect(compareApplication(app, nil)).To(BeFalse())
+		})
+	})
+
+	Context("when both applications are identical", func() {
+		It("should return true", func() {
+			app := newArgoApplication(pattern)
+			Expect(compareApplication(app, app)).To(BeTrue())
+		})
+	})
+
+	Context("when applications have different sources", func() {
+		It("should return false", func() {
+			app1 := newArgoApplication(pattern)
+			app2 := app1.DeepCopy()
+			app2.Spec.Source.RepoURL = "https://different.repo/url"
+			Expect(compareApplication(app1, app2)).To(BeFalse())
+		})
+	})
+
+	Context("when applications have different sync policies", func() {
+		It("should return false", func() {
+			app1 := newArgoApplication(pattern)
+			app2 := app1.DeepCopy()
+			app2.Spec.SyncPolicy = nil
+			Expect(compareApplication(app1, app2)).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("GetApplication", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		name         string
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		name = "test-application"
+		namespace = "default"
+	})
+
+	Context("when the application exists", func() {
+		BeforeEach(func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return the application", func() {
+			app, err := getApplication(argocdclient, name, namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(app).ToNot(BeNil())
+			Expect(app.Name).To(Equal(name))
+		})
+	})
+
+	Context("when the application does not exist", func() {
+		It("should return an error", func() {
+			app, err := getApplication(argocdclient, "nonexistent", namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(app).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("CreateApplication", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		namespace = "default"
+	})
+
+	Context("when creating an application", func() {
+		It("should create successfully", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "new-app",
+					Namespace: namespace,
+				},
+			}
+			err := createApplication(argocdclient, app, namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			created, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Get(context.Background(), "new-app", metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(created.Name).To(Equal("new-app"))
+		})
+	})
+
+	Context("when creation fails", func() {
+		BeforeEach(func() {
+			argocdclient.PrependReactor("create", "applications", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("create error")
+			})
+		})
+
+		It("should return the error", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "new-app",
+					Namespace: namespace,
+				},
+			}
+			err := createApplication(argocdclient, app, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("create error"))
+		})
+	})
+})
+
+var _ = Describe("UpdateApplication", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		namespace = "default"
+	})
+
+	Context("when current is nil", func() {
+		It("should return an error", func() {
+			target := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+			}
+			changed, err := updateApplication(argocdclient, target, nil, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("current application was nil"))
+			Expect(changed).To(BeFalse())
+		})
+	})
+
+	Context("when target is nil", func() {
+		It("should return an error", func() {
+			current := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+			}
+			changed, err := updateApplication(argocdclient, nil, current, namespace)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("target application was nil"))
+			Expect(changed).To(BeFalse())
+		})
+	})
+
+	Context("when applications are identical", func() {
+		It("should not update and return false", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+				Spec: argoapi.ApplicationSpec{
+					Source: &argoapi.ApplicationSource{
+						RepoURL: "https://example.com/repo",
+					},
+				},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			changed, err := updateApplication(argocdclient, app, app.DeepCopy(), namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(changed).To(BeFalse())
+		})
+	})
+
+	Context("when applications differ", func() {
+		It("should update and return true", func() {
+			current := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+				Spec: argoapi.ApplicationSpec{
+					Source: &argoapi.ApplicationSource{
+						RepoURL: "https://example.com/repo-old",
+					},
+				},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), current, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			target := current.DeepCopy()
+			target.Spec.Source.RepoURL = "https://example.com/repo-new"
+
+			changed, err := updateApplication(argocdclient, target, current, namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(changed).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("SyncApplication", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		namespace = "default"
+	})
+
+	Context("when sync is already in progress with same options", func() {
+		It("should return nil", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+				Operation: &argoapi.Operation{
+					Sync: &argoapi.SyncOperation{
+						Prune:       true,
+						SyncOptions: []string{"Force=true"},
+					},
+				},
+			}
+			err := syncApplication(argocdclient, app, true)
+			Expect(err).To(BeNil())
+		})
+	})
+
+	Context("when no sync is in progress", func() {
+		It("should set sync operation and update", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = syncApplication(argocdclient, app, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(app.Operation).ToNot(BeNil())
+			Expect(app.Operation.Sync.Prune).To(BeTrue())
+			Expect(app.Operation.Sync.SyncOptions).To(ContainElement("Force=true"))
+		})
+	})
+
+	Context("when sync without prune", func() {
+		It("should set prune to false", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			err = syncApplication(argocdclient, app, false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(app.Operation.Sync.Prune).To(BeFalse())
+		})
+	})
+
+	Context("when update fails", func() {
+		BeforeEach(func() {
+			argocdclient.PrependReactor("update", "applications", func(testing.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, fmt.Errorf("update error")
+			})
+		})
+
+		It("should return the error", func() {
+			app := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: namespace},
+			}
+			err := syncApplication(argocdclient, app, true)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to sync application"))
+		})
+	})
+})
+
+var _ = Describe("GetChildApplications", func() {
+	var (
+		argocdclient *argoclient.Clientset
+		namespace    string
+	)
+
+	BeforeEach(func() {
+		argocdclient = argoclient.NewSimpleClientset()
+		namespace = "default"
+	})
+
+	Context("when there are child applications", func() {
+		It("should return them", func() {
+			parentApp := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "parent-app", Namespace: namespace},
+			}
+
+			childApp := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "child-app",
+					Namespace: namespace,
+					Labels:    map[string]string{"app.kubernetes.io/instance": "parent-app"},
+				},
+			}
+			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), childApp, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			children, err := getChildApplications(argocdclient, parentApp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(children).To(HaveLen(1))
+			Expect(children[0].Name).To(Equal("child-app"))
+		})
+	})
+
+	Context("when there are no child applications", func() {
+		It("should return empty list", func() {
+			parentApp := &argoapi.Application{
+				ObjectMeta: metav1.ObjectMeta{Name: "parent-app", Namespace: namespace},
+			}
+
+			children, err := getChildApplications(argocdclient, parentApp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(children).To(BeEmpty())
+		})
+	})
+})
+
+var _ = Describe("NewArgoGiteaApplication", func() {
+	var pattern *api.Pattern
+	BeforeEach(func() {
+		tmpFalse := false
+		PatternsOperatorConfig = DefaultPatternOperatorConfig
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
+			TypeMeta:   metav1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
+			Spec: api.PatternSpec{
+				ClusterGroupName: "foogroup",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
+					TargetRevision: "main",
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled: &tmpFalse,
+				},
+				GitOpsConfig: &api.GitOpsConfig{
+					ManualSync: false,
+				},
+			},
+			Status: api.PatternStatus{
+				AppClusterDomain: "apps.hub-cluster.validatedpatterns.io",
+				ClusterDomain:    "hub-cluster.validatedpatterns.io",
+			},
+		}
+	})
+
+	It("should create a gitea application with correct properties", func() {
+		app := newArgoGiteaApplication(pattern)
+		Expect(app).ToNot(BeNil())
+		Expect(app.Name).To(Equal(GiteaApplicationName))
+		Expect(app.Namespace).To(Equal(getClusterWideArgoNamespace()))
+		Expect(app.Labels["validatedpatterns.io/pattern"]).To(Equal("test-pattern"))
+		Expect(app.Spec.Destination.Name).To(Equal("in-cluster"))
+		Expect(app.Spec.Destination.Namespace).To(Equal(GiteaNamespace))
+		Expect(app.Spec.Project).To(Equal("default"))
+		Expect(app.Spec.Source).ToNot(BeNil())
+		Expect(controllerutil.ContainsFinalizer(app, argoapi.ForegroundPropagationPolicyFinalizer)).To(BeTrue())
+
+		// Check helm parameters
+		Expect(app.Spec.Source.Helm).ToNot(BeNil())
+		Expect(app.Spec.Source.Helm.Parameters).To(HaveLen(3))
+
+		foundAdminSecret := false
+		for _, p := range app.Spec.Source.Helm.Parameters {
+			if p.Name == "gitea.admin.existingSecret" {
+				foundAdminSecret = true
+				Expect(p.Value).To(Equal(GiteaAdminSecretName))
+			}
+		}
+		Expect(foundAdminSecret).To(BeTrue())
+	})
+})
+
+var _ = Describe("CommonSyncPolicy", func() {
+	var pattern *api.Pattern
+	BeforeEach(func() {
+		tmpFalse := false
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
+			Spec: api.PatternSpec{
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled: &tmpFalse,
+				},
+				GitOpsConfig: &api.GitOpsConfig{
+					ManualSync: false,
+				},
+			},
+		}
+	})
+
+	Context("when pattern is not being deleted and manualSync is false", func() {
+		It("should return automated sync policy", func() {
+			policy := commonSyncPolicy(pattern)
+			Expect(policy).ToNot(BeNil())
+			Expect(policy.Automated).ToNot(BeNil())
+			Expect(policy.Automated.Prune).To(BeFalse())
+		})
+	})
+
+	Context("when pattern is not being deleted and manualSync is true", func() {
+		It("should return nil sync policy", func() {
+			pattern.Spec.GitOpsConfig.ManualSync = true
+			policy := commonSyncPolicy(pattern)
+			Expect(policy).To(BeNil())
+		})
+	})
+
+	Context("when pattern is being deleted", func() {
+		It("should return sync policy with prune enabled", func() {
+			now := metav1.Now()
+			pattern.DeletionTimestamp = &now
+			policy := commonSyncPolicy(pattern)
+			Expect(policy).ToNot(BeNil())
+			Expect(policy.Automated).ToNot(BeNil())
+			Expect(policy.Automated.Prune).To(BeTrue())
+			Expect(policy.SyncOptions).To(ContainElement("Prune=true"))
+		})
+	})
+})
+
+var _ = Describe("NewApplicationParameters with deletion", func() {
+	var pattern *api.Pattern
+	BeforeEach(func() {
+		tmpFalse := false
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
+			Spec: api.PatternSpec{
+				ClusterGroupName: "foogroup",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/validatedpatterns/multicloud-gitops",
+					TargetRevision: "main",
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled:                  &tmpFalse,
+					HelmRepoUrl:              "https://charts.validatedpatterns.io/",
+					ClusterGroupChartVersion: "0.0.*",
+				},
+			},
+			Status: api.PatternStatus{
+				ClusterPlatform:  "AWS",
+				ClusterVersion:   "4.12",
+				ClusterName:      "barcluster",
+				AppClusterDomain: "apps.hub-cluster.validatedpatterns.io",
+				ClusterDomain:    "hub-cluster.validatedpatterns.io",
+			},
+		}
+	})
+
+	Context("when pattern is being deleted with DeleteSpokeChildApps phase", func() {
+		It("should include deletePattern parameter with phase value", func() {
+			now := metav1.Now()
+			pattern.DeletionTimestamp = &now
+			pattern.Status.DeletionPhase = api.DeleteSpokeChildApps
+			params := newApplicationParameters(pattern)
+			foundDelete := false
+			for _, p := range params {
+				if p.Name == "global.deletePattern" {
+					foundDelete = true
+					Expect(p.Value).To(Equal(string(api.DeleteSpokeChildApps)))
+					Expect(p.ForceString).To(BeTrue())
+				}
+			}
+			Expect(foundDelete).To(BeTrue())
+		})
+	})
+
+	Context("when pattern is being deleted with DeleteHubChildApps phase", func() {
+		It("should include deletePattern=DeleteChildApps", func() {
+			now := metav1.Now()
+			pattern.DeletionTimestamp = &now
+			pattern.Status.DeletionPhase = api.DeleteHubChildApps
+			params := newApplicationParameters(pattern)
+			foundDelete := false
+			for _, p := range params {
+				if p.Name == "global.deletePattern" {
+					foundDelete = true
+					Expect(p.Value).To(Equal("DeleteChildApps"))
+					Expect(p.ForceString).To(BeTrue())
+				}
+			}
+			Expect(foundDelete).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("CompareSource edge cases", func() {
+	Context("when both sources have nil Helm", func() {
+		It("should return true for otherwise identical sources", func() {
+			source := &argoapi.ApplicationSource{
+				RepoURL:        "https://example.com/repo",
+				TargetRevision: "main",
+				Path:           "path",
+			}
+			Expect(compareSource(source, source)).To(BeTrue())
+		})
+	})
+
+	Context("when only one source has Helm set", func() {
+		It("should return false when goal has Helm but actual does not", func() {
+			goal := &argoapi.ApplicationSource{
+				RepoURL:        "https://example.com/repo",
+				TargetRevision: "main",
+				Path:           "path",
+				Helm:           &argoapi.ApplicationSourceHelm{},
+			}
+			actual := &argoapi.ApplicationSource{
+				RepoURL:        "https://example.com/repo",
+				TargetRevision: "main",
+				Path:           "path",
+			}
+			Expect(compareSource(goal, actual)).To(BeFalse())
+		})
+
+		It("should return false when actual has Helm but goal does not", func() {
+			goal := &argoapi.ApplicationSource{
+				RepoURL:        "https://example.com/repo",
+				TargetRevision: "main",
+				Path:           "path",
+			}
+			actual := &argoapi.ApplicationSource{
+				RepoURL:        "https://example.com/repo",
+				TargetRevision: "main",
+				Path:           "path",
+				Helm:           &argoapi.ApplicationSourceHelm{},
+			}
+			Expect(compareSource(goal, actual)).To(BeFalse())
+		})
+	})
+
+	Context("when RepoURL differs", func() {
+		It("should return false", func() {
+			goal := &argoapi.ApplicationSource{RepoURL: "https://a.com"}
+			actual := &argoapi.ApplicationSource{RepoURL: "https://b.com"}
+			Expect(compareSource(goal, actual)).To(BeFalse())
+		})
+	})
+
+	Context("when TargetRevision differs", func() {
+		It("should return false", func() {
+			goal := &argoapi.ApplicationSource{RepoURL: "https://a.com", TargetRevision: "v1"}
+			actual := &argoapi.ApplicationSource{RepoURL: "https://a.com", TargetRevision: "v2"}
+			Expect(compareSource(goal, actual)).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("CompareHelmParameters edge cases", func() {
+	Context("when both are nil", func() {
+		It("should return true", func() {
+			Expect(compareHelmParameters(nil, nil)).To(BeTrue())
+		})
+	})
+
+	Context("when one is nil", func() {
+		It("should return false when goal is nil", func() {
+			params := []argoapi.HelmParameter{{Name: "key", Value: "val"}}
+			Expect(compareHelmParameters(nil, params)).To(BeFalse())
+		})
+		It("should return false when actual is nil", func() {
+			params := []argoapi.HelmParameter{{Name: "key", Value: "val"}}
+			Expect(compareHelmParameters(params, nil)).To(BeFalse())
+		})
+	})
+
+	Context("when ForceString differs", func() {
+		It("should return false", func() {
+			goal := []argoapi.HelmParameter{{Name: "key", Value: "val", ForceString: true}}
+			actual := []argoapi.HelmParameter{{Name: "key", Value: "val", ForceString: false}}
+			Expect(compareHelmParameters(goal, actual)).To(BeFalse())
+		})
+	})
+
+	Context("when values differ", func() {
+		It("should return false", func() {
+			goal := []argoapi.HelmParameter{{Name: "key", Value: "val1"}}
+			actual := []argoapi.HelmParameter{{Name: "key", Value: "val2"}}
+			Expect(compareHelmParameters(goal, actual)).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("GetClusterGroupChartVersion", func() {
+	var pattern *api.Pattern
+	BeforeEach(func() {
+		tmpFalse := false
+		pattern = &api.Pattern{
+			Spec: api.PatternSpec{
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled: &tmpFalse,
+				},
+			},
+		}
+	})
+
+	Context("when ClusterGroupChartVersion is explicitly set", func() {
+		It("should return the explicit version", func() {
+			pattern.Spec.MultiSourceConfig.ClusterGroupChartVersion = "1.2.3"
+			Expect(getClusterGroupChartVersion(pattern)).To(Equal("1.2.3"))
+		})
+	})
+
+	Context("when ClusterGroupChartVersion is not set and common is slimmed", func() {
+		It("should return 0.9.*", func() {
+			// No operator-install directory means it's slimmed
+			pattern.Status.LocalCheckoutPath = "/nonexistent/path"
+			Expect(getClusterGroupChartVersion(pattern)).To(Equal("0.9.*"))
+		})
+	})
+
+	Context("when ClusterGroupChartVersion is not set and common is not slimmed", func() {
+		It("should return 0.8.*", func() {
+			td := createTempDir("vp-version-test")
+			defer cleanupTempDir(td)
+
+			// Create common/operator-install to indicate non-slimmed
+			err := os.MkdirAll(filepath.Join(td, "common", "operator-install"), 0755)
+			Expect(err).ToNot(HaveOccurred())
+
+			pattern.Status.LocalCheckoutPath = td
+			Expect(getClusterGroupChartVersion(pattern)).To(Equal("0.8.*"))
+		})
+	})
+})
+
+var _ = Describe("GetSharedValueFiles", func() {
+	var pattern *api.Pattern
+	var td string
+	BeforeEach(func() {
+		td = createTempDir("vp-shared-test")
+		tmpFalse := false
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
+			Spec: api.PatternSpec{
+				ClusterGroupName: "foogroup",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/validatedpatterns/test",
+					TargetRevision: "main",
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled: &tmpFalse,
+				},
+			},
+			Status: api.PatternStatus{
+				ClusterPlatform:    "AWS",
+				ClusterVersion:     "4.12",
+				ClusterName:        "barcluster",
+				AppClusterDomain:   "apps.hub.example.com",
+				ClusterDomain:      "hub.example.com",
+				LocalCheckoutPath:  td,
+			},
+		}
+	})
+	AfterEach(func() {
+		cleanupTempDir(td)
+	})
+
+	Context("when path does not exist", func() {
+		It("should return an error", func() {
+			pattern.Status.LocalCheckoutPath = "/nonexistent/path"
+			_, err := getSharedValueFiles(pattern, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("path does not exist"))
+		})
+	})
+
+	Context("when there are no sharedValueFiles in the values", func() {
+		It("should return nil", func() {
+			// Create empty values file
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte("key: value\n"), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			result, err := getSharedValueFiles(pattern, "")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(BeNil())
+		})
+	})
+
+	Context("when sharedValueFiles has entries", func() {
+		It("should return the value file paths", func() {
+			yamlContent := `clusterGroup:
+  sharedValueFiles:
+    - /values-shared.yaml
+`
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte(yamlContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			result, err := getSharedValueFiles(pattern, "")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(HaveLen(1))
+			Expect(result[0]).To(ContainSubstring("values-shared.yaml"))
+		})
+	})
+})
+
+var _ = Describe("CountVPApplications", func() {
+	var pattern *api.Pattern
+	var td string
+	BeforeEach(func() {
+		td = createTempDir("vp-count-test")
+		tmpFalse := false
+		pattern = &api.Pattern{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
+			Spec: api.PatternSpec{
+				ClusterGroupName: "foogroup",
+				GitConfig: api.GitConfig{
+					TargetRepo:     "https://github.com/validatedpatterns/test",
+					TargetRevision: "main",
+				},
+				MultiSourceConfig: api.MultiSourceConfig{
+					Enabled: &tmpFalse,
+				},
+			},
+			Status: api.PatternStatus{
+				ClusterPlatform:    "AWS",
+				ClusterVersion:     "4.12",
+				ClusterName:        "barcluster",
+				AppClusterDomain:   "apps.hub.example.com",
+				ClusterDomain:      "hub.example.com",
+				LocalCheckoutPath:  td,
+			},
+		}
+	})
+	AfterEach(func() {
+		cleanupTempDir(td)
+	})
+
+	Context("when path does not exist", func() {
+		It("should return error", func() {
+			pattern.Status.LocalCheckoutPath = "/nonexistent/path"
+			apps, appsets, err := countVPApplications(pattern)
+			Expect(err).To(HaveOccurred())
+			Expect(apps).To(Equal(-1))
+			Expect(appsets).To(Equal(-1))
+		})
+	})
+
+	Context("when there are no applications defined", func() {
+		It("should return 0, 0", func() {
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte("key: value\n"), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			apps, appsets, err := countVPApplications(pattern)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(apps).To(Equal(0))
+			Expect(appsets).To(Equal(0))
+		})
+	})
+
+	Context("when there are applications defined", func() {
+		It("should count them", func() {
+			yamlContent := `clusterGroup:
+  applications:
+    vault:
+      name: vault
+    golang-external-secrets:
+      name: golang-external-secrets
+    acm:
+      generators:
+        - generator1
+`
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte(yamlContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			apps, appsets, err := countVPApplications(pattern)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(apps).To(Equal(2))
+			Expect(appsets).To(Equal(1))
 		})
 	})
 })
