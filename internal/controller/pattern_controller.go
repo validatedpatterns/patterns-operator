@@ -978,7 +978,7 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	}
 
 	// Make the request
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // URL is constructed from a known internal service endpoint
 	if err != nil {
 		return false, fmt.Errorf("failed to make HTTP request to search service: %w", err)
 	}
