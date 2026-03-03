@@ -1245,7 +1245,7 @@ var _ = Describe("SyncApplication", func() {
 				},
 			}
 			err := syncApplication(argocdclient, app, true)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
@@ -1669,12 +1669,12 @@ var _ = Describe("GetSharedValueFiles", func() {
 				},
 			},
 			Status: api.PatternStatus{
-				ClusterPlatform:    "AWS",
-				ClusterVersion:     "4.12",
-				ClusterName:        "barcluster",
-				AppClusterDomain:   "apps.hub.example.com",
-				ClusterDomain:      "hub.example.com",
-				LocalCheckoutPath:  td,
+				ClusterPlatform:   "AWS",
+				ClusterVersion:    "4.12",
+				ClusterName:       "barcluster",
+				AppClusterDomain:  "apps.hub.example.com",
+				ClusterDomain:     "hub.example.com",
+				LocalCheckoutPath: td,
 			},
 		}
 	})
@@ -1694,7 +1694,7 @@ var _ = Describe("GetSharedValueFiles", func() {
 	Context("when there are no sharedValueFiles in the values", func() {
 		It("should return nil", func() {
 			// Create empty values file
-			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte("key: value\n"), 0644)
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte("key: value\n"), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			result, err := getSharedValueFiles(pattern, "")
@@ -1709,7 +1709,7 @@ var _ = Describe("GetSharedValueFiles", func() {
   sharedValueFiles:
     - /values-shared.yaml
 `
-			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte(yamlContent), 0644)
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte(yamlContent), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			result, err := getSharedValueFiles(pattern, "")
@@ -1739,12 +1739,12 @@ var _ = Describe("CountVPApplications", func() {
 				},
 			},
 			Status: api.PatternStatus{
-				ClusterPlatform:    "AWS",
-				ClusterVersion:     "4.12",
-				ClusterName:        "barcluster",
-				AppClusterDomain:   "apps.hub.example.com",
-				ClusterDomain:      "hub.example.com",
-				LocalCheckoutPath:  td,
+				ClusterPlatform:   "AWS",
+				ClusterVersion:    "4.12",
+				ClusterName:       "barcluster",
+				AppClusterDomain:  "apps.hub.example.com",
+				ClusterDomain:     "hub.example.com",
+				LocalCheckoutPath: td,
 			},
 		}
 	})
@@ -1764,7 +1764,7 @@ var _ = Describe("CountVPApplications", func() {
 
 	Context("when there are no applications defined", func() {
 		It("should return 0, 0", func() {
-			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte("key: value\n"), 0644)
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte("key: value\n"), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			apps, appsets, err := countVPApplications(pattern)
@@ -1786,7 +1786,7 @@ var _ = Describe("CountVPApplications", func() {
       generators:
         - generator1
 `
-			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte(yamlContent), 0644)
+			err := os.WriteFile(filepath.Join(td, "values-global.yaml"), []byte(yamlContent), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			apps, appsets, err := countVPApplications(pattern)

@@ -119,6 +119,7 @@ linters:
           - mnd
           - revive
           - staticcheck
+          - dupl
         path: _test\.go
       - path: pkg/golinters/errcheck.go
         text: 'SA1019: errCfg.Exclude is deprecated: use ExcludeFunctions instead'
@@ -144,6 +145,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - console/node_modules
 formatters:
   enable:
     - gofmt
@@ -166,3 +168,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+      - console/node_modules

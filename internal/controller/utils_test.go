@@ -1334,7 +1334,16 @@ var _ = Describe("getHTTPSTransport", func() {
 					Namespace: "openshift-config-managed",
 				},
 				Data: map[string]string{
-					"ca.crt": "-----BEGIN CERTIFICATE-----\nMIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw\nDgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow\nEjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLU3\njSayahkJYT5/UqIqViZFMVh16yrQ1mOA8V/k3H8Pk/DL1tJ1yXYEptzhKELNJIjp\nzUv0jVJHPnLGVaikzlKjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr\nBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1\nNDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2wpSek3WdNcr\njSuvziv6OERWSEZObKHVIJl/Cj9SWWECIGB/W0PCjZjKXBzgoW0OzXRiDP/WRxW6\nfrNHC7GJcIqs\n-----END CERTIFICATE-----\n",
+					"ca.crt": "-----BEGIN CERTIFICATE-----\n" +
+						"MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw\n" +
+						"DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow\n" +
+						"EjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLU3\n" +
+						"jSayahkJYT5/UqIqViZFMVh16yrQ1mOA8V/k3H8Pk/DL1tJ1yXYEptzhKELNJIjp\n" +
+						"zUv0jVJHPnLGVaikzlKjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr\n" +
+						"BgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1\n" +
+						"NDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2wpSek3WdNcr\n" +
+						"jSuvziv6OERWSEZObKHVIJl/Cj9SWWECIGB/W0PCjZjKXBzgoW0OzXRiDP/WRxW6\n" +
+						"frNHC7GJcIqs\n-----END CERTIFICATE-----\n",
 				},
 			}
 			_, err := kubeClient.CoreV1().ConfigMaps("openshift-config-managed").Create(context.TODO(), cm, metav1.CreateOptions{})
@@ -1396,7 +1405,7 @@ var _ = Describe("GenerateRandomPassword", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(password).ToNot(BeEmpty())
 			// base64 encoded 15 bytes = 20 chars
-			Expect(len(password)).To(Equal(20))
+			Expect(password).To(HaveLen(20))
 		})
 	})
 
@@ -1477,7 +1486,7 @@ var _ = Describe("writeConfigMapKeyToFile", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			filePath := filepath.Join(td, "ca.crt")
-			err = os.WriteFile(filePath, []byte("existing-data\n"), 0644)
+			err = os.WriteFile(filePath, []byte("existing-data\n"), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = writeConfigMapKeyToFile(kubeClient, "test-ns", "test-cm", "ca.crt", filePath, true)
@@ -1664,7 +1673,7 @@ var _ = Describe("getClusterWideArgoNamespace", func() {
 	})
 })
 
-var _ = Describe("getPatternConditionByStatus", func() {
+var _ = Describe("Pattern condition search functions", func() {
 	var conditions []api.PatternCondition
 
 	BeforeEach(func() {
@@ -1680,70 +1689,57 @@ var _ = Describe("getPatternConditionByStatus", func() {
 		}
 	})
 
-	Context("when conditions is nil", func() {
-		It("should return -1 and nil", func() {
-			idx, cond := getPatternConditionByStatus(nil, corev1.ConditionTrue)
-			Expect(idx).To(Equal(-1))
-			Expect(cond).To(BeNil())
+	Describe("getPatternConditionByStatus", func() {
+		Context("when conditions is nil", func() {
+			It("should return -1 and nil", func() {
+				idx, cond := getPatternConditionByStatus(nil, corev1.ConditionTrue)
+				Expect(idx).To(Equal(-1))
+				Expect(cond).To(BeNil())
+			})
+		})
+
+		Context("when condition exists", func() {
+			It("should return the index and condition", func() {
+				idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionTrue)
+				Expect(idx).To(Equal(0))
+				Expect(cond).ToNot(BeNil())
+				Expect(cond.Type).To(Equal(api.Synced))
+			})
+		})
+
+		Context("when condition does not exist", func() {
+			It("should return -1 and nil", func() {
+				idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionUnknown)
+				Expect(idx).To(Equal(-1))
+				Expect(cond).To(BeNil())
+			})
 		})
 	})
 
-	Context("when condition exists", func() {
-		It("should return the index and condition", func() {
-			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionTrue)
-			Expect(idx).To(Equal(0))
-			Expect(cond).ToNot(BeNil())
-			Expect(cond.Type).To(Equal(api.Synced))
+	Describe("getPatternConditionByType", func() {
+		Context("when conditions is nil", func() {
+			It("should return -1 and nil", func() {
+				idx, cond := getPatternConditionByType(nil, api.Synced)
+				Expect(idx).To(Equal(-1))
+				Expect(cond).To(BeNil())
+			})
 		})
-	})
 
-	Context("when condition does not exist", func() {
-		It("should return -1 and nil", func() {
-			idx, cond := getPatternConditionByStatus(conditions, corev1.ConditionUnknown)
-			Expect(idx).To(Equal(-1))
-			Expect(cond).To(BeNil())
+		Context("when condition type exists", func() {
+			It("should return the index and condition", func() {
+				idx, cond := getPatternConditionByType(conditions, api.Degraded)
+				Expect(idx).To(Equal(1))
+				Expect(cond).ToNot(BeNil())
+				Expect(cond.Status).To(Equal(corev1.ConditionFalse))
+			})
 		})
-	})
-})
 
-var _ = Describe("getPatternConditionByType", func() {
-	var conditions []api.PatternCondition
-
-	BeforeEach(func() {
-		conditions = []api.PatternCondition{
-			{
-				Type:   api.Synced,
-				Status: corev1.ConditionTrue,
-			},
-			{
-				Type:   api.Degraded,
-				Status: corev1.ConditionFalse,
-			},
-		}
-	})
-
-	Context("when conditions is nil", func() {
-		It("should return -1 and nil", func() {
-			idx, cond := getPatternConditionByType(nil, api.Synced)
-			Expect(idx).To(Equal(-1))
-			Expect(cond).To(BeNil())
-		})
-	})
-
-	Context("when condition type exists", func() {
-		It("should return the index and condition", func() {
-			idx, cond := getPatternConditionByType(conditions, api.Degraded)
-			Expect(idx).To(Equal(1))
-			Expect(cond).ToNot(BeNil())
-			Expect(cond.Status).To(Equal(corev1.ConditionFalse))
-		})
-	})
-
-	Context("when condition type does not exist", func() {
-		It("should return -1 and nil", func() {
-			idx, cond := getPatternConditionByType(conditions, api.Unknown)
-			Expect(idx).To(Equal(-1))
-			Expect(cond).To(BeNil())
+		Context("when condition type does not exist", func() {
+			It("should return -1 and nil", func() {
+				idx, cond := getPatternConditionByType(conditions, api.Unknown)
+				Expect(idx).To(Equal(-1))
+				Expect(cond).To(BeNil())
+			})
 		})
 	})
 })

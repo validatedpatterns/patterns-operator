@@ -248,9 +248,9 @@ var _ = Describe("MergeHelmValues", func() {
 		It("should merge values from multiple files", func() {
 			file1 := filepath.Join(td, "values1.yaml")
 			file2 := filepath.Join(td, "values2.yaml")
-			err := os.WriteFile(file1, []byte("key1: value1\nshared: from-file1\n"), 0644)
+			err := os.WriteFile(file1, []byte("key1: value1\nshared: from-file1\n"), 0600)
 			Expect(err).ToNot(HaveOccurred())
-			err = os.WriteFile(file2, []byte("key2: value2\nshared: from-file2\n"), 0644)
+			err = os.WriteFile(file2, []byte("key2: value2\nshared: from-file2\n"), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			result, err := mergeHelmValues(file1, file2)
@@ -265,7 +265,7 @@ var _ = Describe("MergeHelmValues", func() {
 	Context("with invalid YAML file", func() {
 		It("should return an error", func() {
 			file := filepath.Join(td, "invalid.yaml")
-			err := os.WriteFile(file, []byte("{{invalid yaml}}"), 0644)
+			err := os.WriteFile(file, []byte("{{invalid yaml}}"), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = mergeHelmValues(file)
