@@ -20,8 +20,6 @@ const (
 
 	// Sync option that disables dry run in resource is missing in the cluster
 	SyncOptionSkipDryRunOnMissingResource = "SkipDryRunOnMissingResource=true"
-	// Sync option that disables dry run for applying resources
-	SyncOptionSkipDryRun = "SkipDryRun=true"
 	// Sync option that disables resource pruning
 	SyncOptionDisablePrune = "Prune=false"
 	// Sync option that disables resource validation
@@ -30,6 +28,8 @@ const (
 	SyncOptionPruneLast = "PruneLast=true"
 	// Sync option that enables use of replace or create command instead of apply
 	SyncOptionReplace = "Replace=true"
+	// Sync option that disables use of replace or create command instead of apply
+	SyncOptionDisableReplace = "Replace=false"
 	// Sync option that enables use of --force flag, delete and re-create
 	SyncOptionForce = "Force=true"
 	// Sync option that enables use of --server-side flag instead of client-side
@@ -40,10 +40,19 @@ const (
 	SyncOptionDisableDeletion = "Delete=false"
 	// Sync option that sync only out of sync resources
 	SyncOptionApplyOutOfSyncOnly = "ApplyOutOfSyncOnly=true"
+	// Sync option that disables sync only out of sync resources
+	SyncOptionDisableApplyOutOfSyncOnly = "ApplyOutOfSyncOnly=false"
 	// Sync option that requires confirmation before deleting the resource
 	SyncOptionDeleteRequireConfirm = "Delete=confirm"
 	// Sync option that requires confirmation before deleting the resource
 	SyncOptionPruneRequireConfirm = "Prune=confirm"
+	// Sync option that enables client-side apply migration
+	SyncOptionClientSideApplyMigration = "ClientSideApplyMigration=true"
+	// Sync option that disables client-side apply migration
+	SyncOptionDisableClientSideApplyMigration = "ClientSideApplyMigration=false"
+
+	// Default field manager for client-side apply migration
+	DefaultClientSideApplyMigrationManager = "kubectl-client-side-apply"
 )
 
 type PermissionValidator func(un *unstructured.Unstructured, res *metav1.APIResource) error
