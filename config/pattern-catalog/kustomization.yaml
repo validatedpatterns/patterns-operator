@@ -7,5 +7,5 @@ resources:
 - configmap.yaml
 images:
 - name: pattern-catalog
-  newName: kuemper.int.rhx/bandini/patterns-operator-pattern-catalog
-  newTag: 6.6.6
+  newName: quay.io/validatedpatterns/patterns-operator-pattern-catalog
+  newTag: 0.0.4

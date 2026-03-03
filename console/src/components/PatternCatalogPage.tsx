@@ -142,7 +142,27 @@ export default function PatternCatalogPage() {
                     {clusterError && (
                       <div className="patterns-operator__card-field">
                         <strong>{t('Compatibility')}:</strong>{' '}
-                        <Label color="orange">{t('Check Failed')}</Label>
+                        <div className="patterns-operator__compatibility-status">
+                          <Label color="orange">{t('Check Failed')}</Label>
+                          <Popover
+                            headerContent={t('Compatibility Check Error')}
+                            bodyContent={
+                              <div>
+                                <p>{t('Unable to determine cluster compatibility:')}</p>
+                                <code style={{ fontSize: '0.9em', wordBreak: 'break-word' }}>
+                                  {clusterError}
+                                </code>
+                                <p style={{ marginTop: '8px' }}>
+                                  {t('This may be due to insufficient permissions or cluster connectivity issues.')}
+                                </p>
+                              </div>
+                            }
+                            position="right"
+                            maxWidth="500px"
+                          >
+                            <InfoCircleIcon className="patterns-operator__info-icon" />
+                          </Popover>
+                        </div>
                       </div>
                     )}
                   </CardBody>

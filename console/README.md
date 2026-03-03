@@ -148,23 +148,43 @@ to run in-cluster.
 
 ## Deployment on cluster
 
-A [Helm](https://helm.sh) chart is available to deploy the plugin to an OpenShift environment.
+This console plugin is deployed automatically through the patterns-operator. There is no separate deployment step required.
 
-The following Helm parameters are required:
+### Operator-Managed Deployment
 
-`plugin.image`: The location of the image containing the plugin that was previously pushed
+When the patterns-operator is installed via OLM (Operator Lifecycle Manager), it:
 
-Additional parameters can be specified if desired. Consult the chart [values](charts/openshift-console-plugin/values.yaml) file for the full set of supported parameters.
+1. **Creates the console plugin deployment** using the operator's container image
+2. **Registers the plugin** with OpenShift Console via ConsolePlugin resource
+3. **Enables the plugin** automatically in the console configuration
+4. **Provides RBAC permissions** for cluster compatibility checking through the operator's service account
 
-### Installing the Helm Chart
+### Manual Console Plugin Management
 
-Install the chart using the name of the plugin as the Helm release name into a new namespace or an existing namespace as specified by the `plugin_console-plugin-template` parameter and providing the location of the image within the `plugin.image` parameter by using the following command:
+If you need to manually manage the console plugin state:
 
-```shell
-helm upgrade -i  my-plugin charts/openshift-console-plugin -n my-namespace --create-namespace --set plugin.image=my-plugin-image-location
+```bash
+# Check if plugin is registered
+oc get consoleplugin patterns-operator-console-plugin
+
+# Check if plugin is enabled in console
+oc get console cluster -o yaml | grep patterns-operator-console-plugin
+
+# Manually enable plugin (usually automatic)
+oc patch console cluster --type='merge' --patch='{"spec":{"plugins":["patterns-operator-console-plugin"]}}'
 ```
 
-NOTE: When deploying on OpenShift 4.10, it is recommended to add the parameter `--set plugin.securityContext.enabled=false` which will omit configurations related to Pod Security.
+### Development Deployment
+
+For development purposes, you can build and run the plugin separately:
+
+```bash
+# Build development image
+docker build -t my-console-plugin:latest .
+
+# Run locally (requires cluster access)
+yarn start
+```
 
 NOTE: When defining i18n namespace, adhere `plugin__<name-of-the-plugin>` format. The name of the plugin should be extracted from the `consolePlugin` declaration within the [package.json](package.json) file.
 
@@ -226,6 +246,52 @@ Steps to generate reports
 1. In command prompt, navigate to root folder and execute the command `yarn run cypress-merge`
 2. Then execute command `yarn run cypress-generate`
 The cypress-report.html file is generated and should be in (/integration-tests/screenshots) directory
+
+## RBAC Requirements
+
+This console plugin includes cluster compatibility checking functionality that requires access to cluster nodes. Instead of creating separate RBAC resources, the plugin uses the same service account as the patterns-operator to inherit the necessary permissions.
+
+### Architecture
+
+- **Service Account**: Console plugin uses `patterns-operator-controller-manager`
+- **Permissions**: Inherited from operator's RBAC annotations in Go code
+- **No separate RBAC**: All permissions managed through operator annotations
+
+### Required Permissions
+
+The following permissions are defined in the operator's Go controller:
+
+```go
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
+//+kubebuilder:rbac:groups=machine.openshift.io,resources=machines,verbs=get;list
+//+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
+```
+
+### Troubleshooting RBAC Issues
+
+If you see permission-related errors:
+
+1. **Verify operator permissions include nodes:**
+   ```bash
+   oc get clusterrole patterns-operator-manager-role -o yaml | grep -A3 -B3 nodes
+   ```
+
+2. **Check console plugin uses operator service account:**
+   ```bash
+   oc get deployment patterns-operator-console-plugin -o yaml | grep serviceAccountName
+   ```
+
+3. **Test permissions manually:**
+   ```bash
+   oc auth can-i list nodes --as=system:serviceaccount:patterns-operator-system:patterns-operator-controller-manager
+   ```
+
+4. **Regenerate manifests if needed:**
+   ```bash
+   make manifests  # In the operator root directory
+   ```
+
+For detailed RBAC configuration information, see [RBAC-README.md](./RBAC-README.md).
 
 ## References
 

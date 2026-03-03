@@ -7,5 +7,5 @@ resources:
 - configmap.yaml
 images:
 - name: console-plugin
-  newName: kuemper.int.rhx/bandini/patterns-operator-console
-  newTag: 6.6.6
+  newName: quay.io/validatedpatterns/patterns-operator-console
+  newTag: 0.0.4

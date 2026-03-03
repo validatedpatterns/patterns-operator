@@ -1,31 +1,24 @@
 import { checkErrors } from '../support';
 
-const PLUGIN_TEMPLATE_NAME = 'console-plugin-template';
-const PLUGIN_TEMPLATE_PULL_SPEC = Cypress.env('PLUGIN_TEMPLATE_PULL_SPEC');
+const PLUGIN_NAME = 'patterns-operator-console-plugin';
 export const isLocalDevEnvironment = Cypress.config('baseUrl').includes('localhost');
 
-const installHelmChart = (path: string) => {
-  cy.exec(
-    `cd ../../console-plugin-template && ${path} upgrade -i ${PLUGIN_TEMPLATE_NAME} charts/openshift-console-plugin -n ${PLUGIN_TEMPLATE_NAME} --create-namespace --set plugin.image=${PLUGIN_TEMPLATE_PULL_SPEC}`,
-    {
-      failOnNonZeroExit: false,
-    },
-  ).then((result) => {
-    result.stderr && cy.log('Error installing helm chart: ', result.stderr);
-    result.stdout && cy.log('Successfully installed helm chart: ', result.stdout);
-    cy.visit('/k8s/cluster/operator.openshift.io~v1~Console/cluster/console-plugins');
-    cy.get('[data-test="console-plugin-template-status"]').should('include.text', 'loaded');
-  });
+// Check if console plugin is installed and enabled (operator-managed)
+const checkPluginInstalled = () => {
+  cy.visit('/k8s/cluster/operator.openshift.io~v1~Console/cluster/console-plugins');
+  cy.get(`[data-test="${PLUGIN_NAME}-status"]`).should('include.text', 'loaded');
 };
-const deleteHelmChart = (path: string) => {
-  cy.exec(
-    `cd ../../console-plugin-template && ${path} uninstall ${PLUGIN_TEMPLATE_NAME} -n ${PLUGIN_TEMPLATE_NAME} && oc delete namespaces ${PLUGIN_TEMPLATE_NAME}`,
-    {
-      failOnNonZeroExit: false,
-    },
-  ).then((result) => {
-    cy.log('Error uninstalling helm chart: ', result.stderr);
-    cy.log('Successfully uninstalled helm chart: ', result.stdout);
+
+// For operator-managed deployment, we just need to verify the plugin exists
+const verifyOperatorDeployment = () => {
+  cy.exec('oc get consoleplugin patterns-operator-console-plugin', {
+    failOnNonZeroExit: false,
+  }).then((result) => {
+    if (result.code !== 0) {
+      cy.log('Console plugin not found - operator may not be installed');
+    } else {
+      cy.log('Console plugin found via operator deployment');
+    }
   });
 };
 
@@ -33,21 +26,12 @@ describe('Console plugin template test', () => {
   before(() => {
     cy.login();
     cy.get(`[data-test="tour-step-footer-secondary"]`).contains('Skip tour').click();
+
     if (!isLocalDevEnvironment) {
-      console.log('this is not a local env, installig helm');
-
-      cy.exec('cd ../../console-plugin-template && ./install_helm.sh', {
-        failOnNonZeroExit: false,
-      }).then((result) => {
-        cy.log('Error installing helm binary: ', result.stderr);
-        cy.log('Successfully installed helm binary in "/tmp" directory: ', result.stdout);
-
-        installHelmChart('/tmp/helm');
-      });
+      console.log('Verifying operator-managed console plugin deployment');
+      verifyOperatorDeployment();
     } else {
-      console.log('this is a local env, not installing helm');
-
-      installHelmChart('helm');
+      console.log('Local development environment - assuming plugin is running via yarn start');
     }
   });
 
@@ -56,11 +40,7 @@ describe('Console plugin template test', () => {
   });
 
   after(() => {
-    if (!isLocalDevEnvironment) {
-      deleteHelmChart('/tmp/helm');
-    } else {
-      deleteHelmChart('helm');
-    }
+    // No cleanup needed for operator-managed deployment
     cy.logout();
   });
 

@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - nodes
   verbs:
   - create
   - delete
@@ -129,6 +130,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - machine.openshift.io
+  resources:
+  - machines
+  verbs:
+  - get
+  - list
 - apiGroups:
   - operator.open-cluster-management.io
   resources:

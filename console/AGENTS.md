@@ -159,13 +159,8 @@ docker build -t quay.io/my-repository/my-plugin:latest .
 # For Apple Silicon: add --platform=linux/amd64
 ```
 
-### Deploying via Helm
-```bash
-helm upgrade -i my-plugin charts/openshift-console-plugin \
-  -n my-namespace \
-  --create-namespace \
-  --set plugin.image=my-plugin-image-location
-```
+### Deploying via Operator
+The console plugin is automatically deployed when the patterns-operator is installed. No separate deployment commands are needed as the operator manages the console plugin lifecycle.
 
 **Note:** OpenShift 4.10 requires `--set plugin.securityContext.enabled=false`
 

@@ -199,7 +199,13 @@ export default function InstallPatternPage() {
         })()}
         {clusterError && (
           <Alert variant="warning" title={t('Unable to Check Cluster Compatibility')} isInline>
-            {t('Could not verify cluster compatibility: {{error}}', { error: clusterError })}
+            <p>{t('Could not verify cluster compatibility due to the following error:')}</p>
+            <code style={{ display: 'block', marginTop: '8px', padding: '8px', backgroundColor: 'var(--pf-v6-global--palette--black-150)', borderRadius: '4px', fontSize: '0.9em' }}>
+              {clusterError}
+            </code>
+            <p style={{ marginTop: '8px' }}>
+              {t('This may be due to insufficient permissions to read cluster nodes. You can still proceed with the installation, but please verify manually that your cluster meets the pattern requirements.')}
+            </p>
           </Alert>
         )}
         {!success && (

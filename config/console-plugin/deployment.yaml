@@ -47,6 +47,7 @@ spec:
       dnsPolicy: ClusterFirst
       securityContext:
         runAsNonRoot: true
+      serviceAccountName: patterns-operator-controller-manager
       volumes:
       - name: console-plugin-cert
         secret:
