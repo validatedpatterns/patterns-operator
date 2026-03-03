@@ -103,6 +103,18 @@ for org in "${ORGS[@]}"; do
         mkdir -p "${CATALOG_DIR}/${repo_name}"
         echo "${pattern_json}" | yq -P '.' > "${CATALOG_DIR}/${repo_name}/pattern.yaml"
 
+        # Fetch values-secret.yaml.template if it exists
+        template_response=$(gh api "repos/${full_slug}/contents/values-secret.yaml.template" 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            echo "  Found values-secret.yaml.template, fetching..." >&2
+            template_content=$(echo "${template_response}" | jq -r '.content' | base64 -d)
+            if [ $? -eq 0 ]; then
+                echo "${template_content}" > "${CATALOG_DIR}/${repo_name}/values-secret.yaml.template"
+            else
+                echo "  Failed to decode values-secret.yaml.template, skipping." >&2
+            fi
+        fi
+
         pattern_names+=("${repo_name}")
     done
 done
