@@ -14,7 +14,14 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
-import { fetchPattern, fetchSecretTemplate } from '../api';
+import {
+  fetchPattern,
+  fetchSecretTemplate,
+  fetchVaultJobStatus,
+  triggerVaultInjection as apiTriggerVaultInjection,
+  VaultJobStatus,
+  VaultInjectionRequest
+} from '../api';
 import { SecretTemplate, SecretFormData } from '../types';
 
 const PatternModel = {
@@ -54,6 +61,8 @@ export default function InstallPatternPage() {
   const [targetRevision, setTargetRevision] = React.useState('main');
 
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
+  const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
+  const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
 
   const secretData = locationState?.secretData || null;
 
@@ -76,6 +85,74 @@ export default function InstallPatternPage() {
         setLoading(false);
       });
   }, [name, locationState]);
+
+  const triggerVaultInjection = React.useCallback(async () => {
+    if (!patternName || !secretData || !secretTemplate) return;
+
+    try {
+      // Convert secretData to YAML format
+      const yaml = await import('js-yaml');
+      const valuesSecretYaml = yaml.dump(secretData);
+      const templateYaml = JSON.stringify(secretTemplate, null, 2);
+
+      const request: VaultInjectionRequest = {
+        patternName,
+        valuesSecretYaml,
+        templateYaml,
+      };
+
+      const result = await apiTriggerVaultInjection(request);
+
+      if (result.success) {
+        // Start polling for job status
+        setTimeout(() => {
+          checkVaultJobStatus();
+        }, 2000);
+      } else {
+        setVaultJobStatus({
+          status: 'not-found',
+          message: result.message,
+        });
+      }
+    } catch (err) {
+      console.error('Error triggering vault injection:', err);
+      setVaultJobStatus({
+        status: 'not-found',
+        message: `Failed to trigger vault injection: ${err.message || err}`,
+      });
+    }
+  }, [patternName, secretData, secretTemplate]);
+
+  const checkVaultJobStatus = React.useCallback(async () => {
+    if (!patternName) return;
+
+    try {
+      setCheckingVaultStatus(true);
+      const status = await fetchVaultJobStatus(patternName);
+      setVaultJobStatus(status);
+
+      // Continue polling if job is still running or pending
+      if (status.status === 'running' || status.status === 'pending') {
+        setTimeout(() => {
+          checkVaultJobStatus();
+        }, 5000); // Poll every 5 seconds
+      }
+    } catch (err) {
+      console.error('Error checking vault job status:', err);
+    } finally {
+      setCheckingVaultStatus(false);
+    }
+  }, [patternName]);
+
+  // Check vault job status on component mount if secrets were configured
+  React.useEffect(() => {
+    if (success && secretData && secretTemplate && patternName) {
+      const timer = setTimeout(() => {
+        checkVaultJobStatus();
+      }, 2000); // Wait 2 seconds after pattern creation
+      return () => clearTimeout(timer);
+    }
+  }, [success, secretData, secretTemplate, patternName, checkVaultJobStatus]);
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -108,19 +185,18 @@ export default function InstallPatternPage() {
         },
       };
 
-      // Include secret configuration if provided
-      if (secretData && secretTemplate) {
-        patternData.spec.secretsConfig = {
-          template: btoa(JSON.stringify(secretTemplate)),
-          values: btoa(JSON.stringify(secretData)),
-        };
-      }
+      // Note: Secrets are handled separately after pattern creation
 
       await k8sCreate({
         model: PatternModel,
         data: patternData,
       });
       setSuccess(true);
+
+      // If secrets were configured, trigger vault injection
+      if (secretData && secretTemplate) {
+        await triggerVaultInjection();
+      }
     } catch (err) {
       setSubmitError(err?.message || String(err));
     } finally {
@@ -157,9 +233,36 @@ export default function InstallPatternPage() {
       <PageSection>
         {success && (
           <Alert variant="success" title={t('Pattern created successfully')}>
+            <p>{t('Your pattern has been created and ArgoCD will begin deploying it shortly.')}</p>
             <Button variant="link" onClick={() => history.push('/patterns')}>
               {t('Back to catalog')}
             </Button>
+          </Alert>
+        )}
+        {/* Vault injection status */}
+        {success && secretData && secretTemplate && vaultJobStatus && (
+          <Alert
+            variant={
+              vaultJobStatus.status === 'succeeded'
+                ? 'success'
+                : vaultJobStatus.status === 'failed'
+                ? 'danger'
+                : 'info'
+            }
+            title={t('Vault Secret Injection')}
+            isInline
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(vaultJobStatus.status === 'running' || vaultJobStatus.status === 'pending' || checkingVaultStatus) && (
+                <Spinner aria-label={t('Checking vault status')} size="md" />
+              )}
+              <span>{vaultJobStatus.message}</span>
+            </div>
+            {vaultJobStatus.jobName && (
+              <p style={{ marginTop: '8px', fontSize: '0.9em', color: 'var(--pf-v6-global--palette--black-700)' }}>
+                {t('Job')}: <code>{vaultJobStatus.jobName}</code>
+              </p>
+            )}
           </Alert>
         )}
         {submitError && (
