@@ -60,7 +60,6 @@ export default function InstallPatternPage() {
   const [success, setSuccess] = React.useState(false);
 
   const [patternName, setPatternName] = React.useState('');
-  const [clusterGroupName, setClusterGroupName] = React.useState('hub');
   const [targetRepo, setTargetRepo] = React.useState('');
   const [targetRevision, setTargetRevision] = React.useState('main');
 
@@ -236,7 +235,7 @@ export default function InstallPatternPage() {
       const hasSecrets = secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate;
       console.log('📊 [InstallPatternPage] Installation details:', {
         patternName,
-        clusterGroupName,
+        clusterGroupName: 'hub',
         targetRepo,
         targetRevision,
         hasSecrets,
@@ -261,7 +260,7 @@ export default function InstallPatternPage() {
           namespace: 'openshift-operators',
         },
         spec: {
-          clusterGroupName,
+          clusterGroupName: 'hub',
           gitSpec: {
             targetRepo,
             targetRevision,
@@ -433,14 +432,6 @@ export default function InstallPatternPage() {
                 isRequired
                 value={patternName}
                 onChange={(_event, value) => setPatternName(value)}
-              />
-            </FormGroup>
-            <FormGroup label={t('Cluster Group Name')} isRequired fieldId="pattern-cluster-group">
-              <TextInput
-                id="pattern-cluster-group"
-                isRequired
-                value={clusterGroupName}
-                onChange={(_event, value) => setClusterGroupName(value)}
               />
             </FormGroup>
             <FormGroup label={t('Target Repo')} isRequired fieldId="pattern-target-repo">
