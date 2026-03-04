@@ -21,6 +21,21 @@ bases:
 - ../webhook
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
 #- ../certmanager
+
+# These two are needed because otherwise kustomize will prefix the namespace with `patterns-operator` by default
+patchesJson6902:
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
+    kind: ClusterRoleBinding
+    name: secret-injector-rolebinding
+  path: secret_injector_namespace_patch.yaml
+- target:
+    version: v1
+    kind: ServiceAccount
+    name: secret-injector
+  path: secret_injector_sa_namespace_patch.yaml
+
 patchesStrategicMerge:
 # Mount the controller config file for loading manager configurations
 # through a ComponentConfig type
