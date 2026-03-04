@@ -15,9 +15,7 @@ import {
 } from '@patternfly/react-core';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import { fetchPattern, fetchSecretTemplate } from '../api';
-import { SecretTemplate, SecretFormData, Pattern } from '../types';
-import { useClusterInfo } from '../cluster-api';
-import { checkPatternCompatibility } from '../compatibility';
+import { SecretTemplate, SecretFormData } from '../types';
 
 const PatternModel = {
   apiGroup: 'gitops.hybrid-cloud-patterns.io',
@@ -50,7 +48,6 @@ export default function InstallPatternPage() {
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
 
-  const [pattern, setPattern] = React.useState<Pattern | null>(null);
   const [patternName, setPatternName] = React.useState('');
   const [clusterGroupName, setClusterGroupName] = React.useState('hub');
   const [targetRepo, setTargetRepo] = React.useState('');
@@ -58,14 +55,11 @@ export default function InstallPatternPage() {
 
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
 
-  // Fetch cluster information for compatibility checking
-  const [clusterInfo, clusterLoading, clusterError] = useClusterInfo();
   const secretData = locationState?.secretData || null;
 
   React.useEffect(() => {
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
       .then(([patternData, template]) => {
-        setPattern(patternData);
         setPatternName(patternData.name);
         setTargetRepo(patternData.repo_url || '');
         setSecretTemplate(template);
@@ -176,36 +170,6 @@ export default function InstallPatternPage() {
         {secretData && secretTemplate && (
           <Alert variant="info" title={t('Secrets Configured')} isInline>
             {t('Secret configuration has been provided for this pattern installation.')}
-          </Alert>
-        )}
-        {/* Compatibility warning */}
-        {pattern && clusterInfo && !clusterLoading && (() => {
-          const compatibilityResult = checkPatternCompatibility(pattern, clusterInfo);
-          return compatibilityResult.status !== 'compatible' && (
-            <Alert
-              variant={compatibilityResult.status === 'insufficient' ? 'warning' : 'info'}
-              title={t('Cluster Compatibility Notice')}
-              isInline
-            >
-              <p>{compatibilityResult.reason}</p>
-              {compatibilityResult.status === 'insufficient' && (
-                <p>{t('Installation may fail or require cluster scaling. Consider upgrading your cluster resources before proceeding.')}</p>
-              )}
-              {compatibilityResult.status === 'unknown' && (
-                <p>{t('Please verify that your cluster meets the pattern requirements before proceeding with installation.')}</p>
-              )}
-            </Alert>
-          );
-        })()}
-        {clusterError && (
-          <Alert variant="warning" title={t('Unable to Check Cluster Compatibility')} isInline>
-            <p>{t('Could not verify cluster compatibility due to the following error:')}</p>
-            <code style={{ display: 'block', marginTop: '8px', padding: '8px', backgroundColor: 'var(--pf-v6-global--palette--black-150)', borderRadius: '4px', fontSize: '0.9em' }}>
-              {clusterError}
-            </code>
-            <p style={{ marginTop: '8px' }}>
-              {t('This may be due to insufficient permissions to read cluster nodes. You can still proceed with the installation, but please verify manually that your cluster meets the pattern requirements.')}
-            </p>
           </Alert>
         )}
         {!success && (
