@@ -72,7 +72,7 @@ func (r *PatternValidator) ValidateCreate(ctx context.Context, obj runtime.Objec
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *PatternValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (r *PatternValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
 	p, err := convertToPattern(newObj)
 	if err != nil {
 		return nil, err
