@@ -201,7 +201,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return r.actionPerformed(qualifiedInstance, "error setting patterns operator owner reference of gitops subscription", err)
 			}
 			// Persist the updated ownerReferences on the Subscription
-			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), sub, metav1.UpdateOptions{}); err != nil {
+			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(GitOpsDefaultSubscriptionNamespace).Update(context.Background(), sub, metav1.UpdateOptions{}); err != nil {
 				return r.actionPerformed(qualifiedInstance, "error updating gitops subscription owner references", err)
 			}
 			return r.actionPerformed(qualifiedInstance, "updated patterns operator owner reference of gitops subscription", nil)

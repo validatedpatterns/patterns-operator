@@ -7,8 +7,6 @@ const (
 	OperatorNamespace = "openshift-operators"
 	// Default Operator Config Map Name
 	OperatorConfigMap = "patterns-operator-config"
-	// Default Subscription Namespace
-	SubscriptionNamespace = "openshift-operators"
 	// Default Application Namespace
 	ApplicationNamespace = "openshift-gitops"
 	// ClusterWide Argo Name
@@ -17,6 +15,7 @@ const (
 
 // GitOps Subscription
 const (
+	GitOpsDefaultSubscriptionNamespace  = "openshift-gitops-operator"
 	GitOpsDefaultChannel                = "gitops-1.18"
 	GitOpsDefaultPackageName            = "openshift-gitops-operator"
 	GitOpsDefaultCatalogSource          = "redhat-operators"
