@@ -70,14 +70,14 @@ var _ = Describe("Subscription Functions", func() {
 		It("should error out with a non existing a Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			_, err = getSubscription(fakeOlmClientSet, "foo")
+			_, err = getSubscription(fakeOlmClientSet, &operatorv1alpha1.Subscription{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("should return a proper Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			sub, err := getSubscription(fakeOlmClientSet, "foosubscription")
+			sub, err := getSubscription(fakeOlmClientSet, &operatorv1alpha1.Subscription{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub.Spec.Channel).To(Equal("foochannel"))
 			Expect(sub.Spec.CatalogSource).To(Equal("foosource"))

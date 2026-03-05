@@ -26,8 +26,6 @@ func DetectOperatorNamespace() string {
 const (
 	// Default Operator Config Map Name
 	OperatorConfigMap = "patterns-operator-config"
-	// Default Subscription Namespace
-	SubscriptionNamespace = "openshift-operators"
 	// Default Application Namespace
 	ApplicationNamespace = "openshift-gitops"
 	// ClusterWide Argo Name
@@ -36,21 +34,15 @@ const (
 
 // GitOps Subscription
 const (
+	GitOpsDefaultSubscriptionNamespace  = "openshift-gitops-operator"
+	GitOpsLegacySubscriptionNamespace   = "openshift-operators"
 	GitOpsDefaultChannel                = "gitops-1.18"
 	GitOpsDefaultPackageName            = "openshift-gitops-operator"
 	GitOpsDefaultCatalogSource          = "redhat-operators"
 	GitOpsDefaultCatalogSourceNamespace = "openshift-marketplace"
 	GitOpsDefaultApprovalPlan           = "Automatic"
-)
-
-// GitOps Configuration
-const (
-	// Require manual intervention before Argo will sync new content. Default: False
-	GitOpsDefaultManualSync = "false"
-	// Require manual confirmation before installing and upgrading operators. Default: False
-	GitOpsDefaultManualApproval = "false"
-	// Dangerous. Force a specific version to be installed. Default: False
-	GitOpsDefaultUseCSV = "false"
+	// Dangerous. Force a specific version to be installed. Default: ""
+	GitOpsDefaultCSV = ""
 )
 
 // Gitea chart defaults
@@ -85,16 +77,17 @@ const (
 // Currently none
 
 var DefaultPatternOperatorConfig = map[string]string{
-	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
-	"gitops.name":                GitOpsDefaultPackageName,
-	"gitops.channel":             GitOpsDefaultChannel,
-	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
-	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
-	"gitops.ManualSync":          GitOpsDefaultManualSync,
-	"gitea.chartName":            GiteaChartName,
-	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
-	"gitea.chartVersion":         GiteaDefaultChartVersion,
-	"analytics.enabled":          "true",
+	"gitops.catalogSource":         GitOpsDefaultCatalogSource,
+	"gitops.name":                  GitOpsDefaultPackageName,
+	"gitops.channel":               GitOpsDefaultChannel,
+	"gitops.sourceNamespace":       GitOpsDefaultCatalogSourceNamespace,
+	"gitops.subscriptionNamespace": GitOpsDefaultSubscriptionNamespace,
+	"gitops.installApprovalPlan":   GitOpsDefaultApprovalPlan,
+	"gitops.csv":                   GitOpsDefaultCSV,
+	"gitea.chartName":              GiteaChartName,
+	"gitea.helmRepoUrl":            GiteaHelmRepoUrl,
+	"gitea.chartVersion":           GiteaDefaultChartVersion,
+	"analytics.enabled":            "true",
 }
 
 type GitOpsConfig map[string]string

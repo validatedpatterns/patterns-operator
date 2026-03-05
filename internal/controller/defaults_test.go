@@ -94,7 +94,6 @@ var _ = Describe("DefaultPatternOperatorConfig", func() {
 			"gitops.channel",
 			"gitops.sourceNamespace",
 			"gitops.installApprovalPlan",
-			"gitops.ManualSync",
 			"gitea.chartName",
 			"gitea.helmRepoUrl",
 			"gitea.chartVersion",
@@ -109,7 +108,6 @@ var _ = Describe("DefaultPatternOperatorConfig", func() {
 		Expect(DefaultPatternOperatorConfig["gitops.catalogSource"]).To(Equal("redhat-operators"))
 		Expect(DefaultPatternOperatorConfig["gitops.sourceNamespace"]).To(Equal("openshift-marketplace"))
 		Expect(DefaultPatternOperatorConfig["gitops.installApprovalPlan"]).To(Equal("Automatic"))
-		Expect(DefaultPatternOperatorConfig["gitops.ManualSync"]).To(Equal("false"))
 		Expect(DefaultPatternOperatorConfig["analytics.enabled"]).To(Equal("true"))
 	})
 })
