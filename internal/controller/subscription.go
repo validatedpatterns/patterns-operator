@@ -72,7 +72,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GitOpsDefaultPackageName,
-			Namespace: SubscriptionNamespace,
+			Namespace: GitOpsDefaultSubscriptionNamespace,
 		},
 		Spec: spec,
 	}
@@ -81,7 +81,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 }
 
 func getSubscription(client olmclient.Interface, name string) (*operatorv1alpha1.Subscription, error) {
-	sub, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
+	sub, err := client.OperatorsV1alpha1().Subscriptions(GitOpsDefaultSubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func getSubscription(client olmclient.Interface, name string) (*operatorv1alpha1
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	_, err := client.OperatorsV1alpha1().Subscriptions(GitOpsDefaultSubscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 
@@ -133,7 +133,7 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 	if changed {
 		target.Spec.DeepCopyInto(current.Spec)
-		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		_, err := client.OperatorsV1alpha1().Subscriptions(GitOpsDefaultSubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return changed, err
 	}
 
