@@ -142,9 +142,32 @@ export default function InstallPatternPage() {
       const yaml = await import('js-yaml');
       console.log('🔄 [InstallPatternPage] Converting secretFormData to YAML:', secretFormData);
 
-      // Wrap the secret data in the structure expected by vault_load_secrets module
+      // Build the v2.0 secrets list structure expected by parse_secrets_info
+      const secretsList = secretTemplate.secrets.map((secretDef) => {
+        const formValues = secretFormData[secretDef.name] || {};
+        const secret: any = { name: secretDef.name };
+        if (secretDef.vaultMount) secret.vaultMount = secretDef.vaultMount;
+        if (secretDef.vaultPrefixes) secret.vaultPrefixes = secretDef.vaultPrefixes;
+        secret.fields = secretDef.fields.map((fieldDef) => {
+          const field: any = { name: fieldDef.name };
+          if (fieldDef.onMissingValue) field.onMissingValue = fieldDef.onMissingValue;
+          if (fieldDef.vaultPolicy) field.vaultPolicy = fieldDef.vaultPolicy;
+          if (fieldDef.base64) field.base64 = fieldDef.base64;
+          if (fieldDef.override) field.override = fieldDef.override;
+          if (fieldDef.onMissingValue !== 'generate') {
+            const val = formValues[fieldDef.name];
+            if (typeof val === 'string' && val !== '') {
+              field.value = val;
+            }
+          }
+          return field;
+        });
+        return secret;
+      });
+
       const vaultSecretStructure = {
-        secrets: secretFormData
+        version: '2.0',
+        secrets: secretsList
       };
 
       const valuesSecretYaml = yaml.dump(vaultSecretStructure);

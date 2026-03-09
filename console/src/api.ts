@@ -204,7 +204,6 @@ PLAYBOOK_EOF
                     -e vault_pod="${request.vaultPod || 'vault-0'}" \\
                     -e vault_hub="${request.vaultHub || 'hub'}" \\
                     -e found_file="/tmp/pattern/values-secret.yaml" \\
-                    -e is_encrypted=false \\
                     -e secret_template="/tmp/pattern/values-secret.yaml.template"
 
                   echo "Vault secret injection completed successfully"
