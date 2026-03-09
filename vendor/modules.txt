@@ -119,11 +119,11 @@ github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/argoproj-labs/argocd-operator v0.15.0
+# github.com/argoproj-labs/argocd-operator v0.17.0
 ## explicit; go 1.24.6
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
-# github.com/argoproj/argo-cd/v3 v3.0.19
+# github.com/argoproj/argo-cd/v3 v3.1.11
 ## explicit; go 1.24.6
 github.com/argoproj/argo-cd/v3/assets
 github.com/argoproj/argo-cd/v3/common
@@ -138,7 +138,6 @@ github.com/argoproj/argo-cd/v3/util
 github.com/argoproj/argo-cd/v3/util/assets
 github.com/argoproj/argo-cd/v3/util/cache
 github.com/argoproj/argo-cd/v3/util/cert
-github.com/argoproj/argo-cd/v3/util/claims
 github.com/argoproj/argo-cd/v3/util/config
 github.com/argoproj/argo-cd/v3/util/env
 github.com/argoproj/argo-cd/v3/util/exec
@@ -151,14 +150,16 @@ github.com/argoproj/argo-cd/v3/util/io/files
 github.com/argoproj/argo-cd/v3/util/io/path
 github.com/argoproj/argo-cd/v3/util/jwt
 github.com/argoproj/argo-cd/v3/util/log
+github.com/argoproj/argo-cd/v3/util/oci
 github.com/argoproj/argo-cd/v3/util/proxy
+github.com/argoproj/argo-cd/v3/util/rand
 github.com/argoproj/argo-cd/v3/util/rbac
 github.com/argoproj/argo-cd/v3/util/regex
 github.com/argoproj/argo-cd/v3/util/security
 github.com/argoproj/argo-cd/v3/util/versions
 github.com/argoproj/argo-cd/v3/util/workloadidentity
-# github.com/argoproj/gitops-engine v0.7.1-0.20250905153922-d96c3d51e4c4
-## explicit; go 1.23.5
+# github.com/argoproj/gitops-engine v0.7.1-0.20250905160054-e48120133eec
+## explicit; go 1.24.0
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/api/v1/endpoints
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/util/hash
 github.com/argoproj/gitops-engine/pkg/diff
@@ -176,10 +177,11 @@ github.com/argoproj/gitops-engine/pkg/utils/text
 github.com/argoproj/gitops-engine/pkg/utils/tracing
 # github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5
 ## explicit; go 1.23.5
-github.com/argoproj/pkg/exec
-github.com/argoproj/pkg/rand
 github.com/argoproj/pkg/sync
 github.com/argoproj/pkg/time
+# github.com/argoproj/pkg/v2 v2.0.1
+## explicit; go 1.23.5
+github.com/argoproj/pkg/v2/sync
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -197,6 +199,9 @@ github.com/bombsimon/logrusr/v4
 # github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 ## explicit; go 1.24.0
 github.com/bradleyfalzon/ghinstallation/v2
+# github.com/carapace-sh/carapace-shlex v1.0.1
+## explicit; go 1.15
+github.com/carapace-sh/carapace-shlex
 # github.com/casbin/casbin/v2 v2.127.0
 ## explicit; go 1.13
 github.com/casbin/casbin/v2
@@ -474,9 +479,9 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
-# github.com/google/go-github/v66 v66.0.0
-## explicit; go 1.21
-github.com/google/go-github/v66/github
+# github.com/google/go-github/v69 v69.2.0
+## explicit; go 1.22.0
+github.com/google/go-github/v69/github
 # github.com/google/go-github/v75 v75.0.0
 ## explicit; go 1.24.0
 github.com/google/go-github/v75/github
@@ -486,10 +491,7 @@ github.com/google/go-querystring/query
 # github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83
 ## explicit; go 1.24.0
 github.com/google/pprof/profile
-# github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-## explicit; go 1.13
-github.com/google/shlex
-# github.com/google/uuid v1.6.0
+# github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518
 ## explicit
 github.com/google/uuid
 # github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
@@ -677,7 +679,7 @@ github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientse
 github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v2
 github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v2/fake
 github.com/operator-framework/operator-lifecycle-manager/pkg/lib/clientfake
-# github.com/patrickmn/go-cache v2.1.0+incompatible
+# github.com/patrickmn/go-cache v2.1.1-0.20191004192108-46f407853014+incompatible
 ## explicit
 github.com/patrickmn/go-cache
 # github.com/peterbourgon/diskv v2.0.1+incompatible
@@ -728,7 +730,7 @@ github.com/redis/go-redis/v9/internal/pool
 github.com/redis/go-redis/v9/internal/proto
 github.com/redis/go-redis/v9/internal/rand
 github.com/redis/go-redis/v9/internal/util
-# github.com/robfig/cron/v3 v3.0.1
+# github.com/robfig/cron/v3 v3.0.2-0.20210106135023-bc59245fe10e
 ## explicit; go 1.12
 github.com/robfig/cron/v3
 # github.com/russross/blackfriday/v2 v2.1.0
@@ -769,7 +771,7 @@ github.com/spf13/afero/mem
 # github.com/spf13/cast v1.7.1
 ## explicit; go 1.19
 github.com/spf13/cast
-# github.com/spf13/cobra v1.9.1
+# github.com/spf13/cobra v1.10.1
 ## explicit; go 1.15
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.10
@@ -784,8 +786,8 @@ github.com/tklauser/numcpus
 # github.com/vmihailenco/go-tinylfu v0.2.2
 ## explicit; go 1.15
 github.com/vmihailenco/go-tinylfu
-# github.com/vmihailenco/msgpack/v5 v5.3.5
-## explicit; go 1.11
+# github.com/vmihailenco/msgpack/v5 v5.4.1
+## explicit; go 1.19
 github.com/vmihailenco/msgpack/v5
 github.com/vmihailenco/msgpack/v5/msgpcode
 # github.com/vmihailenco/tagparser/v2 v2.0.0
@@ -883,8 +885,8 @@ golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.30.0
-## explicit; go 1.23.0
+# golang.org/x/oauth2 v0.31.0
+## explicit; go 1.24.0
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
 golang.org/x/oauth2/google
@@ -968,16 +970,14 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # golang.org/x/tools/go/expect v0.1.1-deprecated
 ## explicit; go 1.23.0
-# golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated
-## explicit; go 1.23.0
 # gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20250929231259-57b25ae835d4
 ## explicit; go 1.24.0
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.75.1
-## explicit; go 1.23.0
+# google.golang.org/grpc v1.76.0
+## explicit; go 1.24.0
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/grpclog
@@ -1579,7 +1579,7 @@ k8s.io/component-base/zpages/features
 k8s.io/component-helpers/auth/rbac/reconciliation
 k8s.io/component-helpers/auth/rbac/validation
 k8s.io/component-helpers/resource
-# k8s.io/controller-manager v0.0.0 => k8s.io/controller-manager v0.33.4
+# k8s.io/controller-manager v0.33.1 => k8s.io/controller-manager v0.33.4
 ## explicit; go 1.24.0
 k8s.io/controller-manager/pkg/features
 # k8s.io/klog/v2 v2.130.1
@@ -1650,7 +1650,7 @@ k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 k8s.io/kubectl/pkg/validation
-# k8s.io/kubernetes v1.32.2 => k8s.io/kubernetes v1.33.4
+# k8s.io/kubernetes v1.33.1 => k8s.io/kubernetes v1.33.4
 ## explicit; go 1.24.0
 k8s.io/kubernetes/pkg/api/legacyscheme
 k8s.io/kubernetes/pkg/api/v1/service
@@ -1767,14 +1767,27 @@ k8s.io/utils/ptr
 k8s.io/utils/trace
 # oras.land/oras-go/v2 v2.6.0
 ## explicit; go 1.23.0
+oras.land/oras-go/v2
 oras.land/oras-go/v2/content
+oras.land/oras-go/v2/content/file
+oras.land/oras-go/v2/content/oci
 oras.land/oras-go/v2/errdef
 oras.land/oras-go/v2/internal/cas
+oras.land/oras-go/v2/internal/container/set
+oras.land/oras-go/v2/internal/copyutil
 oras.land/oras-go/v2/internal/descriptor
 oras.land/oras-go/v2/internal/docker
+oras.land/oras-go/v2/internal/fs/tarfs
+oras.land/oras-go/v2/internal/graph
 oras.land/oras-go/v2/internal/httputil
+oras.land/oras-go/v2/internal/interfaces
 oras.land/oras-go/v2/internal/ioutil
+oras.land/oras-go/v2/internal/manifestutil
+oras.land/oras-go/v2/internal/platform
+oras.land/oras-go/v2/internal/registryutil
+oras.land/oras-go/v2/internal/resolver
 oras.land/oras-go/v2/internal/spec
+oras.land/oras-go/v2/internal/status
 oras.land/oras-go/v2/internal/syncutil
 oras.land/oras-go/v2/registry
 oras.land/oras-go/v2/registry/remote
@@ -1870,7 +1883,7 @@ sigs.k8s.io/controller-tools/pkg/webhook
 ## explicit; go 1.23
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/kustomize/api v0.19.0
+# sigs.k8s.io/kustomize/api v0.20.0
 ## explicit; go 1.22.7
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
@@ -1916,7 +1929,7 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kyaml v0.19.0
+# sigs.k8s.io/kustomize/kyaml v0.20.1
 ## explicit; go 1.22.7
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
