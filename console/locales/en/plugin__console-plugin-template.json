@@ -5,6 +5,7 @@
   "exposedModules": "exposedModules",
   "Hello, Plugin!": "Hello, Plugin!",
   "in package.json mapping the reference to the module.": "in package.json mapping the reference to the module.",
+  "Catalog": "Catalog",
   "Patterns": "Patterns",
   "Plugin Example": "Plugin Example",
   "Success!": "Success!",
