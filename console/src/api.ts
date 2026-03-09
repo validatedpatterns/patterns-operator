@@ -147,7 +147,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
           spec: {
             serviceAccountName: 'patterns-operator-secret-injector',
             restartPolicy: 'Never',
-            containers: [
+            initContainers: [
               {
                 name: 'secret-injector',
                 image: 'quay.io/validatedpatterns/imperative-container:v1',
@@ -155,7 +155,6 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
                   '/bin/bash',
                   '-c',
                   `
-                  set -e
                   echo "Starting vault secret injection for pattern: ${request.patternName}"
 
                   # Copy mounted secret files to expected location
@@ -195,7 +194,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
         name: rhvp.cluster_utils.load_secrets
 PLAYBOOK_EOF
 
-                  # Run the playbook with our variables
+                  # Run the playbook and save the exit code
                   cd /pattern-home
                   ansible-playbook -v -i localhost, /tmp/vault_injection_playbook.yaml \\
                     -e pattern_name="${request.patternName}" \\
@@ -205,8 +204,11 @@ PLAYBOOK_EOF
                     -e vault_hub="${request.vaultHub || 'hub'}" \\
                     -e found_file="/tmp/pattern/values-secret.yaml" \\
                     -e secret_template="/tmp/pattern/values-secret.yaml.template"
+                  rc=$?
 
-                  echo "Vault secret injection completed successfully"
+                  echo $rc > /shared/rc
+                  echo "Vault secret injection finished with exit code $rc"
+                  exit 0
                   `,
                 ],
                 env: [
@@ -221,10 +223,60 @@ PLAYBOOK_EOF
                     mountPath: '/vault-secrets',
                     readOnly: true,
                   },
+                  {
+                    name: 'shared',
+                    mountPath: '/shared',
+                  },
                 ],
                 resources: {
                   requests: { cpu: '100m', memory: '256Mi' },
                   limits: { cpu: '500m', memory: '512Mi' },
+                },
+              },
+              {
+                name: 'cleanup',
+                image: 'quay.io/validatedpatterns/imperative-container:v1',
+                command: [
+                  '/bin/bash',
+                  '-c',
+                  `echo "Deleting temporary secret $SECRET_NAME"
+                  kubectl delete secret "$SECRET_NAME" -n openshift-operators --ignore-not-found
+                  echo "Cleanup complete"`,
+                ],
+                env: [
+                  { name: 'SECRET_NAME', value: secretName },
+                ],
+                resources: {
+                  requests: { cpu: '50m', memory: '64Mi' },
+                  limits: { cpu: '100m', memory: '128Mi' },
+                },
+              },
+            ],
+            containers: [
+              {
+                name: 'result',
+                image: 'quay.io/validatedpatterns/imperative-container:v1',
+                command: [
+                  '/bin/bash',
+                  '-c',
+                  `rc=$(cat /shared/rc 2>/dev/null || echo 1)
+                  if [ "$rc" -eq 0 ]; then
+                    echo "Vault secret injection completed successfully"
+                  else
+                    echo "Vault secret injection failed with exit code $rc"
+                  fi
+                  exit $rc`,
+                ],
+                volumeMounts: [
+                  {
+                    name: 'shared',
+                    mountPath: '/shared',
+                    readOnly: true,
+                  },
+                ],
+                resources: {
+                  requests: { cpu: '10m', memory: '16Mi' },
+                  limits: { cpu: '50m', memory: '32Mi' },
                 },
               },
             ],
@@ -232,6 +284,10 @@ PLAYBOOK_EOF
               {
                 name: 'vault-secrets',
                 secret: { secretName: secretName },
+              },
+              {
+                name: 'shared',
+                emptyDir: {},
               },
             ],
           },
