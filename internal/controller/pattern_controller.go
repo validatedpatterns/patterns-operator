@@ -169,44 +169,37 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// -- GitOps Subscription
 	targetSub, _ := newSubscriptionFromConfigMap(r.fullClient)
-	operatorConfigMap, err := GetOperatorConfigmap()
-	if err == nil {
-		if err := controllerutil.SetOwnerReference(operatorConfigMap, targetSub, r.Scheme); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error setting owner of gitops subscription", err)
-		}
-	} else {
-		return r.actionPerformed(qualifiedInstance, "error getting operator configmap", err)
-	}
 
 	sub, _ := getSubscription(r.olmClient, targetSub.Name)
 	if sub == nil {
 		err = createSubscription(r.olmClient, targetSub)
 		return r.actionPerformed(qualifiedInstance, "create gitops subscription", err)
-	} else if ownedBySame(targetSub, sub) {
-		// Check version/channel etc
-		// Dangerous if multiple patterns do not agree, or automatic upgrades are in place...
-		changed, errSub := updateSubscription(r.olmClient, targetSub, sub)
-		if changed {
-			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
-		}
 	} else {
-		// Historically the subscription was owned by the pattern, not the operator. If this is the case,
-		// we update the owner reference to the operator itself. When the subscription is owned by the pattern,
-		// deleting the pattern removes the subscription and some, but not all, argo resources. This causes
-		// subsequent pattern installations to try to start argo in namespaced mode and any charts requiring
-		// cluster-wide access, like Vault, will fail to install. Having the subscription owned by the operator
-		// allows subsequent pattern installations to reuse the openshift gitops operator already on the cluster.
+		// Remove any stale owner references from the subscription (historically set by
+		// the pattern or the operator configmap). Cross-namespace owner references are
+		// not allowed, so we clean them up and rely on the subscription persisting
+		// independently.
+		changed := false
 		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, sub, r.Scheme); err == nil {
-			if err := controllerutil.SetOwnerReference(operatorConfigMap, sub, r.Scheme); err != nil {
-				return r.actionPerformed(qualifiedInstance, "error setting patterns operator owner reference of gitops subscription", err)
+			changed = true
+		}
+		operatorConfigMap, cmErr := GetOperatorConfigmap()
+		if cmErr == nil {
+			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, sub, r.Scheme); err == nil {
+				changed = true
 			}
-			// Persist the updated ownerReferences on the Subscription
+		}
+		if changed {
 			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), sub, metav1.UpdateOptions{}); err != nil {
-				return r.actionPerformed(qualifiedInstance, "error updating gitops subscription owner references", err)
+				return r.actionPerformed(qualifiedInstance, "error removing stale owner references from gitops subscription", err)
 			}
-			return r.actionPerformed(qualifiedInstance, "updated patterns operator owner reference of gitops subscription", nil)
-		} else {
-			logOnce("The gitops subscription is not owned by us, leaving untouched")
+			return r.actionPerformed(qualifiedInstance, "removed stale owner references from gitops subscription", nil)
+		}
+
+		// Check version/channel etc
+		updatedSub, errSub := updateSubscription(r.olmClient, targetSub, sub)
+		if updatedSub {
+			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
 		}
 	}
 	logOnce("subscription found")
