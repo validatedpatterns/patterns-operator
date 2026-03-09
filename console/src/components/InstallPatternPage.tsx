@@ -432,7 +432,7 @@ export default function InstallPatternPage() {
             </div>
             {vaultJobStatus.jobName && (
               <p style={{ marginTop: '8px', fontSize: '0.9em', color: 'var(--pf-v6-global--palette--black-700)' }}>
-                {t('Job')}: <code>{vaultJobStatus.jobName}</code>
+                {t('Job')}: <a href={`/k8s/ns/openshift-operators/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
               </p>
             )}
           </Alert>
