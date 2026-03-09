@@ -78,8 +78,16 @@ func main() {
 
 	printVersion()
 
+	ns, err := controllers.DetectOperatorNamespace()
+	if err != nil {
+		setupLog.Error(err, "unable to detect operator namespace")
+		os.Exit(1)
+	}
+	controllers.OperatorNamespace = ns
+	setupLog.Info("detected operator namespace", "namespace", ns)
+
 	// Create initial config map for gitops
-	err := createGitOpsConfigMap()
+	err = createGitOpsConfigMap()
 	if err != nil {
 		setupLog.Error(err, "unable to create config map")
 	}

@@ -62,6 +62,9 @@ func cleanupTempDir(tempDir string) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
+	// Initialize OperatorNamespace for tests (it's a var detected at runtime in production)
+	OperatorNamespace = "openshift-operators"
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},

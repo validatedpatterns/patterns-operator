@@ -2,7 +2,7 @@
 set -e -o pipefail
 
 CATALOGSOURCE="test-pattern-operator"
-NS="openshift-operators"
+NS="patterns-operator"
 OPERATOR="patterns-operator"
 VERSION="${VERSION:-6.6.6}"
 UPLOADREGISTRY="${UPLOADREGISTRY:-kuemper.int.rhx/bandini}"
@@ -79,6 +79,20 @@ make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" CHANNELS=fast USE_IMA
     catalog-push catalog-install
 
 wait_for_resource "packagemanifest" "${OPERATOR}" "" "${CATALOGSOURCE}"
+
+# Create namespace and OperatorGroup for dedicated namespace install
+oc create namespace ${NS} --dry-run=client -o yaml | oc apply -f -
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: patterns-operator-group
+  namespace: ${NS}
+spec:
+  targetNamespaces:
+  - ${NS}
+EOF
+
 apply_subscription
 wait_for_resource "operator" "${OPERATOR}" "${NS}"
 

@@ -15,41 +15,45 @@ import (
 	"k8s.io/client-go/testing"
 )
 
-var defaultTestSubscription = operatorv1alpha1.Subscription{
-	Spec: &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          "foosource",
-		CatalogSourceNamespace: "foosourcenamespace",
-		Package:                "foooperator",
-		Channel:                "foochannel",
-		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
-		Config: &operatorv1alpha1.SubscriptionConfig{
-			Env: []corev1.EnvVar{
-				{
-					Name:  "foo",
-					Value: "bar",
+func newDefaultTestSubscription() operatorv1alpha1.Subscription {
+	return operatorv1alpha1.Subscription{
+		Spec: &operatorv1alpha1.SubscriptionSpec{
+			CatalogSource:          "foosource",
+			CatalogSourceNamespace: "foosourcenamespace",
+			Package:                "foooperator",
+			Channel:                "foochannel",
+			InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
+			Config: &operatorv1alpha1.SubscriptionConfig{
+				Env: []corev1.EnvVar{
+					{
+						Name:  "foo",
+						Value: "bar",
+					},
 				},
 			},
 		},
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "foosubscription",
-		Namespace: OperatorNamespace,
-	},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foosubscription",
+			Namespace: OperatorNamespace,
+		},
+	}
 }
 
-var defaultTestSubConfigMap = corev1.ConfigMap{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      OperatorConfigMap,
-		Namespace: OperatorNamespace,
-	},
-	Data: map[string]string{
-		"gitops.installApprovalPlan": "Manual",
-		"gitops.catalogSource":       "foo-source",
-		"gitops.sourceNamespace":     "foo-source-namespace",
-		"gitops.name":                "foo-name",
-		"gitops.channel":             "foo-channel",
-		"gitops.csv":                 "1.2.3",
-	},
+func newDefaultTestSubConfigMap() corev1.ConfigMap {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      OperatorConfigMap,
+			Namespace: OperatorNamespace,
+		},
+		Data: map[string]string{
+			"gitops.installApprovalPlan": "Manual",
+			"gitops.catalogSource":       "foo-source",
+			"gitops.sourceNamespace":     "foo-source-namespace",
+			"gitops.name":                "foo-name",
+			"gitops.channel":             "foo-channel",
+			"gitops.csv":                 "1.2.3",
+		},
+	}
 }
 
 var _ = Describe("Subscription Functions", func() {
@@ -58,7 +62,8 @@ var _ = Describe("Subscription Functions", func() {
 		var fakeOlmClientSet *olmclient.Clientset
 
 		BeforeEach(func() {
-			testSubscription = defaultTestSubscription.DeepCopy()
+			s := newDefaultTestSubscription()
+			testSubscription = s.DeepCopy()
 			fakeOlmClientSet = olmclient.NewSimpleClientset()
 		})
 
@@ -90,7 +95,8 @@ var _ = Describe("Subscription Functions", func() {
 
 		BeforeEach(func() {
 			fakeClientSet = kubeclient.NewSimpleClientset()
-			testConfigMap = defaultTestSubConfigMap.DeepCopy()
+			cm := newDefaultTestSubConfigMap()
+			testConfigMap = cm.DeepCopy()
 		})
 
 		It("should handle the absence of the ConfigMap gracefully", func() {

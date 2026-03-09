@@ -1,10 +1,29 @@
 package controllers
 
+import (
+	"os"
+	"strings"
+)
+
+// OperatorNamespace is detected at runtime via DetectOperatorNamespace().
+// It defaults to "openshift-operators" for backward compatibility.
+var OperatorNamespace string
+
+// DetectOperatorNamespace determines the namespace the operator is running in.
+func DetectOperatorNamespace() (string, error) {
+	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
+		return ns, nil
+	}
+	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err == nil && len(data) > 0 {
+		return strings.TrimSpace(string(data)), nil
+	}
+	return "openshift-operators", nil
+}
+
 // Below are the default constants that we will
 // use throughout the patterns operator code
 const (
-	// Default Operator Namespace
-	OperatorNamespace = "openshift-operators"
 	// Default Operator Config Map Name
 	OperatorConfigMap = "patterns-operator-config"
 	// Default Subscription Namespace
