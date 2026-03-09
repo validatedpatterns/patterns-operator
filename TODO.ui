@@ -1,2 +1,4 @@
 - Tie down the RBACs
 - Finish job loading to work
+- Add a button to load the secrets separately
+- Make sure we delete the secret used by the secret loading job
