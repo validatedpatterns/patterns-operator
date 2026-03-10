@@ -15,6 +15,7 @@ import {
   PageSection,
   Spinner,
   Title,
+  Tooltip,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 import { fetchAllPatterns, fetchInstalledPatterns, fetchCatalogImage } from '../api';
@@ -89,7 +90,9 @@ export default function PatternCatalogPage() {
                         <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
                       )}
                     </CardHeader>
-                    <CardTitle>{pattern.display_name}</CardTitle>
+                    <Tooltip content={pattern.org}>
+                      <CardTitle>{pattern.display_name}</CardTitle>
+                    </Tooltip>
                     <CardBody />
                     <CardFooter className="patterns-operator__card-footer">
                       {isInstalled ? (
