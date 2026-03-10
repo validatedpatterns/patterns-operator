@@ -82,10 +82,12 @@ export default function InstallPatternPage() {
 
         setPatternName(patternData.name);
         setTargetRepo(patternData.repo_url || '');
-        setSecretTemplate(template);
+        // Only use the template if it has actual secrets defined
+        const hasSecrets = template && template.secrets && template.secrets.length > 0;
+        setSecretTemplate(hasSecrets ? template : null);
 
-        // Initialize secret form data if template exists
-        if (template) {
+        // Initialize secret form data if template has secrets
+        if (hasSecrets) {
           console.log('🔧 [InstallPatternPage] Initializing secret form with template:', template);
           const initialData: SecretFormData = {};
           const initialExpanded: Record<string, boolean> = {};
