@@ -71,6 +71,12 @@ const TIER_COLORS: Record<string, 'green' | 'blue' | 'grey'> = {
   sandbox: 'grey',
 };
 
+const TIER_DESCRIPTIONS: Record<string, string> = {
+  maintained: 'Rigorously tested through an automated CI pipeline with continuous validation across OpenShift versions. Highest level of validation and prioritized for ongoing maintenance.',
+  tested: 'Undergoes a manual or automated test plan which passes at least once for each new OpenShift Container Platform minor version.',
+  sandbox: 'Entry-level patterns that are deployable onto a freshly installed OpenShift cluster without prior modification. May be work-in-progress.',
+};
+
 export default function PatternCatalogPage() {
   const { t } = useTranslation('plugin__console-plugin-template');
   const history = useHistory();
@@ -120,15 +126,15 @@ export default function PatternCatalogPage() {
           </Alert>
         )}
         {!loading && !error && (
-          <div className="patterns-operator__catalog-layout">
-            <div className="patterns-operator__catalog-main">
-              <Gallery hasGutter minWidths={{ default: '300px' }}>
+          <Gallery hasGutter minWidths={{ default: '300px' }}>
                 {patterns.map((pattern) => {
                   const isInstalled = installedPatterns.has(pattern.name);
                   return (
                   <Card key={pattern.name} className="patterns-operator__card">
                     <CardHeader>
-                      <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
+                      <Tooltip content={TIER_DESCRIPTIONS[pattern.tier] || pattern.tier}>
+                        <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
+                      </Tooltip>
                       {isInstalled && (
                         <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
                       )}
@@ -224,28 +230,7 @@ export default function PatternCatalogPage() {
                   </Card>
                   );
                 })}
-              </Gallery>
-            </div>
-            <div className="patterns-operator__catalog-sidebar">
-              <Card>
-                <CardTitle>{t('Pattern Tiers')}</CardTitle>
-                <CardBody>
-                  <div className="patterns-operator__tier-item">
-                    <Label color="green">{t('maintained')}</Label>
-                    <p>{t('Rigorously tested through an automated CI pipeline with continuous validation across OpenShift versions. Highest level of validation and prioritized for ongoing maintenance.')}</p>
-                  </div>
-                  <div className="patterns-operator__tier-item">
-                    <Label color="blue">{t('tested')}</Label>
-                    <p>{t('Undergoes a manual or automated test plan which passes at least once for each new OpenShift Container Platform minor version.')}</p>
-                  </div>
-                  <div className="patterns-operator__tier-item">
-                    <Label color="grey">{t('sandbox')}</Label>
-                    <p>{t('Entry-level patterns that are deployable onto a freshly installed OpenShift cluster without prior modification. May be work-in-progress.')}</p>
-                  </div>
-                </CardBody>
-              </Card>
-            </div>
-          </div>
+          </Gallery>
         )}
       </PageSection>
     </>

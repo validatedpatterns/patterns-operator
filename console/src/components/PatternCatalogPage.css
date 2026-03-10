@@ -12,35 +12,6 @@
   margin-left: var(--pf-v6-global--spacer--sm);
 }
 
-.patterns-operator__catalog-layout {
-  display: flex;
-  gap: var(--pf-v6-global--spacer--2xl);
-  align-items: flex-start;
-}
-
-.patterns-operator__catalog-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.patterns-operator__catalog-sidebar {
-  flex: 0 0 280px;
-}
-
-.patterns-operator__tier-item {
-  margin-bottom: var(--pf-v6-global--spacer--md);
-}
-
-.patterns-operator__tier-item:last-child {
-  margin-bottom: 0;
-}
-
-.patterns-operator__tier-item p {
-  margin-top: var(--pf-v6-global--spacer--xs);
-  font-size: var(--pf-v6-global--FontSize--sm);
-  color: var(--pf-v6-global--Color--200);
-}
-
 .patterns-operator__requirements {
   display: flex;
   flex-direction: column;
