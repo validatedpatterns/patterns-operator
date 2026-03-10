@@ -76,7 +76,8 @@
     "description": "OpenShift Patterns Operator Console plugin for Pattern Catalog.",
     "exposedModules": {
       "PatternCatalogPage": "./components/PatternCatalogPage",
-      "InstallPatternPage": "./components/InstallPatternPage"
+      "InstallPatternPage": "./components/InstallPatternPage",
+      "UninstallPatternPage": "./components/UninstallPatternPage"
     },
     "dependencies": {
       "@console/pluginAPI": "*"

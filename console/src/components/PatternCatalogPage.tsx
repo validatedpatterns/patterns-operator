@@ -17,7 +17,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
-import { fetchAllPatterns, fetchInstalledPatterns, fetchCatalogImage, deletePattern } from '../api';
+import { fetchAllPatterns, fetchInstalledPatterns, fetchCatalogImage } from '../api';
 import { Pattern } from '../types';
 import './PatternCatalogPage.css';
 
@@ -35,8 +35,6 @@ export default function PatternCatalogPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [installedPatterns, setInstalledPatterns] = React.useState<Set<string>>(new Set());
   const [catalogImage, setCatalogImage] = React.useState<string | null>(null);
-  const [uninstalling, setUninstalling] = React.useState<string | null>(null);
-  const [uninstallError, setUninstallError] = React.useState<string | null>(null);
 
   const loadData = React.useCallback(() => {
     setLoading(true);
@@ -56,23 +54,6 @@ export default function PatternCatalogPage() {
   React.useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const handleUninstall = async (patternName: string) => {
-    setUninstalling(patternName);
-    setUninstallError(null);
-    try {
-      await deletePattern(patternName);
-      setInstalledPatterns((prev) => {
-        const next = new Set(prev);
-        next.delete(patternName);
-        return next;
-      });
-    } catch (err) {
-      setUninstallError(err?.message || String(err));
-    } finally {
-      setUninstalling(null);
-    }
-  };
 
   return (
     <>
@@ -94,18 +75,12 @@ export default function PatternCatalogPage() {
             {error}
           </Alert>
         )}
-        {uninstallError && (
-          <Alert variant="danger" title={t('Failed to uninstall pattern')} isInline>
-            {uninstallError}
-          </Alert>
-        )}
         {!loading && !error && (
           <div className="patterns-operator__catalog-layout">
             <div className="patterns-operator__catalog-main">
               <Gallery hasGutter minWidths={{ default: '300px' }}>
                 {patterns.map((pattern) => {
                   const isInstalled = installedPatterns.has(pattern.name);
-                  const isUninstalling = uninstalling === pattern.name;
                   return (
                   <Card key={pattern.name} className="patterns-operator__card">
                     <CardHeader>
@@ -120,9 +95,7 @@ export default function PatternCatalogPage() {
                       {isInstalled ? (
                         <Button
                           variant="danger"
-                          onClick={() => handleUninstall(pattern.name)}
-                          isLoading={isUninstalling}
-                          isDisabled={isUninstalling}
+                          onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
                         >
                           {t('Uninstall')}
                         </Button>

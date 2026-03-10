@@ -456,6 +456,35 @@ export async function fetchInstalledPatterns(): Promise<string[]> {
   return (data.items || []).map((item: any) => item.metadata.name as string);
 }
 
+export interface PatternCRStatus {
+  exists: boolean;
+  lastStep?: string;
+  lastError?: string;
+  deletionPhase?: string;
+  conditions?: any[];
+}
+
+export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
+  const response = await consoleFetch(
+    `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns/${name}`,
+  );
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { exists: false };
+    }
+    throw new Error(`Failed to fetch pattern CR: ${response.status}`);
+  }
+  const data = await response.json();
+  const status = data.status || {};
+  return {
+    exists: true,
+    lastStep: status.lastStep,
+    lastError: status.lastError,
+    deletionPhase: status.deletionPhase,
+    conditions: status.conditions,
+  };
+}
+
 export async function deletePattern(name: string): Promise<void> {
   const response = await consoleFetch(
     `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns/${name}`,
