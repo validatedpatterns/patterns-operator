@@ -18,6 +18,21 @@ export async function fetchPattern(name: string): Promise<Pattern> {
   return fetchYAML<Pattern>(`${PROXY_BASE}/${name}/pattern.yaml`);
 }
 
+export async function fetchCatalogImage(): Promise<string> {
+  const response = await consoleFetch(
+    '/api/kubernetes/apis/apps/v1/namespaces/openshift-operators/deployments/patterns-operator-pattern-catalog',
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch catalog deployment: ${response.status}`);
+  }
+  const data = await response.json();
+  const containers = data.spec?.template?.spec?.containers || [];
+  const catalogContainer = containers.find(
+    (c: any) => c.name === 'patterns-operator-pattern-catalog',
+  );
+  return catalogContainer?.image || 'unknown';
+}
+
 export async function fetchAllPatterns(): Promise<Pattern[]> {
   const catalog = await fetchCatalog();
   const patterns = await Promise.all(

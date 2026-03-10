@@ -17,7 +17,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
-import { fetchAllPatterns, fetchInstalledPatterns, deletePattern } from '../api';
+import { fetchAllPatterns, fetchInstalledPatterns, fetchCatalogImage, deletePattern } from '../api';
 import { Pattern } from '../types';
 import './PatternCatalogPage.css';
 
@@ -34,15 +34,17 @@ export default function PatternCatalogPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [installedPatterns, setInstalledPatterns] = React.useState<Set<string>>(new Set());
+  const [catalogImage, setCatalogImage] = React.useState<string | null>(null);
   const [uninstalling, setUninstalling] = React.useState<string | null>(null);
   const [uninstallError, setUninstallError] = React.useState<string | null>(null);
 
   const loadData = React.useCallback(() => {
     setLoading(true);
-    Promise.all([fetchAllPatterns(), fetchInstalledPatterns()])
-      .then(([data, installed]) => {
+    Promise.all([fetchAllPatterns(), fetchInstalledPatterns(), fetchCatalogImage()])
+      .then(([data, installed, image]) => {
         setPatterns(data);
         setInstalledPatterns(new Set(installed));
+        setCatalogImage(image);
         setLoading(false);
       })
       .catch((err) => {
@@ -79,6 +81,11 @@ export default function PatternCatalogPage() {
       </Helmet>
       <PageSection>
         <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
+        {catalogImage && (
+          <div className="patterns-operator__catalog-source">
+            {t('Catalog source')}: <code>{catalogImage}</code>
+          </div>
+        )}
       </PageSection>
       <PageSection>
         {loading && <Spinner aria-label={t('Loading patterns')} />}
