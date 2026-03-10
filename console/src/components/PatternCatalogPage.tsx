@@ -113,14 +113,7 @@ export default function PatternCatalogPage() {
                   )}
                 </CardHeader>
                 <CardTitle>{pattern.display_name}</CardTitle>
-                <CardBody>
-                  <div className="patterns-operator__card-field">
-                    <strong>{t('Organization')}:</strong> {pattern.org}
-                  </div>
-                  <div className="patterns-operator__card-field">
-                    <strong>{t('Owners')}:</strong> {pattern.owners?.join(', ')}
-                  </div>
-                </CardBody>
+                <CardBody />
                 <CardFooter className="patterns-operator__card-footer">
                   {isInstalled ? (
                     <Button
