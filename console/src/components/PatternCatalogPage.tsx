@@ -114,7 +114,7 @@ export default function PatternCatalogPage() {
         <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
         {catalogImage && (
           <div className="patterns-operator__catalog-source">
-            {t('Catalog source')}: <code>{catalogImage}</code>
+            {t('Catalog source')}: {catalogImage}
           </div>
         )}
       </PageSection>
