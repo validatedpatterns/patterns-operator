@@ -66,8 +66,13 @@ export default function UninstallPatternPage() {
         } else {
           setStatus(s);
         }
-      } catch {
-        // Ignore fetch errors during polling - CR may have just been deleted
+      } catch (err) {
+        // If the fetch fails with a 404-like error, treat as deleted
+        if (err?.message && /404|not found/i.test(err.message)) {
+          setDeleted(true);
+          setDeleting(false);
+          clearInterval(interval);
+        }
       }
     }, 3000);
 
@@ -80,7 +85,15 @@ export default function UninstallPatternPage() {
     setError(null);
     try {
       await deletePattern(name);
-      setConfirmed(true);
+      // Check immediately if the CR is already gone
+      const s = await fetchPatternCR(name);
+      if (!s.exists) {
+        setDeleted(true);
+        setDeleting(false);
+      } else {
+        setStatus(s);
+        setConfirmed(true);
+      }
     } catch (err) {
       setError(err?.message || String(err));
       setDeleting(false);
