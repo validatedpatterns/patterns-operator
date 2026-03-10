@@ -8,6 +8,7 @@
 - Need to think about workflows around the catalog
 - Add some requirements
 - Did the random secret injection not work?
+- We need to come up with a plan for the versioning of catalogs (i.e. the tags of the catalog container)
 
 [DONE]
 - If a pattern is already installed then show it is so in the catalog (or add the uninstall button)
