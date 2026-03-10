@@ -14,7 +14,7 @@
 
 .patterns-operator__catalog-layout {
   display: flex;
-  gap: var(--pf-v6-global--spacer--lg);
+  gap: var(--pf-v6-global--spacer--2xl);
   align-items: flex-start;
 }
 
