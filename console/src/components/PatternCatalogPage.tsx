@@ -100,71 +100,94 @@ export default function PatternCatalogPage() {
           </Alert>
         )}
         {!loading && !error && (
-          <Gallery hasGutter minWidths={{ default: '300px' }}>
-            {patterns.map((pattern) => {
-              const isInstalled = installedPatterns.has(pattern.name);
-              const isUninstalling = uninstalling === pattern.name;
-              return (
-              <Card key={pattern.name} className="patterns-operator__card">
-                <CardHeader>
-                  <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
-                  {isInstalled && (
-                    <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
-                  )}
-                </CardHeader>
-                <CardTitle>{pattern.display_name}</CardTitle>
-                <CardBody />
-                <CardFooter className="patterns-operator__card-footer">
-                  {isInstalled ? (
-                    <Button
-                      variant="danger"
-                      onClick={() => handleUninstall(pattern.name)}
-                      isLoading={isUninstalling}
-                      isDisabled={isUninstalling}
-                    >
-                      {t('Uninstall')}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      onClick={() =>
-                        history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
-                      }
-                    >
-                      {t('Install')}
-                    </Button>
-                  )}
-                  {pattern.docs_url && (
-                    <Button
-                      variant="link"
-                      component="a"
-                      href={pattern.docs_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      icon={<ExternalLinkAltIcon />}
-                      iconPosition="end"
-                    >
-                      {t('Docs')}
-                    </Button>
-                  )}
-                  {pattern.repo_url && (
-                    <Button
-                      variant="link"
-                      component="a"
-                      href={pattern.repo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      icon={<ExternalLinkAltIcon />}
-                      iconPosition="end"
-                    >
-                      {t('Repo')}
-                    </Button>
-                  )}
-                </CardFooter>
+          <div className="patterns-operator__catalog-layout">
+            <div className="patterns-operator__catalog-main">
+              <Gallery hasGutter minWidths={{ default: '300px' }}>
+                {patterns.map((pattern) => {
+                  const isInstalled = installedPatterns.has(pattern.name);
+                  const isUninstalling = uninstalling === pattern.name;
+                  return (
+                  <Card key={pattern.name} className="patterns-operator__card">
+                    <CardHeader>
+                      <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
+                      {isInstalled && (
+                        <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
+                      )}
+                    </CardHeader>
+                    <CardTitle>{pattern.display_name}</CardTitle>
+                    <CardBody />
+                    <CardFooter className="patterns-operator__card-footer">
+                      {isInstalled ? (
+                        <Button
+                          variant="danger"
+                          onClick={() => handleUninstall(pattern.name)}
+                          isLoading={isUninstalling}
+                          isDisabled={isUninstalling}
+                        >
+                          {t('Uninstall')}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          onClick={() =>
+                            history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
+                          }
+                        >
+                          {t('Install')}
+                        </Button>
+                      )}
+                      {pattern.docs_url && (
+                        <Button
+                          variant="link"
+                          component="a"
+                          href={pattern.docs_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          icon={<ExternalLinkAltIcon />}
+                          iconPosition="end"
+                        >
+                          {t('Docs')}
+                        </Button>
+                      )}
+                      {pattern.repo_url && (
+                        <Button
+                          variant="link"
+                          component="a"
+                          href={pattern.repo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          icon={<ExternalLinkAltIcon />}
+                          iconPosition="end"
+                        >
+                          {t('Repo')}
+                        </Button>
+                      )}
+                    </CardFooter>
+                  </Card>
+                  );
+                })}
+              </Gallery>
+            </div>
+            <div className="patterns-operator__catalog-sidebar">
+              <Card>
+                <CardTitle>{t('Pattern Tiers')}</CardTitle>
+                <CardBody>
+                  <div className="patterns-operator__tier-item">
+                    <Label color="green">{t('maintained')}</Label>
+                    <p>{t('Rigorously tested through an automated CI pipeline with continuous validation across OpenShift versions. Highest level of validation and prioritized for ongoing maintenance.')}</p>
+                  </div>
+                  <div className="patterns-operator__tier-item">
+                    <Label color="blue">{t('tested')}</Label>
+                    <p>{t('Undergoes a manual or automated test plan which passes at least once for each new OpenShift Container Platform minor version.')}</p>
+                  </div>
+                  <div className="patterns-operator__tier-item">
+                    <Label color="grey">{t('sandbox')}</Label>
+                    <p>{t('Entry-level patterns that are deployable onto a freshly installed OpenShift cluster without prior modification. May be work-in-progress.')}</p>
+                  </div>
+                </CardBody>
               </Card>
-              );
-            })}
-          </Gallery>
+            </div>
+          </div>
         )}
       </PageSection>
     </>
