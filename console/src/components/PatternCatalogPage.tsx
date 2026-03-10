@@ -17,10 +17,53 @@ import {
   Title,
   Tooltip,
 } from '@patternfly/react-core';
-import { ExternalLinkAltIcon } from '@patternfly/react-icons';
+import { ExternalLinkAltIcon, InfoCircleIcon } from '@patternfly/react-icons';
 import { fetchAllPatterns, fetchInstalledPatterns, fetchCatalogImage } from '../api';
-import { Pattern } from '../types';
+import { Pattern, ClusterRoleRequirements } from '../types';
 import './PatternCatalogPage.css';
+
+const CLOUD_LABELS: Record<string, string> = {
+  aws: 'AWS',
+  gcp: 'GCP',
+  azure: 'Azure',
+};
+
+function getCloudProviders(pattern: Pattern): string[] {
+  if (!pattern.requirements) return [];
+  const providers = new Set<string>();
+  for (const role of Object.values(pattern.requirements)) {
+    for (const nodeType of [role.compute, role.controlPlane]) {
+      if (nodeType) {
+        Object.keys(nodeType).forEach((p) => providers.add(p));
+      }
+    }
+  }
+  return Array.from(providers);
+}
+
+function getSizingSummary(role: ClusterRoleRequirements, cloud: string): string | null {
+  const control = role.controlPlane?.[cloud];
+  const compute = role.compute?.[cloud];
+  if (!control && !compute) return null;
+  const parts: string[] = [];
+  if (control) parts.push(`${control.replicas} control`);
+  if (compute) parts.push(`${compute.replicas} compute`);
+  return parts.join(' + ');
+}
+
+function getSizingTooltip(role: ClusterRoleRequirements, clouds: string[]): string {
+  return clouds
+    .map((cloud) => {
+      const control = role.controlPlane?.[cloud];
+      const compute = role.compute?.[cloud];
+      const lines: string[] = [];
+      if (control) lines.push(`  Control: ${control.replicas}x ${control.type}`);
+      if (compute) lines.push(`  Compute: ${compute.replicas}x ${compute.type}`);
+      return lines.length ? `${CLOUD_LABELS[cloud] || cloud}:\n${lines.join('\n')}` : null;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
 
 const TIER_COLORS: Record<string, 'green' | 'blue' | 'grey'> = {
   maintained: 'green',
@@ -93,7 +136,46 @@ export default function PatternCatalogPage() {
                     <Tooltip content={pattern.org}>
                       <CardTitle>{pattern.display_name}</CardTitle>
                     </Tooltip>
-                    <CardBody />
+                    <CardBody>
+                      {pattern.requirements && (() => {
+                        const clouds = getCloudProviders(pattern);
+                        const hub = pattern.requirements.hub;
+                        const spoke = pattern.requirements.spoke;
+                        const defaultCloud = clouds.includes('aws') ? 'aws' : clouds[0];
+                        const hubSummary = hub && defaultCloud ? getSizingSummary(hub, defaultCloud) : null;
+                        const spokeSummary = spoke && defaultCloud ? getSizingSummary(spoke, defaultCloud) : null;
+                        const tooltipParts: string[] = [];
+                        if (hub) tooltipParts.push(`Hub:\n${getSizingTooltip(hub, clouds)}`);
+                        if (spoke) tooltipParts.push(`Spoke:\n${getSizingTooltip(spoke, clouds)}`);
+                        const fullTooltip = tooltipParts.join('\n\n');
+                        return (
+                          <div className="patterns-operator__requirements">
+                            {clouds.length > 0 && (
+                              <div className="patterns-operator__cloud-labels">
+                                {clouds.map((cloud) => (
+                                  <Label key={cloud} color="blue" isCompact>{CLOUD_LABELS[cloud] || cloud}</Label>
+                                ))}
+                              </div>
+                            )}
+                            {hubSummary && (
+                              <Tooltip content={<pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{fullTooltip}</pre>}>
+                                <div className="patterns-operator__sizing-line">
+                                  {t('Hub')}: {hubSummary}
+                                  {spokeSummary && ` · ${t('Spoke')}: ${spokeSummary}`}
+                                </div>
+                              </Tooltip>
+                            )}
+                            {pattern.external_requirements?.cluster_sizing_note && (
+                              <Tooltip content={pattern.external_requirements.cluster_sizing_note.trim()}>
+                                <span className="patterns-operator__sizing-note">
+                                  <InfoCircleIcon /> {t('Additional requirements')}
+                                </span>
+                              </Tooltip>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </CardBody>
                     <CardFooter className="patterns-operator__card-footer">
                       {isInstalled ? (
                         <Button

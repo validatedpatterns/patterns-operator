@@ -9,6 +9,24 @@ export interface ExtraFeatures {
   spoke_support?: boolean;
 }
 
+export interface NodeRequirement {
+  replicas: number;
+  type: string;
+}
+
+export type CloudRequirements = Record<string, NodeRequirement>;
+
+export interface ClusterRoleRequirements {
+  compute?: CloudRequirements;
+  controlPlane?: CloudRequirements;
+}
+
+export type PatternRequirements = Record<string, ClusterRoleRequirements>;
+
+export interface ExternalRequirements {
+  cluster_sizing_note?: string;
+}
+
 export interface Pattern {
   metadata_version: string;
   name: string;
@@ -21,9 +39,9 @@ export interface Pattern {
   ci_url: string;
   tier: 'maintained' | 'tested' | 'sandbox';
   owners: string[];
-  requirements?: unknown; // Keep for backwards compatibility but don't use
+  requirements?: PatternRequirements;
   extra_features?: ExtraFeatures;
-  external_requirements?: unknown;
+  external_requirements?: ExternalRequirements;
   org: string;
   spoke?: unknown;
   /** The catalog directory key used to fetch this pattern. */
