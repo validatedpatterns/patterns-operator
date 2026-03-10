@@ -430,6 +430,28 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
   }
 }
 
+export async function fetchInstalledPatterns(): Promise<string[]> {
+  const response = await consoleFetch(
+    '/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns',
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch installed patterns: ${response.status}`);
+  }
+  const data = await response.json();
+  return (data.items || []).map((item: any) => item.metadata.name as string);
+}
+
+export async function deletePattern(name: string): Promise<void> {
+  const response = await consoleFetch(
+    `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns/${name}`,
+    { method: 'DELETE' },
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete pattern: ${response.status} ${errorText}`);
+  }
+}
+
 export async function fetchSecretTemplate(name: string): Promise<SecretTemplate | null> {
   try {
     return await fetchYAML<SecretTemplate>(`${PROXY_BASE}/${name}/values-secret.yaml.template`);

@@ -2,6 +2,10 @@
   margin-bottom: var(--pf-v6-global--spacer--xs);
 }
 
+.patterns-operator__installed-label {
+  margin-left: var(--pf-v6-global--spacer--sm);
+}
+
 .patterns-operator__card-footer {
   display: flex;
   flex-wrap: wrap;
