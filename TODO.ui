@@ -2,7 +2,6 @@
 - Add a button to load the secrets separately ?
 - Next to Catalog, can we show the single Pattern CR (reusing the existing UI)?
 - Add one or two screenshots (logo, screenshot, etc)
-- If a pattern is already installed then show it is so in the catalog (or add the uninstall button)
 - AI based pattern with extra bits (one AI quickstart vs the other quickstart)
 - Can we prettify the install part (maybe poke the pattern CR status?)
   Or the metadata of the pattern can include some steps
@@ -11,6 +10,7 @@
 - Did the random secret injection not work?
 
 [DONE]
+- If a pattern is already installed then show it is so in the catalog (or add the uninstall button)
 - Finish job loading to work
 - Make sure we delete the secret used by the secret loading job
 - Fix IE when no secrets
