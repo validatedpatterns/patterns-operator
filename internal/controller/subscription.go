@@ -147,7 +147,7 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 	if changed {
 		target.Spec.DeepCopyInto(current.Spec)
-		_, err := client.OperatorsV1alpha1().Subscriptions(GitOpsDefaultSubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		_, err := client.OperatorsV1alpha1().Subscriptions(current.Namespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return changed, err
 	}
 
