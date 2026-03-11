@@ -10,15 +10,15 @@ import (
 var OperatorNamespace string
 
 // DetectOperatorNamespace determines the namespace the operator is running in.
-func DetectOperatorNamespace() (string, error) {
+func DetectOperatorNamespace() string {
 	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
-		return ns, nil
+		return ns
 	}
 	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err == nil && len(data) > 0 {
-		return strings.TrimSpace(string(data)), nil
+		return strings.TrimSpace(string(data))
 	}
-	return "openshift-operators", nil
+	return "openshift-operators"
 }
 
 // Below are the default constants that we will
