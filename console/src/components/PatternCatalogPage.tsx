@@ -143,6 +143,11 @@ export default function PatternCatalogPage() {
                       <CardTitle>{pattern.display_name}</CardTitle>
                     </Tooltip>
                     <CardBody>
+                      {pattern.description && (
+                        <div className="patterns-operator__card-description">{pattern.description}</div>
+                      )}
+                    </CardBody>
+                    <CardBody>
                       {pattern.requirements && (() => {
                         const clouds = getCloudProviders(pattern);
                         const hub = pattern.requirements.hub;

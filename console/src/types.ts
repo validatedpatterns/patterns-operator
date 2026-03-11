@@ -32,6 +32,7 @@ export interface Pattern {
   name: string;
   pattern_version: string;
   display_name: string;
+  description?: string;
   repo_url: string;
   docs_repo_url?: string;
   issues_url: string;

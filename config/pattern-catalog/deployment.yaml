@@ -20,7 +20,7 @@ spec:
         app.kubernetes.io/component: patterns-operator-pattern-catalog
     spec:
       containers:
-      - image: pattern-catalog
+      - image: quay.io/validatedpatterns/pattern-catalog:stable-v1
         name: patterns-operator-pattern-catalog
         ports:
         - containerPort: 9444

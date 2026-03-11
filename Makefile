@@ -78,11 +78,6 @@ CONSOLE_PLUGIN_IMAGE_BASE ?= $(IMAGE_TAG_BASE)-console
 CONSOLE_PLUGIN_IMAGE ?= $(CONSOLE_PLUGIN_IMAGE_BASE):$(VERSION)
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
-# Image base URL of the pattern catalog
-PATTERN_CATALOG_IMAGE_BASE ?= $(IMAGE_TAG_BASE)-pattern-catalog
-PATTERN_CATALOG_IMAGE ?= $(PATTERN_CATALOG_IMAGE_BASE):$(VERSION)
-PATTERN_CATALOG_DOCKERFILE ?= pattern-catalog.Dockerfile
-
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30
 
@@ -220,7 +215,6 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	cd config/console-plugin && $(KUSTOMIZE) edit set image console-plugin=${CONSOLE_PLUGIN_IMAGE}
-	cd config/pattern-catalog && $(KUSTOMIZE) edit set image pattern-catalog=${PATTERN_CATALOG_IMAGE}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 	$(KUSTOMIZE) build config/console-plugin | kubectl apply -f -
 	$(KUSTOMIZE) build config/pattern-catalog | kubectl apply -f -
@@ -314,7 +308,6 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	cd config/console-plugin && $(KUSTOMIZE) edit set image console-plugin=$(CONSOLE_PLUGIN_IMAGE)
-	cd config/pattern-catalog && $(KUSTOMIZE) edit set image pattern-catalog=$(PATTERN_CATALOG_IMAGE)
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-fixes bundle-date
 	./hack/set_openshift_minimum_version.sh
@@ -389,22 +382,6 @@ console-build: generate-dockerfile-console-plugin ## Build the console image
 .PHONY: console-push
 console-push: ## Push the console image
 	podman push $(CONSOLE_PLUGIN_IMAGE)
-
-# Generate Dockerfile for pattern catalog using the template
-.PHONY: generate-dockerfile-pattern-catalog
-generate-dockerfile-pattern-catalog:
-	VERSION=$(VERSION) SUPPORTED_OCP_VERSIONS=$(SUPPORTED_OCP_VERSIONS) envsubst < templates/pattern-catalog.Dockerfile.template > $(PATTERN_CATALOG_DOCKERFILE)
-
-.PHONY: pattern-catalog-build
-pattern-catalog-build: generate-dockerfile-pattern-catalog ## Build the pattern catalog image
-	@echo "Building pattern catalog image..."
-	@podman pull $(PATTERN_CATALOG_IMAGE_BASE):latest 2>/dev/null || true
-	podman build -f $(CURPATH)/$(PATTERN_CATALOG_DOCKERFILE) -t ${PATTERN_CATALOG_IMAGE} .
-	podman tag ${PATTERN_CATALOG_IMAGE} $(PATTERN_CATALOG_IMAGE_BASE):latest
-
-.PHONY: pattern-catalog-push
-pattern-catalog-push: ## Push the pattern catalog image
-	podman push $(PATTERN_CATALOG_IMAGE)
 
 # Build an OLM catalog image by adding the bundle image to a simple catalog using the
 # operator package manager tool, 'opm'. For more information see:
