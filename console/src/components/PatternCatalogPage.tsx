@@ -111,11 +111,12 @@ export default function PatternCatalogPage() {
         <title data-test="pattern-catalog-page-title">{t('Pattern Catalog')}</title>
       </Helmet>
       <PageSection>
-        <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
-        {catalogImage && (
-          <div className="patterns-operator__catalog-source">
-            {t('Catalog source')}: {catalogImage}
-          </div>
+        {catalogImage ? (
+          <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
+            <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
+          </Tooltip>
+        ) : (
+          <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
         )}
       </PageSection>
       <PageSection>

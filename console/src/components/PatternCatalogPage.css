@@ -1,9 +1,3 @@
-.patterns-operator__catalog-source {
-  padding-top: var(--pf-v6-global--spacer--lg);
-  font-size: var(--pf-v6-global--FontSize--sm);
-  color: var(--pf-v6-global--Color--200);
-}
-
 .patterns-operator__card-field {
   margin-bottom: var(--pf-v6-global--spacer--xs);
 }
