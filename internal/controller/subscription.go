@@ -56,7 +56,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          PatternsOperatorConfig.getValueWithDefault("gitops.catalogSource"),
 		CatalogSourceNamespace: PatternsOperatorConfig.getValueWithDefault("gitops.sourceNamespace"),
-		Package:                PatternsOperatorConfig.getValueWithDefault("gitops.name"),
+		Package:                GitOpsDefaultPackageName,
 		Channel:                PatternsOperatorConfig.getValueWithDefault("gitops.channel"),
 		StartingCSV:            PatternsOperatorConfig.getValueWithDefault("gitops.csv"),
 		InstallPlanApproval:    installPlanApproval,
