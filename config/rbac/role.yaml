@@ -103,6 +103,7 @@ rules:
 - apiGroups:
   - operators.coreos.com
   resources:
+  - operatorgroups
   - subscriptions
   verbs:
   - create
