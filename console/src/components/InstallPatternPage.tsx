@@ -156,10 +156,13 @@ export default function InstallPatternPage() {
           if (fieldDef.vaultPolicy) field.vaultPolicy = fieldDef.vaultPolicy;
           if (fieldDef.base64) field.base64 = fieldDef.base64;
           if (fieldDef.override) field.override = fieldDef.override;
-          if (fieldDef.onMissingValue !== 'generate') {
-            const val = formValues[fieldDef.name];
-            if (typeof val === 'string' && val !== '') {
-              field.value = val;
+          const val = formValues[fieldDef.name];
+          if (typeof val === 'string' && val !== '') {
+            field.value = val;
+            // User provided an explicit value, so don't auto-generate
+            if (fieldDef.onMissingValue === 'generate') {
+              delete field.onMissingValue;
+              delete field.vaultPolicy;
             }
           }
           return field;
