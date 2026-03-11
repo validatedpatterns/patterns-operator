@@ -35,7 +35,7 @@ const (
 	operatorConfigMap = "patterns-operator-config"
 )
 
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
 // UpdateCatalogImageIfOverridden reads the "catalog.image" key from the
 // patterns-operator-config ConfigMap. If the value is non-empty it patches the

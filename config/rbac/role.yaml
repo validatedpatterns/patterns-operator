@@ -43,8 +43,10 @@ rules:
   - deployments
   verbs:
   - get
+  - list
   - patch
   - update
+  - watch
 - apiGroups:
   - argoproj.io
   resources:
