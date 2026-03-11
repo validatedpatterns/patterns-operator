@@ -177,50 +177,40 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
 	}
 
-	//Only remove legacy sub if name or ns is not legacy anymore (we do not use it anymore)
-	if targetSub.Namespace != legacySub.Namespace || targetSub.Name != legacySub.Name {
-		r.logger.Info("We are not using legacy gitops subscription anymore")
-		var currentLegacySub *operatorv1alpha1.Subscription
-		if currentLegacySub, err = getSubscription(r.olmClient, legacySub); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error getting legacy gitops subscription", err)
+	subscriptionNamespace := GitOpsLegacySubscriptionNamespace
+	subscriptionName := GitOpsDefaultPackageName
+	//If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
+	if OperatorNamespace != LegacyOperatorNamespace {
+
+		subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
+		subscriptionName = GitOpsDefaultPackageName
+
+		// Create namespace for gitops subscription
+		if err := createNamespace(r.fullClient, GitOpsDefaultSubscriptionNamespace); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error creating namespace for gitops subscription", err)
 		}
 
-		if currentLegacySub != nil {
-			r.logger.Info("Legacy gitops subscription exists, removing it")
-			// Delete legacy sub
-			if err := deleteSubscription(r.olmClient, legacySub); err != nil {
-				return r.actionPerformed(qualifiedInstance, "error deleting legacy gitops subscription", err)
-			}
-			r.logger.Info("Legacy gitops subscription deleted")
+		// Create operatorgroup for gitops subscription
+		//TODO add tests
+		var og *v1.OperatorGroup
+		if og, err = getOperatorGroup(r.olmClient, GitOpsDefaultSubscriptionNamespace); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error getting operatorgroup for gitops subscription", err)
 		}
+		if og == nil {
+			if err := createOperatorGroup(r.olmClient, GitOpsDefaultSubscriptionNamespace); err != nil {
+				return r.actionPerformed(qualifiedInstance, "error creating operatorgroup for gitops subscription", err)
+			}
+		}
+
 	}
 
 	var currentSub *operatorv1alpha1.Subscription
 
-	if currentSub, err = getSubscription(r.olmClient, targetSub); err != nil {
+	if currentSub, err = getSubscription(r.olmClient, subscriptionName, subscriptionNamespace); err != nil {
 		return r.actionPerformed(qualifiedInstance, "error getting gitops subscription", err)
 	}
 
 	if currentSub == nil {
-		// Create namespace for gitops subscription
-		if err := createNamespace(r.fullClient, targetSub.Namespace); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error creating namespace for gitops subscription", err)
-		}
-		//TODO add tests
-		// We only need to create the operatorgorup for namespaces other than openshift-operators
-		if targetSub.Namespace != GitOpsLegacySubscriptionNamespace {
-			var og *v1.OperatorGroup
-
-			if og, err = getOperatorGroup(r.olmClient, targetSub.Namespace); err != nil {
-				return r.actionPerformed(qualifiedInstance, "error getting operatorgroup for gitops subscription", err)
-			}
-
-			if og == nil {
-				if err := createOperatorGroup(r.olmClient, targetSub.Namespace); err != nil {
-					return r.actionPerformed(qualifiedInstance, "error creating operatorgroup for gitops subscription", err)
-				}
-			}
-		}
 		if err = createSubscription(r.olmClient, targetSub); err != nil {
 			return r.actionPerformed(qualifiedInstance, "error creating gitops subscription", err)
 		}

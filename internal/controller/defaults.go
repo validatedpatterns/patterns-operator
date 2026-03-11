@@ -9,6 +9,8 @@ import (
 // It defaults to "openshift-operators" for backward compatibility.
 var OperatorNamespace string
 
+var LegacyOperatorNamespace = "openshift-operators"
+
 // DetectOperatorNamespace determines the namespace the operator is running in.
 func DetectOperatorNamespace() string {
 	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
@@ -18,7 +20,7 @@ func DetectOperatorNamespace() string {
 	if err == nil && len(data) > 0 {
 		return strings.TrimSpace(string(data))
 	}
-	return "openshift-operators"
+	return LegacyOperatorNamespace
 }
 
 // Below are the default constants that we will
@@ -77,17 +79,15 @@ const (
 // Currently none
 
 var DefaultPatternOperatorConfig = map[string]string{
-	"gitops.catalogSource":         GitOpsDefaultCatalogSource,
-	"gitops.name":                  GitOpsDefaultPackageName,
-	"gitops.channel":               GitOpsDefaultChannel,
-	"gitops.sourceNamespace":       GitOpsDefaultCatalogSourceNamespace,
-	"gitops.subscriptionNamespace": GitOpsDefaultSubscriptionNamespace,
-	"gitops.installApprovalPlan":   GitOpsDefaultApprovalPlan,
-	"gitops.csv":                   GitOpsDefaultCSV,
-	"gitea.chartName":              GiteaChartName,
-	"gitea.helmRepoUrl":            GiteaHelmRepoUrl,
-	"gitea.chartVersion":           GiteaDefaultChartVersion,
-	"analytics.enabled":            "true",
+	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
+	"gitops.channel":             GitOpsDefaultChannel,
+	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
+	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
+	"gitops.csv":                 GitOpsDefaultCSV,
+	"gitea.chartName":            GiteaChartName,
+	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
+	"gitea.chartVersion":         GiteaDefaultChartVersion,
+	"analytics.enabled":          "true",
 }
 
 type GitOpsConfig map[string]string

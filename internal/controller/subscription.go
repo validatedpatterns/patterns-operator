@@ -31,13 +31,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var legacySub = &operatorv1alpha1.Subscription{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      GitOpsDefaultPackageName,
-		Namespace: GitOpsLegacySubscriptionNamespace,
-	},
-}
-
 func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Subscription, error) {
 	var newSubscription *operatorv1alpha1.Subscription
 
@@ -76,11 +69,20 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 			},
 		},
 	}
+	var subscriptionName, subscriptionNamespace string
+
+	subscriptionName = GitOpsDefaultPackageName
+	subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
+
+	if OperatorNamespace == LegacyOperatorNamespace {
+		subscriptionName = GitOpsDefaultPackageName
+		subscriptionNamespace = GitOpsLegacySubscriptionNamespace
+	}
 
 	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      PatternsOperatorConfig.getValueWithDefault("gitops.name"),
-			Namespace: PatternsOperatorConfig.getValueWithDefault("gitops.subscriptionNamespace"),
+			Name:      subscriptionName,
+			Namespace: subscriptionNamespace,
 		},
 		Spec: spec,
 	}
@@ -88,10 +90,10 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	return newSubscription, nil
 }
 
-func getSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) (*operatorv1alpha1.Subscription, error) {
+func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
 	var subscription *operatorv1alpha1.Subscription
 	var err error
-	if subscription, err = client.OperatorsV1alpha1().Subscriptions(sub.Namespace).Get(context.Background(), sub.Name, metav1.GetOptions{}); err != nil {
+	if subscription, err = client.OperatorsV1alpha1().Subscriptions(namespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil
 		}
