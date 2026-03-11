@@ -16,7 +16,7 @@ func clientKey(namespace, name string) client.ObjectKey {
 	return client.ObjectKey{Namespace: namespace, Name: name}
 }
 
-func newConfigMap(image string) *corev1.ConfigMap {
+func newOperatorConfigMap(image string) *corev1.ConfigMap {
 	data := map[string]string{}
 	if image != "" {
 		data["catalog.image"] = image
@@ -30,134 +30,124 @@ func newConfigMap(image string) *corev1.ConfigMap {
 	}
 }
 
-func newCatalogDeployment(image string) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      CatalogDeploymentName,
-			Namespace: defaultNamespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "catalog"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": "catalog"},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  CatalogContainerName,
-							Image: image,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func TestUpdateCatalogImageIfOverridden_NoOverride(t *testing.T) {
-	cm := newConfigMap("")
-	deploy := newCatalogDeployment("original:latest")
-
+func newFakeClient(objs ...client.Object) client.Client {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
+	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+}
 
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, deploy).Build()
+func TestCreateOrUpdateCatalog_DefaultImage(t *testing.T) {
+	cm := newOperatorConfigMap("")
+	cl := newFakeClient(cm)
 
-	if err := UpdateCatalogImageIfOverridden(context.Background(), cl, cl); err != nil {
+	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	updated := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), updated); err != nil {
-		t.Fatalf("unexpected error getting deployment: %v", err)
+	deploy := &appsv1.Deployment{}
+	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+		t.Fatalf("expected catalog deployment to be created: %v", err)
 	}
 
-	got := updated.Spec.Template.Spec.Containers[0].Image
-	if got != "original:latest" {
-		t.Errorf("expected image to remain 'original:latest', got %q", got)
+	got := deploy.Spec.Template.Spec.Containers[0].Image
+	if got != CatalogDefaultImage {
+		t.Errorf("expected image %q, got %q", CatalogDefaultImage, got)
 	}
 }
 
-func TestUpdateCatalogImageIfOverridden_WithOverride(t *testing.T) {
-	cm := newConfigMap("custom-catalog:v2")
-	deploy := newCatalogDeployment("original:latest")
+func TestCreateOrUpdateCatalog_OverriddenImage(t *testing.T) {
+	cm := newOperatorConfigMap("custom-catalog:v2")
+	cl := newFakeClient(cm)
 
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appsv1.AddToScheme(scheme)
-
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, deploy).Build()
-
-	if err := UpdateCatalogImageIfOverridden(context.Background(), cl, cl); err != nil {
+	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	updated := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), updated); err != nil {
-		t.Fatalf("unexpected error getting deployment: %v", err)
+	deploy := &appsv1.Deployment{}
+	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+		t.Fatalf("expected catalog deployment to be created: %v", err)
 	}
 
-	got := updated.Spec.Template.Spec.Containers[0].Image
+	got := deploy.Spec.Template.Spec.Containers[0].Image
 	if got != "custom-catalog:v2" {
-		t.Errorf("expected image to be 'custom-catalog:v2', got %q", got)
+		t.Errorf("expected image %q, got %q", "custom-catalog:v2", got)
 	}
 }
 
-func TestUpdateCatalogImageIfOverridden_AlreadyUpToDate(t *testing.T) {
-	cm := newConfigMap("custom-catalog:v2")
-	deploy := newCatalogDeployment("custom-catalog:v2")
+func TestCreateOrUpdateCatalog_UpdatesExistingDeployment(t *testing.T) {
+	cm := newOperatorConfigMap("custom-catalog:v3")
+	cl := newFakeClient(cm)
 
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appsv1.AddToScheme(scheme)
-
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, deploy).Build()
-
-	if err := UpdateCatalogImageIfOverridden(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// First call creates
+	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
+		t.Fatalf("unexpected error on create: %v", err)
 	}
 
-	updated := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), updated); err != nil {
+	// Change the override
+	cm.Data["catalog.image"] = "custom-catalog:v4"
+	if err := cl.Update(context.Background(), cm); err != nil {
+		t.Fatalf("unexpected error updating configmap: %v", err)
+	}
+
+	// Second call updates
+	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
+		t.Fatalf("unexpected error on update: %v", err)
+	}
+
+	deploy := &appsv1.Deployment{}
+	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
 		t.Fatalf("unexpected error getting deployment: %v", err)
 	}
 
-	got := updated.Spec.Template.Spec.Containers[0].Image
-	if got != "custom-catalog:v2" {
-		t.Errorf("expected image to remain 'custom-catalog:v2', got %q", got)
+	got := deploy.Spec.Template.Spec.Containers[0].Image
+	if got != "custom-catalog:v4" {
+		t.Errorf("expected image %q, got %q", "custom-catalog:v4", got)
 	}
 }
 
-func TestUpdateCatalogImageIfOverridden_MissingConfigMap(t *testing.T) {
-	deploy := newCatalogDeployment("original:latest")
+func TestCreateOrUpdateCatalog_CreatesConfigMapAndService(t *testing.T) {
+	cm := newOperatorConfigMap("")
+	cl := newFakeClient(cm)
 
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appsv1.AddToScheme(scheme)
+	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(deploy).Build()
+	// Check ConfigMap
+	catalogCM := &corev1.ConfigMap{}
+	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogConfigMapName), catalogCM); err != nil {
+		t.Fatalf("expected catalog configmap to be created: %v", err)
+	}
+	if _, ok := catalogCM.Data["nginx.conf"]; !ok {
+		t.Error("expected nginx.conf key in catalog configmap")
+	}
 
-	err := UpdateCatalogImageIfOverridden(context.Background(), cl, cl)
-	if err == nil {
-		t.Fatal("expected error when configmap is missing, got nil")
+	// Check Service
+	svc := &corev1.Service{}
+	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogServiceName), svc); err != nil {
+		t.Fatalf("expected catalog service to be created: %v", err)
+	}
+	if svc.Spec.Ports[0].Port != PatternCatalogServicePort {
+		t.Errorf("expected service port %d, got %d", PatternCatalogServicePort, svc.Spec.Ports[0].Port)
 	}
 }
 
-func TestUpdateCatalogImageIfOverridden_MissingDeployment(t *testing.T) {
-	cm := newConfigMap("custom-catalog:v2")
+func TestCreateOrUpdateCatalog_MissingOperatorConfigMap(t *testing.T) {
+	// No operator configmap — should fall back to default image
+	cl := newFakeClient()
 
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appsv1.AddToScheme(scheme)
+	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-	cl := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+	deploy := &appsv1.Deployment{}
+	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+		t.Fatalf("expected catalog deployment to be created: %v", err)
+	}
 
-	err := UpdateCatalogImageIfOverridden(context.Background(), cl, cl)
-	if err == nil {
-		t.Fatal("expected error when deployment is missing, got nil")
+	got := deploy.Spec.Template.Spec.Containers[0].Image
+	if got != CatalogDefaultImage {
+		t.Errorf("expected default image %q, got %q", CatalogDefaultImage, got)
 	}
 }
