@@ -419,6 +419,7 @@ export default function InstallPatternPage() {
         {/* Vault injection status */}
         {success && secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate && vaultJobStatus && (
           <Alert
+            style={{ marginTop: 'var(--pf-v6-global--spacer--md)' }}
             variant={
               vaultJobStatus.status === 'succeeded'
                 ? 'success'
