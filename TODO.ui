@@ -1,5 +1,4 @@
 - Tie down the RBACs
-- Add a button to load the secrets separately ?
 - Next to Catalog, can we show the single Pattern CR (reusing the existing UI)?
 - Add one or two screenshots (logo, screenshot, etc)
 - AI based pattern with extra bits (one AI quickstart vs the other quickstart)
@@ -10,6 +9,7 @@
 - We need to come up with a plan for the versioning of catalogs (i.e. the tags of the catalog container)
 
 [DONE]
+- Add a button to load the secrets separately ?
 - Did the random secret injection not work?
 - If a pattern is already installed then show it is so in the catalog (or add the uninstall button)
 - Finish job loading to work
