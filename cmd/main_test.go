@@ -26,7 +26,7 @@ func newFakeReader(objs ...crclient.Object) crclient.Reader {
 func newOperatorConfigMap(analyticsEnabled string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: controllers.OperatorNamespace,
+			Namespace: controllers.DetectOperatorNamespace(),
 			Name:      controllers.OperatorConfigMap,
 		},
 		Data: map[string]string{

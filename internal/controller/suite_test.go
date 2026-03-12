@@ -66,8 +66,8 @@ func cleanupTempDir(tempDir string) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	// Initialize OperatorNamespace for tests (it's a var detected at runtime in production)
-	OperatorNamespace = suggestedOperatorNamespace
+	// Set OPERATOR_NAMESPACE env var so DetectOperatorNamespace() returns the test namespace
+	os.Setenv("OPERATOR_NAMESPACE", suggestedOperatorNamespace)
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

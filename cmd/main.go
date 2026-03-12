@@ -78,9 +78,7 @@ func main() {
 
 	printVersion()
 
-	ns := controllers.DetectOperatorNamespace()
-	controllers.OperatorNamespace = ns
-	setupLog.Info("detected operator namespace", "namespace", ns)
+	setupLog.Info("detected operator namespace", "namespace", controllers.DetectOperatorNamespace())
 
 	// Create initial config map for gitops
 	err := createGitOpsConfigMap()
@@ -164,14 +162,14 @@ func createGitOpsConfigMap() error {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      controllers.OperatorConfigMap,
-			Namespace: controllers.OperatorNamespace,
+			Namespace: controllers.DetectOperatorNamespace(),
 		},
 	}
 
-	_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{})
+	_, err = clientset.CoreV1().ConfigMaps(controllers.DetectOperatorNamespace()).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{})
 	if err != nil && errors.IsNotFound(err) {
 		// if the configmap does not exist we create an empty one
-		_, err = clientset.CoreV1().ConfigMaps(controllers.OperatorNamespace).Create(context.Background(), &configMap, metav1.CreateOptions{})
+		_, err = clientset.CoreV1().ConfigMaps(controllers.DetectOperatorNamespace()).Create(context.Background(), &configMap, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -197,7 +195,7 @@ func areAnalyticsEnabled(reader crclient.Reader) bool {
 	enabled := strings.ToLower(os.Getenv("ANALYTICS")) != "false"
 
 	var cm corev1.ConfigMap
-	err := reader.Get(context.Background(), crclient.ObjectKey{Namespace: controllers.OperatorNamespace, Name: controllers.OperatorConfigMap}, &cm)
+	err := reader.Get(context.Background(), crclient.ObjectKey{Namespace: controllers.DetectOperatorNamespace(), Name: controllers.OperatorConfigMap}, &cm)
 	if err != nil {
 		setupLog.Error(err, "error reading operator configmap for analytics setting")
 		return enabled

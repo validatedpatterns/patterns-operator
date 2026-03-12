@@ -51,7 +51,7 @@ const (
 )
 
 var (
-	namespace         = OperatorNamespace
+	namespace         = suggestedOperatorNamespace
 	patternNamespaced = types.NamespacedName{Name: foo, Namespace: namespace}
 	mockGitOps        *MockGitOperations
 	gitOptions        *git.CloneOptions
