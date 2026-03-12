@@ -192,12 +192,20 @@ export default function PatternCatalogPage() {
                     </CardBody>
                     <CardFooter className="patterns-operator__card-footer">
                       {isInstalled ? (
-                        <Button
-                          variant="danger"
-                          onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
-                        >
-                          {t('Uninstall')}
-                        </Button>
+                        <>
+                          <Button
+                            variant="secondary"
+                            onClick={() => history.push(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)}
+                          >
+                            {t('Manage Secrets')}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
+                          >
+                            {t('Uninstall')}
+                          </Button>
+                        </>
                       ) : (
                         <Button
                           variant="primary"

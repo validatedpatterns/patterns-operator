@@ -77,7 +77,8 @@
     "exposedModules": {
       "PatternCatalogPage": "./components/PatternCatalogPage",
       "InstallPatternPage": "./components/InstallPatternPage",
-      "UninstallPatternPage": "./components/UninstallPatternPage"
+      "UninstallPatternPage": "./components/UninstallPatternPage",
+      "ManageSecretsPage": "./components/ManageSecretsPage"
     },
     "dependencies": {
       "@console/pluginAPI": "*"
