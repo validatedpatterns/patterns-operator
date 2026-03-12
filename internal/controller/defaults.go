@@ -9,8 +9,6 @@ import (
 // It defaults to "openshift-operators" for backward compatibility.
 var OperatorNamespace string
 
-var LegacyOperatorNamespace = "openshift-operators"
-
 // DetectOperatorNamespace determines the namespace the operator is running in.
 func DetectOperatorNamespace() string {
 	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
@@ -26,6 +24,7 @@ func DetectOperatorNamespace() string {
 // Below are the default constants that we will
 // use throughout the patterns operator code
 const (
+	LegacyOperatorNamespace = "openshift-operators"
 	// Default Operator Config Map Name
 	OperatorConfigMap = "patterns-operator-config"
 	// Default Application Namespace
@@ -37,7 +36,7 @@ const (
 // GitOps Subscription
 const (
 	GitOpsDefaultSubscriptionNamespace  = "openshift-gitops-operator"
-	GitOpsLegacySubscriptionNamespace   = "openshift-operators"
+	GitOpsLegacySubscriptionNamespace   = LegacyOperatorNamespace
 	GitOpsDefaultChannel                = "gitops-1.18"
 	GitOpsDefaultPackageName            = "openshift-gitops-operator"
 	GitOpsDefaultCatalogSource          = "redhat-operators"
