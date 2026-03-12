@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nodejs-20:latest AS build
+FROM registry.access.redhat.com/ubi10/nodejs-22:latest AS build
 USER root
 RUN command -v yarn || npm i -g yarn
 
@@ -8,7 +8,7 @@ COPY console/ .
 RUN sed -r -i "s|\"version\": \"0.0.1\"|\"version\": \"${VERSION}\"|;" ./package.json
 RUN yarn install && yarn build
 
-FROM registry.access.redhat.com/ubi9/nginx-120:latest
+FROM registry.access.redhat.com/ubi10/nginx-126:latest
 LABEL \
     com.redhat.openshift.versions="${SUPPORTED_OCP_VERSIONS}" \
     com.redhat.component="Console plugin image for OpenShift Pattern Operator" \
