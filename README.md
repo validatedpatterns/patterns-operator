@@ -45,11 +45,11 @@ Removing the top-level application ensures that Argo won't try to put back anyth
 
 ## Watch the logs
 
-Note that when installing via UI the namespace will be `openshift-operators`
+Note that when installing via UI the namespace will be `patterns-operator`
 and not `patterns-operator-system`
 
 ```
-oc logs -npatterns-operator-system `oc get -npatterns-operator-system pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
+oc logs -n patterns-operator-system `oc get -n patterns-operator-system pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
 ```
 
 ## Development

@@ -25,7 +25,6 @@ import (
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -94,7 +93,7 @@ func getSubscription(client olmclient.Interface, name, namespace string) (*opera
 	var subscription *operatorv1alpha1.Subscription
 	var err error
 	if subscription, err = client.OperatorsV1alpha1().Subscriptions(namespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -152,9 +151,4 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 	}
 
 	return changed, nil
-}
-
-func deleteSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	err := client.OperatorsV1alpha1().Subscriptions(sub.Namespace).Delete(context.Background(), sub.Name, metav1.DeleteOptions{})
-	return err
 }

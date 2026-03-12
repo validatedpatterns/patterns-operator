@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func getOperatorGroup(client olmclient.Interface, name string) (*v1.OperatorGroup, error) {
+func getOperatorGroup(client olmclient.Interface, name string) (*v1.OperatorGroup, error) { //nolint:unparam
 	var og *v1.OperatorGroup
 	var err error
 	if og, err = client.OperatorsV1().OperatorGroups(name).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
@@ -37,7 +37,7 @@ func getOperatorGroup(client olmclient.Interface, name string) (*v1.OperatorGrou
 	return og, nil
 }
 
-func createOperatorGroup(client olmclient.Interface, name string) error {
+func createOperatorGroup(client olmclient.Interface, name string) error { //nolint:unparam
 	_, err := client.OperatorsV1().OperatorGroups(name).Create(
 		context.Background(),
 		&v1.OperatorGroup{

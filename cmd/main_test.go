@@ -13,11 +13,6 @@ import (
 	controllers "github.com/hybrid-cloud-patterns/patterns-operator/internal/controller"
 )
 
-func TestMain(m *testing.M) {
-	controllers.OperatorNamespace = "openshift-operators"
-	os.Exit(m.Run())
-}
-
 func newFakeReader(objs ...crclient.Object) crclient.Reader {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)

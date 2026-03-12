@@ -109,7 +109,7 @@ type PatternReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
-func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:funlen
 	// Reconcile() should perform at most one action in any invocation
 	// in order to simplify testing.
 	r.logger = klog.FromContext(ctx)
@@ -177,32 +177,28 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
 	}
-
 	subscriptionNamespace := GitOpsLegacySubscriptionNamespace
 	subscriptionName := GitOpsDefaultPackageName
-	//If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
+	// If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
 	if OperatorNamespace != LegacyOperatorNamespace {
-
 		subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
 		subscriptionName = GitOpsDefaultPackageName
 
 		// Create namespace for gitops subscription
-		if err := createNamespace(r.fullClient, GitOpsDefaultSubscriptionNamespace); err != nil {
+		if err := createNamespace(r.fullClient, subscriptionNamespace); err != nil {
 			return r.actionPerformed(qualifiedInstance, "error creating namespace for gitops subscription", err)
 		}
 
 		// Create operatorgroup for gitops subscription
-		//TODO add tests
 		var og *v1.OperatorGroup
-		if og, err = getOperatorGroup(r.olmClient, GitOpsDefaultSubscriptionNamespace); err != nil {
+		if og, err = getOperatorGroup(r.olmClient, subscriptionNamespace); err != nil {
 			return r.actionPerformed(qualifiedInstance, "error getting operatorgroup for gitops subscription", err)
 		}
 		if og == nil {
-			if err := createOperatorGroup(r.olmClient, GitOpsDefaultSubscriptionNamespace); err != nil {
+			if err := createOperatorGroup(r.olmClient, subscriptionNamespace); err != nil {
 				return r.actionPerformed(qualifiedInstance, "error creating operatorgroup for gitops subscription", err)
 			}
 		}
-
 	}
 
 	var currentSub *operatorv1alpha1.Subscription
