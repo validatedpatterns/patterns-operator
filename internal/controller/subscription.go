@@ -34,7 +34,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	var newSubscription *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	cm, err := r.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
 	// If we hit an error that is not related to the configmap not existing bubble it up
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -73,7 +73,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	subscriptionName = GitOpsDefaultPackageName
 	subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
 
-	if OperatorNamespace == LegacyOperatorNamespace {
+	if DetectOperatorNamespace() == LegacyOperatorNamespace {
 		subscriptionName = GitOpsDefaultPackageName
 		subscriptionNamespace = GitOpsLegacySubscriptionNamespace
 	}

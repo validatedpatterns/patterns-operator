@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-// OperatorNamespace is detected at runtime via DetectOperatorNamespace().
-// It defaults to "openshift-operators" for backward compatibility.
-var OperatorNamespace string
-
 // DetectOperatorNamespace determines the namespace the operator is running in.
 func DetectOperatorNamespace() string {
 	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {

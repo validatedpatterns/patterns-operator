@@ -180,7 +180,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	subscriptionNamespace := GitOpsLegacySubscriptionNamespace
 	subscriptionName := GitOpsDefaultPackageName
 	// If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
-	if OperatorNamespace != LegacyOperatorNamespace {
+	if DetectOperatorNamespace() != LegacyOperatorNamespace {
 		subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
 		subscriptionName = GitOpsDefaultPackageName
 

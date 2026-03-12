@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,7 +44,7 @@ func newDefaultTestSubConfigMap() corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      OperatorConfigMap,
-			Namespace: OperatorNamespace,
+			Namespace: DetectOperatorNamespace(),
 		},
 		Data: map[string]string{
 			"gitops.installApprovalPlan": "Manual",
@@ -111,7 +112,7 @@ var _ = Describe("Subscription Functions", func() {
 		})
 
 		It("should create a Subscription from a configmap", func() {
-			_, err := fakeClientSet.CoreV1().ConfigMaps(OperatorNamespace).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
+			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
 			Expect(err).ToNot(HaveOccurred())
@@ -132,18 +133,18 @@ var _ = Describe("Subscription Functions", func() {
 		var fakeClientSet *kubeclient.Clientset
 
 		BeforeEach(func() {
-			OperatorNamespace = LegacyOperatorNamespace
+			os.Setenv("OPERATOR_NAMESPACE", LegacyOperatorNamespace)
 			fakeClientSet = kubeclient.NewSimpleClientset()
 			cm := newDefaultTestSubConfigMap()
 			testConfigMap = cm.DeepCopy()
 		})
 
 		AfterEach(func() {
-			OperatorNamespace = suggestedOperatorNamespace
+			os.Setenv("OPERATOR_NAMESPACE", suggestedOperatorNamespace)
 		})
 
 		It("should create a Subscription to legacy operator ns", func() {
-			_, err := fakeClientSet.CoreV1().ConfigMaps(OperatorNamespace).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
+			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
 			Expect(err).ToNot(HaveOccurred())
