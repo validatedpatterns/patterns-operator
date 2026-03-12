@@ -177,13 +177,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
 	}
-	subscriptionNamespace := GitOpsLegacySubscriptionNamespace
-	subscriptionName := GitOpsDefaultPackageName
+	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
 	// If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
 	if DetectOperatorNamespace() != LegacyOperatorNamespace {
-		subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
-		subscriptionName = GitOpsDefaultPackageName
-
 		// Create namespace for gitops subscription
 		if err := createNamespace(r.fullClient, subscriptionNamespace); err != nil {
 			return r.actionPerformed(qualifiedInstance, "error creating namespace for gitops subscription", err)

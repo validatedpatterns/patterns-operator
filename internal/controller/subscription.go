@@ -68,15 +68,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 			},
 		},
 	}
-	var subscriptionName, subscriptionNamespace string
-
-	subscriptionName = GitOpsDefaultPackageName
-	subscriptionNamespace = GitOpsDefaultSubscriptionNamespace
-
-	if DetectOperatorNamespace() == LegacyOperatorNamespace {
-		subscriptionName = GitOpsDefaultPackageName
-		subscriptionNamespace = GitOpsLegacySubscriptionNamespace
-	}
+	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
 
 	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{

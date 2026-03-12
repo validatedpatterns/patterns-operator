@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+// DetectGitOpsSubscription returns the subscription name and namespace for the
+// GitOps operator based on the namespace the patterns operator is running in.
+func DetectGitOpsSubscription() (name, namespace string) {
+	if DetectOperatorNamespace() == LegacyOperatorNamespace {
+		return GitOpsDefaultPackageName, GitOpsLegacySubscriptionNamespace
+	}
+	return GitOpsDefaultPackageName, GitOpsDefaultSubscriptionNamespace
+}
+
 // DetectOperatorNamespace determines the namespace the operator is running in.
 func DetectOperatorNamespace() string {
 	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
