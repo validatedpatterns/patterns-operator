@@ -170,13 +170,13 @@ export default function UninstallPatternPage() {
               </DescriptionList>
 
               {!confirmed && (
-                <div style={{ marginTop: 'var(--pf-v6-global--spacer--lg)' }}>
+                <div style={{ marginTop: '24px' }}>
                   <Alert
                     variant="warning"
                     title={t('This will delete the pattern and all its deployed resources.')}
                     isInline
                   />
-                  <div style={{ marginTop: 'var(--pf-v6-global--spacer--md)', display: 'flex', gap: 'var(--pf-v6-global--spacer--sm)' }}>
+                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
                     <Button
                       variant="danger"
                       onClick={handleDelete}

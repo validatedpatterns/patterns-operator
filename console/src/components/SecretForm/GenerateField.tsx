@@ -48,7 +48,7 @@ export const GenerateField: React.FC<GenerateFieldProps> = ({ field, value, onCh
           value={value}
           onChange={handleManualValueChange}
           placeholder={t('Enter manual value')}
-          style={{ marginTop: 'var(--pf-v6-global--spacer--sm)' }}
+          style={{ marginTop: '8px' }}
         />
       )}
       <FormHelperText>

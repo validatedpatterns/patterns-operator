@@ -273,7 +273,7 @@ export default function ManageSecretsPage() {
         )}
         {success && vaultJobStatus && (
           <Alert
-            style={{ marginTop: 'var(--pf-v6-global--spacer--md)' }}
+            style={{ marginTop: '16px' }}
             variant={
               vaultJobStatus.status === 'succeeded'
                 ? 'success'
@@ -291,7 +291,7 @@ export default function ManageSecretsPage() {
               <span>{vaultJobStatus.message}</span>
             </div>
             {vaultJobStatus.jobName && (
-              <p style={{ marginTop: '8px', fontSize: '0.9em', color: 'var(--pf-v6-global--palette--black-700)' }}>
+              <p style={{ marginTop: '8px', fontSize: '0.9em', color: '#4f5255' }}>
                 {t('Job')}: <a href={`/k8s/ns/openshift-operators/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
               </p>
             )}
@@ -303,7 +303,7 @@ export default function ManageSecretsPage() {
           </Alert>
         )}
         <Form
-          style={{ marginTop: success ? 'var(--pf-v6-global--spacer--md)' : undefined }}
+          style={{ marginTop: success ? '16px' : undefined }}
           onSubmit={(e) => {
             e.preventDefault();
             handleSubmit();

@@ -62,7 +62,7 @@ export const StaticField: React.FC<StaticFieldProps> = ({ field, value, onChange
           label={t('Allow override')}
           isChecked={allowOverride}
           onChange={(_event, checked) => handleOverrideChange(checked)}
-          style={{ marginTop: 'var(--pf-v6-global--spacer--sm)' }}
+          style={{ marginTop: '8px' }}
         />
       )}
 
