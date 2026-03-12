@@ -113,7 +113,7 @@ export default function PatternCatalogPage() {
       <PageSection>
         {catalogImage ? (
           <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
-            <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
+            <Title headingLevel="h1" style={{ display: 'inline-block' }}>{t('Pattern Catalog')}</Title>
           </Tooltip>
         ) : (
           <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
@@ -140,7 +140,7 @@ export default function PatternCatalogPage() {
                         <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
                       )}
                     </CardHeader>
-                    <Tooltip content={pattern.org}>
+                    <Tooltip content={`Org: ${pattern.org}`}>
                       <CardTitle>{pattern.display_name}</CardTitle>
                     </Tooltip>
                     <CardBody>
