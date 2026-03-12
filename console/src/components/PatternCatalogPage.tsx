@@ -191,58 +191,64 @@ export default function PatternCatalogPage() {
                       })()}
                     </CardBody>
                     <CardFooter className="patterns-operator__card-footer">
-                      {isInstalled && (
-                        <Button
-                          variant="secondary"
-                          onClick={() => history.push(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)}
-                        >
-                          {t('Manage Secrets')}
-                        </Button>
+                      {(pattern.docs_url || pattern.repo_url) && (
+                        <div className="patterns-operator__card-links">
+                          {pattern.docs_url && (
+                            <Button
+                              variant="link"
+                              component="a"
+                              href={pattern.docs_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              icon={<ExternalLinkAltIcon />}
+                              iconPosition="end"
+                            >
+                              {t('Docs')}
+                            </Button>
+                          )}
+                          {pattern.repo_url && (
+                            <Button
+                              variant="link"
+                              component="a"
+                              href={pattern.repo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              icon={<ExternalLinkAltIcon />}
+                              iconPosition="end"
+                            >
+                              {t('Repo')}
+                            </Button>
+                          )}
+                        </div>
                       )}
-                      {isInstalled && (
-                        <Button
-                          variant="danger"
-                          onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
-                        >
-                          {t('Uninstall')}
-                        </Button>
-                      )}
-                      {!isInstalled && (
-                        <Button
-                          variant="primary"
-                          onClick={() =>
-                            history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
-                          }
-                        >
-                          {t('Install')}
-                        </Button>
-                      )}
-                      {pattern.docs_url && (
-                        <Button
-                          variant="link"
-                          component="a"
-                          href={pattern.docs_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          icon={<ExternalLinkAltIcon />}
-                          iconPosition="end"
-                        >
-                          {t('Docs')}
-                        </Button>
-                      )}
-                      {pattern.repo_url && (
-                        <Button
-                          variant="link"
-                          component="a"
-                          href={pattern.repo_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          icon={<ExternalLinkAltIcon />}
-                          iconPosition="end"
-                        >
-                          {t('Repo')}
-                        </Button>
-                      )}
+                      <div className="patterns-operator__card-actions">
+                        {isInstalled && (
+                          <Button
+                            variant="secondary"
+                            onClick={() => history.push(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)}
+                          >
+                            {t('Manage Secrets')}
+                          </Button>
+                        )}
+                        {isInstalled && (
+                          <Button
+                            variant="danger"
+                            onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
+                          >
+                            {t('Uninstall')}
+                          </Button>
+                        )}
+                        {!isInstalled && (
+                          <Button
+                            variant="primary"
+                            onClick={() =>
+                              history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
+                            }
+                          >
+                            {t('Install')}
+                          </Button>
+                        )}
+                      </div>
                     </CardFooter>
                   </Card>
                   );

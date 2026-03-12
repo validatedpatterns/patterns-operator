@@ -37,7 +37,17 @@
 
 .patterns-operator__card-footer {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.patterns-operator__card-links {
+  display: flex;
+  gap: 16px;
+}
+
+.patterns-operator__card-actions {
+  display: flex;
   gap: 16px;
 }
 
