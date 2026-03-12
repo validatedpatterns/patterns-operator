@@ -7,6 +7,8 @@
 - Need to think about workflows around the catalog
 - Add some requirements
 - We need to come up with a plan for the versioning of catalogs (i.e. the tags of the catalog container)
+  Default is stable-v1, future operators could switch defaults. Maybe we could show if we're using an
+  outdated tag in the console
 
 [DONE]
 - Add a button to load the secrets separately ?
