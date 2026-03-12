@@ -173,7 +173,7 @@ export default function PatternCatalogPage() {
                               <Tooltip content={<pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{fullTooltip}</pre>}>
                                 <div className="patterns-operator__sizing-line">
                                   {spoke
-                                    ? `${t('Hub')}: ${hubSummary} · ${t('Spoke')}: ${spokeSummary}`
+                                    ? <>{t('Hub')}: {hubSummary}<br />{t('Spoke')}: {spokeSummary}</>
                                     : `${t('Cluster')}: ${hubSummary}`
                                   }
                                 </div>
