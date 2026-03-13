@@ -23,6 +23,7 @@ import {
   fetchSecretTemplate,
   fetchVaultJobStatus,
   triggerVaultInjection as apiTriggerVaultInjection,
+  getOperatorNamespace,
   VaultJobStatus,
   VaultInjectionRequest
 } from '../api';
@@ -68,9 +69,12 @@ export default function InstallPatternPage() {
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
   const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
   const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
+  const [operatorNamespace, setOperatorNamespace] = React.useState('openshift-operators');
 
   React.useEffect(() => {
     console.log('🔵 [InstallPatternPage] Starting to load pattern data for:', name);
+
+    getOperatorNamespace().then(setOperatorNamespace);
 
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
       .then(([patternData, template]) => {
@@ -283,9 +287,7 @@ export default function InstallPatternPage() {
         kind: 'Pattern',
         metadata: {
           name: patternName,
-          // FIXME(bandini): we need a way to override this for the time when we move our operator to
-          // another namespace
-          namespace: 'openshift-operators',
+          namespace: operatorNamespace,
         },
         spec: {
           clusterGroupName: 'hub',
@@ -438,7 +440,7 @@ export default function InstallPatternPage() {
             </div>
             {vaultJobStatus.jobName && (
               <p style={{ marginTop: '8px', fontSize: '0.9em', color: '#4f5255' }}>
-                {t('Job')}: <a href={`/k8s/ns/openshift-operators/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
+                {t('Job')}: <a href={`/k8s/ns/${operatorNamespace}/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
               </p>
             )}
           </Alert>

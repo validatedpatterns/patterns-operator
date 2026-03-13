@@ -21,6 +21,7 @@ import {
   fetchSecretTemplate,
   fetchVaultJobStatus,
   triggerVaultInjection as apiTriggerVaultInjection,
+  getOperatorNamespace,
   VaultJobStatus,
   VaultInjectionRequest,
 } from '../api';
@@ -51,8 +52,11 @@ export default function ManageSecretsPage() {
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
   const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
   const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
+  const [operatorNamespace, setOperatorNamespace] = React.useState('openshift-operators');
 
   React.useEffect(() => {
+    getOperatorNamespace().then(setOperatorNamespace);
+
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
       .then(([patternData, template]) => {
         setPatternName(patternData.name);
@@ -292,7 +296,7 @@ export default function ManageSecretsPage() {
             </div>
             {vaultJobStatus.jobName && (
               <p style={{ marginTop: '8px', fontSize: '0.9em', color: '#4f5255' }}>
-                {t('Job')}: <a href={`/k8s/ns/openshift-operators/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
+                {t('Job')}: <a href={`/k8s/ns/${operatorNamespace}/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
               </p>
             )}
           </Alert>

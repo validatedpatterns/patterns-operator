@@ -3,6 +3,30 @@ import { load } from 'js-yaml';
 import { Catalog, Pattern, SecretTemplate } from './types';
 
 const PROXY_BASE = '/api/proxy/plugin/patterns-operator-console-plugin/pattern-catalog';
+const PLUGIN_NAME = 'patterns-operator-console-plugin';
+
+let cachedNamespace: string | null = null;
+
+export async function getOperatorNamespace(): Promise<string> {
+  if (cachedNamespace) return cachedNamespace;
+  try {
+    const response = await consoleFetch(
+      `/api/kubernetes/apis/console.openshift.io/v1/consoleplugins/${PLUGIN_NAME}`,
+    );
+    if (response.ok) {
+      const data = await response.json();
+      const ns = data.spec?.backend?.service?.namespace;
+      if (ns) {
+        cachedNamespace = ns;
+        return ns;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to detect operator namespace, falling back to openshift-operators:', err);
+  }
+  cachedNamespace = 'openshift-operators';
+  return cachedNamespace;
+}
 
 async function fetchYAML<T>(url: string): Promise<T> {
   const response = await consoleFetch(url);
@@ -19,8 +43,9 @@ export async function fetchPattern(name: string): Promise<Pattern> {
 }
 
 export async function fetchCatalogImage(): Promise<string> {
+  const ns = await getOperatorNamespace();
   const response = await consoleFetch(
-    '/api/kubernetes/apis/apps/v1/namespaces/openshift-operators/deployments/patterns-operator-pattern-catalog',
+    `/api/kubernetes/apis/apps/v1/namespaces/${ns}/deployments/patterns-operator-pattern-catalog`,
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch catalog deployment: ${response.status}`);
@@ -83,6 +108,8 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
     const secretName = `vault-secrets-${request.patternName}-${timestamp}`;
     const jobName = `vault-inject-${request.patternName}-${timestamp}`;
 
+    const ns = await getOperatorNamespace();
+
     console.log('🔐 [API] Creating Kubernetes secret:', secretName);
     console.log('⚙️ [API] Creating Kubernetes job:', jobName);
 
@@ -100,7 +127,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
       kind: 'Secret',
       metadata: {
         name: secretName,
-        namespace: 'openshift-operators',
+        namespace: ns,
         labels: {
           'patterns.gitops.hybrid-cloud-patterns.io/pattern': request.patternName,
           'patterns.gitops.hybrid-cloud-patterns.io/component': 'secret-injector',
@@ -118,7 +145,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
       labels: secret.metadata.labels
     });
 
-    const secretResponse = await consoleFetch('/api/kubernetes/api/v1/namespaces/openshift-operators/secrets', {
+    const secretResponse = await consoleFetch(`/api/kubernetes/api/v1/namespaces/${ns}/secrets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(secret),
@@ -144,7 +171,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
       kind: 'Job',
       metadata: {
         name: jobName,
-        namespace: 'openshift-operators',
+        namespace: ns,
         labels: {
           'patterns.gitops.hybrid-cloud-patterns.io/pattern': request.patternName,
           'patterns.gitops.hybrid-cloud-patterns.io/component': 'secret-injector',
@@ -254,12 +281,13 @@ PLAYBOOK_EOF
                 command: [
                   '/bin/bash',
                   '-c',
-                  `echo "Deleting temporary secret $SECRET_NAME"
-                  kubectl delete secret "$SECRET_NAME" -n openshift-operators --ignore-not-found
+                  `echo "Deleting temporary secret $SECRET_NAME in namespace $SECRET_NAMESPACE"
+                  kubectl delete secret "$SECRET_NAME" -n "$SECRET_NAMESPACE" --ignore-not-found
                   echo "Cleanup complete"`,
                 ],
                 env: [
                   { name: 'SECRET_NAME', value: secretName },
+                  { name: 'SECRET_NAMESPACE', value: ns },
                 ],
                 resources: {
                   requests: { cpu: '50m', memory: '64Mi' },
@@ -320,7 +348,7 @@ PLAYBOOK_EOF
       containerImage: job.spec.template.spec.containers[0].image
     });
 
-    const jobResponse = await consoleFetch('/api/kubernetes/apis/batch/v1/namespaces/openshift-operators/jobs', {
+    const jobResponse = await consoleFetch(`/api/kubernetes/apis/batch/v1/namespaces/${ns}/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(job),
@@ -364,7 +392,8 @@ PLAYBOOK_EOF
 
 export async function fetchVaultJobStatus(patternName: string): Promise<VaultJobStatus> {
   try {
-    const url = `/api/kubernetes/apis/batch/v1/namespaces/openshift-operators/jobs?labelSelector=patterns.gitops.hybrid-cloud-patterns.io/pattern=${patternName},patterns.gitops.hybrid-cloud-patterns.io/component=secret-injector`;
+    const ns = await getOperatorNamespace();
+    const url = `/api/kubernetes/apis/batch/v1/namespaces/${ns}/jobs?labelSelector=patterns.gitops.hybrid-cloud-patterns.io/pattern=${patternName},patterns.gitops.hybrid-cloud-patterns.io/component=secret-injector`;
     console.log(`🔍 [API] Fetching vault job status for pattern: ${patternName}`);
     console.log(`🔍 [API] Request URL: ${url}`);
 
@@ -446,8 +475,9 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
 }
 
 export async function fetchInstalledPatterns(): Promise<string[]> {
+  const ns = await getOperatorNamespace();
   const response = await consoleFetch(
-    '/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns',
+    `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/${ns}/patterns`,
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch installed patterns: ${response.status}`);
@@ -466,8 +496,9 @@ export interface PatternCRStatus {
 
 export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
   try {
+    const ns = await getOperatorNamespace();
     const response = await consoleFetch(
-      `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns/${name}`,
+      `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/${ns}/patterns/${name}`,
     );
     if (!response.ok) {
       if (response.status === 404) {
@@ -495,8 +526,9 @@ export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
 }
 
 export async function deletePattern(name: string): Promise<void> {
+  const ns = await getOperatorNamespace();
   const response = await consoleFetch(
-    `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/openshift-operators/patterns/${name}`,
+    `/api/kubernetes/apis/gitops.hybrid-cloud-patterns.io/v1alpha1/namespaces/${ns}/patterns/${name}`,
     { method: 'DELETE' },
   );
   if (!response.ok) {
