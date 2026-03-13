@@ -2,7 +2,7 @@ import { consoleFetch } from '@openshift-console/dynamic-plugin-sdk';
 import { load } from 'js-yaml';
 import { Catalog, Pattern, SecretTemplate } from './types';
 
-const PROXY_BASE = '/api/proxy/plugin/patterns-operator-console-plugin/pattern-catalog';
+const PROXY_BASE = '/api/proxy/plugin/patterns-operator-console-plugin/pattern-ui-catalog';
 const PLUGIN_NAME = 'patterns-operator-console-plugin';
 
 let cachedNamespace: string | null = null;
@@ -45,7 +45,7 @@ export async function fetchPattern(name: string): Promise<Pattern> {
 export async function fetchCatalogImage(): Promise<string> {
   const ns = await getOperatorNamespace();
   const response = await consoleFetch(
-    `/api/kubernetes/apis/apps/v1/namespaces/${ns}/deployments/patterns-operator-pattern-catalog`,
+    `/api/kubernetes/apis/apps/v1/namespaces/${ns}/deployments/patterns-operator-pattern-ui-catalog`,
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch catalog deployment: ${response.status}`);
@@ -53,7 +53,7 @@ export async function fetchCatalogImage(): Promise<string> {
   const data = await response.json();
   const containers = data.spec?.template?.spec?.containers || [];
   const catalogContainer = containers.find(
-    (c: any) => c.name === 'patterns-operator-pattern-catalog',
+    (c: any) => c.name === 'patterns-operator-pattern-ui-catalog',
   );
   return catalogContainer?.image || 'unknown';
 }

@@ -41,12 +41,12 @@ const (
 	// ServicePort is the port of the console plugin Service and must match the port of the Service in /bundle/manifests!
 	ServicePort = 9443
 
-	// PatternCatalogServiceName is the name of the pattern-catalog Service
-	PatternCatalogServiceName = "patterns-operator-pattern-catalog"
-	// PatternCatalogServicePort is the port of the pattern-catalog Service (TLS)
+	// PatternCatalogServiceName is the name of the pattern-ui-catalog Service
+	PatternCatalogServiceName = "patterns-operator-pattern-ui-catalog"
+	// PatternCatalogServicePort is the port of the pattern-ui-catalog Service (TLS)
 	PatternCatalogServicePort = 9444
 	// PatternCatalogProxyAlias is the proxy alias used in console plugin proxy configuration
-	PatternCatalogProxyAlias = "pattern-catalog"
+	PatternCatalogProxyAlias = "pattern-ui-catalog"
 )
 
 // +kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=get;list;watch;create;update;patch;delete

@@ -31,28 +31,28 @@ import (
 )
 
 const (
-	// CatalogDeploymentName is the name of the pattern-catalog Deployment
-	CatalogDeploymentName = "patterns-operator-pattern-catalog"
+	// CatalogDeploymentName is the name of the pattern-ui-catalog Deployment
+	CatalogDeploymentName = "patterns-operator-pattern-ui-catalog"
 	// CatalogContainerName is the name of the container inside the catalog Deployment
-	CatalogContainerName = "patterns-operator-pattern-catalog"
+	CatalogContainerName = "patterns-operator-pattern-ui-catalog"
 	// CatalogConfigMapName is the name of the nginx config ConfigMap
-	CatalogConfigMapName = "patterns-operator-pattern-catalog"
+	CatalogConfigMapName = "patterns-operator-pattern-ui-catalog"
 	// CatalogServiceName is the name of the catalog Service
-	CatalogServiceName = "patterns-operator-pattern-catalog"
+	CatalogServiceName = "patterns-operator-pattern-ui-catalog"
 	// CatalogCertSecretName is the name of the serving cert Secret
-	CatalogCertSecretName = "patterns-operator-pattern-catalog-cert"
+	CatalogCertSecretName = "patterns-operator-pattern-ui-catalog-cert"
 	// CatalogDefaultImage is the default catalog image
-	CatalogDefaultImage = "quay.io/validatedpatterns/pattern-catalog:stable-v1"
+	CatalogDefaultImage = "quay.io/validatedpatterns/pattern-ui-catalog:stable-v1"
 	// operatorConfigMap is the name of the operator ConfigMap (mirrors controllers.OperatorConfigMap)
 	operatorConfigMap = "patterns-operator-config"
 	// catalogComponentLabel is the label applied to all catalog resources
-	catalogComponentLabel = "patterns-operator-pattern-catalog"
+	catalogComponentLabel = "patterns-operator-pattern-ui-catalog"
 )
 
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch
 
-// CreateOrUpdateCatalog creates or updates the pattern-catalog ConfigMap, Service,
+// CreateOrUpdateCatalog creates or updates the pattern-ui-catalog ConfigMap, Service,
 // and Deployment. If the operator ConfigMap contains a "catalog.image" key, that
 // image is used instead of the built-in default.
 func CreateOrUpdateCatalog(ctx context.Context, cl client.Client, reader client.Reader) error {
@@ -245,7 +245,7 @@ func createOrUpdateCatalogDeployment(ctx context.Context, cl client.Client, name
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      "pattern-catalog-cert",
+									Name:      "pattern-ui-catalog-cert",
 									MountPath: "/var/cert",
 									ReadOnly:  true,
 								},
@@ -266,7 +266,7 @@ func createOrUpdateCatalogDeployment(ctx context.Context, cl client.Client, name
 					ServiceAccountName: "patterns-operator-controller-manager",
 					Volumes: []corev1.Volume{
 						{
-							Name: "pattern-catalog-cert",
+							Name: "pattern-ui-catalog-cert",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									DefaultMode: &defaultMode,
