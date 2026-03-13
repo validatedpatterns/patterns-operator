@@ -17,6 +17,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
+    operatorframework.io/suggested-namespace: patterns-operator
     operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather:latest
     repository: https://github.com/validatedpatterns/patterns-operator
     support: validatedpatterns@googlegroups.com
@@ -204,7 +205,7 @@ spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
   - supported: false
     type: SingleNamespace

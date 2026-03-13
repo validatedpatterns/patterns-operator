@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,41 +16,44 @@ import (
 	"k8s.io/client-go/testing"
 )
 
-var defaultTestSubscription = operatorv1alpha1.Subscription{
-	Spec: &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          "foosource",
-		CatalogSourceNamespace: "foosourcenamespace",
-		Package:                "foooperator",
-		Channel:                "foochannel",
-		InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
-		Config: &operatorv1alpha1.SubscriptionConfig{
-			Env: []corev1.EnvVar{
-				{
-					Name:  "foo",
-					Value: "bar",
+func newDefaultTestSubscription() operatorv1alpha1.Subscription {
+	return operatorv1alpha1.Subscription{
+		Spec: &operatorv1alpha1.SubscriptionSpec{
+			CatalogSource:          "foosource",
+			CatalogSourceNamespace: "foosourcenamespace",
+			Package:                "foooperator",
+			Channel:                "foochannel",
+			InstallPlanApproval:    operatorv1alpha1.ApprovalAutomatic,
+			Config: &operatorv1alpha1.SubscriptionConfig{
+				Env: []corev1.EnvVar{
+					{
+						Name:  "foo",
+						Value: "bar",
+					},
 				},
 			},
 		},
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "foosubscription",
-		Namespace: OperatorNamespace,
-	},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foosubscription",
+			Namespace: LegacyOperatorNamespace,
+		},
+	}
 }
 
-var defaultTestSubConfigMap = corev1.ConfigMap{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      OperatorConfigMap,
-		Namespace: OperatorNamespace,
-	},
-	Data: map[string]string{
-		"gitops.installApprovalPlan": "Manual",
-		"gitops.catalogSource":       "foo-source",
-		"gitops.sourceNamespace":     "foo-source-namespace",
-		"gitops.name":                "foo-name",
-		"gitops.channel":             "foo-channel",
-		"gitops.csv":                 "1.2.3",
-	},
+func newDefaultTestSubConfigMap() corev1.ConfigMap {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      OperatorConfigMap,
+			Namespace: DetectOperatorNamespace(),
+		},
+		Data: map[string]string{
+			"gitops.installApprovalPlan": "Manual",
+			"gitops.catalogSource":       "foo-source",
+			"gitops.sourceNamespace":     "foo-source-namespace",
+			"gitops.channel":             "foo-channel",
+			"gitops.csv":                 "1.2.3",
+		},
+	}
 }
 
 var _ = Describe("Subscription Functions", func() {
@@ -58,39 +62,39 @@ var _ = Describe("Subscription Functions", func() {
 		var fakeOlmClientSet *olmclient.Clientset
 
 		BeforeEach(func() {
-			testSubscription = defaultTestSubscription.DeepCopy()
+			s := newDefaultTestSubscription()
+			testSubscription = s.DeepCopy()
 			fakeOlmClientSet = olmclient.NewSimpleClientset()
 		})
 
-		It("should error out with a non existing a Subscription", func() {
+		It("should not error out with a non existing a Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			_, err = getSubscription(fakeOlmClientSet, "foo")
-			Expect(err).To(HaveOccurred())
+
+			sub, err := getSubscription(fakeOlmClientSet, "non-existing-sub", GitOpsLegacySubscriptionNamespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sub).To(BeNil())
+
 		})
 
 		It("should return a proper Subscription", func() {
 			err := createSubscription(fakeOlmClientSet, testSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			sub, err := getSubscription(fakeOlmClientSet, "foosubscription")
+			sub, err := getSubscription(fakeOlmClientSet, testSubscription.Name, testSubscription.Namespace)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(sub.Spec.Channel).To(Equal("foochannel"))
-			Expect(sub.Spec.CatalogSource).To(Equal("foosource"))
-			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foosourcenamespace"))
-			Expect(sub.Spec.Package).To(Equal("foooperator"))
-			Expect(sub.Spec.Channel).To(Equal("foochannel"))
-			Expect(sub.Spec.StartingCSV).To(BeEmpty())
-			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalAutomatic))
+			Expect(sub).ToNot(BeNil())
+			Expect(sub).To(Equal(testSubscription))
 		})
 	})
 
-	Context("newSubscriptionFromConfigMap", func() {
+	Context("newSubscriptionFromConfigMap (operator in suggested namespace patterns-operator)", func() {
 		var testConfigMap *corev1.ConfigMap
 		var fakeClientSet *kubeclient.Clientset
 
 		BeforeEach(func() {
 			fakeClientSet = kubeclient.NewSimpleClientset()
-			testConfigMap = defaultTestSubConfigMap.DeepCopy()
+			cm := newDefaultTestSubConfigMap()
+			testConfigMap = cm.DeepCopy()
 		})
 
 		It("should handle the absence of the ConfigMap gracefully", func() {
@@ -103,20 +107,70 @@ var _ = Describe("Subscription Functions", func() {
 			Expect(sub.Spec.Channel).To(Equal(GitOpsDefaultChannel))
 			Expect(sub.Spec.StartingCSV).To(BeEmpty())
 			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalAutomatic))
+			Expect(sub.Namespace).To(Equal(GitOpsDefaultSubscriptionNamespace))
+			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
 		})
 
 		It("should create a Subscription from a configmap", func() {
-			_, err := fakeClientSet.CoreV1().ConfigMaps(OperatorNamespace).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
+			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
 			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foo-source-namespace"))
-			Expect(sub.Spec.Package).To(Equal("foo-name"))
+			Expect(sub.Spec.Package).To(Equal(GitOpsDefaultPackageName))
 			Expect(sub.Spec.Channel).To(Equal("foo-channel"))
 			Expect(sub.Spec.StartingCSV).To(Equal("1.2.3"))
 			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
+			Expect(sub.Namespace).To(Equal(GitOpsDefaultSubscriptionNamespace))
+			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
+		})
+	})
+
+	Context("newSubscriptionFromConfigMap (operator in legacy namespace openshift-operators)", func() {
+		var testConfigMap *corev1.ConfigMap
+		var fakeClientSet *kubeclient.Clientset
+
+		BeforeEach(func() {
+			os.Setenv("OPERATOR_NAMESPACE", LegacyOperatorNamespace)
+			fakeClientSet = kubeclient.NewSimpleClientset()
+			cm := newDefaultTestSubConfigMap()
+			testConfigMap = cm.DeepCopy()
+		})
+
+		AfterEach(func() {
+			os.Setenv("OPERATOR_NAMESPACE", suggestedOperatorNamespace)
+		})
+
+		It("should create a Subscription to legacy operator ns", func() {
+			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sub).NotTo(BeNil())
+			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
+			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foo-source-namespace"))
+			Expect(sub.Spec.Package).To(Equal(GitOpsDefaultPackageName))
+			Expect(sub.Spec.Channel).To(Equal("foo-channel"))
+			Expect(sub.Spec.StartingCSV).To(Equal("1.2.3"))
+			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
+			Expect(sub.Namespace).To(Equal(GitOpsLegacySubscriptionNamespace))
+			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
+		})
+
+		It("should handle the absence of the ConfigMap gracefully (legacy operator ns)", func() {
+			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sub).NotTo(BeNil())
+			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))
+			Expect(sub.Spec.CatalogSourceNamespace).To(Equal(GitOpsDefaultCatalogSourceNamespace))
+			Expect(sub.Spec.Package).To(Equal(GitOpsDefaultPackageName))
+			Expect(sub.Spec.Channel).To(Equal(GitOpsDefaultChannel))
+			Expect(sub.Spec.StartingCSV).To(BeEmpty())
+			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalAutomatic))
+			Expect(sub.Namespace).To(Equal(GitOpsLegacySubscriptionNamespace))
+			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
 		})
 	})
 })
@@ -131,7 +185,7 @@ var _ = Describe("UpdateSubscription", func() {
 
 	BeforeEach(func() {
 		client = olmclient.NewSimpleClientset()
-		subscriptionNs = "openshift-operators"
+		subscriptionNs = GitOpsLegacySubscriptionNamespace
 
 		current = &operatorv1alpha1.Subscription{
 			ObjectMeta: metav1.ObjectMeta{

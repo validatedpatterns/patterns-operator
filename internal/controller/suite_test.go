@@ -42,6 +42,10 @@ var testEnv *envtest.Environment
 var tempDir string
 var gitOpsImpl *GitOperationsImpl
 
+// suggestedOperatorNamespace is the namespace used when testing the "new" install path
+// (operator in patterns-operator ns, subscription in openshift-gitops-operator).
+const suggestedOperatorNamespace = "patterns-operator"
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -61,6 +65,9 @@ func cleanupTempDir(tempDir string) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	// Set OPERATOR_NAMESPACE env var so DetectOperatorNamespace() returns the test namespace
+	os.Setenv("OPERATOR_NAMESPACE", suggestedOperatorNamespace)
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

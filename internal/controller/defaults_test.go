@@ -26,11 +26,6 @@ var _ = Describe("GitOpsConfig getValueWithDefault", func() {
 			Expect(config.getValueWithDefault("gitops.catalogSource")).To(Equal(GitOpsDefaultCatalogSource))
 		})
 
-		It("should return the default value for gitops.name", func() {
-			config := GitOpsConfig{}
-			Expect(config.getValueWithDefault("gitops.name")).To(Equal(GitOpsDefaultPackageName))
-		})
-
 		It("should return the default value for gitops.sourceNamespace", func() {
 			config := GitOpsConfig{}
 			Expect(config.getValueWithDefault("gitops.sourceNamespace")).To(Equal(GitOpsDefaultCatalogSourceNamespace))
@@ -90,11 +85,9 @@ var _ = Describe("DefaultPatternOperatorConfig", func() {
 	It("should contain all expected keys", func() {
 		expectedKeys := []string{
 			"gitops.catalogSource",
-			"gitops.name",
 			"gitops.channel",
 			"gitops.sourceNamespace",
 			"gitops.installApprovalPlan",
-			"gitops.ManualSync",
 			"gitea.chartName",
 			"gitea.helmRepoUrl",
 			"gitea.chartVersion",
@@ -109,7 +102,6 @@ var _ = Describe("DefaultPatternOperatorConfig", func() {
 		Expect(DefaultPatternOperatorConfig["gitops.catalogSource"]).To(Equal("redhat-operators"))
 		Expect(DefaultPatternOperatorConfig["gitops.sourceNamespace"]).To(Equal("openshift-marketplace"))
 		Expect(DefaultPatternOperatorConfig["gitops.installApprovalPlan"]).To(Equal("Automatic"))
-		Expect(DefaultPatternOperatorConfig["gitops.ManualSync"]).To(Equal("false"))
 		Expect(DefaultPatternOperatorConfig["analytics.enabled"]).To(Equal("true"))
 	})
 })

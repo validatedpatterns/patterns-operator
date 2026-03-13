@@ -428,5 +428,5 @@ func GetOperatorConfigmap() (*corev1.ConfigMap, error) {
 		return nil, fmt.Errorf("failed to call NewForConfig: %s", err)
 	}
 
-	return clientset.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	return clientset.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
 }

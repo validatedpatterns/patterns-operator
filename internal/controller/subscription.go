@@ -34,7 +34,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	var newSubscription *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
-	cm, err := r.CoreV1().ConfigMaps(OperatorNamespace).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	cm, err := r.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
 	// If we hit an error that is not related to the configmap not existing bubble it up
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -55,7 +55,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	spec := &operatorv1alpha1.SubscriptionSpec{
 		CatalogSource:          PatternsOperatorConfig.getValueWithDefault("gitops.catalogSource"),
 		CatalogSourceNamespace: PatternsOperatorConfig.getValueWithDefault("gitops.sourceNamespace"),
-		Package:                PatternsOperatorConfig.getValueWithDefault("gitops.name"),
+		Package:                GitOpsDefaultPackageName,
 		Channel:                PatternsOperatorConfig.getValueWithDefault("gitops.channel"),
 		StartingCSV:            PatternsOperatorConfig.getValueWithDefault("gitops.csv"),
 		InstallPlanApproval:    installPlanApproval,
@@ -68,11 +68,12 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 			},
 		},
 	}
+	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
 
 	newSubscription = &operatorv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      GitOpsDefaultPackageName,
-			Namespace: SubscriptionNamespace,
+			Name:      subscriptionName,
+			Namespace: subscriptionNamespace,
 		},
 		Spec: spec,
 	}
@@ -80,16 +81,20 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	return newSubscription, nil
 }
 
-func getSubscription(client olmclient.Interface, name string) (*operatorv1alpha1.Subscription, error) {
-	sub, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
+func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
+	var subscription *operatorv1alpha1.Subscription
+	var err error
+	if subscription, err = client.OperatorsV1alpha1().Subscriptions(namespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return sub, nil
+	return subscription, nil
 }
 
 func createSubscription(client olmclient.Interface, sub *operatorv1alpha1.Subscription) error {
-	_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Create(context.Background(), sub, metav1.CreateOptions{})
+	_, err := client.OperatorsV1alpha1().Subscriptions(sub.Namespace).Create(context.Background(), sub, metav1.CreateOptions{})
 	return err
 }
 
@@ -133,7 +138,7 @@ func updateSubscription(client olmclient.Interface, target, current *operatorv1a
 
 	if changed {
 		target.Spec.DeepCopyInto(current.Spec)
-		_, err := client.OperatorsV1alpha1().Subscriptions(SubscriptionNamespace).Update(context.Background(), current, metav1.UpdateOptions{})
+		_, err := client.OperatorsV1alpha1().Subscriptions(current.Namespace).Update(context.Background(), current, metav1.UpdateOptions{})
 		return changed, err
 	}
 

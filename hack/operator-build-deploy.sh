@@ -2,7 +2,7 @@
 set -e -o pipefail
 
 CATALOGSOURCE="test-pattern-operator"
-NS="openshift-operators"
+DEFAULT_NS="patterns-operator"
 OPERATOR="patterns-operator"
 VERSION="${VERSION:-6.6.6}"
 UPLOADREGISTRY="${UPLOADREGISTRY:-kuemper.int.rhx/bandini}"
@@ -78,7 +78,34 @@ make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" CHANNELS=fast USE_IMA
     manifests bundle generate docker-build docker-push bundle-build bundle-push catalog-build \
     catalog-push catalog-install
 
+# If the operator already exists in openshift-operators, keep using that namespace;
+# otherwise use the new dedicated namespace.
+if oc get subscriptions.operators.coreos.com "${OPERATOR}" -n openshift-operators &>/dev/null; then
+    NS="openshift-operators"
+    echo "Existing installation found in openshift-operators, upgrading in place"
+else
+    NS="${DEFAULT_NS}"
+    echo "No existing installation found, installing in ${NS}"
+fi
+
 wait_for_resource "packagemanifest" "${OPERATOR}" "" "${CATALOGSOURCE}"
+
+# Create namespace and OperatorGroup for dedicated namespace install
+# (openshift-operators already has a global OperatorGroup, so skip for that namespace)
+if [[ "${NS}" != "openshift-operators" ]]; then
+    oc create namespace ${NS} --dry-run=client -o yaml | oc apply -f -
+    oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: patterns-operator-group
+  namespace: ${NS}
+spec:
+  targetNamespaces:
+  - ${NS}
+EOF
+fi
+
 apply_subscription
 wait_for_resource "operator" "${OPERATOR}" "${NS}"
 

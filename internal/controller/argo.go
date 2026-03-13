@@ -499,7 +499,11 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Value: p.Spec.ExperimentalCapabilities,
 		},
 	}
+	_, gitOpsSubNamespace := DetectGitOpsSubscription()
 	parameters = append(parameters, argoapi.HelmParameter{
+		Name:  "global.gitOpsSubNamespace",
+		Value: gitOpsSubNamespace,
+	}, argoapi.HelmParameter{
 		Name:  "global.multiSourceTargetRevision",
 		Value: getClusterGroupChartVersion(p),
 	})

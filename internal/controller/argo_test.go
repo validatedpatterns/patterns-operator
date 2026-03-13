@@ -447,6 +447,10 @@ var _ = Describe("Argo Pattern", func() {
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
+						Name:  "global.gitOpsSubNamespace",
+						Value: GitOpsDefaultSubscriptionNamespace,
+					},
+					argoapi.HelmParameter{
 						Name:        "global.multiSourceTargetRevision",
 						Value:       "0.0.*",
 						ForceString: false,
@@ -481,6 +485,10 @@ var _ = Describe("Argo Pattern", func() {
 						ForceString: false,
 					},
 					argoapi.HelmParameter{
+						Name:  "global.gitOpsSubNamespace",
+						Value: GitOpsDefaultSubscriptionNamespace,
+					},
+					argoapi.HelmParameter{
 						Name:        "global.multiSourceTargetRevision",
 						Value:       "0.0.*",
 						ForceString: false,
@@ -512,6 +520,10 @@ var _ = Describe("Argo Pattern", func() {
 						Name:        "global.experimentalCapabilities",
 						Value:       "",
 						ForceString: false,
+					},
+					argoapi.HelmParameter{
+						Name:  "global.gitOpsSubNamespace",
+						Value: GitOpsDefaultSubscriptionNamespace,
 					},
 					argoapi.HelmParameter{
 						Name:  "global.multiSourceTargetRevision",

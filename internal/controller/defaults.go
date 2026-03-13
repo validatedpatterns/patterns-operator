@@ -1,14 +1,37 @@
 package controllers
 
+import (
+	"os"
+	"strings"
+)
+
+// DetectGitOpsSubscription returns the subscription name and namespace for the
+// GitOps operator based on the namespace the patterns operator is running in.
+func DetectGitOpsSubscription() (name, namespace string) {
+	if DetectOperatorNamespace() == LegacyOperatorNamespace {
+		return GitOpsDefaultPackageName, GitOpsLegacySubscriptionNamespace
+	}
+	return GitOpsDefaultPackageName, GitOpsDefaultSubscriptionNamespace
+}
+
+// DetectOperatorNamespace determines the namespace the operator is running in.
+func DetectOperatorNamespace() string {
+	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
+		return ns
+	}
+	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err == nil && len(data) > 0 {
+		return strings.TrimSpace(string(data))
+	}
+	return LegacyOperatorNamespace
+}
+
 // Below are the default constants that we will
 // use throughout the patterns operator code
 const (
-	// Default Operator Namespace
-	OperatorNamespace = "openshift-operators"
+	LegacyOperatorNamespace = "openshift-operators"
 	// Default Operator Config Map Name
 	OperatorConfigMap = "patterns-operator-config"
-	// Default Subscription Namespace
-	SubscriptionNamespace = "openshift-operators"
 	// Default Application Namespace
 	ApplicationNamespace = "openshift-gitops"
 	// ClusterWide Argo Name
@@ -17,21 +40,15 @@ const (
 
 // GitOps Subscription
 const (
+	GitOpsDefaultSubscriptionNamespace  = "openshift-gitops-operator"
+	GitOpsLegacySubscriptionNamespace   = LegacyOperatorNamespace
 	GitOpsDefaultChannel                = "gitops-1.18"
 	GitOpsDefaultPackageName            = "openshift-gitops-operator"
 	GitOpsDefaultCatalogSource          = "redhat-operators"
 	GitOpsDefaultCatalogSourceNamespace = "openshift-marketplace"
 	GitOpsDefaultApprovalPlan           = "Automatic"
-)
-
-// GitOps Configuration
-const (
-	// Require manual intervention before Argo will sync new content. Default: False
-	GitOpsDefaultManualSync = "false"
-	// Require manual confirmation before installing and upgrading operators. Default: False
-	GitOpsDefaultManualApproval = "false"
-	// Dangerous. Force a specific version to be installed. Default: False
-	GitOpsDefaultUseCSV = "false"
+	// Dangerous. Force a specific version to be installed. Default: ""
+	GitOpsDefaultCSV = ""
 )
 
 // Gitea chart defaults
@@ -67,11 +84,10 @@ const (
 
 var DefaultPatternOperatorConfig = map[string]string{
 	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
-	"gitops.name":                GitOpsDefaultPackageName,
 	"gitops.channel":             GitOpsDefaultChannel,
 	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
 	"gitops.installApprovalPlan": GitOpsDefaultApprovalPlan,
-	"gitops.ManualSync":          GitOpsDefaultManualSync,
+	"gitops.csv":                 GitOpsDefaultCSV,
 	"gitea.chartName":            GiteaChartName,
 	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
 	"gitea.chartVersion":         GiteaDefaultChartVersion,

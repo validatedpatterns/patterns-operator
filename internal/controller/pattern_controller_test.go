@@ -44,7 +44,6 @@ import (
 )
 
 const (
-	namespace        = "openshift-operators"
 	defaultNamespace = "default"
 	foo              = "foo"
 	originURL        = "https://origin.url"
@@ -52,6 +51,7 @@ const (
 )
 
 var (
+	namespace         = suggestedOperatorNamespace
 	patternNamespaced = types.NamespacedName{Name: foo, Namespace: namespace}
 	mockGitOps        *MockGitOperations
 	gitOptions        *git.CloneOptions
