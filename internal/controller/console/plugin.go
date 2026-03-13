@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,10 +67,15 @@ func CreateOrUpdatePlugin(ctx context.Context, cl client.Client) error {
 }
 
 // getDeploymentNamespace returns the namespace where the operator is deployed.
-// It reads from the POD_NAMESPACE env var (set via downward API) or falls back to the default.
+// It checks the OPERATOR_NAMESPACE env var first, then reads the service account
+// namespace file, and falls back to the default namespace.
 func getDeploymentNamespace() string {
-	if ns, found := os.LookupEnv("POD_NAMESPACE"); found && ns != "" {
+	if ns, found := os.LookupEnv("OPERATOR_NAMESPACE"); found && ns != "" {
 		return ns
+	}
+	data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err == nil && len(data) > 0 {
+		return strings.TrimSpace(string(data))
 	}
 	return defaultNamespace
 }
