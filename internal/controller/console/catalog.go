@@ -222,8 +222,9 @@ func createOrUpdateCatalogDeployment(ctx context.Context, cl client.Client, name
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  CatalogContainerName,
-							Image: image,
+							Name:            CatalogContainerName,
+							Image:           image,
+							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "https",
