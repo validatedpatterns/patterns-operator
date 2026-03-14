@@ -12,6 +12,12 @@
   gap: 4px;
 }
 
+.patterns-operator__requirements-heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--pf-v5-global--Color--100, var(--pf-v6-global--Color--100, #151515));
+}
+
 .patterns-operator__cloud-labels {
   display: flex;
   gap: 4px;

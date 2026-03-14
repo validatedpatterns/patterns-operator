@@ -51,15 +51,24 @@ function getSizingSummary(role: ClusterRoleRequirements, cloud: string): string 
   return parts.join(' + ');
 }
 
-function getSizingTooltip(role: ClusterRoleRequirements, clouds: string[]): string {
+function formatRoleLine(role: ClusterRoleRequirements, cloud: string): string {
+  const control = role.controlPlane?.[cloud];
+  const compute = role.compute?.[cloud];
+  const parts: string[] = [];
+  if (control) parts.push(`${control.replicas}× ${control.type} control`);
+  if (compute) parts.push(`${compute.replicas}× ${compute.type} compute`);
+  return parts.join(', ');
+}
+
+function getRequirementsTooltip(hub: ClusterRoleRequirements | undefined, spoke: ClusterRoleRequirements | undefined, clouds: string[]): string {
   return clouds
     .map((cloud) => {
-      const control = role.controlPlane?.[cloud];
-      const compute = role.compute?.[cloud];
       const lines: string[] = [];
-      if (control) lines.push(`  Control: ${control.replicas}x ${control.type}`);
-      if (compute) lines.push(`  Compute: ${compute.replicas}x ${compute.type}`);
-      return lines.length ? `${CLOUD_LABELS[cloud] || cloud}:\n${lines.join('\n')}` : null;
+      const hubLine = hub ? formatRoleLine(hub, cloud) : '';
+      const spokeLine = spoke ? formatRoleLine(spoke, cloud) : '';
+      if (hubLine) lines.push(spoke ? `  Hub: ${hubLine}` : `  ${hubLine}`);
+      if (spokeLine) lines.push(`  Spoke: ${spokeLine}`);
+      return lines.length ? `${CLOUD_LABELS[cloud] || cloud}\n${lines.join('\n')}` : null;
     })
     .filter(Boolean)
     .join('\n');
@@ -156,12 +165,10 @@ export default function PatternCatalogPage() {
                         const defaultCloud = clouds.includes('aws') ? 'aws' : clouds[0];
                         const hubSummary = hub && defaultCloud ? getSizingSummary(hub, defaultCloud) : null;
                         const spokeSummary = spoke && defaultCloud ? getSizingSummary(spoke, defaultCloud) : null;
-                        const tooltipParts: string[] = [];
-                        if (hub) tooltipParts.push(`Hub:\n${getSizingTooltip(hub, clouds)}`);
-                        if (spoke) tooltipParts.push(`Spoke:\n${getSizingTooltip(spoke, clouds)}`);
-                        const fullTooltip = tooltipParts.join('\n\n');
+                        const fullTooltip = getRequirementsTooltip(hub, spoke, clouds);
                         return (
                           <div className="patterns-operator__requirements">
+                            <div className="patterns-operator__requirements-heading">{t('Tested Requirements:')}</div>
                             {clouds.length > 0 && (
                               <div className="patterns-operator__cloud-labels">
                                 {clouds.map((cloud) => (
