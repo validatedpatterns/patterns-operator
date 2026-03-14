@@ -168,7 +168,9 @@ export default function PatternCatalogPage() {
                         const fullTooltip = getRequirementsTooltip(hub, spoke, clouds);
                         return (
                           <div className="patterns-operator__requirements">
-                            <div className="patterns-operator__requirements-heading">{t('Tested Requirements:')}</div>
+                            <Tooltip content={t('This is the sizing that has been tested. The pattern is expected to work on any similarly-sized architecture.')}>
+                              <div className="patterns-operator__requirements-heading">{t('Tested Requirements:')}</div>
+                            </Tooltip>
                             {clouds.length > 0 && (
                               <div className="patterns-operator__cloud-labels">
                                 {clouds.map((cloud) => (

@@ -16,6 +16,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--pf-v5-global--Color--100, var(--pf-v6-global--Color--100, #151515));
+  cursor: pointer;
 }
 
 .patterns-operator__cloud-labels {
