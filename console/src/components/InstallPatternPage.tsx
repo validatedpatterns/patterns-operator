@@ -480,7 +480,7 @@ export default function InstallPatternPage() {
                     )}
                     {patternStatus.lastError && (
                       <DescriptionListGroup>
-                        <DescriptionListTerm>{t('Last Error')}</DescriptionListTerm>
+                        <DescriptionListTerm>{t('Last Status')}</DescriptionListTerm>
                         <DescriptionListDescription>
                           <Label color="red">{patternStatus.lastError}</Label>
                         </DescriptionListDescription>
