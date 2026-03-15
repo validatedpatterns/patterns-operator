@@ -9,21 +9,36 @@ import {
   Card,
   CardBody,
   CardTitle,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
   ExpandableSection,
   Form,
   FormGroup,
+  Label,
   PageSection,
   Spinner,
   TextInput,
   Title,
 } from '@patternfly/react-core';
+import {
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+} from '@patternfly/react-table';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import {
   fetchPattern,
+  fetchPatternCR,
   fetchSecretTemplate,
   fetchVaultJobStatus,
   triggerVaultInjection as apiTriggerVaultInjection,
   getOperatorNamespace,
+  PatternCRStatus,
   VaultJobStatus,
   VaultInjectionRequest
 } from '../api';
@@ -70,6 +85,7 @@ export default function InstallPatternPage() {
   const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
   const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
   const [operatorNamespace, setOperatorNamespace] = React.useState('openshift-operators');
+  const [patternStatus, setPatternStatus] = React.useState<PatternCRStatus | null>(null);
 
   React.useEffect(() => {
     console.log('🔵 [InstallPatternPage] Starting to load pattern data for:', name);
@@ -258,6 +274,32 @@ export default function InstallPatternPage() {
     }
   }, [success, secretFormData, secretTemplate, patternName, checkVaultJobStatus]);
 
+  // Poll Pattern CR status after successful creation
+  React.useEffect(() => {
+    if (!success || !patternName) return;
+
+    // Initial fetch after a short delay to let the reconciler start
+    const initialTimer = setTimeout(() => {
+      fetchPatternCR(patternName).then(setPatternStatus).catch(() => {});
+    }, 3000);
+
+    const interval = setInterval(async () => {
+      try {
+        const s = await fetchPatternCR(patternName);
+        if (s.exists) {
+          setPatternStatus(s);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 10000); // Poll every 10 seconds
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [success, patternName]);
+
   const handleSubmit = async () => {
     console.log('🚀 [InstallPatternPage] Starting pattern installation process');
     setSubmitting(true);
@@ -411,12 +453,85 @@ export default function InstallPatternPage() {
       </PageSection>
       <PageSection>
         {success && (
-          <Alert variant="success" title={t('Pattern created successfully')}>
-            <p>{t('Your pattern has been created and ArgoCD will begin deploying it shortly.')}</p>
-            <Button variant="link" onClick={() => history.push('/patterns')}>
-              {t('Back to catalog')}
-            </Button>
-          </Alert>
+          <>
+            <Alert variant="success" title={t('Pattern created successfully')}>
+              <p>{t('Your pattern has been created. The operator is now reconciling it.')}</p>
+              <Button variant="link" onClick={() => history.push('/patterns')}>
+                {t('Back to catalog')}
+              </Button>
+            </Alert>
+
+            {/* Pattern reconciliation status */}
+            {patternStatus && patternStatus.exists && (
+              <Card style={{ marginTop: '16px' }}>
+                <CardTitle>{t('Reconciliation Status')}</CardTitle>
+                <CardBody>
+                  <DescriptionList isHorizontal>
+                    {patternStatus.lastStep && (
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>{t('Current Step')}</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {!patternStatus.lastError && <Spinner size="md" aria-label={t('Reconciling')} />}
+                            <span>{patternStatus.lastStep}</span>
+                          </div>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                    )}
+                    {patternStatus.lastError && (
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>{t('Last Error')}</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <Label color="red">{patternStatus.lastError}</Label>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                    )}
+                  </DescriptionList>
+
+                  {patternStatus.applications && patternStatus.applications.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                      <Title headingLevel="h4" style={{ marginBottom: '8px' }}>{t('Applications')}</Title>
+                      <Table aria-label={t('Pattern applications')} variant="compact">
+                        <Thead>
+                          <Tr>
+                            <Th>{t('Name')}</Th>
+                            <Th>{t('Namespace')}</Th>
+                            <Th>{t('Sync')}</Th>
+                            <Th>{t('Health')}</Th>
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {patternStatus.applications.map((app) => (
+                            <Tr key={`${app.namespace}/${app.name}`}>
+                              <Td dataLabel={t('Name')}>{app.name}</Td>
+                              <Td dataLabel={t('Namespace')}>{app.namespace}</Td>
+                              <Td dataLabel={t('Sync')}>
+                                <Label color={app.syncStatus === 'Synced' ? 'green' : app.syncStatus === 'OutOfSync' ? 'orange' : 'grey'}>
+                                  {app.syncStatus || 'Unknown'}
+                                </Label>
+                              </Td>
+                              <Td dataLabel={t('Health')}>
+                                <Label color={app.healthStatus === 'Healthy' ? 'green' : app.healthStatus === 'Degraded' ? 'red' : app.healthStatus === 'Progressing' ? 'blue' : 'grey'}>
+                                  {app.healthStatus || 'Unknown'}
+                                </Label>
+                              </Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {(!patternStatus.applications || patternStatus.applications.length === 0) && !patternStatus.lastError && (
+                    <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Spinner size="md" aria-label={t('Waiting for applications')} />
+                      <span>{t('Waiting for ArgoCD applications to be created...')}</span>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            )}
+          </>
         )}
         {/* Vault injection status */}
         {success && secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate && vaultJobStatus && (

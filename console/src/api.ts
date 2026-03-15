@@ -486,12 +486,22 @@ export async function fetchInstalledPatterns(): Promise<string[]> {
   return (data.items || []).map((item: any) => item.metadata.name as string);
 }
 
+export interface PatternApplicationInfo {
+  name: string;
+  namespace: string;
+  syncStatus: string;
+  healthStatus: string;
+  healthMessage?: string;
+}
+
 export interface PatternCRStatus {
   exists: boolean;
   lastStep?: string;
   lastError?: string;
   deletionPhase?: string;
   conditions?: any[];
+  applications?: PatternApplicationInfo[];
+  version?: number;
 }
 
 export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
@@ -514,6 +524,8 @@ export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
       lastError: status.lastError,
       deletionPhase: status.deletionPhase,
       conditions: status.conditions,
+      applications: status.applications,
+      version: status.version,
     };
   } catch (err) {
     // consoleFetch may throw on 404 instead of returning a response
