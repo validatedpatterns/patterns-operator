@@ -300,6 +300,17 @@ export default function InstallPatternPage() {
     };
   }, [success, patternName]);
 
+  // Redirect to catalog once reconciliation has created applications
+  React.useEffect(() => {
+    if (!patternStatus?.applications || patternStatus.applications.length === 0) return;
+
+    const timer = setTimeout(() => {
+      history.push('/patterns');
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [patternStatus, history]);
+
   const handleSubmit = async () => {
     console.log('🚀 [InstallPatternPage] Starting pattern installation process');
     setSubmitting(true);
@@ -455,7 +466,11 @@ export default function InstallPatternPage() {
         {success && (
           <>
             <Alert variant="success" title={t('Pattern created successfully')}>
-              <p>{t('Your pattern has been created. The operator is now reconciling it.')}</p>
+              <p>
+                {patternStatus?.applications && patternStatus.applications.length > 0
+                  ? t('Reconciliation complete. Redirecting to catalog...')
+                  : t('Your pattern has been created. The operator is now reconciling it.')}
+              </p>
               <Button variant="link" onClick={() => history.push('/patterns')}>
                 {t('Back to catalog')}
               </Button>
