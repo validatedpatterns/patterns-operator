@@ -22,6 +22,23 @@ import { fetchAllPatterns, fetchInstalledPatterns, fetchCatalogImage } from '../
 import { Pattern, ClusterRoleRequirements } from '../types';
 import './PatternCatalogPage.css';
 
+const ALLOWED_TAGS = ['b', 'i', 'em', 'strong', 'a', 'br'];
+
+function sanitizeHTML(html: string): string {
+  return html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tag) => {
+    const lower = tag.toLowerCase();
+    if (!ALLOWED_TAGS.includes(lower)) return '';
+    if (lower === 'a') {
+      const hrefMatch = match.match(/href\s*=\s*"([^"]*)"/);
+      if (match.startsWith('</')) return '</a>';
+      return hrefMatch
+        ? `<a href="${hrefMatch[1]}" target="_blank" rel="noopener noreferrer">`
+        : '';
+    }
+    return match.startsWith('</') ? `</${lower}>` : `<${lower}>`;
+  });
+}
+
 const CLOUD_LABELS: Record<string, string> = {
   aws: 'AWS',
   gcp: 'GCP',
@@ -94,12 +111,14 @@ export default function PatternCatalogPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [installedPatterns, setInstalledPatterns] = React.useState<Set<string>>(new Set());
   const [catalogImage, setCatalogImage] = React.useState<string | null>(null);
+  const [catalogDescription, setCatalogDescription] = React.useState<string | undefined>();
 
   const loadData = React.useCallback(() => {
     setLoading(true);
     Promise.all([fetchAllPatterns(), fetchInstalledPatterns(), fetchCatalogImage()])
-      .then(([data, installed, image]) => {
-        setPatterns(data);
+      .then(([catalogData, installed, image]) => {
+        setPatterns(catalogData.patterns);
+        setCatalogDescription(catalogData.catalogDescription);
         setInstalledPatterns(new Set(installed));
         setCatalogImage(image);
         setLoading(false);
@@ -128,6 +147,11 @@ export default function PatternCatalogPage() {
           <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
         )}
       </PageSection>
+      {catalogDescription && (
+        <PageSection>
+          <p dangerouslySetInnerHTML={{ __html: sanitizeHTML(catalogDescription) }} />
+        </PageSection>
+      )}
       <PageSection>
         {loading && <Spinner aria-label={t('Loading patterns')} />}
         {error && (
