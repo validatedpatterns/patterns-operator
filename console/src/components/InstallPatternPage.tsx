@@ -62,7 +62,7 @@ const PatternModel = {
 };
 
 export default function InstallPatternPage() {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const history = useHistory();
   const match = useRouteMatch<{ name: string }>('/patterns/install/:name');
   const name = match?.params?.name;

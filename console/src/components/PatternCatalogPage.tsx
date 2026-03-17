@@ -2,6 +2,7 @@ import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
 import { useHistory } from 'react-router-dom';
+
 import {
   Alert,
   Button,
@@ -104,7 +105,7 @@ const TIER_DESCRIPTIONS: Record<string, string> = {
 };
 
 export default function PatternCatalogPage() {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const history = useHistory();
   const [patterns, setPatterns] = React.useState<Pattern[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -258,7 +259,9 @@ export default function PatternCatalogPage() {
                         {isInstalled && (
                           <Button
                             variant="secondary"
-                            onClick={() => history.push(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)}
+                            onClick={() =>
+                              history.push(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)
+                            }
                           >
                             {t('Manage Secrets')}
                           </Button>
@@ -266,7 +269,9 @@ export default function PatternCatalogPage() {
                         {isInstalled && (
                           <Button
                             variant="danger"
-                            onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
+                            onClick={() =>
+                            history.push(`/patterns/uninstall/${pattern.name}`)
+                            }
                           >
                             {t('Uninstall')}
                           </Button>

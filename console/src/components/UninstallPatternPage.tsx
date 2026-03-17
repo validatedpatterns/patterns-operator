@@ -28,7 +28,7 @@ const DELETION_PHASES: Record<string, { label: string; order: number }> = {
 };
 
 export default function UninstallPatternPage() {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const history = useHistory();
   const match = useRouteMatch<{ name: string }>('/patterns/uninstall/:name');
   const name = match?.params?.name;

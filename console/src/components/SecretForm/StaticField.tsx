@@ -20,7 +20,7 @@ interface StaticFieldProps {
 }
 
 export const StaticField: React.FC<StaticFieldProps> = ({ field, value, onChange }) => {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [allowOverride, setAllowOverride] = React.useState(false);
 
   // Initialize with the static value if not already set

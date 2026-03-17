@@ -19,7 +19,7 @@ interface PromptFieldProps {
 }
 
 export const PromptField: React.FC<PromptFieldProps> = ({ field, value, onChange }) => {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [validated, setValidated] = React.useState<ValidatedOptions>(ValidatedOptions.default);
 
   const handleValueChange = (_event: React.FormEvent<HTMLInputElement>, newValue: string) => {

@@ -30,7 +30,7 @@ interface ParsedIni {
 }
 
 export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) => {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [filename, setFilename] = React.useState('');
   const [fileContent, setFileContent] = React.useState('');
   const [parsedIni, setParsedIni] = React.useState<ParsedIni | null>(null);

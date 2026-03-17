@@ -3,7 +3,7 @@
     "type": "console.navigation/section",
     "properties": {
       "id": "patterns",
-      "name": "%plugin__console-plugin-template~Patterns%",
+      "name": "%plugin__patterns-operator-console-plugin~Patterns%",
       "perspective": "admin",
       "insertBefore": "workloads"
     }
@@ -44,7 +44,7 @@
     "type": "console.navigation/href",
     "properties": {
       "id": "patterns",
-      "name": "%plugin__console-plugin-template~Catalog%",
+      "name": "%plugin__patterns-operator-console-plugin~Catalog%",
       "href": "/patterns",
       "perspective": "admin",
       "section": "patterns"

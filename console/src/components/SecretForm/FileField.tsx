@@ -14,7 +14,7 @@ interface FileFieldProps {
 }
 
 export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange }) => {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [filename, setFilename] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
 

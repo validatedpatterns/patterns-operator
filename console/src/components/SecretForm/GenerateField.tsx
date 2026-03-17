@@ -19,7 +19,7 @@ interface GenerateFieldProps {
 }
 
 export const GenerateField: React.FC<GenerateFieldProps> = ({ field, value, onChange }) => {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [autoGenerate, setAutoGenerate] = React.useState(true);
 
   const handleAutoGenerateChange = (checked: boolean) => {

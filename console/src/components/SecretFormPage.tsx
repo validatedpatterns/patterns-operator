@@ -26,7 +26,7 @@ import { StaticField } from './SecretForm/StaticField';
 import './SecretForm/SecretForm.css';
 
 export default function SecretFormPage() {
-  const { t } = useTranslation('plugin__console-plugin-template');
+  const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const history = useHistory();
   const match = useRouteMatch<{ name: string }>('/patterns/install/:name/secrets');
   const name = match?.params?.name;
