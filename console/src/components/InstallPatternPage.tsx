@@ -37,7 +37,7 @@ import {
   fetchSecretTemplate,
   fetchVaultJobStatus,
   triggerVaultInjection as apiTriggerVaultInjection,
-  getOperatorNamespace,
+  PATTERN_OPERATOR_NS,
   PatternCRStatus,
   VaultJobStatus,
   VaultInjectionRequest
@@ -84,13 +84,10 @@ export default function InstallPatternPage() {
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
   const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
   const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
-  const [operatorNamespace, setOperatorNamespace] = React.useState('openshift-operators');
   const [patternStatus, setPatternStatus] = React.useState<PatternCRStatus | null>(null);
 
   React.useEffect(() => {
     console.log('🔵 [InstallPatternPage] Starting to load pattern data for:', name);
-
-    getOperatorNamespace().then(setOperatorNamespace);
 
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
       .then(([patternData, template]) => {
@@ -340,7 +337,7 @@ export default function InstallPatternPage() {
         kind: 'Pattern',
         metadata: {
           name: patternName,
-          namespace: operatorNamespace,
+          namespace: PATTERN_OPERATOR_NS,
         },
         spec: {
           clusterGroupName: 'hub',
@@ -570,7 +567,7 @@ export default function InstallPatternPage() {
             </div>
             {vaultJobStatus.jobName && (
               <p style={{ marginTop: '8px', fontSize: '0.9em', color: '#4f5255' }}>
-                {t('Job')}: <a href={`/k8s/ns/${operatorNamespace}/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
+                {t('Job')}: <a href={`/k8s/ns/${PATTERN_OPERATOR_NS}/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
               </p>
             )}
           </Alert>

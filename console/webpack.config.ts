@@ -1,13 +1,24 @@
 /* eslint-env node */
 
 import * as path from 'path';
+import { DefinePlugin } from 'webpack';
 import { Configuration as WebpackConfiguration } from 'webpack';
 import { Configuration as WebpackDevServerConfiguration } from 'webpack-dev-server';
 import { ConsoleRemotePlugin } from '@openshift-console/dynamic-plugin-sdk-webpack';
 
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
+// Load .env and .env.local so PATTERN_UI_CATALOG_BASE_URL is set when running locally
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+  require('dotenv').config({ path: path.resolve(__dirname, '.env.local') });
+} catch {
+  // dotenv optional
+}
+
 const isProd = process.env.NODE_ENV === 'production';
+const catalogBaseUrl = process.env.PATTERN_UI_CATALOG_BASE_URL;
+const operatorNamespace = process.env.OPERATOR_NAMESPACE;
 
 interface Configuration extends WebpackConfiguration {
   devServer?: WebpackDevServerConfiguration;
@@ -76,6 +87,10 @@ const config: Configuration = {
   },
   plugins: [
     new ConsoleRemotePlugin(),
+    new DefinePlugin({
+      __PATTERN_UI_CATALOG_BASE_URL__: JSON.stringify(catalogBaseUrl),
+      __PATTERN_OPERATOR_NS__:JSON.stringify(operatorNamespace),
+    }),
     new CopyWebpackPlugin({
       patterns: [{ from: path.resolve(__dirname, 'locales'), to: 'locales' }],
     }),
