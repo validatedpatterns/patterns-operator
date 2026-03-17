@@ -187,6 +187,8 @@ git push <upstream-remote> $VERSION
 # and changes the indent depending on USE_IMAGE_DIGESTS
 git co -b "update-bundle-${VERSION}"
 CHANNELS=fast USE_IMAGE_DIGESTS=true make bundle
+# Update the catalog we use for upgrade testing in catalog/template.yaml
+# Also update the image at the bottom of that file
 git commit -a -m "Update bundle for image digests ${VERSION}"
 gh pr create
 # Merge the PR
