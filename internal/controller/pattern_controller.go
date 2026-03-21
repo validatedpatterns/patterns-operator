@@ -25,6 +25,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -926,6 +927,16 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 		searchURL = fmt.Sprintf("https://search-search-api.%s.svc.cluster.local:4010/searchapi/graphql", searchNamespace)
 	}
 
+	parsedURL, err := url.Parse(searchURL)
+	if err != nil || (parsedURL.Scheme != "https" && parsedURL.Scheme != "http") {
+		return false, fmt.Errorf("invalid search API URL: %s", searchURL)
+	}
+	cleanURL := url.URL{
+		Scheme: parsedURL.Scheme,
+		Host:   parsedURL.Host,
+		Path:   parsedURL.Path,
+	}
+
 	token := os.Getenv("ACM_SEARCH_API_TOKEN")
 	if token == "" {
 		var tokenBytes []byte
@@ -983,7 +994,7 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(context.Background(), "POST", searchURL, bytes.NewBuffer(queryJSON))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", cleanURL.String(), bytes.NewBuffer(queryJSON))
 	if err != nil {
 		return false, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
