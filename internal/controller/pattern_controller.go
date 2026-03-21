@@ -254,6 +254,18 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
 	}
 
+	// Wait for the trusted-ca-bundle configmap to be populated by the cluster network operator
+	// before creating the ArgoCD CR. This prevents a race where the repo-server init container
+	// runs before the CA bundle is injected, leaving ArgoCD unable to verify public TLS certs.
+	populated, errPopulated := isTrustedBundleCMPopulated(r.fullClient, getClusterWideArgoNamespace())
+	if errPopulated != nil {
+		return r.actionPerformed(qualifiedInstance, "error checking trusted-ca-bundle population", errPopulated)
+	}
+	if !populated {
+		return r.actionPerformed(qualifiedInstance, "waiting for trusted-ca-bundle to be populated",
+			fmt.Errorf("trusted-ca-bundle configmap in %s not yet populated by cluster network operator", getClusterWideArgoNamespace()))
+	}
+
 	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
 	err = createOrUpdateArgoCD(r.dynamicClient, r.fullClient, ClusterWideArgoName, clusterWideNS)
 	if err != nil {
