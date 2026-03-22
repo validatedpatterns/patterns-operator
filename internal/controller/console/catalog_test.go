@@ -12,10 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func clientKey(namespace, name string) client.ObjectKey {
-	return client.ObjectKey{Namespace: namespace, Name: name}
-}
-
 func newOperatorConfigMap(image string) *corev1.ConfigMap {
 	data := map[string]string{}
 	if image != "" {
@@ -46,7 +42,7 @@ func TestCreateOrUpdateCatalog_DefaultImage(t *testing.T) {
 	}
 
 	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
 		t.Fatalf("expected catalog deployment to be created: %v", err)
 	}
 
@@ -65,7 +61,7 @@ func TestCreateOrUpdateCatalog_OverriddenImage(t *testing.T) {
 	}
 
 	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
 		t.Fatalf("expected catalog deployment to be created: %v", err)
 	}
 
@@ -96,7 +92,7 @@ func TestCreateOrUpdateCatalog_UpdatesExistingDeployment(t *testing.T) {
 	}
 
 	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
 		t.Fatalf("unexpected error getting deployment: %v", err)
 	}
 
@@ -116,7 +112,7 @@ func TestCreateOrUpdateCatalog_CreatesConfigMapAndService(t *testing.T) {
 
 	// Check ConfigMap
 	catalogCM := &corev1.ConfigMap{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogConfigMapName), catalogCM); err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogConfigMapName}, catalogCM); err != nil {
 		t.Fatalf("expected catalog configmap to be created: %v", err)
 	}
 	if _, ok := catalogCM.Data["nginx.conf"]; !ok {
@@ -125,7 +121,7 @@ func TestCreateOrUpdateCatalog_CreatesConfigMapAndService(t *testing.T) {
 
 	// Check Service
 	svc := &corev1.Service{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogServiceName), svc); err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogServiceName}, svc); err != nil {
 		t.Fatalf("expected catalog service to be created: %v", err)
 	}
 	if svc.Spec.Ports[0].Port != PatternCatalogServicePort {
@@ -142,7 +138,7 @@ func TestCreateOrUpdateCatalog_MissingOperatorConfigMap(t *testing.T) {
 	}
 
 	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), clientKey(defaultNamespace, CatalogDeploymentName), deploy); err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
 		t.Fatalf("expected catalog deployment to be created: %v", err)
 	}
 

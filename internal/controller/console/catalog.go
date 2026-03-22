@@ -193,7 +193,7 @@ func createOrUpdateCatalogService(ctx context.Context, cl client.Client, namespa
 func createOrUpdateCatalogDeployment(ctx context.Context, cl client.Client, namespace, image string) error {
 	labels := catalogLabels()
 	replicas := int32(1)
-	defaultMode := int32(420)
+	defaultMode := int32(0644) //nolint:mnd
 	maxUnavailable := intstr.FromString("25%")
 	maxSurge := intstr.FromString("25%")
 
