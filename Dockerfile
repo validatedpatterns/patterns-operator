@@ -23,6 +23,7 @@ COPY Makefile .
 
 # Build
 USER root
+RUN git config --global --add safe.directory /workspace
 RUN --mount=type=secret,id=apikey GOARCH=${GOARCH} make build
 
 # Use distroless as minimal base image to package the manager binary
