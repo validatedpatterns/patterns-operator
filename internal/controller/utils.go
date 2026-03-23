@@ -50,6 +50,8 @@ var (
 	logKeys = map[string]bool{}
 )
 
+const trustedBundleCM = "trusted-ca-bundle"
+
 func logOnce(message string) {
 	if _, ok := logKeys[message]; ok {
 		return
@@ -236,17 +238,16 @@ func createNamespace(kubeClient kubernetes.Interface, namespace string) error {
 }
 
 func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) error {
-	name := "trusted-ca-bundle"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      trustedBundleCM,
 			Namespace: namespace,
 			Labels: map[string]string{
 				"config.openshift.io/inject-trusted-cabundle": "true",
 			},
 		},
 	}
-	_, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	_, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), trustedBundleCM, metav1.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			_, err = fullClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
@@ -255,6 +256,22 @@ func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) er
 		return err
 	}
 	return nil
+}
+
+// isTrustedBundleCMPopulated checks if the trusted-ca-bundle configmap has been
+// populated with CA certificates by the cluster network operator. This prevents
+// a race condition where the ArgoCD repo-server starts before the CA bundle is
+// injected, causing TLS verification failures for public repositories.
+func isTrustedBundleCMPopulated(fullClient kubernetes.Interface, namespace string) (bool, error) {
+	cm, err := fullClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), trustedBundleCM, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	bundle, ok := cm.Data["ca-bundle.crt"]
+	if !ok || bundle == "" {
+		return false, nil
+	}
+	return true, nil
 }
 
 func getClusterWideArgoNamespace() string {

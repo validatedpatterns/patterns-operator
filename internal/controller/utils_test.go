@@ -2510,3 +2510,59 @@ var _ = Describe("createTrustedBundleCM", func() {
 		})
 	})
 })
+
+var _ = Describe("isTrustedBundleCMPopulated", func() {
+	var kubeClient kubernetes.Interface
+
+	BeforeEach(func() {
+		kubeClient = fake.NewSimpleClientset()
+	})
+
+	Context("when the configmap does not exist", func() {
+		It("should return an error", func() {
+			_, err := isTrustedBundleCMPopulated(kubeClient, "test-namespace")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("when the configmap exists but has no data", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "trusted-ca-bundle",
+					Namespace: "test-namespace",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-namespace").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return false", func() {
+			populated, err := isTrustedBundleCMPopulated(kubeClient, "test-namespace")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(populated).To(BeFalse())
+		})
+	})
+
+	Context("when the configmap exists and has CA data", func() {
+		BeforeEach(func() {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "trusted-ca-bundle",
+					Namespace: "test-namespace",
+				},
+				Data: map[string]string{
+					"ca-bundle.crt": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----\n",
+				},
+			}
+			_, err := kubeClient.CoreV1().ConfigMaps("test-namespace").Create(context.Background(), cm, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return true", func() {
+			populated, err := isTrustedBundleCMPopulated(kubeClient, "test-namespace")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(populated).To(BeTrue())
+		})
+	})
+})
