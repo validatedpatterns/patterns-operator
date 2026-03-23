@@ -8,7 +8,7 @@ declare const __PATTERN_OPERATOR_NS__: string;
 const DEFAULT_PATTERN_OPERATOR_NS = 'patterns-operator';
 export const PATTERN_OPERATOR_NS = __PATTERN_OPERATOR_NS__ || DEFAULT_PATTERN_OPERATOR_NS;
 
-const DEFAULT_PATTERN_UI_CATALOG_BASE_URL = `patterns-operator-pattern-ui-catalog.${PATTERN_OPERATOR_NS}.svc.cluster.local`;
+const DEFAULT_PATTERN_UI_CATALOG_BASE_URL = '/api/proxy/plugin/patterns-operator-console-plugin/pattern-ui-catalog';
 const PATTERN_UI_CATALOG_BASE_URL = __PATTERN_UI_CATALOG_BASE_URL__ || DEFAULT_PATTERN_UI_CATALOG_BASE_URL;
 
 
