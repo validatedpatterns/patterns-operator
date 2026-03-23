@@ -123,7 +123,7 @@ github.com/ProtonMail/go-crypto/openpgp/x448
 ## explicit; go 1.24.6
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
-# github.com/argoproj/argo-cd/v3 v3.0.19
+# github.com/argoproj/argo-cd/v3 v3.0.23
 ## explicit; go 1.24.6
 github.com/argoproj/argo-cd/v3/assets
 github.com/argoproj/argo-cd/v3/common
@@ -157,7 +157,7 @@ github.com/argoproj/argo-cd/v3/util/regex
 github.com/argoproj/argo-cd/v3/util/security
 github.com/argoproj/argo-cd/v3/util/versions
 github.com/argoproj/argo-cd/v3/util/workloadidentity
-# github.com/argoproj/gitops-engine v0.7.1-0.20250905153922-d96c3d51e4c4
+# github.com/argoproj/gitops-engine v0.7.1-0.20250905171100-0882c168faa3
 ## explicit; go 1.23.5
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/api/v1/endpoints
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/util/hash
@@ -968,8 +968,6 @@ golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # golang.org/x/tools/go/expect v0.1.1-deprecated
-## explicit; go 1.23.0
-# golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated
 ## explicit; go 1.23.0
 # gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
