@@ -34,12 +34,12 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -824,11 +824,11 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return nil
 				}
 				requests := make([]reconcile.Request, len(patterns.Items))
-				for i, p := range patterns.Items {
+				for i := range patterns.Items {
 					requests[i] = reconcile.Request{
 						NamespacedName: types.NamespacedName{
-							Name:      p.Name,
-							Namespace: p.Namespace,
+							Name:      patterns.Items[i].Name,
+							Namespace: patterns.Items[i].Namespace,
 						},
 					}
 				}
