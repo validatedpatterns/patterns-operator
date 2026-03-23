@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-CONSOLE_IMAGE=${CONSOLE_IMAGE:="quay.io/openshift/origin-console:latest"}
+CONSOLE_IMAGE=${CONSOLE_IMAGE:="quay.io/openshift/origin-console:${CONSOLE_VERSION}"}
 CONSOLE_PORT=${CONSOLE_PORT:=9000}
 CONSOLE_IMAGE_PLATFORM=${CONSOLE_IMAGE_PLATFORM:="linux/amd64"}
 
