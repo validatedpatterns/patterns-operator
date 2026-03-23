@@ -37,11 +37,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	argoclient "github.com/argoproj/argo-cd/v3/pkg/client/clientset/versioned"
@@ -795,8 +800,41 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.gitOperations = &GitOperationsImpl{}
 	r.giteaOperations = &GiteaOperationsImpl{}
 
+	// Watch ArgoCD instances so that if the ArgoCD CR is deleted (e.g. during
+	// an upgrade that changes the GitOps Subscription), the Pattern controller
+	// reconciles immediately and recreates it.
+	argoCD := &unstructured.Unstructured{}
+	argoCD.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   ArgoCDGroup,
+		Version: ArgoCDVersion,
+		Kind:    "ArgoCD",
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
+		WatchesRawSource(source.Kind(mgr.GetCache(), argoCD,
+			handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, obj *unstructured.Unstructured) []reconcile.Request {
+				// Only react to changes on the ArgoCD instance we manage
+				if obj.GetName() != ClusterWideArgoName || obj.GetNamespace() != getClusterWideArgoNamespace() {
+					return nil
+				}
+				// Enqueue all Pattern CRs for reconciliation
+				var patterns api.PatternList
+				if err := mgr.GetClient().List(ctx, &patterns); err != nil {
+					return nil
+				}
+				requests := make([]reconcile.Request, len(patterns.Items))
+				for i, p := range patterns.Items {
+					requests[i] = reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      p.Name,
+							Namespace: p.Namespace,
+						},
+					}
+				}
+				return requests
+			}),
+		)).
 		Complete(r)
 }
 
