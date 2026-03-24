@@ -322,6 +322,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
+	qualifiedInstance.Status.LastStep = "reconcile complete"
+	qualifiedInstance.Status.LastError = ""
+	if updateErr := r.Client.Status().Update(context.TODO(), qualifiedInstance); updateErr != nil {
+		r.logger.Error(updateErr, "Failed to update Pattern status")
+	}
+
 	result := ctrl.Result{
 		Requeue:      false,
 		RequeueAfter: ReconcileLoopRequeueTime,

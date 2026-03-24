@@ -297,9 +297,9 @@ export default function InstallPatternPage() {
     };
   }, [success, patternName]);
 
-  // Redirect to catalog once reconciliation has created applications
+  // Redirect to catalog once the pattern reconciliation is complete
   React.useEffect(() => {
-    if (!patternStatus?.applications || patternStatus.applications.length === 0) return;
+    if (patternStatus?.lastStep !== 'reconcile complete') return;
 
     const timer = setTimeout(() => {
       history.push('/patterns');
