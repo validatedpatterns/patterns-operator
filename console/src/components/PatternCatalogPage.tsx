@@ -13,9 +13,16 @@ import {
   CardTitle,
   Gallery,
   Label,
+  MenuToggle,
   PageSection,
+  Select,
+  SelectList,
+  SelectOption,
   Spinner,
   Title,
+  Toolbar,
+  ToolbarContent,
+  ToolbarItem,
   Tooltip,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon, InfoCircleIcon } from '@patternfly/react-icons';
@@ -113,6 +120,8 @@ export default function PatternCatalogPage() {
   const [installedPatterns, setInstalledPatterns] = React.useState<Set<string>>(new Set());
   const [catalogImage, setCatalogImage] = React.useState<string | null>(null);
   const [catalogDescription, setCatalogDescription] = React.useState<string | undefined>();
+  const [selectedTiers, setSelectedTiers] = React.useState<Set<string>>(new Set(['maintained']));
+  const [tierSelectOpen, setTierSelectOpen] = React.useState(false);
 
   const loadData = React.useCallback(() => {
     setLoading(true);
@@ -133,6 +142,27 @@ export default function PatternCatalogPage() {
   React.useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const filteredPatterns = React.useMemo(
+    () => selectedTiers.size === 0 ? patterns : patterns.filter((p) => selectedTiers.has(p.tier)),
+    [patterns, selectedTiers],
+  );
+
+  const onTierSelect = (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
+    setSelectedTiers((prev) => {
+      const next = new Set(prev);
+      if (next.has(value as string)) {
+        next.delete(value as string);
+      } else {
+        next.add(value as string);
+      }
+      return next;
+    });
+  };
+
+  const tierToggleLabel = selectedTiers.size === 0
+    ? t('Tier')
+    : Array.from(selectedTiers).map((tier) => tier.charAt(0).toUpperCase() + tier.slice(1)).join(', ');
 
   return (
     <>
@@ -161,8 +191,45 @@ export default function PatternCatalogPage() {
           </Alert>
         )}
         {!loading && !error && (
+          <>
+          <Toolbar>
+            <ToolbarContent>
+              <ToolbarItem>
+                <Select
+                  role="menu"
+                  id="tier-filter"
+                  isOpen={tierSelectOpen}
+                  selected={Array.from(selectedTiers)}
+                  onSelect={onTierSelect}
+                  onOpenChange={setTierSelectOpen}
+                  toggle={(toggleRef) => (
+                    <MenuToggle
+                      ref={toggleRef}
+                      onClick={() => setTierSelectOpen((prev) => !prev)}
+                      isExpanded={tierSelectOpen}
+                    >
+                      {tierToggleLabel}
+                    </MenuToggle>
+                  )}
+                >
+                  <SelectList>
+                    {['maintained', 'tested', 'sandbox'].map((tier) => (
+                      <SelectOption
+                        key={tier}
+                        value={tier}
+                        hasCheckbox
+                        isSelected={selectedTiers.has(tier)}
+                      >
+                        {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                      </SelectOption>
+                    ))}
+                  </SelectList>
+                </Select>
+              </ToolbarItem>
+            </ToolbarContent>
+          </Toolbar>
           <Gallery hasGutter minWidths={{ default: '300px' }}>
-                {patterns.map((pattern) => {
+                {filteredPatterns.map((pattern) => {
                   const isInstalled = installedPatterns.has(pattern.name);
                   return (
                   <Card key={pattern.name} className="patterns-operator__card">
@@ -292,6 +359,7 @@ export default function PatternCatalogPage() {
                   );
                 })}
           </Gallery>
+          </>
         )}
       </PageSection>
     </>
