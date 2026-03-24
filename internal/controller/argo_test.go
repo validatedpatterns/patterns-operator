@@ -663,11 +663,18 @@ var _ = Describe("Argo Pattern", func() {
 				syncOptions2 := []string{"opt2=value2", "opt1=value1"}
 				Expect(compareSyncOptions(syncOptions1, syncOptions2)).To(BeFalse())
 			})
-			It("compareSyncOptions() function with nil arg1", func() {
-				Expect(compareSyncOptions(syncOptions, nil)).To(BeFalse())
+			It("compareSyncOptions() nil vs empty slice are equivalent", func() {
+				emptySlice := argoapi.SyncOptions{}
+				Expect(compareSyncOptions(emptySlice, nil)).To(BeTrue())
+				Expect(compareSyncOptions(nil, emptySlice)).To(BeTrue())
 			})
-			It("compareSyncOptions() function with nil arg2", func() {
-				Expect(compareSyncOptions(nil, syncOptions)).To(BeFalse())
+			It("compareSyncOptions() both nil", func() {
+				Expect(compareSyncOptions(nil, nil)).To(BeTrue())
+			})
+			It("compareSyncOptions() nil vs non-empty", func() {
+				nonEmpty := argoapi.SyncOptions{"key=value"}
+				Expect(compareSyncOptions(nonEmpty, nil)).To(BeFalse())
+				Expect(compareSyncOptions(nil, nonEmpty)).To(BeFalse())
 			})
 
 		})
