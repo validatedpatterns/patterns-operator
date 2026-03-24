@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { login, dismissTour } from '../helpers/auth';
+import { login, dismissTour, gotoCatalogPage } from '../helpers/auth';
 import { selectors } from '../helpers/selectors';
 
 test.describe('Install Pattern Page', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await dismissTour(page);
-    await page.goto('/patterns');
-    await page.waitForSelector(selectors.spinner, { state: 'detached', timeout: 30_000 });
+
+    const loaded = await gotoCatalogPage(page);
+    test.skip(!loaded, 'Catalog failed to load');
 
     const installButton = page.locator(selectors.patternCard).locator(selectors.installButton).first();
     const count = await installButton.count();

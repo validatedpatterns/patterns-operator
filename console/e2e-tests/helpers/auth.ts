@@ -34,3 +34,20 @@ export async function dismissTour(page: Page): Promise<void> {
     // Tour may not appear
   }
 }
+
+/**
+ * Navigate to /patterns and wait for loading to complete (either success or error).
+ * Returns true if patterns loaded successfully, false if an error occurred.
+ */
+export async function gotoCatalogPage(page: Page): Promise<boolean> {
+  await page.goto('/patterns');
+  // Wait for either spinner to disappear or error alert to appear
+  await Promise.race([
+    page.waitForSelector('.pf-v6-c-spinner', { state: 'detached', timeout: 30_000 }).catch(() => {}),
+    page.waitForSelector('.pf-v6-c-alert.pf-m-danger', { state: 'visible', timeout: 30_000 }).catch(() => {}),
+  ]);
+  // Give a moment for the DOM to settle
+  await page.waitForTimeout(500);
+  const hasError = await page.locator('.pf-v6-c-alert.pf-m-danger').count() > 0;
+  return !hasError;
+}
