@@ -316,10 +316,9 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.logger.Info("Pattern CR Updated")
 	}
 
-	// Report loop completion statistics
-	if r.AnalyticsClient.SendPatternEndEventInfo(qualifiedInstance) {
-		return r.actionPerformed(qualifiedInstance, "Updated status with end event sent", nil)
-	}
+	// Report loop completion statistics (fire-and-forget, don't interrupt reconcile completion)
+	r.AnalyticsClient.SendPatternEndEventInfo(qualifiedInstance)
+
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
 
 	qualifiedInstance.Status.LastStep = "reconcile complete"
