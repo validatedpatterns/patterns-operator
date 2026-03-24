@@ -15,7 +15,7 @@ test.describe('Pattern Catalog Page', () => {
 
   test('renders pattern cards from the catalog', async ({ page }) => {
     const loaded = await gotoCatalogPage(page);
-    test.skip(!loaded, 'Catalog failed to load — skipping card tests');
+    test.skip(!loaded, 'Catalog failed to load');
 
     const cards = page.locator(selectors.patternCard);
     await expect(cards.first()).toBeVisible();
@@ -28,10 +28,8 @@ test.describe('Pattern Catalog Page', () => {
 
     const firstCard = page.locator(selectors.patternCard).first();
     await expect(firstCard).toBeVisible();
-    // Card title text should not be empty
     const titleText = await firstCard.locator('[class*="card"] [class*="title"]').first().textContent();
     expect(titleText?.trim()).toBeTruthy();
-    // Should have a tier label
     await expect(firstCard.locator('[class*="label"]').first()).toBeVisible();
   });
 
@@ -52,7 +50,6 @@ test.describe('Pattern Catalog Page', () => {
 
     // Select "Tested" tier
     await page.locator(selectors.tierOption('Tested')).click();
-    // Close and reopen isn't needed — dropdown stays open
 
     // Deselect "Maintained"
     await page.locator(selectors.tierOption('Maintained')).click();
@@ -60,9 +57,44 @@ test.describe('Pattern Catalog Page', () => {
     // Close the dropdown
     await toggle.click();
 
-    // The toggle should now show only "Tested"
     await expect(toggle).toContainText('Tested');
     await expect(toggle).not.toContainText('Maintained');
+  });
+
+  test('selecting all tiers shows all patterns', async ({ page }) => {
+    const loaded = await gotoCatalogPage(page);
+    test.skip(!loaded, 'Catalog failed to load');
+
+    // Count cards with default filter (maintained only)
+    const maintainedCount = await page.locator(selectors.patternCard).count();
+
+    // Select all tiers
+    const toggle = page.locator(selectors.tierFilterToggle);
+    await toggle.click();
+    await page.locator(selectors.tierOption('Tested')).click();
+    await page.locator(selectors.tierOption('Sandbox')).click();
+    await toggle.click();
+
+    const allCount = await page.locator(selectors.patternCard).count();
+    expect(allCount).toBeGreaterThanOrEqual(maintainedCount);
+  });
+
+  test('deselecting all tiers shows all patterns', async ({ page }) => {
+    const loaded = await gotoCatalogPage(page);
+    test.skip(!loaded, 'Catalog failed to load');
+
+    // Deselect maintained (the only selected tier)
+    const toggle = page.locator(selectors.tierFilterToggle);
+    await toggle.click();
+    await page.locator(selectors.tierOption('Maintained')).click();
+    await toggle.click();
+
+    // Toggle should show generic "Tier" label
+    await expect(toggle).toContainText('Tier');
+
+    // Should show all patterns
+    const cards = page.locator(selectors.patternCard);
+    expect(await cards.count()).toBeGreaterThan(0);
   });
 
   test('pattern cards show cloud provider labels when available', async ({ page }) => {
@@ -88,6 +120,28 @@ test.describe('Pattern Catalog Page', () => {
     }
   });
 
+  test('installed patterns show Uninstall and Manage Secrets buttons', async ({ page }) => {
+    const loaded = await gotoCatalogPage(page);
+    test.skip(!loaded, 'Catalog failed to load');
+
+    // Show all tiers to maximize chances of finding installed patterns
+    const toggle = page.locator(selectors.tierFilterToggle);
+    await toggle.click();
+    await page.locator(selectors.tierOption('Tested')).click();
+    await page.locator(selectors.tierOption('Sandbox')).click();
+    await toggle.click();
+
+    const installedCards = page.locator(selectors.patternCard).filter({
+      has: page.locator(selectors.installedLabel),
+    });
+    const count = await installedCards.count();
+    test.skip(count === 0, 'No installed patterns on this cluster');
+
+    const firstInstalled = installedCards.first();
+    await expect(firstInstalled.locator(selectors.uninstallButton)).toBeVisible();
+    await expect(firstInstalled.locator(selectors.manageSecretsButton)).toBeVisible();
+  });
+
   test('pattern cards show Docs and Repo links', async ({ page }) => {
     const loaded = await gotoCatalogPage(page);
     test.skip(!loaded, 'Catalog failed to load');
@@ -101,11 +155,25 @@ test.describe('Pattern Catalog Page', () => {
     }
   });
 
-  test('shows error alert when catalog fails to load', async ({ page }) => {
-    await gotoCatalogPage(page);
-    // This test verifies the page doesn't crash — it either shows cards or an error
-    const hasCards = await page.locator(selectors.patternCard).count() > 0;
-    const hasError = await page.locator(selectors.alertDanger).count() > 0;
-    expect(hasCards || hasError).toBe(true);
+  test('catalog description is shown when available', async ({ page }) => {
+    const loaded = await gotoCatalogPage(page);
+    test.skip(!loaded, 'Catalog failed to load');
+
+    // The catalog description section appears between the title and the toolbar
+    const description = page.locator(selectors.catalogDescription).first();
+    const count = await description.count();
+    if (count > 0) {
+      const text = await description.textContent();
+      expect(text?.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  test('page renders without crashing', async ({ page }) => {
+    const loaded = await gotoCatalogPage(page);
+    if (loaded) {
+      await expect(page.locator(selectors.patternCard).first()).toBeVisible();
+    } else {
+      await expect(page.locator(selectors.alertDanger)).toBeVisible();
+    }
   });
 });
