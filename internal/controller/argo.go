@@ -995,11 +995,8 @@ func compareAutomatedSyncPolicy(goal, actual *argoapi.SyncPolicyAutomated) bool 
 }
 
 func compareSyncOptions(goal, actual argoapi.SyncOptions) bool {
-	if goal == nil && actual == nil {
+	if len(goal) == 0 && len(actual) == 0 {
 		return true
-	}
-	if (goal == nil) != (actual == nil) {
-		return false
 	}
 	if len(goal) != len(actual) {
 		return false
