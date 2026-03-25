@@ -58,3 +58,12 @@
   gap: 16px;
 }
 
+.patterns-operator__card--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.patterns-operator__card--disabled .patterns-operator__card-actions {
+  pointer-events: auto;
+}
+

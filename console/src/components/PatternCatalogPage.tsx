@@ -261,8 +261,10 @@ export default function PatternCatalogPage() {
           <Gallery hasGutter minWidths={{ default: '300px' }}>
                 {filteredPatterns.map((pattern) => {
                   const isInstalled = installedPatterns.has(pattern.name);
+                  const hasAnyInstalled = installedPatterns.size > 0;
+                  const isDisabled = hasAnyInstalled && !isInstalled;
                   return (
-                  <Card key={pattern.name} className="patterns-operator__card">
+                  <Card key={pattern.name} className={`patterns-operator__card${isDisabled ? ' patterns-operator__card--disabled' : ''}`}>
                     <CardHeader>
                       <Tooltip content={TIER_DESCRIPTIONS[pattern.tier] || pattern.tier}>
                         <Label color={TIER_COLORS[pattern.tier] || 'grey'} icon={<TierIcon tier={pattern.tier} />}>{pattern.tier}</Label>
@@ -374,14 +376,20 @@ export default function PatternCatalogPage() {
                           </Button>
                         )}
                         {!isInstalled && (
-                          <Button
-                            variant="primary"
-                            onClick={() =>
-                              history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
-                            }
+                          <Tooltip
+                            content={t('Only one pattern can be installed at a time. Uninstall the current pattern first.')}
+                            trigger={isDisabled ? 'mouseenter focus' : 'manual'}
                           >
-                            {t('Install')}
-                          </Button>
+                            <Button
+                              variant="primary"
+                              isDisabled={isDisabled}
+                              onClick={() =>
+                                history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
+                              }
+                            >
+                              {t('Install')}
+                            </Button>
+                          </Tooltip>
                         )}
                       </div>
                     </CardFooter>
