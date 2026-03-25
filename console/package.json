@@ -23,11 +23,7 @@
     "cypress-merge": "mochawesome-merge ./integration-tests/screenshots/cypress_report*.json > ./integration-tests/screenshots/cypress.json",
     "cypress-generate": "marge -o ./integration-tests/screenshots/ -f cypress-report -t 'OpenShift Console Plugin Template Cypress Test Results' -p 'OpenShift Cypress Plugin Template Test Results' --showPassed false --assetsDir ./integration-tests/screenshots/cypress/assets ./integration-tests/screenshots/cypress.json",
     "cypress-postreport": "yarn cypress-merge && yarn cypress-generate",
-    "webpack": "node -r ts-node/register ./node_modules/.bin/webpack",
-    "test-playwright": "playwright test",
-    "test-playwright:chromium": "playwright test --project=chromium",
-    "test-playwright:headed": "playwright test --project=chromium --headed",
-    "test-playwright:debug": "PWDEBUG=1 playwright test --project=chromium"
+    "webpack": "node -r ts-node/register ./node_modules/.bin/webpack"
   },
   "devDependencies": {
     "@cypress/webpack-preprocessor": "^5.15.5",
@@ -36,7 +32,6 @@
     "@patternfly/react-core": "^6.2.2",
     "@patternfly/react-icons": "^6.2.2",
     "@patternfly/react-table": "^6.2.2",
-    "@playwright/test": "^1.58.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^18.0.0",
     "@types/react": "^17.0.37",
