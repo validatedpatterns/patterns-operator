@@ -1318,7 +1318,7 @@ var _ = Describe("SyncApplication", func() {
 	})
 })
 
-var _ = Describe("GetChildApplications", func() {
+var _ = Describe("getChildApplications", func() {
 	var (
 		argocdclient *argoclient.Clientset
 		namespace    string
@@ -1339,7 +1339,9 @@ var _ = Describe("GetChildApplications", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "child-app",
 					Namespace: namespace,
-					Labels:    map[string]string{"app.kubernetes.io/instance": "parent-app"},
+					Annotations: map[string]string{
+						"argocd.argoproj.io/tracking-id": fmt.Sprintf("parent-app:argoproj.io/Application:%s/child-app", namespace),
+					},
 				},
 			}
 			_, err := argocdclient.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), childApp, metav1.CreateOptions{})
@@ -2216,8 +2218,8 @@ var _ = Describe("getChildApplications", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "child-app",
 					Namespace: "openshift-gitops",
-					Labels: map[string]string{
-						"app.kubernetes.io/instance": "parent-app",
+					Annotations: map[string]string{
+						"argocd.argoproj.io/tracking-id": "parent-app:argoproj.io/Application:openshift-gitops/child-app",
 					},
 				},
 			}
