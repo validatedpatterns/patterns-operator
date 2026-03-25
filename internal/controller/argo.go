@@ -1162,14 +1162,30 @@ func syncApplication(client argoclient.Interface, app *argoapi.Application, with
 
 // returns the child applications owned by the app-of-apps parentApp
 func getChildApplications(client argoclient.Interface, parentApp *argoapi.Application) ([]argoapi.Application, error) {
-	listOptions := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", parentApp.Name),
-	}
-
-	appList, err := client.ArgoprojV1alpha1().Applications("").List(context.Background(), listOptions)
+	appList, err := client.ArgoprojV1alpha1().
+		Applications("").
+		List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list child applications of %s: %w", parentApp.Name, err)
 	}
 
-	return appList.Items, nil
+	var result []argoapi.Application
+
+	// Build expected tracking prefix
+	// Example:
+	// multicloud-gitops-hub:argoproj.io/Application:multicloud-gitops-hub/
+	expectedPrefix := fmt.Sprintf(
+		"%s:argoproj.io/Application:%s/",
+		parentApp.Name,
+		parentApp.Namespace,
+	)
+
+	for _, app := range appList.Items { //nolint:gocritic // rangeValCopy: each iteration copies 992 bytes
+		if trackingID, ok := app.Annotations["argocd.argoproj.io/tracking-id"]; ok {
+			if strings.HasPrefix(trackingID, expectedPrefix) {
+				result = append(result, app)
+			}
+		}
+	}
+	return result, nil
 }
