@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -85,6 +86,10 @@ type PatternReconciler struct {
 	operatorClient  operatorclient.OperatorV1Interface
 	gitOperations   GitOperations
 	giteaOperations GiteaOperations
+
+	mgr                ctrl.Manager
+	ctrl               crcontroller.Controller
+	argoCDWatchStarted bool
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -94,7 +99,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;delete;update;get;create;patch
-//+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;get;create;update;patch;delete
+//+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;watch;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=operatorgroups,verbs=list;get;create;update;patch;delete
@@ -242,6 +247,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 	logOnce("subscription found")
+
+	// Dynamically add an ArgoCD watch once the GitOps operator is installed
+	// and the CRD is available. This is a no-op after the first successful call.
+	r.startArgoCDWatch()
 
 	clusterWideNS := getClusterWideArgoNamespace()
 	if !haveNamespace(r.Client, clusterWideNS) {
@@ -812,10 +821,29 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	r.gitOperations = &GitOperationsImpl{}
 	r.giteaOperations = &GiteaOperationsImpl{}
+	r.mgr = mgr
 
-	// Watch ArgoCD instances so that if the ArgoCD CR is deleted (e.g. during
-	// an upgrade that changes the GitOps Subscription), the Pattern controller
-	// reconciles immediately and recreates it.
+	var ctrlErr error
+	r.ctrl, ctrlErr = ctrl.NewControllerManagedBy(mgr).
+		For(&api.Pattern{}).
+		Build(r)
+	return ctrlErr
+}
+
+// startArgoCDWatch dynamically adds a watch on ArgoCD instances so that if
+// the ArgoCD CR is deleted (e.g. during an upgrade that changes the GitOps
+// Subscription), the Pattern controller reconciles immediately and recreates it.
+// This is called from the reconcile loop once the GitOps operator has been
+// installed and the ArgoCD CRD is available.
+func (r *PatternReconciler) startArgoCDWatch() {
+	if r.argoCDWatchStarted {
+		return
+	}
+
+	if err := checkAPIVersion(r.fullClient, ArgoCDGroup, ArgoCDVersion); err != nil {
+		return
+	}
+
 	argoCD := &unstructured.Unstructured{}
 	argoCD.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   ArgoCDGroup,
@@ -823,32 +851,34 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Kind:    "ArgoCD",
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&api.Pattern{}).
-		WatchesRawSource(source.Kind(mgr.GetCache(), argoCD,
-			handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, obj *unstructured.Unstructured) []reconcile.Request {
-				// Only react to changes on the ArgoCD instance we manage
-				if obj.GetName() != ClusterWideArgoName || obj.GetNamespace() != getClusterWideArgoNamespace() {
-					return nil
+	err := r.ctrl.Watch(source.Kind(r.mgr.GetCache(), argoCD,
+		handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, obj *unstructured.Unstructured) []reconcile.Request {
+			if obj.GetName() != ClusterWideArgoName || obj.GetNamespace() != getClusterWideArgoNamespace() {
+				return nil
+			}
+			var patterns api.PatternList
+			if err := r.mgr.GetClient().List(ctx, &patterns); err != nil {
+				return nil
+			}
+			requests := make([]reconcile.Request, len(patterns.Items))
+			for i := range patterns.Items {
+				requests[i] = reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      patterns.Items[i].Name,
+						Namespace: patterns.Items[i].Namespace,
+					},
 				}
-				// Enqueue all Pattern CRs for reconciliation
-				var patterns api.PatternList
-				if err := mgr.GetClient().List(ctx, &patterns); err != nil {
-					return nil
-				}
-				requests := make([]reconcile.Request, len(patterns.Items))
-				for i := range patterns.Items {
-					requests[i] = reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      patterns.Items[i].Name,
-							Namespace: patterns.Items[i].Namespace,
-						},
-					}
-				}
-				return requests
-			}),
-		)).
-		Complete(r)
+			}
+			return requests
+		}),
+	))
+	if err != nil {
+		ctrl.Log.Error(err, "Failed to start ArgoCD watch, will retry on next reconcile")
+		return
+	}
+
+	ctrl.Log.Info("ArgoCD watch started successfully")
+	r.argoCDWatchStarted = true
 }
 
 func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason string, err error, duration *time.Duration) (reconcile.Result, error) {
