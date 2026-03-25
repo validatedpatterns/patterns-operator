@@ -300,15 +300,19 @@ export default function InstallPatternPage() {
   }, [success, patternName]);
 
   // Redirect to catalog once the pattern reconciliation is complete
+  // and vault secret injection (if applicable) has succeeded
   React.useEffect(() => {
     if (patternStatus?.lastStep !== 'reconcile complete') return;
+
+    const hasSecrets = secretTemplate && secretFormData && Object.keys(secretFormData).length > 0;
+    if (hasSecrets && vaultJobStatus?.status !== 'succeeded') return;
 
     const timer = setTimeout(() => {
       history.push('/patterns');
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [patternStatus, history]);
+  }, [patternStatus, history, secretTemplate, secretFormData, vaultJobStatus]);
 
   const handleSubmit = async () => {
     console.log('🚀 [InstallPatternPage] Starting pattern installation process');
@@ -466,9 +470,18 @@ export default function InstallPatternPage() {
           <>
             <Alert variant="success" title={t('Pattern created successfully')}>
               <p>
-                {patternStatus?.applications && patternStatus.applications.length > 0
-                  ? t('Reconciliation complete. Redirecting to catalog...')
-                  : t('Your pattern has been created. The operator is now reconciling it.')}
+                {(() => {
+                  const hasSecrets = secretTemplate && secretFormData && Object.keys(secretFormData).length > 0;
+                  const reconcileComplete = patternStatus?.lastStep === 'reconcile complete';
+                  const vaultDone = !hasSecrets || vaultJobStatus?.status === 'succeeded';
+                  if (reconcileComplete && vaultDone) {
+                    return t('Reconciliation complete. Redirecting to catalog...');
+                  }
+                  if (reconcileComplete && hasSecrets && vaultJobStatus?.status !== 'succeeded') {
+                    return t('Reconciliation complete. Waiting for secret injection to finish...');
+                  }
+                  return t('Your pattern has been created. The operator is now reconciling it.');
+                })()}
               </p>
               <Button variant="link" onClick={() => history.push('/patterns')}>
                 {t('Back to catalog')}
