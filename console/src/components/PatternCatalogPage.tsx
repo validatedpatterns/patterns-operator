@@ -99,11 +99,41 @@ function getRequirementsTooltip(hub: ClusterRoleRequirements | undefined, spoke:
     .join('\n');
 }
 
-const TIER_COLORS: Record<string, 'green' | 'blue' | 'grey'> = {
+const TIER_COLORS: Record<string, 'green' | 'blue' | 'orange' | 'grey'> = {
   maintained: 'green',
   tested: 'blue',
-  sandbox: 'grey',
+  sandbox: 'orange',
 };
+
+const TIER_SVG_COLORS: Record<string, { filled: string; outline: string }> = {
+  maintained: { filled: '#3e8635', outline: '#3e8635' },
+  tested: { filled: '#0066cc', outline: '#0066cc' },
+  sandbox: { filled: '#f0ab00', outline: '#f0ab00' },
+};
+
+function TierIcon({ tier }: { tier: string }) {
+  const colors = TIER_SVG_COLORS[tier] || TIER_SVG_COLORS.sandbox;
+  // 3 horizontal bars: bottom=bar1, middle=bar2, top=bar3
+  // maintained: all 3 filled; tested: 2 filled + 1 outline; sandbox: 1 filled + 2 outline
+  const filledCount = tier === 'maintained' ? 3 : tier === 'tested' ? 2 : 1;
+  return (
+    <svg width="16" height="16" viewBox="0 0 48 48" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+      {[0, 1, 2].map((i) => {
+        const y = 34 - i * 14;
+        const filled = i < filledCount;
+        return (
+          <rect
+            key={i}
+            x="4" y={y} width="40" height="10" rx="5"
+            fill={filled ? colors.filled : 'none'}
+            stroke={colors.outline}
+            strokeWidth={filled ? 0 : 3}
+          />
+        );
+      })}
+    </svg>
+  );
+}
 
 const TIER_DESCRIPTIONS: Record<string, string> = {
   maintained: 'Rigorously tested through an automated CI pipeline with continuous validation across OpenShift versions. Highest level of validation and prioritized for ongoing maintenance.',
@@ -235,7 +265,7 @@ export default function PatternCatalogPage() {
                   <Card key={pattern.name} className="patterns-operator__card">
                     <CardHeader>
                       <Tooltip content={TIER_DESCRIPTIONS[pattern.tier] || pattern.tier}>
-                        <Label color={TIER_COLORS[pattern.tier] || 'grey'}>{pattern.tier}</Label>
+                        <Label color={TIER_COLORS[pattern.tier] || 'grey'} icon={<TierIcon tier={pattern.tier} />}>{pattern.tier}</Label>
                       </Tooltip>
                       {isInstalled && (
                         <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
