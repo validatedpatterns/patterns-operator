@@ -9,6 +9,7 @@ import {
   Card,
   CardBody,
   CardTitle,
+  Checkbox,
   DescriptionList,
   DescriptionListDescription,
   DescriptionListGroup,
@@ -77,6 +78,7 @@ export default function InstallPatternPage() {
 
   const [patternName, setPatternName] = React.useState('');
   const [targetRepo, setTargetRepo] = React.useState('');
+  const [useOwnFork, setUseOwnFork] = React.useState(false);
   const [targetRevision, setTargetRevision] = React.useState('main');
 
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
@@ -597,7 +599,15 @@ export default function InstallPatternPage() {
                 id="pattern-target-repo"
                 isRequired
                 value={targetRepo}
+                isDisabled={!useOwnFork}
                 onChange={(_event, value) => setTargetRepo(value)}
+              />
+              <Checkbox
+                id="use-own-fork"
+                label={t('I want to use my own fork')}
+                isChecked={useOwnFork}
+                onChange={(_event, checked) => setUseOwnFork(checked)}
+                style={{ marginTop: '8px' }}
               />
             </FormGroup>
             <FormGroup label={t('Target Revision')} isRequired fieldId="pattern-target-revision">
