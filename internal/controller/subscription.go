@@ -65,10 +65,6 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 					Name:  "ARGOCD_CLUSTER_CONFIG_NAMESPACES",
 					Value: "*",
 				},
-				{
-					Name:  "DISABLE_DEFAULT_ARGOCD_INSTANCE",
-					Value: "true",
-				},
 			},
 		},
 	}
