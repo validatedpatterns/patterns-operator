@@ -411,19 +411,30 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 
 	if !haveArgo(client, name, namespace) {
 		// create it
-		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		if errConvert != nil {
+			return fmt.Errorf("failed to convert ArgoCD to unstructured for create: %v", errConvert)
+		}
 		newArgo := &unstructured.Unstructured{Object: obj}
 		_, err = client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
 	} else { // update it
-		oldArgo, _ := getArgoCD(client, name, namespace)
+		oldArgo, errGet := getArgoCDFunc(client, name, namespace)
+		if errGet != nil {
+			return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, errGet)
+		}
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
-		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		if errConvert != nil {
+			return fmt.Errorf("failed to convert ArgoCD to unstructured for update: %v", errConvert)
+		}
 		newArgo := &unstructured.Unstructured{Object: obj}
 
 		_, err = client.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
 	}
 	return err
 }
+
+var getArgoCDFunc = getArgoCD
 
 func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, error) {
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
@@ -705,9 +716,10 @@ func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.Applica
 	valueFiles := newApplicationValueFiles(p, prefix)
 	sharedValueFiles, err := getSharedValueFiles(p, prefix)
 	if err != nil {
-		fmt.Printf("Could not fetch sharedValueFiles: %s", err)
+		log.Printf("Could not fetch sharedValueFiles: %s", err)
+	} else {
+		valueFiles = append(valueFiles, sharedValueFiles...)
 	}
-	valueFiles = append(valueFiles, sharedValueFiles...)
 
 	return &argoapi.ApplicationSourceHelm{
 		ValueFiles: valueFiles,
@@ -910,9 +922,12 @@ func getApplication(client argoclient.Interface, name, namespace string) (*argoa
 
 func createApplication(client argoclient.Interface, app *argoapi.Application, namespace string) error {
 	saved, err := client.ArgoprojV1alpha1().Applications(namespace).Create(context.Background(), app, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
 	yamlOutput, _ := objectYaml(saved)
 	log.Printf("Created: %s\n", yamlOutput)
-	return err
+	return nil
 }
 
 func updateApplication(client argoclient.Interface, target, current *argoapi.Application, namespace string) (bool, error) {

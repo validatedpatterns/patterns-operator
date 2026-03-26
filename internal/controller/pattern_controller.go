@@ -599,7 +599,11 @@ func (r *PatternReconciler) deleteSpokeApps(targetApp, app *argoapi.Application,
 	log.Printf("Deletion phase: %s - checking if all child applications are gone from spoke", api.DeleteSpokeChildApps)
 
 	// Update application with deletePattern=DeleteSpokeChildApps to trigger spoke child deletion
-	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+	changed, errUpdate := updateApplication(r.argoClient, targetApp, app, namespace)
+	if errUpdate != nil {
+		return fmt.Errorf("failed to update application %q for spoke child deletion: %v", app.Name, errUpdate)
+	}
+	if changed {
 		return fmt.Errorf("updated application %q for spoke child deletion", app.Name)
 	}
 
@@ -660,7 +664,11 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 	}
 
 	// Update application with deletePattern=DeleteHubChildApps to trigger hub child app deletion
-	if changed, _ := updateApplication(r.argoClient, targetApp, app, namespace); changed {
+	changed, errUpdate := updateApplication(r.argoClient, targetApp, app, namespace)
+	if errUpdate != nil {
+		return fmt.Errorf("failed to update application %q for hub deletion: %v", app.Name, errUpdate)
+	}
+	if changed {
 		return fmt.Errorf("updated application %q for hub deletion", app.Name)
 	}
 
@@ -731,7 +739,11 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 
 		// Phase 2: Delete app of apps from spoke
 		if qualifiedInstance.Status.DeletionPhase == api.DeleteSpoke {
-			if changed, _ := updateApplication(r.argoClient, targetApp, app, ns); changed {
+			changed, errUpdate := updateApplication(r.argoClient, targetApp, app, ns)
+			if errUpdate != nil {
+				return fmt.Errorf("failed to update application %q for spoke app of apps deletion: %v", app.Name, errUpdate)
+			}
+			if changed {
 				return fmt.Errorf("updated application %q for spoke app of apps deletion", app.Name)
 			}
 
