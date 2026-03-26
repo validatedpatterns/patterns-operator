@@ -998,6 +998,40 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			Expect(argoCD.GetResourceVersion()).To(Equal("1")) // Ensure it has been updated
 		})
 	})
+
+	Context("when there is an error in the getArgoCD fn but there is an argocd", func() {
+
+		BeforeEach(func() {
+			argoCD := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "argoproj.io/v1beta1",
+					"kind":       "ArgoCD",
+					"metadata": map[string]any{
+						"name":            name,
+						"namespace":       namespace,
+						"resourceVersion": "1",
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), argoCD, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			getArgoCDFunc = func(_ dynamic.Interface, _, _ string) (*argooperator.ArgoCD, error) {
+				return nil, fmt.Errorf("forced error")
+			}
+		})
+
+		It("should propagate the error and not update the existing argocd", func() {
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace)
+			Expect(err).To(HaveOccurred())
+
+			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(argoCD).ToNot(BeNil())
+			Expect(argoCD.GetResourceVersion()).To(Equal("1"))
+
+		})
+	})
 })
 
 var _ = Describe("CompareApplication", func() {
