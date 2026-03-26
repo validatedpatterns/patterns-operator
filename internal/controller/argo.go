@@ -415,7 +415,10 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 		newArgo := &unstructured.Unstructured{Object: obj}
 		_, err = client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
 	} else { // update it
-		oldArgo, _ := getArgoCD(client, name, namespace)
+		oldArgo, err := getArgoCD(client, name, namespace)
+		if err != nil {
+			return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, err)
+		}
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
 		obj, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		newArgo := &unstructured.Unstructured{Object: obj}
