@@ -1684,8 +1684,9 @@ var _ = Describe("IntOrZero", func() {
 	})
 })
 
-var _ = Describe("getClusterWideArgoNamespace", func() {
+var _ = Describe("getClusterWideArgoNamespace defaults", func() {
 	It("should return the ApplicationNamespace", func() {
+		activeArgoNamespace = ApplicationNamespace
 		Expect(getClusterWideArgoNamespace()).To(Equal(ApplicationNamespace))
 	})
 })
@@ -2030,10 +2031,31 @@ var _ = Describe("getPatternConditionByType", func() {
 })
 
 var _ = Describe("getClusterWideArgoNamespace", func() {
-	It("should return the ApplicationNamespace constant", func() {
+	AfterEach(func() {
+		// Reset to defaults
+		activeArgoNamespace = ApplicationNamespace
+		activeArgoName = ClusterWideArgoName
+	})
+
+	It("should return the default ApplicationNamespace (vp-gitops)", func() {
+		activeArgoNamespace = ApplicationNamespace
 		ns := getClusterWideArgoNamespace()
 		Expect(ns).To(Equal(ApplicationNamespace))
+		Expect(ns).To(Equal("vp-gitops"))
+	})
+
+	It("should return legacy namespace when set", func() {
+		activeArgoNamespace = LegacyApplicationNamespace
+		ns := getClusterWideArgoNamespace()
+		Expect(ns).To(Equal(LegacyApplicationNamespace))
 		Expect(ns).To(Equal("openshift-gitops"))
+	})
+
+	It("should report legacy correctly", func() {
+		activeArgoNamespace = LegacyApplicationNamespace
+		Expect(isLegacyArgoNamespace()).To(BeTrue())
+		activeArgoNamespace = ApplicationNamespace
+		Expect(isLegacyArgoNamespace()).To(BeFalse())
 	})
 })
 

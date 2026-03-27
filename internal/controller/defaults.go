@@ -33,9 +33,13 @@ const (
 	// Default Operator Config Map Name
 	OperatorConfigMap = "patterns-operator-config"
 	// Default Application Namespace
-	ApplicationNamespace = "openshift-gitops"
+	ApplicationNamespace = "vp-gitops"
 	// ClusterWide Argo Name
-	ClusterWideArgoName = "openshift-gitops"
+	ClusterWideArgoName = "vp-gitops"
+	// Legacy Application Namespace (used by the default gitops-operator instance)
+	LegacyApplicationNamespace = "openshift-gitops"
+	// Legacy ClusterWide Argo Name
+	LegacyClusterWideArgoName = "openshift-gitops"
 )
 
 // GitOps Subscription

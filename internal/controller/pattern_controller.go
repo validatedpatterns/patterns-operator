@@ -99,6 +99,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;delete;update;get;create;patch
+//+kubebuilder:rbac:groups=console.openshift.io,resources=consolelinks,verbs=get;list;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;watch;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
@@ -174,6 +175,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.actionPerformed(qualifiedInstance, "applying defaults", err)
 	}
 
+	// -- Detect ArgoCD namespace (legacy upgrade vs greenfield)
+	// Must happen before subscription creation since it controls DISABLE_DEFAULT_ARGOCD_INSTANCE.
+	detectArgoNamespace(r.dynamicClient)
+
 	if r.AnalyticsClient.SendPatternInstallationInfo(qualifiedInstance) {
 		return r.actionPerformed(qualifiedInstance, "Updated status with identity sent", nil)
 	}
@@ -183,7 +188,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	targetSub, err := newSubscriptionFromConfigMap(r.fullClient)
+	// Only disable the default ArgoCD instance for non-legacy deployments.
+	// For legacy deployments, the gitops-operator's default instance is still in use.
+	disableDefault := !isLegacyArgoNamespace()
+	targetSub, err := newSubscriptionFromConfigMap(r.fullClient, disableDefault)
 
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
@@ -254,13 +262,16 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	clusterWideNS := getClusterWideArgoNamespace()
 	if !haveNamespace(r.Client, clusterWideNS) {
-		return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
+		if isLegacyArgoNamespace() {
+			// Legacy mode: wait for the gitops-operator to create the openshift-gitops namespace
+			return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
+		}
+		// Greenfield: create the namespace ourselves
+		if err = createNamespace(r.fullClient, clusterWideNS); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error creating ArgoCD namespace", err)
+		}
+		return r.actionPerformed(qualifiedInstance, "created ArgoCD namespace", nil)
 	}
-	// Once we add support for creating the clusterwide argo in a separate NS we will uncomment this
-	// else if !haveNamespace(r.Client, clusterWideNS) && *qualifiedInstance.Spec.Experimental { // create the namespace if it does not exist
-	// 	 err = createNamespace(r.fullClient, clusterWideNS)
-	//	 return r.actionPerformed(qualifiedInstance, "created vp clusterwide namespace", err)
-	// }
 	logOnce("namespace found")
 
 	// Create the trusted-bundle configmap inside the clusterwide namespace
@@ -282,10 +293,18 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
-	err = createOrUpdateArgoCD(r.dynamicClient, r.fullClient, ClusterWideArgoName, clusterWideNS)
+	err = createOrUpdateArgoCD(r.dynamicClient, r.fullClient, getClusterWideArgoName(), clusterWideNS)
 	if err != nil {
 		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
 	}
+
+	// Create/update the ConsoleLink so the ArgoCD instance appears in the OpenShift console nine-box menu
+	if !isLegacyArgoNamespace() && qualifiedInstance.Status.AppClusterDomain != "" {
+		if err = createOrUpdateConsoleLink(r.dynamicClient, getClusterWideArgoName(), clusterWideNS, qualifiedInstance.Status.AppClusterDomain); err != nil {
+			return r.actionPerformed(qualifiedInstance, "error creating ConsoleLink for ArgoCD", err)
+		}
+	}
+
 	// Copy the bootstrap secret to the namespaced argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
 		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
@@ -691,6 +710,8 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			log.Printf("\n\x1b[31;1m\tCannot cleanup the ArgoCD application of an invalid pattern: %s\x1b[0m\n", err.Error())
 			return nil
 		}
+		// Ensure detection has run for the finalize path
+		detectArgoNamespace(r.dynamicClient)
 		ns := getClusterWideArgoNamespace()
 
 		targetApp := newArgoApplication(qualifiedInstance)
@@ -793,6 +814,13 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 			if err := removeApplication(r.argoClient, app.Name, ns); err != nil {
 				return err
 			}
+			// Clean up the ConsoleLink if we created one
+			if !isLegacyArgoNamespace() {
+				err := removeConsoleLink(r.dynamicClient, getClusterWideArgoName())
+				if err != nil {
+					log.Printf("failed to remove the consoleLink: %v", err)
+				}
+			}
 		}
 	}
 
@@ -865,7 +893,7 @@ func (r *PatternReconciler) startArgoCDWatch() {
 
 	err := r.ctrl.Watch(source.Kind(r.mgr.GetCache(), argoCD,
 		handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, obj *unstructured.Unstructured) []reconcile.Request {
-			if obj.GetName() != ClusterWideArgoName || obj.GetNamespace() != getClusterWideArgoNamespace() {
+			if obj.GetName() != getClusterWideArgoName() || obj.GetNamespace() != getClusterWideArgoNamespace() {
 				return nil
 			}
 			var patterns api.PatternList
@@ -915,6 +943,21 @@ func (r *PatternReconciler) onReconcileErrorWithRequeue(p *api.Pattern, reason s
 		return reconcile.Result{RequeueAfter: *duration}, nil
 	}
 	return reconcile.Result{}, err
+}
+
+// detectArgoNamespace determines whether this is a legacy upgrade or greenfield deploy
+// by checking if the legacy ArgoCD CR exists. Sets the package-level active ArgoCD
+// namespace/name accordingly.
+func detectArgoNamespace(dynamicClient dynamic.Interface) {
+	if haveArgo(dynamicClient, LegacyClusterWideArgoName, LegacyApplicationNamespace) {
+		activeArgoNamespace = LegacyApplicationNamespace
+		activeArgoName = LegacyClusterWideArgoName
+		logOnce(fmt.Sprintf("Detected legacy ArgoCD instance, using namespace: %s", LegacyApplicationNamespace))
+	} else {
+		activeArgoNamespace = ApplicationNamespace
+		activeArgoName = ClusterWideArgoName
+		logOnce(fmt.Sprintf("No legacy ArgoCD instance found, using namespace: %s", ApplicationNamespace))
+	}
 }
 
 func (r *PatternReconciler) actionPerformed(p *api.Pattern, reason string, err error) (reconcile.Result, error) {

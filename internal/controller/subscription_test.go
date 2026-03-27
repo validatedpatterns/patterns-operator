@@ -98,7 +98,7 @@ var _ = Describe("Subscription Functions", func() {
 		})
 
 		It("should handle the absence of the ConfigMap gracefully", func() {
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))
@@ -114,7 +114,7 @@ var _ = Describe("Subscription Functions", func() {
 		It("should create a Subscription from a configmap", func() {
 			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
@@ -146,7 +146,7 @@ var _ = Describe("Subscription Functions", func() {
 		It("should create a Subscription to legacy operator ns", func() {
 			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
@@ -160,7 +160,7 @@ var _ = Describe("Subscription Functions", func() {
 		})
 
 		It("should handle the absence of the ConfigMap gracefully (legacy operator ns)", func() {
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet)
+			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))

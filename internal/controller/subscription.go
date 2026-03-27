@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Subscription, error) {
+func newSubscriptionFromConfigMap(r kubernetes.Interface, disableDefaultInstance bool) (*operatorv1alpha1.Subscription, error) {
 	var newSubscription *operatorv1alpha1.Subscription
 
 	// Check if the config map exists and read the config map values
@@ -60,12 +60,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 		StartingCSV:            PatternsOperatorConfig.getValueWithDefault("gitops.csv"),
 		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
-			Env: []corev1.EnvVar{
-				{
-					Name:  "ARGOCD_CLUSTER_CONFIG_NAMESPACES",
-					Value: "*",
-				},
-			},
+			Env: newSubscriptionEnvVars(disableDefaultInstance),
 		},
 	}
 	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
@@ -79,6 +74,27 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface) (*operatorv1alpha1.Sub
 	}
 
 	return newSubscription, nil
+}
+
+// newSubscriptionEnvVars returns the environment variables for the GitOps operator subscription.
+// When disableDefaultInstance is true, the DISABLE_DEFAULT_ARGOCD_INSTANCE env var is added
+// to prevent the gitops-operator from creating (and actively deleting) the default ArgoCD
+// instance in the openshift-gitops namespace. This is safe when using a non-default ArgoCD
+// name/namespace (e.g. vp-gitops) since the gitops-operator only targets "openshift-gitops".
+func newSubscriptionEnvVars(disableDefaultInstance bool) []corev1.EnvVar {
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "ARGOCD_CLUSTER_CONFIG_NAMESPACES",
+			Value: "*",
+		},
+	}
+	if disableDefaultInstance {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "DISABLE_DEFAULT_ARGOCD_INSTANCE",
+			Value: "true",
+		})
+	}
+	return envVars
 }
 
 func getSubscription(client olmclient.Interface, name, namespace string) (*operatorv1alpha1.Subscription, error) {
