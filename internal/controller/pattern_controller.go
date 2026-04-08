@@ -55,7 +55,6 @@ import (
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	v1 "github.com/operator-framework/api/pkg/operators/v1"
-	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned"
 	"k8s.io/client-go/kubernetes"
@@ -188,71 +187,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	// Only disable the default ArgoCD instance for non-legacy deployments.
-	// For legacy deployments, the gitops-operator's default instance is still in use.
-	disableDefault := !isLegacyArgoNamespace()
-	targetSub, err := newSubscriptionFromConfigMap(r.fullClient, disableDefault)
-
-	if err != nil {
-		return r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
-	}
-	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
-	// If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
-	if DetectOperatorNamespace() != LegacyOperatorNamespace {
-		// Create namespace for gitops subscription
-		if err := createNamespace(r.fullClient, subscriptionNamespace); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error creating namespace for gitops subscription", err)
-		}
-
-		// Create operatorgroup for gitops subscription
-		var og *v1.OperatorGroup
-		if og, err = getOperatorGroup(r.olmClient, subscriptionNamespace); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error getting operatorgroup for gitops subscription", err)
-		}
-		if og == nil {
-			if err := createOperatorGroup(r.olmClient, subscriptionNamespace); err != nil {
-				return r.actionPerformed(qualifiedInstance, "error creating operatorgroup for gitops subscription", err)
-			}
-		}
-	}
-
-	var currentSub *operatorv1alpha1.Subscription
-
-	if currentSub, err = getSubscription(r.olmClient, subscriptionName, subscriptionNamespace); err != nil {
-		return r.actionPerformed(qualifiedInstance, "error getting gitops subscription", err)
-	}
-
-	if currentSub == nil {
-		if err = createSubscription(r.olmClient, targetSub); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error creating gitops subscription", err)
-		}
-	} else {
-		// Remove any stale owner references from the subscription (historically set by
-		// the pattern or the operator configmap). Cross-namespace owner references are
-		// not allowed, so we clean them up and rely on the subscription persisting
-		// independently.
-		changed := false
-		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, currentSub, r.Scheme); err == nil {
-			changed = true
-		}
-		operatorConfigMap, cmErr := GetOperatorConfigmap()
-		if cmErr == nil {
-			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, currentSub, r.Scheme); err == nil {
-				changed = true
-			}
-		}
-		if changed {
-			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(currentSub.Namespace).Update(context.Background(), currentSub, metav1.UpdateOptions{}); err != nil {
-				return r.actionPerformed(qualifiedInstance, "error removing stale owner references from gitops subscription", err)
-			}
-			return r.actionPerformed(qualifiedInstance, "removed stale owner references from gitops subscription", nil)
-		}
-
-		// Check version/channel etc
-		updatedSub, errSub := updateSubscription(r.olmClient, targetSub, currentSub)
-		if updatedSub {
-			return r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
-		}
+	if done, result, subErr := r.reconcileGitOpsSubscription(qualifiedInstance); done {
+		return result, subErr
 	}
 	logOnce("subscription found")
 
@@ -381,6 +317,87 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return result, nil
+}
+
+// reconcileGitOpsSubscription ensures the GitOps operator subscription exists and is up-to-date.
+// It returns (done, result, err) — when done is true the caller should return result/err immediately.
+func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.Pattern) (done bool, result ctrl.Result, err error) {
+	// Only disable the default ArgoCD instance for non-legacy deployments.
+	// For legacy deployments, the gitops-operator's default instance is still in use.
+	disableDefault := !isLegacyArgoNamespace()
+	targetSub, err := newSubscriptionFromConfigMap(r.fullClient, disableDefault)
+
+	if err != nil {
+		res, e := r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
+		return true, res, e
+	}
+	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
+	// If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
+	if DetectOperatorNamespace() != LegacyOperatorNamespace {
+		// Create namespace for gitops subscription
+		if err := createNamespace(r.fullClient, subscriptionNamespace); err != nil {
+			res, e := r.actionPerformed(qualifiedInstance, "error creating namespace for gitops subscription", err)
+			return true, res, e
+		}
+
+		// Create operatorgroup for gitops subscription
+		var og *v1.OperatorGroup
+		if og, err = getOperatorGroup(r.olmClient, subscriptionNamespace); err != nil {
+			res, e := r.actionPerformed(qualifiedInstance, "error getting operatorgroup for gitops subscription", err)
+			return true, res, e
+		}
+		if og == nil {
+			if err := createOperatorGroup(r.olmClient, subscriptionNamespace); err != nil {
+				res, e := r.actionPerformed(qualifiedInstance, "error creating operatorgroup for gitops subscription", err)
+				return true, res, e
+			}
+		}
+	}
+
+	currentSub, err := getSubscription(r.olmClient, subscriptionName, subscriptionNamespace)
+	if err != nil {
+		res, e := r.actionPerformed(qualifiedInstance, "error getting gitops subscription", err)
+		return true, res, e
+	}
+
+	if currentSub == nil {
+		if err = createSubscription(r.olmClient, targetSub); err != nil {
+			res, e := r.actionPerformed(qualifiedInstance, "error creating gitops subscription", err)
+			return true, res, e
+		}
+	} else {
+		// Remove any stale owner references from the subscription (historically set by
+		// the pattern or the operator configmap). Cross-namespace owner references are
+		// not allowed, so we clean them up and rely on the subscription persisting
+		// independently.
+		changed := false
+		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, currentSub, r.Scheme); err == nil {
+			changed = true
+		}
+		operatorConfigMap, cmErr := GetOperatorConfigmap()
+		if cmErr == nil {
+			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, currentSub, r.Scheme); err == nil {
+				changed = true
+			}
+		}
+		if changed {
+			if _, err := r.olmClient.OperatorsV1alpha1().Subscriptions(currentSub.Namespace).Update(context.Background(), currentSub, metav1.UpdateOptions{}); err != nil {
+				res, e := r.actionPerformed(qualifiedInstance, "error removing stale owner references from gitops subscription", err)
+				return true, res, e
+			}
+			res, e := r.actionPerformed(qualifiedInstance, "removed stale owner references from gitops subscription", nil)
+			return true, res, e
+		}
+
+		// Check version/channel etc
+		updatedSub, errSub := updateSubscription(r.olmClient, targetSub, currentSub)
+		if updatedSub {
+			res, e := r.actionPerformed(qualifiedInstance, "update gitops subscription", errSub)
+			return true, res, e
+		}
+	}
+
+	return false, ctrl.Result{}, nil
 }
 
 func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
