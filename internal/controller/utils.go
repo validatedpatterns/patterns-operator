@@ -274,10 +274,26 @@ func isTrustedBundleCMPopulated(fullClient kubernetes.Interface, namespace strin
 	return true, nil
 }
 
+// activeArgoNamespace and activeArgoName hold the detected ArgoCD namespace
+// and name for the current deployment. They are set by detectArgoNamespace()
+// during reconciliation and default to the new vp-gitops values.
+var (
+	activeArgoNamespace = ApplicationNamespace
+	activeArgoName      = ClusterWideArgoName
+)
+
 func getClusterWideArgoNamespace() string {
-	// Once we add support for running the cluster-wide argo instance
-	// we will need to amend the logic here
-	return ApplicationNamespace
+	return activeArgoNamespace
+}
+
+func getClusterWideArgoName() string {
+	return activeArgoName
+}
+
+// isLegacyArgoNamespace returns true if the active ArgoCD deployment
+// is using the legacy openshift-gitops namespace.
+func isLegacyArgoNamespace() bool {
+	return activeArgoNamespace == LegacyApplicationNamespace
 }
 
 // writeConfigMapKeyToFile writes the value of a specified key from a ConfigMap to a file.

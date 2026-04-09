@@ -105,7 +105,7 @@ var _ = Describe("Argo Pattern", func() {
 		argoApp = &argoapi.Application{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      applicationName(pattern),
-				Namespace: "openshift-gitops",
+				Namespace: getClusterWideArgoNamespace(),
 				Labels: map[string]string{
 					"validatedpatterns.io/pattern": pattern.Name,
 				},
@@ -118,8 +118,13 @@ var _ = Describe("Argo Pattern", func() {
 				},
 				Project: "default",
 				SyncPolicy: &argoapi.SyncPolicy{
-					Automated:   &argoapi.SyncPolicyAutomated{},
+					Automated: &argoapi.SyncPolicyAutomated{
+						SelfHeal: true,
+					},
 					SyncOptions: []string{},
+					Retry: &argoapi.RetryStrategy{
+						Limit: 20,
+					},
 				},
 			},
 		}
@@ -451,6 +456,10 @@ var _ = Describe("Argo Pattern", func() {
 						Value: GitOpsDefaultSubscriptionNamespace,
 					},
 					argoapi.HelmParameter{
+						Name:  "global.vpArgoNamespace",
+						Value: getClusterWideArgoNamespace(),
+					},
+					argoapi.HelmParameter{
 						Name:        "global.multiSourceTargetRevision",
 						Value:       "0.0.*",
 						ForceString: false,
@@ -489,6 +498,10 @@ var _ = Describe("Argo Pattern", func() {
 						Value: GitOpsDefaultSubscriptionNamespace,
 					},
 					argoapi.HelmParameter{
+						Name:  "global.vpArgoNamespace",
+						Value: getClusterWideArgoNamespace(),
+					},
+					argoapi.HelmParameter{
 						Name:        "global.multiSourceTargetRevision",
 						Value:       "0.0.*",
 						ForceString: false,
@@ -524,6 +537,10 @@ var _ = Describe("Argo Pattern", func() {
 					argoapi.HelmParameter{
 						Name:  "global.gitOpsSubNamespace",
 						Value: GitOpsDefaultSubscriptionNamespace,
+					},
+					argoapi.HelmParameter{
+						Name:  "global.vpArgoNamespace",
+						Value: getClusterWideArgoNamespace(),
 					},
 					argoapi.HelmParameter{
 						Name:  "global.multiSourceTargetRevision",
@@ -625,14 +642,14 @@ var _ = Describe("Argo Pattern", func() {
 			})
 			It("should return false and log the appropriate message", func() {
 				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
-				automatedSyncPolicyChanged.SelfHeal = true
+				automatedSyncPolicyChanged.SelfHeal = false
 				logBuffer := new(bytes.Buffer)
 				log.SetOutput(logBuffer)
 				defer log.SetOutput(os.Stderr)
 
 				result := compareAutomatedSyncPolicy(automatedSyncPolicy, automatedSyncPolicyChanged)
 				Expect(result).To(BeFalse())
-				Expect(logBuffer.String()).To(ContainSubstring("SyncPolicy SelfHeal changed true -> false"))
+				Expect(logBuffer.String()).To(ContainSubstring("SyncPolicy SelfHeal changed false -> true"))
 			})
 			It("compareAutomatedSyncPolicy() function with nil arg1", func() {
 				Expect(compareAutomatedSyncPolicy(automatedSyncPolicy, nil)).To(BeFalse())
@@ -1479,6 +1496,9 @@ var _ = Describe("CommonSyncPolicy", func() {
 			Expect(policy).ToNot(BeNil())
 			Expect(policy.Automated).ToNot(BeNil())
 			Expect(policy.Automated.Prune).To(BeFalse())
+			Expect(policy.Automated.SelfHeal).To(BeTrue())
+			Expect(policy.Retry).ToNot(BeNil())
+			Expect(policy.Retry.Limit).To(Equal(int64(20)))
 		})
 	})
 
@@ -1954,16 +1974,16 @@ var _ = Describe("removeApplication", func() {
 			app := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 				},
 			}
 			argoClient := argoclient.NewSimpleClientset(app)
 
-			err := removeApplication(argoClient, "test-app", "openshift-gitops")
+			err := removeApplication(argoClient, "test-app", getClusterWideArgoNamespace())
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify the application is gone
-			_, err = argoClient.ArgoprojV1alpha1().Applications("openshift-gitops").Get(
+			_, err = argoClient.ArgoprojV1alpha1().Applications(getClusterWideArgoNamespace()).Get(
 				context.Background(), "test-app", metav1.GetOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(kerrors.IsNotFound(err)).To(BeTrue())
@@ -1973,7 +1993,7 @@ var _ = Describe("removeApplication", func() {
 	Context("when the application does not exist", func() {
 		It("should return an error", func() {
 			argoClient := argoclient.NewSimpleClientset()
-			err := removeApplication(argoClient, "nonexistent", "openshift-gitops")
+			err := removeApplication(argoClient, "nonexistent", getClusterWideArgoNamespace())
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -2151,6 +2171,9 @@ var _ = Describe("commonSyncPolicy", func() {
 		Expect(policy).ToNot(BeNil())
 		Expect(policy.Automated).ToNot(BeNil())
 		Expect(policy.Automated.Prune).To(BeFalse())
+		Expect(policy.Automated.SelfHeal).To(BeTrue())
+		Expect(policy.Retry).ToNot(BeNil())
+		Expect(policy.Retry.Limit).To(Equal(int64(20)))
 	})
 
 	It("should return nil sync policy when manual sync is enabled", func() {
@@ -2188,7 +2211,7 @@ var _ = Describe("syncApplication", func() {
 			app := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 				},
 			}
 			argoFakeClient := argoclient.NewSimpleClientset(app)
@@ -2205,7 +2228,7 @@ var _ = Describe("syncApplication", func() {
 			app := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 				},
 			}
 			argoFakeClient := argoclient.NewSimpleClientset(app)
@@ -2222,7 +2245,7 @@ var _ = Describe("syncApplication", func() {
 			app := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 				},
 				Operation: &argoapi.Operation{
 					Sync: &argoapi.SyncOperation{
@@ -2245,15 +2268,15 @@ var _ = Describe("getChildApplications", func() {
 			parentApp := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "parent-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 				},
 			}
 			childApp := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "child-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 					Annotations: map[string]string{
-						"argocd.argoproj.io/tracking-id": "parent-app:argoproj.io/Application:openshift-gitops/child-app",
+						"argocd.argoproj.io/tracking-id": fmt.Sprintf("parent-app:argoproj.io/Application:%s/child-app", getClusterWideArgoNamespace()),
 					},
 				},
 			}
@@ -2271,7 +2294,7 @@ var _ = Describe("getChildApplications", func() {
 			parentApp := &argoapi.Application{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "parent-app",
-					Namespace: "openshift-gitops",
+					Namespace: getClusterWideArgoNamespace(),
 				},
 			}
 			argoFakeClient := argoclient.NewSimpleClientset(parentApp)
