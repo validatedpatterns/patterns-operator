@@ -1,16 +1,22 @@
-- Tie down the RBACs
-- Next to Catalog, can we show the single Pattern CR (reusing the existing UI)?
-- Add one or two screenshots (logo, screenshot, etc)
-- AI based pattern with extra bits (one AI quickstart vs the other quickstart)
-- Can we prettify the install part (maybe poke the pattern CR status?)
-  Or the metadata of the pattern can include some steps
+- port uicatalog unit tests to ginkgo
+- Add one or two screenshots (logo, screenshot, etc) in a pattern
+- AI based pattern with extra bits (one AI quickstart vs the other quickstart)?
 - Need to think about workflows around the catalog
-- Add some requirements
-- We need to come up with a plan for the versioning of catalogs (i.e. the tags of the catalog container)
-  Default is stable-v1, future operators could switch defaults. Maybe we could show if we're using an
-  outdated tag in the console
 - Test plan
   - Deploy a pattern via CLI, will it show as installed in the UI catalog
+
+- Can we explore a way to to fill in values for the pattern from the UI
+  To make it easier to deploy and customize via UI in a sort of demo situation
+
+- The requirements topic:
+  - Requirements are hard but we can at least probably start with a single number for RAM and CPU and match it
+    against the cluster in the UI and figure out some UX for that?
+
+- Create a new UI for a custom pattern thing (i.e. replace the currend UI for pattern CRs)
+
+- Improve docs in the pattern-catalog repo on how to create a custom catalog and how to make the operator
+  use that
+
 
 [DONE]
 - Add a button to load the secrets separately ?
@@ -21,3 +27,10 @@
 - Fix IE when no secrets
 - Add a description, drop owners (maybe also org)
 - Add where the catalog came from
+- We need to come up with a plan for the versioning of catalogs (i.e. the tags of the catalog container)
+  Default is stable-v1, future operators could switch defaults. Maybe we could show if we're using an
+  outdated tag in the console
+- Can we prettify the install part (maybe poke the pattern CR status?)
+  Or the metadata of the pattern can include some steps
+- Tie down the RBACs
+- Next to Catalog, can we show the single Pattern CR (reusing the existing UI)?
