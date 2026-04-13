@@ -105,6 +105,9 @@ rules:
   - list
   - patch
   - update
+- apiGroups:
+  - console.openshift.io
+  resources:
   - consoleplugins
   verbs:
   - create
