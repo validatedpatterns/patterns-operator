@@ -8,16 +8,6 @@ rules:
   - ""
   resources:
   - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
   - namespaces
   verbs:
   - create
@@ -30,10 +20,39 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - nodes
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create
   - get
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - get
+  - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -87,6 +106,18 @@ rules:
   - patch
   - update
 - apiGroups:
+  - console.openshift.io
+  resources:
+  - consoleplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - gitops.hybrid-cloud-patterns.io
   resources:
   - patterns
@@ -113,12 +144,28 @@ rules:
   - patch
   - update
 - apiGroups:
+  - machine.openshift.io
+  resources:
+  - machines
+  verbs:
+  - get
+  - list
+- apiGroups:
   - operator.open-cluster-management.io
   resources:
   - multiclusterhubs
   verbs:
   - get
   - list
+- apiGroups:
+  - operator.openshift.io
+  resources:
+  - consoles
+  verbs:
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - operator.openshift.io
   resources:

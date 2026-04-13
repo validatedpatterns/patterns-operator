@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/hybrid-cloud-patterns/patterns-operator/internal/controller/console"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,13 +98,15 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=list;get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=list;get
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
+//+kubebuilder:rbac:groups=machine.openshift.io,resources=machines,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;delete;update;get;create;patch
 //+kubebuilder:rbac:groups=console.openshift.io,resources=consolelinks,verbs=get;list;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=argocds,verbs=list;watch;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=subscriptions,verbs=list;get;create;update;patch;delete
 //+kubebuilder:rbac:groups=operators.coreos.com,resources=operatorgroups,verbs=list;get;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="operator.open-cluster-management.io",resources=multiclusterhubs,verbs=get;list
 //+kubebuilder:rbac:groups=operator.openshift.io,resources="openshiftcontrollermanagers",resources=openshiftcontrollermanagers,verbs=get;list
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
@@ -166,6 +169,14 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		log.Printf("\x1b[34;1m\tReconcile step %q complete\x1b[0m\n", "finalize")
 		return reconcile.Result{}, nil
+	}
+
+	// Ensure console plugin is registered and enabled
+	if err := console.CreateOrUpdatePlugin(ctx, r.Client); err != nil {
+		r.logger.Error(err, "failed to create/update console plugin")
+	}
+	if err := console.EnablePlugin(ctx, r.Client); err != nil {
+		r.logger.Error(err, "failed to enable console plugin")
 	}
 
 	// -- Fill in defaults (changes made to a copy and not persisted)
@@ -305,11 +316,18 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.logger.Info("Pattern CR Updated")
 	}
 
-	// Report loop completion statistics
-	if r.AnalyticsClient.SendPatternEndEventInfo(qualifiedInstance) {
-		return r.actionPerformed(qualifiedInstance, "Updated status with end event sent", nil)
-	}
+	// Report loop completion statistics (fire-and-forget, don't interrupt reconcile completion)
+	r.AnalyticsClient.SendPatternEndEventInfo(qualifiedInstance)
+
 	log.Printf("\x1b[32;1m\tReconcile complete\x1b[0m\n")
+
+	if qualifiedInstance.Status.LastStep != "reconcile complete" || qualifiedInstance.Status.LastError != "" {
+		qualifiedInstance.Status.LastStep = "reconcile complete"
+		qualifiedInstance.Status.LastError = ""
+		if updateErr := r.Client.Status().Update(context.TODO(), qualifiedInstance); updateErr != nil {
+			r.logger.Error(updateErr, "Failed to update Pattern status")
+		}
+	}
 
 	result := ctrl.Result{
 		Requeue:      false,

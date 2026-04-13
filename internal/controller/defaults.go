@@ -96,6 +96,7 @@ var DefaultPatternOperatorConfig = map[string]string{
 	"gitea.helmRepoUrl":          GiteaHelmRepoUrl,
 	"gitea.chartVersion":         GiteaDefaultChartVersion,
 	"analytics.enabled":          "true",
+	"catalog.image":              "",
 }
 
 type GitOpsConfig map[string]string

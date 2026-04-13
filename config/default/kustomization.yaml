@@ -21,6 +21,7 @@ bases:
 - ../webhook
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
 #- ../certmanager
+
 patchesStrategicMerge:
 # Mount the controller config file for loading manager configurations
 # through a ComponentConfig type

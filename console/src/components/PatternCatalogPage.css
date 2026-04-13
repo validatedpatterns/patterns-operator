@@ -1,0 +1,69 @@
+.patterns-operator__card-field {
+  margin-bottom: 4px;
+}
+
+.patterns-operator__installed-label {
+  margin-left: 8px;
+}
+
+.patterns-operator__requirements {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.patterns-operator__requirements-heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--pf-v5-global--Color--100, var(--pf-v6-global--Color--100, #151515));
+  cursor: pointer;
+}
+
+.patterns-operator__cloud-labels {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.patterns-operator__sizing-line {
+  font-size: 0.875rem;
+  color: var(--pf-v5-global--Color--200, var(--pf-v6-global--Color--200, #6a6e73));
+  cursor: pointer;
+}
+
+.patterns-operator__sizing-note {
+  font-size: 0.875rem;
+  color: var(--pf-v5-global--Color--200, var(--pf-v6-global--Color--200, #6a6e73));
+  cursor: pointer;
+}
+
+.patterns-operator__card-description {
+  font-size: 0.875rem;
+  color: var(--pf-v5-global--Color--200, var(--pf-v6-global--Color--200, #6a6e73));
+}
+
+.patterns-operator__card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.patterns-operator__card-links {
+  display: flex;
+  gap: 16px;
+}
+
+.patterns-operator__card-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.patterns-operator__card--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.patterns-operator__card--disabled .patterns-operator__card-actions {
+  pointer-events: auto;
+}
+

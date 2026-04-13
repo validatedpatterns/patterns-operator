@@ -9,3 +9,7 @@ resources:
 - role_binding.yaml
 - leader_election_role.yaml
 - leader_election_role_binding.yaml
+# RBAC for secret-injector service account
+- patterns_secret_injector_service_account.yaml
+- patterns_secret_injector_role.yaml
+- patterns_secret_injector_role_binding.yaml

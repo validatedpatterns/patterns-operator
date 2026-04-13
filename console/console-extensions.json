@@ -1,0 +1,53 @@
+[
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "patterns",
+      "name": "%plugin__patterns-operator-console-plugin~Patterns%",
+      "perspective": "admin",
+      "insertBefore": "workloads"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/patterns",
+      "component": { "$codeRef": "PatternCatalogPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/patterns/install/:name",
+      "component": { "$codeRef": "InstallPatternPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/patterns/uninstall/:name",
+      "component": { "$codeRef": "UninstallPatternPage" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/patterns/secrets/:name",
+      "component": { "$codeRef": "ManageSecretsPage" }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "patterns",
+      "name": "%plugin__patterns-operator-console-plugin~Catalog%",
+      "href": "/patterns",
+      "perspective": "admin",
+      "section": "patterns"
+    }
+  }
+]
