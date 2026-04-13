@@ -323,20 +323,20 @@ bundle-push: ## Push the bundle image.
 
 .PHONY: csv-date
 csv-date: ## Set createdAt date in the CSV.
-	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;"  ./config/manifests/bases/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -c -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;"  ./config/manifests/bases/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
 # Some fixes in the bundle
 .PHONY: bundle-fixes
 bundle-fixes: ## update container image
-	sed -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -c -r -i "s|containerImage: .*|containerImage: $(IMG)|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
 .PHONY: bundle-date
 bundle-date: ## Set createdAt date in the bundle's CSV. Do not commit changes!
-	sed -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -c -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
 .PHONY: bundle-date-reset
 bundle-date-reset: ## Reset createdAt date to empty value
-	sed -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
+	sed -c -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -404,7 +404,7 @@ catalog-install: config/samples/pattern-catalog-$(VERSION).yaml ## Install the O
 .PHONY: config/samples/pattern-catalog-$(VERSION).yaml
 config/samples/pattern-catalog-$(VERSION).yaml:
 	cp  config/samples/pattern-catalog.yaml config/samples/pattern-catalog-$(VERSION).yaml
-	sed -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
+	sed -c -i -e "s@CATALOG_IMG@$(CATALOG_IMG)@g" config/samples/pattern-catalog-$(VERSION).yaml
 
 .PHONY: super-linter
 super-linter: ## Runs super linter locally
