@@ -2,8 +2,9 @@ package console
 
 import (
 	"context"
-	"os"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -12,13 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
-
-func TestMain(m *testing.M) {
-	// Ensure getDeploymentNamespace() always returns defaultNamespace in tests,
-	// regardless of whether /var/run/secrets/.../namespace exists (e.g. in CI).
-	os.Setenv("OPERATOR_NAMESPACE", defaultNamespace)
-	os.Exit(m.Run())
-}
 
 func newOperatorConfigMap(image string) *corev1.ConfigMap {
 	data := map[string]string{}
@@ -41,117 +35,103 @@ func newFakeClient(objs ...client.Object) client.Client {
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 }
 
-func TestCreateOrUpdateCatalog_DefaultImage(t *testing.T) {
-	cm := newOperatorConfigMap("")
-	cl := newFakeClient(cm)
+var _ = Describe("CreateOrUpdateCatalog", func() {
+	var (
+		ctx context.Context
+		cm  *corev1.ConfigMap
+		cl  client.Client
+	)
 
-	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	BeforeEach(func() {
+		ctx = context.Background()
+	})
 
-	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
-		t.Fatalf("expected catalog deployment to be created: %v", err)
-	}
+	Context("with default image", func() {
+		BeforeEach(func() {
+			cm = newOperatorConfigMap("")
+			cl = newFakeClient(cm)
+		})
 
-	got := deploy.Spec.Template.Spec.Containers[0].Image
-	if got != CatalogDefaultImage {
-		t.Errorf("expected image %q, got %q", CatalogDefaultImage, got)
-	}
-}
+		It("should create a deployment with the default image", func() {
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-func TestCreateOrUpdateCatalog_OverriddenImage(t *testing.T) {
-	cm := newOperatorConfigMap("custom-catalog:v2")
-	cl := newFakeClient(cm)
+			deploy := &appsv1.Deployment{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
+			Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(Equal(CatalogDefaultImage))
+		})
+	})
 
-	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	Context("with an overridden image", func() {
+		BeforeEach(func() {
+			cm = newOperatorConfigMap("custom-catalog:v2")
+			cl = newFakeClient(cm)
+		})
 
-	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
-		t.Fatalf("expected catalog deployment to be created: %v", err)
-	}
+		It("should create a deployment with the overridden image", func() {
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-	got := deploy.Spec.Template.Spec.Containers[0].Image
-	if got != "custom-catalog:v2" {
-		t.Errorf("expected image %q, got %q", "custom-catalog:v2", got)
-	}
-}
+			deploy := &appsv1.Deployment{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
+			Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(Equal("custom-catalog:v2"))
+		})
+	})
 
-func TestCreateOrUpdateCatalog_UpdatesExistingDeployment(t *testing.T) {
-	cm := newOperatorConfigMap("custom-catalog:v3")
-	cl := newFakeClient(cm)
+	Context("when updating an existing deployment", func() {
+		BeforeEach(func() {
+			cm = newOperatorConfigMap("custom-catalog:v3")
+			cl = newFakeClient(cm)
+		})
 
-	// First call creates
-	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error on create: %v", err)
-	}
+		It("should update the deployment image", func() {
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-	// Change the override
-	cm.Data["catalog.image"] = "custom-catalog:v4"
-	if err := cl.Update(context.Background(), cm); err != nil {
-		t.Fatalf("unexpected error updating configmap: %v", err)
-	}
+			// Change the override
+			cm.Data["catalog.image"] = "custom-catalog:v4"
+			Expect(cl.Update(ctx, cm)).To(Succeed())
 
-	// Second call updates
-	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error on update: %v", err)
-	}
+			// Second call updates
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
-		t.Fatalf("unexpected error getting deployment: %v", err)
-	}
+			deploy := &appsv1.Deployment{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
+			Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(Equal("custom-catalog:v4"))
+		})
+	})
 
-	got := deploy.Spec.Template.Spec.Containers[0].Image
-	if got != "custom-catalog:v4" {
-		t.Errorf("expected image %q, got %q", "custom-catalog:v4", got)
-	}
-}
+	Context("when checking auxiliary resources", func() {
+		BeforeEach(func() {
+			cm = newOperatorConfigMap("")
+			cl = newFakeClient(cm)
+		})
 
-func TestCreateOrUpdateCatalog_CreatesConfigMapAndService(t *testing.T) {
-	cm := newOperatorConfigMap("")
-	cl := newFakeClient(cm)
+		It("should create the nginx ConfigMap", func() {
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			catalogCM := &corev1.ConfigMap{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogConfigMapName}, catalogCM)).To(Succeed())
+			Expect(catalogCM.Data).To(HaveKey("nginx.conf"))
+		})
 
-	// Check ConfigMap
-	catalogCM := &corev1.ConfigMap{}
-	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogConfigMapName}, catalogCM); err != nil {
-		t.Fatalf("expected catalog configmap to be created: %v", err)
-	}
-	if _, ok := catalogCM.Data["nginx.conf"]; !ok {
-		t.Error("expected nginx.conf key in catalog configmap")
-	}
+		It("should create the Service with the correct port", func() {
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-	// Check Service
-	svc := &corev1.Service{}
-	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogServiceName}, svc); err != nil {
-		t.Fatalf("expected catalog service to be created: %v", err)
-	}
-	if svc.Spec.Ports[0].Port != PatternCatalogServicePort {
-		t.Errorf("expected service port %d, got %d", PatternCatalogServicePort, svc.Spec.Ports[0].Port)
-	}
-}
+			svc := &corev1.Service{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogServiceName}, svc)).To(Succeed())
+			Expect(svc.Spec.Ports[0].Port).To(BeNumerically("==", PatternCatalogServicePort))
+		})
+	})
 
-func TestCreateOrUpdateCatalog_MissingOperatorConfigMap(t *testing.T) {
-	// No operator configmap — should fall back to default image
-	cl := newFakeClient()
+	Context("when the operator ConfigMap is missing", func() {
+		BeforeEach(func() {
+			cl = newFakeClient()
+		})
 
-	if err := CreateOrUpdateCatalog(context.Background(), cl, cl); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+		It("should fall back to the default image", func() {
+			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
 
-	deploy := &appsv1.Deployment{}
-	if err := cl.Get(context.Background(), client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy); err != nil {
-		t.Fatalf("expected catalog deployment to be created: %v", err)
-	}
-
-	got := deploy.Spec.Template.Spec.Containers[0].Image
-	if got != CatalogDefaultImage {
-		t.Errorf("expected default image %q, got %q", CatalogDefaultImage, got)
-	}
-}
+			deploy := &appsv1.Deployment{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
+			Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(Equal(CatalogDefaultImage))
+		})
+	})
+})
