@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -11,6 +12,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func TestMain(m *testing.M) {
+	// Ensure getDeploymentNamespace() always returns defaultNamespace in tests,
+	// regardless of whether /var/run/secrets/.../namespace exists (e.g. in CI).
+	os.Setenv("OPERATOR_NAMESPACE", defaultNamespace)
+	os.Exit(m.Run())
+}
 
 func newOperatorConfigMap(image string) *corev1.ConfigMap {
 	data := map[string]string{}
