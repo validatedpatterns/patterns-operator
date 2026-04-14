@@ -20,7 +20,7 @@ spec:
         app.kubernetes.io/component: patterns-operator-console-plugin
     spec:
       containers:
-      - image: console-plugin
+      - image: ${CONSOLE_PLUGIN_IMAGE}
         name: patterns-operator-console-plugin
         env:
         - name: OPERATOR_NAMESPACE

@@ -69,7 +69,7 @@ IMAGE_TAG_BASE ?= $(UPLOADREGISTRY)/$(OPERATOR_NAME)-operator
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+export IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 OPERATOR_IMG ?= $(OPERATOR_NAME)-operator:$(VERSION)
 
 # always release the console with the same tag as the operator and the other way around!
