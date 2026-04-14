@@ -356,7 +356,6 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
-
 # Build an OLM catalog image by adding the bundle image to a simple catalog using the
 # operator package manager tool, 'opm'. For more information see:
 # https://olm.operatorframework.io/docs/reference/catalog-templates
@@ -428,3 +427,8 @@ console-build-arm64: generate-dockerfile-console-plugin console-multiarch-manife
 console-push: ## Uploads the container to quay.io/validatedpatterns/${CONSOLE_PLUGIN_IMAGE}
 	@echo "Uploading the ${REGISTRY}/${CONSOLE_PLUGIN_IMAGE} container to ${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
 	buildah manifest push --all "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
+
+.PHONY: console-integration-tests
+console-integration-tests: ## Run console integration tests (requires running cluster)
+	@echo "Running console integration tests..."
+	cd console; ./test-prow-e2e.sh
