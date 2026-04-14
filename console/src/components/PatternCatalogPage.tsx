@@ -202,10 +202,10 @@ export default function PatternCatalogPage() {
       <PageSection>
         {catalogImage ? (
           <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
-            <Title headingLevel="h1" style={{ display: 'inline-block' }}>{t('Pattern Catalog')}</Title>
+            <Title headingLevel="h1" data-test="pattern-catalog-page-title" style={{ display: 'inline-block' }}>{t('Pattern Catalog')}</Title>
           </Tooltip>
         ) : (
-          <Title headingLevel="h1">{t('Pattern Catalog')}</Title>
+          <Title headingLevel="h1" data-test="pattern-catalog-page-title">{t('Pattern Catalog')}</Title>
         )}
       </PageSection>
       {catalogDescription && (

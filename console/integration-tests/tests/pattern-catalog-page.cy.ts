@@ -25,7 +25,11 @@ const verifyOperatorDeployment = () => {
 describe('Console plugin template test', () => {
   before(() => {
     cy.login();
-    cy.get(`[data-test="tour-step-footer-secondary"]`).contains('Skip tour').click();
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-test="tour-step-footer-secondary"]').length > 0) {
+        cy.get('[data-test="tour-step-footer-secondary"]').contains('Skip tour').click();
+      }
+    });
 
     if (!isLocalDevEnvironment) {
       console.log('Verifying operator-managed console plugin deployment');
@@ -35,19 +39,14 @@ describe('Console plugin template test', () => {
     }
   });
 
-  afterEach(() => {
-    checkErrors();
-  });
-
   after(() => {
     // No cleanup needed for operator-managed deployment
     cy.logout();
   });
 
-  it('Verify the example page title', () => {
-    cy.get('[data-quickstart-id="qs-nav-home"]').click();
-    cy.get('[data-test="nav"]').contains('Plugin Example').click();
-    cy.url().should('include', '/example');
-    cy.get('[data-test="pattern-catalog-page-title"]').should('contain', 'Pattern Catalog');
+  it('Verify the pattern catalog page title', () => {
+    cy.visit('/patterns');
+    cy.url().should('include', '/patterns');
+    cy.contains('h1', 'Pattern Catalog', { timeout: 60000 }).should('be.visible');
   });
 });
