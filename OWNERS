@@ -8,6 +8,7 @@ approvers:
   - mlabonte-rh
   - gaurav-nelson
   - dminnear-rh
+  - OAharoni-RedHat
 options: {}
 reviewers:
   - beekhof
@@ -15,7 +16,5 @@ reviewers:
   - day0hero
   - mhjacks
   - darkdoc
-  - yukinchan
-  - mlabonte-rh
-  - gaurav-nelson
   - dminnear-rh
+  - OAharoni-RedHat
