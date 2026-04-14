@@ -1,11 +1,3 @@
-const dismissTour = () => {
-  cy.get('body').then(($body) => {
-    if ($body.find('[data-test="tour-step-footer-secondary"]').length > 0) {
-      cy.get('[data-test="tour-step-footer-secondary"]').contains('Skip tour').click();
-    }
-  });
-};
-
 const navigateToInstallPage = () => {
   cy.visit('/patterns');
   cy.get('.patterns-operator__card', { timeout: 60000 }).should('exist');
@@ -19,7 +11,7 @@ const navigateToInstallPage = () => {
 describe('Install Pattern Page', () => {
   before(function () {
     cy.login();
-    dismissTour();
+    cy.dismissTour();
 
     // Check if Install is available; skip the entire suite if not
     cy.visit('/patterns');

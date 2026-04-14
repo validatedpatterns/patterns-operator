@@ -1,14 +1,3 @@
-const PLUGIN_NAME = 'patterns-operator-console-plugin';
-const isLocalDevEnvironment = Cypress.config('baseUrl').includes('localhost');
-
-const dismissTour = () => {
-  cy.get('body').then(($body) => {
-    if ($body.find('[data-test="tour-step-footer-secondary"]').length > 0) {
-      cy.get('[data-test="tour-step-footer-secondary"]').contains('Skip tour').click();
-    }
-  });
-};
-
 const visitCatalog = () => {
   cy.visit('/patterns');
   cy.get('.patterns-operator__card', { timeout: 60000 }).should('exist');
@@ -17,7 +6,7 @@ const visitCatalog = () => {
 describe('Pattern Catalog Page', () => {
   before(() => {
     cy.login();
-    dismissTour();
+    cy.dismissTour();
   });
 
   after(() => {
