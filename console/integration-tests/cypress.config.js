@@ -17,6 +17,7 @@ module.exports = defineConfig({
     openMode: 0,
   },
   e2e: {
+    testIsolation: false,
     setupNodeEvents(on, config) {
       return require('./plugins/index.ts')(on, config);
     },
