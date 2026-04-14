@@ -3,6 +3,7 @@ declare global {
     interface Chainable {
       login(username?: string, password?: string): Chainable<Element>;
       logout(): Chainable<Element>;
+      dismissTour(): Chainable<Element>;
     }
   }
 }
@@ -27,6 +28,14 @@ Cypress.Commands.add('login', (username: string, password: string) => {
     cy.get('button[type=submit]').click();
 
     cy.get('[data-test="username"]').should('be.visible');
+  });
+});
+
+Cypress.Commands.add('dismissTour', () => {
+  cy.get('body').then(($body) => {
+    if ($body.find('[data-test="tour-step-footer-secondary"]').length > 0) {
+      cy.get('[data-test="tour-step-footer-secondary"]').contains('Skip tour').click();
+    }
   });
 });
 

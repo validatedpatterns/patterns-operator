@@ -428,3 +428,8 @@ console-build-arm64: generate-dockerfile-console-plugin console-multiarch-manife
 console-push: ## Uploads the container to quay.io/validatedpatterns/${CONSOLE_PLUGIN_IMAGE}
 	@echo "Uploading the ${REGISTRY}/${CONSOLE_PLUGIN_IMAGE} container to ${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
 	buildah manifest push --all "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
+
+.PHONY: console-integration-tests
+console-integration-tests: ## Run console integration tests (requires running cluster)
+	@echo "Running console integration tests..."
+	cd console; ./scripts/test-prow-e2e.sh
