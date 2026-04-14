@@ -321,10 +321,6 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push the bundle image.
 	docker push $(BUNDLE_IMG)
 
-.PHONY: csv-date
-csv-date: ## Set createdAt date in the CSV.
-	sed -c -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;"  ./config/manifests/bases/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
-
 # Some fixes in the bundle
 .PHONY: bundle-fixes
 bundle-fixes: ## update container image
@@ -333,10 +329,6 @@ bundle-fixes: ## update container image
 .PHONY: bundle-date
 bundle-date: ## Set createdAt date in the bundle's CSV. Do not commit changes!
 	sed -c -r -i "s|createdAt: .*|createdAt: `date '+%Y-%m-%d %T'`|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
-
-.PHONY: bundle-date-reset
-bundle-date-reset: ## Reset createdAt date to empty value
-	sed -c -r -i "s|createdAt: .*|createdAt: \"\"|;" ./bundle/manifests/$(OPERATOR_NAME)-operator.clusterserviceversion.yaml
 
 .PHONY: opm
 OPM = ./bin/opm
