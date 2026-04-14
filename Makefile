@@ -356,6 +356,7 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
+
 # Build an OLM catalog image by adding the bundle image to a simple catalog using the
 # operator package manager tool, 'opm'. For more information see:
 # https://olm.operatorframework.io/docs/reference/catalog-templates
@@ -431,4 +432,4 @@ console-push: ## Uploads the container to quay.io/validatedpatterns/${CONSOLE_PL
 .PHONY: console-integration-tests
 console-integration-tests: ## Run console integration tests (requires running cluster)
 	@echo "Running console integration tests..."
-	cd console; ./test-prow-e2e.sh
+	cd console; ./scripts/test-prow-e2e.sh
