@@ -3,10 +3,10 @@ name: Console
 on:
   push:
     paths:
-      - "console/"
+      - "console/**"
   pull_request:
     paths:
-      - "console/"
+      - "console/**"
 
 permissions:
   contents: read
