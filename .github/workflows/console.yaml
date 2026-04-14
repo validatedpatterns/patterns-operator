@@ -21,4 +21,4 @@ jobs:
         persist-credentials: false
     - name: Build the console container
       run: |
-        make console-build
+        make console-build-amd64

@@ -69,13 +69,13 @@ IMAGE_TAG_BASE ?= $(UPLOADREGISTRY)/$(OPERATOR_NAME)-operator
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+export IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 OPERATOR_IMG ?= $(OPERATOR_NAME)-operator:$(VERSION)
 
 # always release the console with the same tag as the operator and the other way around!
 # Image base URL of the console plugin
-CONSOLE_PLUGIN_IMAGE_BASE ?= $(IMAGE_TAG_BASE)-console
-CONSOLE_PLUGIN_IMAGE ?= $(CONSOLE_PLUGIN_IMAGE_BASE):$(VERSION)
+CONSOLE_PLUGIN_IMAGE_BASE ?= $(OPERATOR_NAME)-operator-console
+export CONSOLE_PLUGIN_IMAGE ?= $(CONSOLE_PLUGIN_IMAGE_BASE):$(VERSION)
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -306,9 +306,7 @@ endef
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	cd config/console-plugin && $(KUSTOMIZE) edit set image console-plugin=$(CONSOLE_PLUGIN_IMAGE)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests | envsubst | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-fixes bundle-date
 	./hack/set_openshift_minimum_version.sh
 	$(OPERATOR_SDK) bundle validate ./bundle
@@ -359,22 +357,6 @@ ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
-# Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
-.PHONY: generate-dockerfile-console-plugin
-generate-dockerfile-console-plugin:
-	VERSION=$(VERSION) SUPPORTED_OCP_VERSIONS=$(SUPPORTED_OCP_VERSIONS) envsubst < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
-
-.PHONY: console-build
-console-build: generate-dockerfile-console-plugin ## Build the console image
-	@echo "Building console image with cache optimization..."
-	@podman pull $(CONSOLE_PLUGIN_IMAGE_BASE):latest 2>/dev/null || true
-	podman build -f $(CURPATH)/$(CONSOLE_PLUGIN_DOCKERFILE) -t ${CONSOLE_PLUGIN_IMAGE} .
-	podman tag ${CONSOLE_PLUGIN_IMAGE} $(CONSOLE_PLUGIN_IMAGE_BASE):latest
-
-.PHONY: console-push
-console-push: ## Push the console image
-	podman push $(CONSOLE_PLUGIN_IMAGE)
-
 # Build an OLM catalog image by adding the bundle image to a simple catalog using the
 # operator package manager tool, 'opm'. For more information see:
 # https://olm.operatorframework.io/docs/reference/catalog-templates
@@ -417,3 +399,32 @@ super-linter: ## Runs super linter locally
 					-v $(PWD):/tmp/lint:rw,z \
 					-w /tmp/lint \
 					ghcr.io/super-linter/super-linter@sha256:6c71bd17ab38ceb7acb5b93ef72f5c2288b5456a5c82693ded3ee8bb501bba7f # slim-v8.1.0
+
+##@ Console plugin tasks
+# Generate Dockerfile using the template. It uses envsubst to replace the value of the version label in the container
+.PHONY: generate-dockerfile-console-plugin
+generate-dockerfile-console-plugin:
+	VERSION=$(VERSION) SUPPORTED_OCP_VERSIONS=$(SUPPORTED_OCP_VERSIONS) envsubst < templates/console-plugin.Dockerfile.template > $(CONSOLE_PLUGIN_DOCKERFILE)
+
+.PHONY: console-multiarch-manifest
+console-multiarch-manifest: ## creates the buildah manifest for multi-arch images
+	# The rm is needed due to bug https://www.github.com/containers/podman/issues/19757
+	buildah manifest rm "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" || /bin/true
+	buildah manifest create "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
+
+.PHONY: console-build-amd64
+console-build-amd64: generate-dockerfile-console-plugin console-multiarch-manifest ## build the console in amd64
+	@echo "Building the console amd64"
+	buildah build --platform linux/amd64 --format docker -f $(CONSOLE_PLUGIN_DOCKERFILE) -t "${CONSOLE_PLUGIN_IMAGE}-amd64"
+	buildah manifest add --arch=amd64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-amd64"
+
+.PHONY: console-build-arm64
+console-build-arm64: generate-dockerfile-console-plugin console-multiarch-manifest ## build the console in amd64
+	@echo "Building the console arm64"
+	buildah build --platform linux/arm64 --format docker -f $(CONSOLE_PLUGIN_DOCKERFILE) -t "${CONSOLE_PLUGIN_IMAGE}-arm64"
+	buildah manifest add --arch=arm64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-arm64"
+
+.PHONY: console-push
+console-push: ## Uploads the container to quay.io/validatedpatterns/${CONSOLE_PLUGIN_IMAGE}
+	@echo "Uploading the ${REGISTRY}/${CONSOLE_PLUGIN_IMAGE} container to ${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
+	buildah manifest push --all "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"

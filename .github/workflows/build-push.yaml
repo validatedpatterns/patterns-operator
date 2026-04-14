@@ -14,6 +14,7 @@ permissions:
 env:
   REGISTRY: localhost
   NAME: patterns-operator
+  CONSOLE_NAME: patterns-operator-console
   TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref_name == 'main' && 'latest' || github.ref_name) }}
 
 jobs:
@@ -61,8 +62,41 @@ jobs:
           path: /tmp/image-${{ matrix.targetarch }}.tar
           retention-days: 1
 
+  build-console:
+    strategy:
+      matrix:
+        include:
+          - targetarch: amd64
+            runner: ubuntu-latest
+          - targetarch: arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Build console container image and save tarball
+        env:
+          TARGETARCH: ${{ matrix.targetarch }}
+          CONSOLE_PLUGIN_IMAGE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
+        run: |
+          make "console-build-${TARGETARCH}"
+          buildah push "${CONSOLE_PLUGIN_IMAGE}-${TARGETARCH}" "docker-archive:/tmp/console-image-${TARGETARCH}.tar:${CONSOLE_PLUGIN_IMAGE}-${TARGETARCH}"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: console-image-${{ matrix.targetarch }}-${{ github.run_id }}
+          path: /tmp/console-image-${{ matrix.targetarch }}.tar
+          retention-days: 1
+
   pre-push-check:
-    needs: [build-container]
+    needs: [build-container, build-console]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -115,10 +149,24 @@ jobs:
           name: image-arm64-${{ github.run_id }}
           path: /tmp
 
+      - name: Download console AMD64 image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: console-image-amd64-${{ github.run_id }}
+          path: /tmp
+
+      - name: Download console ARM64 image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: console-image-arm64-${{ github.run_id }}
+          path: /tmp
+
       - name: Load tarballs into local containers-storage
         run: |
           buildah pull docker-archive:/tmp/image-amd64.tar
           buildah pull docker-archive:/tmp/image-arm64.tar
+          buildah pull docker-archive:/tmp/console-image-amd64.tar
+          buildah pull docker-archive:/tmp/console-image-arm64.tar
 
       - name: Log into Quay
         env:
@@ -134,6 +182,7 @@ jobs:
         env:
           UPLOADREGISTRY: ${{ matrix.upload_registry }}
           OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
+          CONSOLE_PLUGIN_IMAGE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
         run: |
           make buildah-manifest
           buildah manifest add --arch=amd64 "${REGISTRY}/${OPERATOR_IMG}" "${REGISTRY}/${OPERATOR_IMG}-amd64"
@@ -141,6 +190,12 @@ jobs:
           make buildah-push
           DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker://${UPLOADREGISTRY}/${OPERATOR_IMG}")
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          make console-multiarch-manifest
+          buildah manifest add --arch=arm64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-arm64"
+          buildah manifest add --arch=amd64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-amd64"
+          make console-push
+          CONSOLE_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}")
+          echo "console_digest=$CONSOLE_DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Install cosign
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
@@ -152,8 +207,11 @@ jobs:
       - name: Sign the published Docker image
         env:
           DIGEST: ${{ steps.manifest-push.outputs.digest }}
+          CONSOLE_DIGEST: ${{ steps.manifest-push.outputs.console_digest }}
           UPLOADREGISTRY: ${{ matrix.upload_registry }}
           OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
+          CONSOLE_PLUGIN_IMAGE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
         run: |
           cat "${XDG_RUNTIME_DIR}/containers/auth.json" > ~/.docker/config.json
           cosign sign --yes "${UPLOADREGISTRY}/${OPERATOR_IMG}@${DIGEST}"
+          cosign sign --yes "${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}@${CONSOLE_DIGEST}"
