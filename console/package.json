@@ -97,5 +97,8 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.1"
+  },
+  "resolutions": {
+    "braces": "^3.0.3"
   }
 }
