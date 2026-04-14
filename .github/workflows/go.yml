@@ -1,6 +1,12 @@
 name: Go
 
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - 'console/**'
+  pull_request:
+    paths-ignore:
+      - 'console/**'
 
 permissions:
   contents: read
