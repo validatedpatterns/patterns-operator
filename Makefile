@@ -74,8 +74,8 @@ OPERATOR_IMG ?= $(OPERATOR_NAME)-operator:$(VERSION)
 
 # always release the console with the same tag as the operator and the other way around!
 # Image base URL of the console plugin
-CONSOLE_PLUGIN_IMAGE_BASE ?= $(OPERATOR_NAME)-operator-console
-export CONSOLE_PLUGIN_IMAGE ?= $(CONSOLE_PLUGIN_IMAGE_BASE):$(VERSION)
+CONSOLE_PLUGIN_IMAGE_BASE ?= $(OPERATOR_NAME)-operator-console:$(VERSION)
+export CONSOLE_PLUGIN_IMAGE ?= $(UPLOADREGISTRY)/$(CONSOLE_PLUGIN_IMAGE_BASE)
 CONSOLE_PLUGIN_DOCKERFILE ?= console-plugin.Dockerfile
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -409,25 +409,25 @@ generate-dockerfile-console-plugin:
 .PHONY: console-multiarch-manifest
 console-multiarch-manifest: ## creates the buildah manifest for multi-arch images
 	# The rm is needed due to bug https://www.github.com/containers/podman/issues/19757
-	buildah manifest rm "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" || /bin/true
-	buildah manifest create "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
+	buildah manifest rm "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" || /bin/true
+	buildah manifest create "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}"
 
 .PHONY: console-build-amd64
 console-build-amd64: generate-dockerfile-console-plugin console-multiarch-manifest ## build the console in amd64
 	@echo "Building the console amd64"
-	buildah build --platform linux/amd64 --format docker -f $(CONSOLE_PLUGIN_DOCKERFILE) -t "${CONSOLE_PLUGIN_IMAGE}-amd64"
-	buildah manifest add --arch=amd64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-amd64"
+	buildah build --platform linux/amd64 --format docker -f $(CONSOLE_PLUGIN_DOCKERFILE) -t "${CONSOLE_PLUGIN_IMAGE_BASE}-amd64"
+	buildah manifest add --arch=amd64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}-amd64"
 
 .PHONY: console-build-arm64
 console-build-arm64: generate-dockerfile-console-plugin console-multiarch-manifest ## build the console in amd64
 	@echo "Building the console arm64"
-	buildah build --platform linux/arm64 --format docker -f $(CONSOLE_PLUGIN_DOCKERFILE) -t "${CONSOLE_PLUGIN_IMAGE}-arm64"
-	buildah manifest add --arch=arm64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-arm64"
+	buildah build --platform linux/arm64 --format docker -f $(CONSOLE_PLUGIN_DOCKERFILE) -t "${CONSOLE_PLUGIN_IMAGE_BASE}-arm64"
+	buildah manifest add --arch=arm64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}-arm64"
 
 .PHONY: console-push
 console-push: ## Uploads the container to quay.io/validatedpatterns/${CONSOLE_PLUGIN_IMAGE}
-	@echo "Uploading the ${REGISTRY}/${CONSOLE_PLUGIN_IMAGE} container to ${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
-	buildah manifest push --all "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}"
+	@echo "Uploading the ${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE} container to ${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}"
+	buildah manifest push --all "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}"
 
 .PHONY: console-integration-tests
 console-integration-tests: ## Run console integration tests (requires running cluster)

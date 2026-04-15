@@ -83,10 +83,10 @@ jobs:
       - name: Build console container image and save tarball
         env:
           TARGETARCH: ${{ matrix.targetarch }}
-          CONSOLE_PLUGIN_IMAGE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
+          CONSOLE_PLUGIN_IMAGE_BASE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
         run: |
           make "console-build-${TARGETARCH}"
-          buildah push "${CONSOLE_PLUGIN_IMAGE}-${TARGETARCH}" "docker-archive:/tmp/console-image-${TARGETARCH}.tar:${CONSOLE_PLUGIN_IMAGE}-${TARGETARCH}"
+          buildah push "${CONSOLE_PLUGIN_IMAGE_BASE}-${TARGETARCH}" "docker-archive:/tmp/console-image-${TARGETARCH}.tar:${CONSOLE_PLUGIN_IMAGE_BASE}-${TARGETARCH}"
 
       - name: Upload image artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -182,7 +182,7 @@ jobs:
         env:
           UPLOADREGISTRY: ${{ matrix.upload_registry }}
           OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
-          CONSOLE_PLUGIN_IMAGE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
+          CONSOLE_PLUGIN_IMAGE_BASE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
         run: |
           make buildah-manifest
           buildah manifest add --arch=amd64 "${REGISTRY}/${OPERATOR_IMG}" "${REGISTRY}/${OPERATOR_IMG}-amd64"
@@ -191,10 +191,10 @@ jobs:
           DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker://${UPLOADREGISTRY}/${OPERATOR_IMG}")
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           make console-multiarch-manifest
-          buildah manifest add --arch=arm64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-arm64"
-          buildah manifest add --arch=amd64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE}-amd64"
+          buildah manifest add --arch=arm64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}-arm64"
+          buildah manifest add --arch=amd64 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}-amd64"
           make console-push
-          CONSOLE_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}")
+          CONSOLE_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}")
           echo "console_digest=$CONSOLE_DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Install cosign
@@ -210,8 +210,8 @@ jobs:
           CONSOLE_DIGEST: ${{ steps.manifest-push.outputs.console_digest }}
           UPLOADREGISTRY: ${{ matrix.upload_registry }}
           OPERATOR_IMG: ${{ env.NAME }}:${{ env.TAG }}
-          CONSOLE_PLUGIN_IMAGE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
+          CONSOLE_PLUGIN_IMAGE_BASE: ${{ env.CONSOLE_NAME }}:${{ env.TAG }}
         run: |
           cat "${XDG_RUNTIME_DIR}/containers/auth.json" > ~/.docker/config.json
           cosign sign --yes "${UPLOADREGISTRY}/${OPERATOR_IMG}@${DIGEST}"
-          cosign sign --yes "${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE}@${CONSOLE_DIGEST}"
+          cosign sign --yes "${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}@${CONSOLE_DIGEST}"
