@@ -80,7 +80,7 @@ func CreateOrUpdateCatalog(ctx context.Context, cl client.Client, reader client.
 func getCatalogImage(ctx context.Context, reader client.Reader) string {
 	var cm corev1.ConfigMap
 	if err := reader.Get(ctx, client.ObjectKey{
-		Namespace: defaultNamespace,
+		Namespace: getDeploymentNamespace(),
 		Name:      operatorConfigMap,
 	}, &cm); err != nil {
 		return CatalogDefaultImage
