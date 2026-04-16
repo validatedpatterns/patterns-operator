@@ -24,8 +24,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: OpenShift Optional
-    containerImage: quay.io/validatedpatterns/patterns-operator:0.0.70
-    createdAt: 2026-04-13 08:26:22
+    containerImage: quay.io/validatedpatterns/patterns-operator:0.0.71
+    createdAt: 2026-04-16 14:31:20
     description: "An operator to deploy and manage architecture patterns from https://validatedpatterns.io.
       \nThis operator collects some Analytics like cluster version, cloud type, etc.
       To disable this\nadd \"ANALYTICS: false\" to the environment variables in the
@@ -38,7 +38,7 @@ metadata:
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/suggested-namespace: patterns-operator
-    operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather@sha256:ac23dfe8c3b8404f75f4bdf0eb54470acc98bbb5f892de34d2580066e93ee63d
+    operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather:latest
     operators.operatorframework.io/builder: operator-sdk-v1.42.2+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/validatedpatterns/patterns-operator
@@ -46,7 +46,7 @@ metadata:
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
-  name: patterns-operator.v0.0.70
+  name: patterns-operator.v0.0.71
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -230,16 +230,6 @@ spec:
           - ""
           resources:
           - configmaps
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-        - apiGroups:
-          - ""
-          resources:
           - namespaces
           verbs:
           - create
@@ -252,10 +242,39 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - nodes
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - ""
+          resources:
           - secrets
           verbs:
           - create
           - get
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - get
+          - list
+          - patch
           - update
           - watch
         - apiGroups:
@@ -309,6 +328,18 @@ spec:
           - patch
           - update
         - apiGroups:
+          - console.openshift.io
+          resources:
+          - consoleplugins
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - gitops.hybrid-cloud-patterns.io
           resources:
           - patterns
@@ -335,12 +366,28 @@ spec:
           - patch
           - update
         - apiGroups:
+          - machine.openshift.io
+          resources:
+          - machines
+          verbs:
+          - get
+          - list
+        - apiGroups:
           - operator.open-cluster-management.io
           resources:
           - multiclusterhubs
           verbs:
           - get
           - list
+        - apiGroups:
+          - operator.openshift.io
+          resources:
+          - consoles
+          verbs:
+          - get
+          - list
+          - update
+          - watch
         - apiGroups:
           - operator.openshift.io
           resources:
@@ -396,7 +443,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/validatedpatterns/patterns-operator@sha256:12855d993a1ba1f8c45768d8ad0bc77f1ffc3658a000882a7401896e4028b150
+                image: quay.io/validatedpatterns/patterns-operator:0.0.71
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -437,6 +484,67 @@ spec:
                 secret:
                   defaultMode: 420
                   secretName: webhook-server-cert
+      - label:
+          app.kubernetes.io/component: patterns-operator-console-plugin
+        name: patterns-operator-console-plugin
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/component: patterns-operator-console-plugin
+          strategy:
+            rollingUpdate:
+              maxSurge: 25%
+              maxUnavailable: 25%
+            type: RollingUpdate
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/component: patterns-operator-console-plugin
+            spec:
+              containers:
+              - env:
+                - name: OPERATOR_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                image: quay.io/validatedpatterns/patterns-operator-console:0.0.71
+                name: patterns-operator-console-plugin
+                ports:
+                - containerPort: 9443
+                  name: https
+                  protocol: TCP
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 50Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                volumeMounts:
+                - mountPath: /var/cert
+                  name: console-plugin-cert
+                  readOnly: true
+                - mountPath: /etc/nginx/nginx.conf
+                  name: nginx-conf
+                  readOnly: true
+                  subPath: nginx.conf
+              dnsPolicy: ClusterFirst
+              restartPolicy: Always
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: patterns-operator-controller-manager
+              volumes:
+              - name: console-plugin-cert
+                secret:
+                  defaultMode: 420
+                  secretName: patterns-operator-console-plugin-cert
+              - configMap:
+                  defaultMode: 420
+                  name: patterns-operator-console-plugin
+                name: nginx-conf
       permissions:
       - rules:
         - apiGroups:
@@ -510,12 +618,7 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
-  relatedImages:
-  - image: quay.io/validatedpatterns/patterns-operator@sha256:12855d993a1ba1f8c45768d8ad0bc77f1ffc3658a000882a7401896e4028b150
-    name: manager
-  - image: quay.io/validatedpatterns/must-gather@sha256:ac23dfe8c3b8404f75f4bdf0eb54470acc98bbb5f892de34d2580066e93ee63d
-    name: must-gather-ac23dfe8c3b8404f75f4bdf0eb54470acc98bbb5f892de34d2580066e93ee63d-annotation
-  version: 0.0.70
+  version: 0.0.71
   webhookdefinitions:
   - admissionReviewVersions:
     - v1
