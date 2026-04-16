@@ -13,7 +13,7 @@ const PATTERN_UI_CATALOG_BASE_URL = __PATTERN_UI_CATALOG_BASE_URL__ || DEFAULT_P
 
 
 async function fetchYAML<T>(url: string): Promise<T> {
-  const response = await consoleFetch(url);
+  const response = await consoleFetch(url, { cache: 'no-store' });
   const text = await response.text();
   return load(text) as T;
 }
