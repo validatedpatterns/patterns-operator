@@ -25,7 +25,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     containerImage: quay.io/validatedpatterns/patterns-operator:0.0.71
-    createdAt: 2026-04-16 14:31:20
+    createdAt: 2026-04-16 14:57:09
     description: "An operator to deploy and manage architecture patterns from https://validatedpatterns.io.
       \nThis operator collects some Analytics like cluster version, cloud type, etc.
       To disable this\nadd \"ANALYTICS: false\" to the environment variables in the
@@ -38,7 +38,7 @@ metadata:
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/suggested-namespace: patterns-operator
-    operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather:latest
+    operators.openshift.io/must-gather-image: quay.io/validatedpatterns/must-gather@sha256:ac23dfe8c3b8404f75f4bdf0eb54470acc98bbb5f892de34d2580066e93ee63d
     operators.operatorframework.io/builder: operator-sdk-v1.42.2+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/validatedpatterns/patterns-operator
@@ -443,7 +443,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/validatedpatterns/patterns-operator:0.0.71
+                image: quay.io/validatedpatterns/patterns-operator@sha256:6dd4e307443b9ddbc6990c5d24664e2bef76b1f39d06187a8931115abc277290
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -508,7 +508,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/validatedpatterns/patterns-operator-console:0.0.71
+                image: quay.io/validatedpatterns/patterns-operator-console@sha256:85564bbe2b0ddef446f6ccc0cf3ac116ea0d6fdcaa299b1c0923c85e0876da2e
                 name: patterns-operator-console-plugin
                 ports:
                 - containerPort: 9443
@@ -618,6 +618,13 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com/en/products/edge/validated-patterns
+  relatedImages:
+  - image: quay.io/validatedpatterns/patterns-operator@sha256:6dd4e307443b9ddbc6990c5d24664e2bef76b1f39d06187a8931115abc277290
+    name: manager
+  - image: quay.io/validatedpatterns/patterns-operator-console@sha256:85564bbe2b0ddef446f6ccc0cf3ac116ea0d6fdcaa299b1c0923c85e0876da2e
+    name: patterns-operator-console-plugin
+  - image: quay.io/validatedpatterns/must-gather@sha256:ac23dfe8c3b8404f75f4bdf0eb54470acc98bbb5f892de34d2580066e93ee63d
+    name: must-gather-ac23dfe8c3b8404f75f4bdf0eb54470acc98bbb5f892de34d2580066e93ee63d-annotation
   version: 0.0.71
   webhookdefinitions:
   - admissionReviewVersions:
