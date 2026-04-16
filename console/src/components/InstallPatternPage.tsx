@@ -80,6 +80,7 @@ export default function InstallPatternPage() {
   const [targetRepo, setTargetRepo] = React.useState('');
   const [useOwnFork, setUseOwnFork] = React.useState(false);
   const [targetRevision, setTargetRevision] = React.useState('main');
+  const [clusterGroupName, setClusterGroupName] = React.useState('hub');
 
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
@@ -100,6 +101,7 @@ export default function InstallPatternPage() {
         });
 
         setPatternName(patternData.name);
+        setClusterGroupName(patternData.clustergroupname);
         setTargetRepo(patternData.repo_url || '');
         // Only use the template if it has actual secrets defined
         const hasSecrets = template && template.secrets && template.secrets.length > 0;
@@ -323,7 +325,7 @@ export default function InstallPatternPage() {
       const hasSecrets = secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate;
       console.log('📊 [InstallPatternPage] Installation details:', {
         patternName,
-        clusterGroupName: 'hub',
+        clusterGroupName,
         targetRepo,
         targetRevision,
         hasSecrets,
@@ -346,7 +348,7 @@ export default function InstallPatternPage() {
           namespace: PATTERN_OPERATOR_NS,
         },
         spec: {
-          clusterGroupName: 'hub',
+          clusterGroupName: clusterGroupName,
           gitSpec: {
             targetRepo,
             targetRevision,

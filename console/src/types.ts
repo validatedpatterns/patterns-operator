@@ -33,19 +33,20 @@ export interface Pattern {
   name: string;
   pattern_version: string;
   display_name: string;
-  description?: string;
   repo_url: string;
-  docs_repo_url?: string;
   issues_url: string;
   docs_url: string;
   ci_url: string;
   tier: 'maintained' | 'tested' | 'sandbox';
   owners: string[];
+  org: string;
+  clustergroupname: string;
+  description?: string;
+  docs_repo_url?: string;
+  spoke?: unknown;
   requirements?: PatternRequirements;
   extra_features?: ExtraFeatures;
   external_requirements?: ExternalRequirements;
-  org: string;
-  spoke?: unknown;
   /** The catalog directory key used to fetch this pattern. */
   catalogKey?: string;
 }
