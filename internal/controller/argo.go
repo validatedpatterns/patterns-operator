@@ -71,6 +71,127 @@ func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorCo
 	argoPolicy := strings.Join(argoPolicies, "\n")
 	defaultPolicy := "role:readonly"
 	argoScopes := "[groups,email]"
+
+	resourceHealthChecks := []argooperator.ResourceHealthCheck{
+		{
+			// We can drop this custom Subscription healthcheck once https://www.github.com/argoproj/argo-cd/issues/25921 is fixed
+			Group: "operators.coreos.com",
+			Kind:  "Subscription",
+			Check: `local health_status = {}
+if obj.status ~= nil then
+  if obj.status.conditions ~= nil then
+    local numDegraded = 0
+    local numPending = 0
+    local msg = ""
+
+    -- Check if this is a manual approval scenario where InstallPlanPending is expected
+    -- and the operator is already installed (upgrade pending, not initial install)
+    local isManualApprovalPending = false
+    if obj.spec ~= nil and obj.spec.installPlanApproval == "Manual" then
+      for _, condition in pairs(obj.status.conditions) do
+        if condition.type == "InstallPlanPending" and condition.status == "True" and condition.reason == "RequiresApproval" then
+          -- Only treat as expected healthy state if the operator is already installed
+          -- (installedCSV is present), meaning this is an upgrade pending approval
+          if obj.status.installedCSV ~= nil then
+            isManualApprovalPending = true
+          end
+          break
+        end
+      end
+    end
+
+    for i, condition in pairs(obj.status.conditions) do
+      -- Skip InstallPlanPending condition when manual approval is pending (expected behavior)
+      if isManualApprovalPending and condition.type == "InstallPlanPending" then
+        -- Do not include in message or count as pending
+      else
+        msg = msg .. i .. ": " .. condition.type .. " | " .. condition.status .. "\n"
+        if condition.type == "InstallPlanPending" and condition.status == "True" then
+          numPending = numPending + 1
+        elseif (condition.type == "InstallPlanMissing" and condition.reason ~= "ReferencedInstallPlanNotFound") then
+          numDegraded = numDegraded + 1
+        elseif (condition.type == "CatalogSourcesUnhealthy" or condition.type == "InstallPlanFailed" or condition.type == "ResolutionFailed") and condition.status == "True" then
+          numDegraded = numDegraded + 1
+        end
+      end
+    end
+
+    -- Available states: undef/nil, UpgradeAvailable, UpgradePending, UpgradeFailed, AtLatestKnown
+    -- Source: https://github.com/openshift/operator-framework-olm/blob/5e2c73b7663d0122c9dc3e59ea39e515a31e2719/staging/api/pkg/operators/v1alpha1/subscription_types.go#L17-L23
+    if obj.status.state == nil  then
+      numPending = numPending + 1
+      msg = msg .. ".status.state not yet known\n"
+    elseif obj.status.state == "" or obj.status.state == "UpgradeAvailable" then
+      numPending = numPending + 1
+      msg = msg .. ".status.state is '" .. obj.status.state .. "'\n"
+    elseif obj.status.state == "UpgradePending" then
+      -- UpgradePending with manual approval is expected behavior, treat as healthy
+      if isManualApprovalPending then
+        msg = msg .. ".status.state is 'AtLatestKnown'\n"
+      else
+        numPending = numPending + 1
+        msg = msg .. ".status.state is '" .. obj.status.state .. "'\n"
+      end
+    elseif obj.status.state == "UpgradeFailed" then
+      numDegraded = numDegraded + 1
+      msg = msg .. ".status.state is '" .. obj.status.state .. "'\n"
+    else
+      -- Last possiblity of .status.state: AtLatestKnown
+      msg =  msg .. ".status.state is '" .. obj.status.state .. "'\n"
+    end
+ 
+    if numDegraded == 0 and numPending == 0 then
+      health_status.status = "Healthy"
+      health_status.message = msg
+      return health_status
+    elseif numPending > 0 and numDegraded == 0 then
+      health_status.status = "Progressing"
+      health_status.message = msg
+      return health_status
+    else
+      health_status.status = "Degraded"
+      health_status.message = msg
+      return health_status
+    end
+  end
+end
+health_status.status = "Progressing"
+health_status.message = "An install plan for a subscription is pending installation"
+return health_status`,
+		},
+	}
+	if strings.EqualFold(patternsOperatorConfig.getValueWithDefault("gitops.applicationHealthCheckEnabled"), "true") {
+		// As of ArgoCD 1.8 the Application health check was dropped (see https://github.com/argoproj/argo-cd/issues/3781),
+		// but in app-of-apps pattern this is needed in order to implement children apps dependencies via sync-waves
+		resourceHealthChecks = append(resourceHealthChecks, argooperator.ResourceHealthCheck{
+			Group: "argoproj.io",
+			Kind:  "Application",
+			Check: `local health_status = {}
+health_status.status = "Progressing"
+health_status.message = ""
+if obj.status ~= nil then
+  if obj.status.health ~= nil then
+    -- we consider the Application Healthy only when the health status is Healthy AND it's synced
+    if obj.status.health.status == "Healthy" and (obj.status.sync and obj.status.sync.status or nil) == "Synced" then
+      health_status.status = "Healthy"
+      health_status.message = (obj.status.health.message or "Application is healthy and synced")
+      return health_status
+    end
+	-- We consider the Application Degraded only when the Sync failed for 'retry.limit' times
+    if obj.status.operationState ~= nil then
+      local retryLimit = (obj.status.operationState.operation and obj.status.operationState.operation.retry and obj.status.operationState.operation.retry.limit or nil)
+      local retryCount = (obj.status.operationState.retryCount or nil)
+      if retryLimit == retryCount and obj.status.operationState.phase ~= "Succeeded" then
+        health_status.status = "Degraded"
+        health_status.message = "Retry limit reached and sync didn't succeed"
+      end
+    end
+  end
+end
+return health_status`,
+		})
+	}
+
 	trueBool := true
 	initVolumes := []v1.Volume{
 		{
@@ -264,93 +385,7 @@ func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorCo
   - TaskRun
   - PipelineRun`,
 			// We can drop this custom Subscription healthcheck once https://www.github.com/argoproj/argo-cd/issues/25921 is fixed
-			ResourceHealthChecks: []argooperator.ResourceHealthCheck{
-				{
-					Group: "operators.coreos.com",
-					Kind:  "Subscription",
-					Check: `local health_status = {}
-if obj.status ~= nil then
-  if obj.status.conditions ~= nil then
-    local numDegraded = 0
-    local numPending = 0
-    local msg = ""
-
-    -- Check if this is a manual approval scenario where InstallPlanPending is expected
-    -- and the operator is already installed (upgrade pending, not initial install)
-    local isManualApprovalPending = false
-    if obj.spec ~= nil and obj.spec.installPlanApproval == "Manual" then
-      for _, condition in pairs(obj.status.conditions) do
-        if condition.type == "InstallPlanPending" and condition.status == "True" and condition.reason == "RequiresApproval" then
-          -- Only treat as expected healthy state if the operator is already installed
-          -- (installedCSV is present), meaning this is an upgrade pending approval
-          if obj.status.installedCSV ~= nil then
-            isManualApprovalPending = true
-          end
-          break
-        end
-      end
-    end
-
-    for i, condition in pairs(obj.status.conditions) do
-      -- Skip InstallPlanPending condition when manual approval is pending (expected behavior)
-      if isManualApprovalPending and condition.type == "InstallPlanPending" then
-        -- Do not include in message or count as pending
-      else
-        msg = msg .. i .. ": " .. condition.type .. " | " .. condition.status .. "\n"
-        if condition.type == "InstallPlanPending" and condition.status == "True" then
-          numPending = numPending + 1
-        elseif (condition.type == "InstallPlanMissing" and condition.reason ~= "ReferencedInstallPlanNotFound") then
-          numDegraded = numDegraded + 1
-        elseif (condition.type == "CatalogSourcesUnhealthy" or condition.type == "InstallPlanFailed" or condition.type == "ResolutionFailed") and condition.status == "True" then
-          numDegraded = numDegraded + 1
-        end
-      end
-    end
-
-    -- Available states: undef/nil, UpgradeAvailable, UpgradePending, UpgradeFailed, AtLatestKnown
-    -- Source: https://github.com/openshift/operator-framework-olm/blob/5e2c73b7663d0122c9dc3e59ea39e515a31e2719/staging/api/pkg/operators/v1alpha1/subscription_types.go#L17-L23
-    if obj.status.state == nil  then
-      numPending = numPending + 1
-      msg = msg .. ".status.state not yet known\n"
-    elseif obj.status.state == "" or obj.status.state == "UpgradeAvailable" then
-      numPending = numPending + 1
-      msg = msg .. ".status.state is '" .. obj.status.state .. "'\n"
-    elseif obj.status.state == "UpgradePending" then
-      -- UpgradePending with manual approval is expected behavior, treat as healthy
-      if isManualApprovalPending then
-        msg = msg .. ".status.state is 'AtLatestKnown'\n"
-      else
-        numPending = numPending + 1
-        msg = msg .. ".status.state is '" .. obj.status.state .. "'\n"
-      end
-    elseif obj.status.state == "UpgradeFailed" then
-      numDegraded = numDegraded + 1
-      msg = msg .. ".status.state is '" .. obj.status.state .. "'\n"
-    else
-      -- Last possiblity of .status.state: AtLatestKnown
-      msg =  msg .. ".status.state is '" .. obj.status.state .. "'\n"
-    end
- 
-    if numDegraded == 0 and numPending == 0 then
-      health_status.status = "Healthy"
-      health_status.message = msg
-      return health_status
-    elseif numPending > 0 and numDegraded == 0 then
-      health_status.status = "Progressing"
-      health_status.message = msg
-      return health_status
-    else
-      health_status.status = "Degraded"
-      health_status.message = msg
-      return health_status
-    end
-  end
-end
-health_status.status = "Progressing"
-health_status.message = "An install plan for a subscription is pending installation"
-return health_status`,
-				},
-			},
+			ResourceHealthChecks:   resourceHealthChecks,
 			ResourceTrackingMethod: "annotation",
 			Server: argooperator.ArgoCDServerSpec{
 				Autoscale: argooperator.ArgoCDServerAutoscaleSpec{

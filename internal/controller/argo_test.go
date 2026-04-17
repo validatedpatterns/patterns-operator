@@ -2178,6 +2178,22 @@ var _ = Describe("newArgoCD", func() {
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("test-admins"))
 	})
 
+	It("should have only Subscription ResourceHealthChecks", func() {
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
+		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("Subscription"))
+	})
+
+	It("should have also Application ResourceHealthChecks when gitops.applicationHealthCheckEnabled is set to true", func() {
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.applicationHealthCheckEnabled": "true"})
+		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("argoproj.io"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Application"))
+	})
+
 })
 
 var _ = Describe("commonSyncPolicy", func() {

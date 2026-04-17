@@ -87,17 +87,18 @@ const (
 // Currently none
 
 var DefaultPatternsOperatorConfig = map[string]string{
-	"gitops.catalogSource":        GitOpsDefaultCatalogSource,
-	"gitops.channel":              GitOpsDefaultChannel,
-	"gitops.sourceNamespace":      GitOpsDefaultCatalogSourceNamespace,
-	"gitops.installApprovalPlan":  GitOpsDefaultApprovalPlan,
-	"gitops.csv":                  GitOpsDefaultCSV,
-	"gitops.additionalArgoAdmins": "",
-	"gitea.chartName":             GiteaChartName,
-	"gitea.helmRepoUrl":           GiteaHelmRepoUrl,
-	"gitea.chartVersion":          GiteaDefaultChartVersion,
-	"analytics.enabled":           "true",
-	"catalog.image":               "",
+	"gitops.catalogSource":                 GitOpsDefaultCatalogSource,
+	"gitops.channel":                       GitOpsDefaultChannel,
+	"gitops.sourceNamespace":               GitOpsDefaultCatalogSourceNamespace,
+	"gitops.installApprovalPlan":           GitOpsDefaultApprovalPlan,
+	"gitops.csv":                           GitOpsDefaultCSV,
+	"gitops.additionalArgoAdmins":          "",
+	"gitops.applicationHealthCheckEnabled": "false",
+	"gitea.chartName":                      GiteaChartName,
+	"gitea.helmRepoUrl":                    GiteaHelmRepoUrl,
+	"gitea.chartVersion":                   GiteaDefaultChartVersion,
+	"analytics.enabled":                    "true",
+	"catalog.image":                        "",
 }
 
 type PatternsOperatorConfig map[string]string
