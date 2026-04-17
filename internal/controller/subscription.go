@@ -27,37 +27,25 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
-func newSubscriptionFromConfigMap(r kubernetes.Interface, disableDefaultInstance bool) (*operatorv1alpha1.Subscription, error) {
+func newSubscription(patternsOperatorConfig PatternsOperatorConfig, disableDefaultInstance bool) *operatorv1alpha1.Subscription {
 	var newSubscription *operatorv1alpha1.Subscription
-
-	// Check if the config map exists and read the config map values
-	cm, err := r.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
-	// If we hit an error that is not related to the configmap not existing bubble it up
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	if cm != nil {
-		PatternsOperatorConfig = cm.Data
-	}
 
 	var installPlanApproval operatorv1alpha1.Approval
 
-	if PatternsOperatorConfig.getValueWithDefault("gitops.installApprovalPlan") == "Manual" {
+	if patternsOperatorConfig.getValueWithDefault("gitops.installApprovalPlan") == "Manual" {
 		installPlanApproval = operatorv1alpha1.ApprovalManual
 	} else {
 		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 	}
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          PatternsOperatorConfig.getValueWithDefault("gitops.catalogSource"),
-		CatalogSourceNamespace: PatternsOperatorConfig.getValueWithDefault("gitops.sourceNamespace"),
+		CatalogSource:          patternsOperatorConfig.getValueWithDefault("gitops.catalogSource"),
+		CatalogSourceNamespace: patternsOperatorConfig.getValueWithDefault("gitops.sourceNamespace"),
 		Package:                GitOpsDefaultPackageName,
-		Channel:                PatternsOperatorConfig.getValueWithDefault("gitops.channel"),
-		StartingCSV:            PatternsOperatorConfig.getValueWithDefault("gitops.csv"),
+		Channel:                patternsOperatorConfig.getValueWithDefault("gitops.channel"),
+		StartingCSV:            patternsOperatorConfig.getValueWithDefault("gitops.csv"),
 		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: newSubscriptionEnvVars(disableDefaultInstance),
@@ -73,7 +61,7 @@ func newSubscriptionFromConfigMap(r kubernetes.Interface, disableDefaultInstance
 		Spec: spec,
 	}
 
-	return newSubscription, nil
+	return newSubscription
 }
 
 // newSubscriptionEnvVars returns the environment variables for the GitOps operator subscription.

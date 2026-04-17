@@ -406,38 +406,38 @@ var _ = Describe("CountApplicationsAndSets", func() {
 	})
 })
 
-var _ = Describe("GitOpsConfig getValueWithDefault", func() {
+var _ = Describe("PatternsOperatorConfig getValueWithDefault", func() {
 	Context("when value exists in config", func() {
 		It("should return the configured value", func() {
-			config := GitOpsConfig{"key1": "value1"}
+			config := PatternsOperatorConfig{"key1": "value1"}
 			Expect(config.getValueWithDefault("key1")).To(Equal("value1"))
 		})
 	})
 
 	Context("when value does not exist in config but has a default", func() {
 		It("should return the default value", func() {
-			config := GitOpsConfig{}
+			config := PatternsOperatorConfig{}
 			Expect(config.getValueWithDefault("gitops.channel")).To(Equal(GitOpsDefaultChannel))
 		})
 	})
 
 	Context("when value does not exist anywhere", func() {
 		It("should return empty string", func() {
-			config := GitOpsConfig{}
+			config := PatternsOperatorConfig{}
 			Expect(config.getValueWithDefault("nonexistent.key")).To(Equal(""))
 		})
 	})
 
 	Context("when config overrides a default", func() {
 		It("should return the config value not the default", func() {
-			config := GitOpsConfig{"gitops.channel": "custom-channel"}
+			config := PatternsOperatorConfig{"gitops.channel": "custom-channel"}
 			Expect(config.getValueWithDefault("gitops.channel")).To(Equal("custom-channel"))
 		})
 	})
 
 	Context("when config is nil", func() {
 		It("should return the default value", func() {
-			var config GitOpsConfig
+			var config PatternsOperatorConfig
 			Expect(config.getValueWithDefault("gitops.channel")).To(Equal(GitOpsDefaultChannel))
 		})
 	})

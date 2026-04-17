@@ -150,6 +150,17 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
+	patternsOperatorConfig := DefaultPatternsOperatorConfig
+
+	configCM, err := GetPatternsOperatorConfigMap()
+	// If we hit an error that is not related to the configmap not existing bubble it up
+	if err != nil && !kerrors.IsNotFound(err) {
+		return r.actionPerformed(instance, "failed to get the configuration ConfigMap", err)
+	}
+	if configCM != nil {
+		patternsOperatorConfig = configCM.Data
+	}
+
 	// Remove the ArgoCD application on deletion
 	if instance.DeletionTimestamp.IsZero() {
 		// Add finalizer when object is created
@@ -198,7 +209,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// -- GitOps Subscription
-	if done, result, subErr := r.reconcileGitOpsSubscription(qualifiedInstance); done {
+	if done, result, subErr := r.reconcileGitOpsSubscription(qualifiedInstance, patternsOperatorConfig); done {
 		return result, subErr
 	}
 	logOnce("subscription found")
@@ -262,7 +273,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// If you specified OriginRepo then we automatically spawn a gitea instance via a special argo gitea application
 	if qualifiedInstance.Spec.GitConfig.OriginRepo != "" {
-		giteaErr := r.createGiteaInstance(qualifiedInstance)
+		giteaErr := r.createGiteaInstance(qualifiedInstance, patternsOperatorConfig)
 		if giteaErr != nil {
 			return r.actionPerformed(qualifiedInstance, "error created gitea instance", giteaErr)
 		}
@@ -339,16 +350,12 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // reconcileGitOpsSubscription ensures the GitOps operator subscription exists and is up-to-date.
 // It returns (done, result, err) — when done is true the caller should return result/err immediately.
-func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.Pattern) (done bool, result ctrl.Result, err error) {
+func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.Pattern, patternsOperatorConfig PatternsOperatorConfig) (done bool, result ctrl.Result, err error) {
 	// Only disable the default ArgoCD instance for non-legacy deployments.
 	// For legacy deployments, the gitops-operator's default instance is still in use.
 	disableDefault := !isLegacyArgoNamespace()
-	targetSub, err := newSubscriptionFromConfigMap(r.fullClient, disableDefault)
+	targetSub := newSubscription(patternsOperatorConfig, disableDefault)
 
-	if err != nil {
-		res, e := r.actionPerformed(qualifiedInstance, "error creating new subscription from configmap", err)
-		return true, res, e
-	}
 	subscriptionName, subscriptionNamespace := DetectGitOpsSubscription()
 	// If the pattern operator is installed to the new vp namespace we need to create a ns, operatorgroup for the new sub
 	if DetectOperatorNamespace() != LegacyOperatorNamespace {
@@ -392,7 +399,7 @@ func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.P
 		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, currentSub, r.Scheme); err == nil {
 			changed = true
 		}
-		operatorConfigMap, cmErr := GetOperatorConfigmap()
+		operatorConfigMap, cmErr := GetPatternsOperatorConfigMap()
 		if cmErr == nil {
 			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, currentSub, r.Scheme); err == nil {
 				changed = true
@@ -418,7 +425,7 @@ func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.P
 	return false, ctrl.Result{}, nil
 }
 
-func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
+func (r *PatternReconciler) createGiteaInstance(input *api.Pattern, patternsOperatorConfig PatternsOperatorConfig) error {
 	gitConfig := input.Spec.GitConfig
 	clusterWideNS := getClusterWideArgoNamespace()
 	// The reason we create the vp-gitea namespace and and the
@@ -449,7 +456,7 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern) error {
 	}
 
 	log.Printf("Origin repo is set, creating gitea instance: %s", gitConfig.OriginRepo)
-	giteaApp := newArgoGiteaApplication(input)
+	giteaApp := newArgoGiteaApplication(input, patternsOperatorConfig)
 	_ = controllerutil.SetOwnerReference(input, giteaApp, r.Scheme)
 	app, err := getApplication(r.argoClient, GiteaApplicationName, clusterWideNS)
 	if app == nil {

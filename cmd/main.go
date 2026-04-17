@@ -86,7 +86,7 @@ func main() {
 	setupLog.Info("detected operator namespace", "namespace", controllers.DetectOperatorNamespace())
 
 	// Create initial config map for gitops
-	err := createGitOpsConfigMap()
+	err := createPatternsOperatorConfigMap()
 	if err != nil {
 		setupLog.Error(err, "unable to create config map")
 	}
@@ -172,7 +172,7 @@ func printVersion() {
 // Creates the patterns operator configmap
 // This will include configuration parameters that
 // will allow operator configuration
-func createGitOpsConfigMap() error {
+func createPatternsOperatorConfigMap() error {
 	config, err := ctrl.GetConfig()
 	if err != nil {
 		return fmt.Errorf("failed to get config: %s", err)

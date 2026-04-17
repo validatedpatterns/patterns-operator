@@ -1420,9 +1420,12 @@ var _ = Describe("getChildApplications", func() {
 
 var _ = Describe("NewArgoGiteaApplication", func() {
 	var pattern *api.Pattern
+	var patternsOperatorConfig PatternsOperatorConfig
+	var app *argoapi.Application
+
 	BeforeEach(func() {
 		tmpFalse := false
-		PatternsOperatorConfig = DefaultPatternOperatorConfig
+		patternsOperatorConfig = DefaultPatternsOperatorConfig
 		pattern = &api.Pattern{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-pattern", Namespace: defaultNamespace},
 			TypeMeta:   metav1.TypeMeta{Kind: "Pattern", APIVersion: api.GroupVersion.String()},
@@ -1444,10 +1447,11 @@ var _ = Describe("NewArgoGiteaApplication", func() {
 				ClusterDomain:    "hub-cluster.validatedpatterns.io",
 			},
 		}
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
+
 	})
 
 	It("should create a gitea application with correct properties", func() {
-		app := newArgoGiteaApplication(pattern)
 		Expect(app).ToNot(BeNil())
 		Expect(app.Name).To(Equal(GiteaApplicationName))
 		Expect(app.Namespace).To(Equal(getClusterWideArgoNamespace()))
@@ -2001,6 +2005,8 @@ var _ = Describe("removeApplication", func() {
 
 var _ = Describe("newArgoGiteaApplication", func() {
 	var pattern *api.Pattern
+	var patternsOperatorConfig PatternsOperatorConfig
+	var app *argoapi.Application
 
 	BeforeEach(func() {
 		tmpFalse := false
@@ -2028,37 +2034,37 @@ var _ = Describe("newArgoGiteaApplication", func() {
 				ClusterVersion:   "4.14.0",
 			},
 		}
-		PatternsOperatorConfig = GitOpsConfig{}
+		patternsOperatorConfig = DefaultPatternsOperatorConfig
 	})
 
 	It("should create the Gitea application with correct name", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Name).To(Equal(GiteaApplicationName))
 		Expect(app.Namespace).To(Equal(getClusterWideArgoNamespace()))
 	})
 
 	It("should set the pattern label", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Labels).To(HaveKeyWithValue("validatedpatterns.io/pattern", "test-pattern"))
 	})
 
 	It("should set the destination namespace to GiteaNamespace", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Spec.Destination.Namespace).To(Equal(GiteaNamespace))
 	})
 
 	It("should set destination to in-cluster", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Spec.Destination.Name).To(Equal("in-cluster"))
 	})
 
 	It("should set the project to default", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Spec.Project).To(Equal("default"))
 	})
 
 	It("should include helm parameters for gitea admin secret and console href", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Spec.Source).ToNot(BeNil())
 		Expect(app.Spec.Source.Helm).ToNot(BeNil())
 
@@ -2074,19 +2080,19 @@ var _ = Describe("newArgoGiteaApplication", func() {
 	})
 
 	It("should have the foreground propagation finalizer", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(controllerutil.ContainsFinalizer(app, argoapi.ForegroundPropagationPolicyFinalizer)).To(BeTrue())
 	})
 
 	It("should set a sync policy when not manual sync", func() {
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Spec.SyncPolicy).ToNot(BeNil())
 		Expect(app.Spec.SyncPolicy.Automated).ToNot(BeNil())
 	})
 
 	It("should have nil sync policy when manual sync is enabled", func() {
 		pattern.Spec.GitOpsConfig.ManualSync = true
-		app := newArgoGiteaApplication(pattern)
+		app = newArgoGiteaApplication(pattern, patternsOperatorConfig)
 		Expect(app.Spec.SyncPolicy).To(BeNil())
 	})
 })

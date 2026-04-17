@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kubeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/testing"
 )
 
@@ -87,35 +86,16 @@ var _ = Describe("Subscription Functions", func() {
 		})
 	})
 
-	Context("newSubscriptionFromConfigMap (operator in suggested namespace patterns-operator)", func() {
+	Context("newSubscription (operator in suggested namespace patterns-operator)", func() {
 		var testConfigMap *corev1.ConfigMap
-		var fakeClientSet *kubeclient.Clientset
 
 		BeforeEach(func() {
-			fakeClientSet = kubeclient.NewSimpleClientset()
 			cm := newDefaultTestSubConfigMap()
 			testConfigMap = cm.DeepCopy()
 		})
 
-		It("should handle the absence of the ConfigMap gracefully", func() {
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(sub).NotTo(BeNil())
-			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))
-			Expect(sub.Spec.CatalogSourceNamespace).To(Equal(GitOpsDefaultCatalogSourceNamespace))
-			Expect(sub.Spec.Package).To(Equal(GitOpsDefaultPackageName))
-			Expect(sub.Spec.Channel).To(Equal(GitOpsDefaultChannel))
-			Expect(sub.Spec.StartingCSV).To(BeEmpty())
-			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalAutomatic))
-			Expect(sub.Namespace).To(Equal(GitOpsDefaultSubscriptionNamespace))
-			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
-		})
-
 		It("should create a Subscription from a configmap", func() {
-			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
-			Expect(err).ToNot(HaveOccurred())
+			sub := newSubscription(testConfigMap.Data, true)
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
 			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foo-source-namespace"))
@@ -128,13 +108,11 @@ var _ = Describe("Subscription Functions", func() {
 		})
 	})
 
-	Context("newSubscriptionFromConfigMap (operator in legacy namespace openshift-operators)", func() {
+	Context("newSubscription (operator in legacy namespace openshift-operators)", func() {
 		var testConfigMap *corev1.ConfigMap
-		var fakeClientSet *kubeclient.Clientset
 
 		BeforeEach(func() {
 			os.Setenv("OPERATOR_NAMESPACE", LegacyOperatorNamespace)
-			fakeClientSet = kubeclient.NewSimpleClientset()
 			cm := newDefaultTestSubConfigMap()
 			testConfigMap = cm.DeepCopy()
 		})
@@ -144,10 +122,7 @@ var _ = Describe("Subscription Functions", func() {
 		})
 
 		It("should create a Subscription to legacy operator ns", func() {
-			_, err := fakeClientSet.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), testConfigMap, metav1.CreateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
-			Expect(err).ToNot(HaveOccurred())
+			sub := newSubscription(testConfigMap.Data, true)
 			Expect(sub).NotTo(BeNil())
 			Expect(sub.Spec.CatalogSource).To(Equal("foo-source"))
 			Expect(sub.Spec.CatalogSourceNamespace).To(Equal("foo-source-namespace"))
@@ -155,20 +130,6 @@ var _ = Describe("Subscription Functions", func() {
 			Expect(sub.Spec.Channel).To(Equal("foo-channel"))
 			Expect(sub.Spec.StartingCSV).To(Equal("1.2.3"))
 			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalManual))
-			Expect(sub.Namespace).To(Equal(GitOpsLegacySubscriptionNamespace))
-			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
-		})
-
-		It("should handle the absence of the ConfigMap gracefully (legacy operator ns)", func() {
-			sub, err := newSubscriptionFromConfigMap(fakeClientSet, true)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(sub).NotTo(BeNil())
-			Expect(sub.Spec.CatalogSource).To(Equal(GitOpsDefaultCatalogSource))
-			Expect(sub.Spec.CatalogSourceNamespace).To(Equal(GitOpsDefaultCatalogSourceNamespace))
-			Expect(sub.Spec.Package).To(Equal(GitOpsDefaultPackageName))
-			Expect(sub.Spec.Channel).To(Equal(GitOpsDefaultChannel))
-			Expect(sub.Spec.StartingCSV).To(BeEmpty())
-			Expect(sub.Spec.InstallPlanApproval).To(Equal(operatorv1alpha1.ApprovalAutomatic))
 			Expect(sub.Namespace).To(Equal(GitOpsLegacySubscriptionNamespace))
 			Expect(sub.Name).To(Equal(GitOpsDefaultPackageName))
 		})

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -o pipefail
 
-CATALOGSOURCE="test-pattern-operator"
+CATALOGSOURCE="test-patterns-operator"
 DEFAULT_NS="patterns-operator"
 OPERATOR="patterns-operator"
 VERSION="${VERSION:-6.6.6}"
