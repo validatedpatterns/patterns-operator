@@ -105,26 +105,19 @@ func main() {
 
 	registerComponentOrExit(mgr, argov1beta1api.AddToScheme)
 
-	// Register and enable the console plugin only when running in the
-	// patterns-operator namespace. The legacy openshift-operators namespace
-	// does not support the UI.
-	if controllers.DetectOperatorNamespace() != controllers.LegacyOperatorNamespace {
-		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			if err := console.CreateOrUpdatePlugin(ctx, mgr.GetClient()); err != nil {
-				setupLog.Error(err, "unable to create/update console plugin")
-			}
-			if err := console.EnablePlugin(ctx, mgr.GetClient()); err != nil {
-				setupLog.Error(err, "unable to enable console plugin")
-			}
-			if err := console.CreateOrUpdateCatalog(ctx, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
-				setupLog.Error(err, "unable to create/update catalog deployment")
-			}
-			return nil
-		})); err != nil {
-			setupLog.Error(err, "unable to add console plugin runnable")
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		if err := console.CreateOrUpdatePlugin(ctx, mgr.GetClient()); err != nil {
+			setupLog.Error(err, "unable to create/update console plugin")
 		}
-	} else {
-		setupLog.Info("skipping console plugin registration in legacy namespace", "namespace", controllers.LegacyOperatorNamespace)
+		if err := console.EnablePlugin(ctx, mgr.GetClient()); err != nil {
+			setupLog.Error(err, "unable to enable console plugin")
+		}
+		if err := console.CreateOrUpdateCatalog(ctx, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+			setupLog.Error(err, "unable to create/update catalog deployment")
+		}
+		return nil
+	})); err != nil {
+		setupLog.Error(err, "unable to add console plugin runnable")
 	}
 
 	analyticsEnabled := areAnalyticsEnabled(mgr.GetAPIReader())
