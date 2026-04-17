@@ -1277,7 +1277,7 @@ func getChildApplications(client argoclient.Interface, parentApp *argoapi.Applic
 	expectedPrefix := fmt.Sprintf(
 		"%s:argoproj.io/Application:%s/",
 		parentApp.Name,
-		parentApp.Namespace,
+		parentApp.Name,
 	)
 
 	for _, app := range appList.Items { //nolint:gocritic // rangeValCopy: each iteration copies 992 bytes

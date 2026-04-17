@@ -1391,7 +1391,7 @@ var _ = Describe("getChildApplications", func() {
 					Name:      "child-app",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						"argocd.argoproj.io/tracking-id": fmt.Sprintf("parent-app:argoproj.io/Application:%s/child-app", namespace),
+						"argocd.argoproj.io/tracking-id": "parent-app:argoproj.io/Application:parent-app/child-app",
 					},
 				},
 			}
@@ -2276,7 +2276,7 @@ var _ = Describe("getChildApplications", func() {
 					Name:      "child-app",
 					Namespace: getClusterWideArgoNamespace(),
 					Annotations: map[string]string{
-						"argocd.argoproj.io/tracking-id": fmt.Sprintf("parent-app:argoproj.io/Application:%s/child-app", getClusterWideArgoNamespace()),
+						"argocd.argoproj.io/tracking-id": "parent-app:argoproj.io/Application:parent-app/child-app",
 					},
 				},
 			}
