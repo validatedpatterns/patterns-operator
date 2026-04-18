@@ -466,7 +466,7 @@ func createOrUpdateConsoleLink(client dynamic.Interface, argoName, argoNamespace
 				},
 				"href":     href,
 				"location": "ApplicationMenu",
-				"text":     "ArgoCD VP",
+				"text":     "Argo CD VP",
 			},
 		},
 	}
