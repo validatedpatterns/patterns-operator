@@ -56,10 +56,19 @@ const (
 	ConsoleLinkResource = "consolelinks"
 )
 
-func newArgoCD(name, namespace string) *argooperator.ArgoCD {
-	argoPolicy := `g, system:cluster-admins, role:admin
-g, cluster-admins, role:admin
-g, admin, role:admin`
+func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorConfig) *argooperator.ArgoCD {
+	argoPolicies := []string{
+		"g, system:cluster-admins, role:admin",
+		"g, cluster-admins, role:admin",
+		"g, admin, role:admin",
+	}
+	for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getValueWithDefault("gitops.additionalArgoAdmins"), ",") {
+		argoAdmin = strings.TrimSpace(argoAdmin)
+		if argoAdmin != "" {
+			argoPolicies = append(argoPolicies, "g, "+argoAdmin+", role:admin")
+		}
+	}
+	argoPolicy := strings.Join(argoPolicies, "\n")
 	defaultPolicy := "role:readonly"
 	argoScopes := "[groups,email]"
 	trueBool := true
@@ -403,8 +412,8 @@ func haveArgo(client dynamic.Interface, name, namespace string) bool {
 	return err == nil
 }
 
-func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interface, name, namespace string) error {
-	argo := newArgoCD(name, namespace)
+func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interface, name, namespace string, patternsOperatorConfig PatternsOperatorConfig) error {
+	argo := newArgoCD(name, namespace, patternsOperatorConfig)
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 
 	var err error

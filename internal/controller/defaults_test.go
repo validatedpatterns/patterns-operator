@@ -36,6 +36,11 @@ var _ = Describe("PatternsOperatorConfig getValueWithDefault", func() {
 			Expect(config.getValueWithDefault("gitops.installApprovalPlan")).To(Equal(GitOpsDefaultApprovalPlan))
 		})
 
+		It("should return the default value for gitops.additionalArgoAdmins", func() {
+			config := PatternsOperatorConfig{}
+			Expect(config.getValueWithDefault("gitops.additionalArgoAdmins")).To(Equal(""))
+		})
+
 		It("should return the default value for gitea.chartName", func() {
 			config := PatternsOperatorConfig{}
 			Expect(config.getValueWithDefault("gitea.chartName")).To(Equal(GiteaChartName))
