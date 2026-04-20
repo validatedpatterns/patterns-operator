@@ -911,7 +911,7 @@ func newArgoApplication(p *api.Pattern) *argoapi.Application {
 	return targetApp
 }
 
-func newArgoGiteaApplication(p *api.Pattern) *argoapi.Application {
+func newArgoGiteaApplication(p *api.Pattern, patternsOperatorConfig PatternsOperatorConfig) *argoapi.Application {
 	consoleHref := fmt.Sprintf("https://%s-%s.%s", GiteaRouteName, GiteaNamespace, p.Status.AppClusterDomain)
 	parameters := []argoapi.HelmParameter{
 		{
@@ -934,9 +934,9 @@ func newArgoGiteaApplication(p *api.Pattern) *argoapi.Application {
 		},
 		Project: "default",
 		Source: &argoapi.ApplicationSource{
-			RepoURL:        PatternsOperatorConfig.getValueWithDefault("gitea.helmRepoUrl"),
-			TargetRevision: PatternsOperatorConfig.getValueWithDefault("gitea.chartVersion"),
-			Chart:          PatternsOperatorConfig.getValueWithDefault("gitea.chartName"),
+			RepoURL:        patternsOperatorConfig.getValueWithDefault("gitea.helmRepoUrl"),
+			TargetRevision: patternsOperatorConfig.getValueWithDefault("gitea.chartVersion"),
+			Chart:          patternsOperatorConfig.getValueWithDefault("gitea.chartName"),
 			Helm: &argoapi.ApplicationSourceHelm{
 				Parameters: parameters,
 			},

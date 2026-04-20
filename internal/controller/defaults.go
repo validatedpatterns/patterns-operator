@@ -86,7 +86,7 @@ const (
 // Experimental Capabilities that can be enabled
 // Currently none
 
-var DefaultPatternOperatorConfig = map[string]string{
+var DefaultPatternsOperatorConfig = map[string]string{
 	"gitops.catalogSource":       GitOpsDefaultCatalogSource,
 	"gitops.channel":             GitOpsDefaultChannel,
 	"gitops.sourceNamespace":     GitOpsDefaultCatalogSourceNamespace,
@@ -99,15 +99,13 @@ var DefaultPatternOperatorConfig = map[string]string{
 	"catalog.image":              "",
 }
 
-type GitOpsConfig map[string]string
+type PatternsOperatorConfig map[string]string
 
-var PatternsOperatorConfig GitOpsConfig
-
-func (g GitOpsConfig) getValueWithDefault(k string) string {
+func (g PatternsOperatorConfig) getValueWithDefault(k string) string {
 	if v, present := g[k]; present {
 		return v
 	}
-	if defaultValue, present := DefaultPatternOperatorConfig[k]; present {
+	if defaultValue, present := DefaultPatternsOperatorConfig[k]; present {
 		return defaultValue
 	}
 	return ""

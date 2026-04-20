@@ -451,7 +451,7 @@ func IntOrZero(secret map[string][]byte, key string) (int64, error) {
 }
 
 // Gets the configmap for the Patterns Operator. (Used as an owner reference for the operator itself.)
-func GetOperatorConfigmap() (*corev1.ConfigMap, error) {
+func GetPatternsOperatorConfigMap() (*corev1.ConfigMap, error) {
 	config, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config: %s", err)
