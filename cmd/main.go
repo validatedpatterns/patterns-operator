@@ -29,12 +29,10 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -46,9 +44,6 @@ import (
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 	consolev1 "github.com/openshift/api/console/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -84,12 +79,6 @@ func main() {
 	printVersion()
 
 	setupLog.Info("detected operator namespace", "namespace", controllers.DetectOperatorNamespace())
-
-	// Create initial config map for gitops
-	err := createPatternsOperatorConfigMap()
-	if err != nil {
-		setupLog.Error(err, "unable to create config map")
-	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -160,44 +149,6 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Operator Version: %s", version.Version))
 	setupLog.Info(fmt.Sprintf("Git Commit: %s", version.GitCommit))
 	setupLog.Info(fmt.Sprintf("Build Date: %s", version.BuildDate))
-}
-
-// Creates the patterns operator configmap
-// This will include configuration parameters that
-// will allow operator configuration
-func createPatternsOperatorConfigMap() error {
-	config, err := ctrl.GetConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get config: %s", err)
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("failed to call NewForConfig: %s", err)
-	}
-
-	configMap := corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      controllers.OperatorConfigMap,
-			Namespace: controllers.DetectOperatorNamespace(),
-		},
-	}
-
-	_, err = clientset.CoreV1().ConfigMaps(controllers.DetectOperatorNamespace()).Get(context.Background(), controllers.OperatorConfigMap, metav1.GetOptions{})
-	if err != nil && errors.IsNotFound(err) {
-		// if the configmap does not exist we create an empty one
-		_, err = clientset.CoreV1().ConfigMaps(controllers.DetectOperatorNamespace()).Create(context.Background(), &configMap, metav1.CreateOptions{})
-		if err != nil {
-			return err
-		}
-	} else {
-		// if we had an error that is not IsNotFound we need to return it
-		return err
-	}
-	return nil
 }
 
 func registerComponentOrExit(mgr manager.Manager, f func(*k8sruntime.Scheme) error) {

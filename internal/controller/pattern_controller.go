@@ -34,6 +34,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hybrid-cloud-patterns/patterns-operator/internal/controller/console"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -149,14 +150,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
+	// Set Patterns Operator config to defaults
 	patternsOperatorConfig := DefaultPatternsOperatorConfig
 
-	configCM, err := GetPatternsOperatorConfigMap()
-	// If we hit an error that is not related to the configmap not existing bubble it up
-	if err != nil && !kerrors.IsNotFound(err) {
+	// We try to get the configuration ConfigMap. The method getPatternsOperatorConfigMap returns nil, nil if the ConfigMap doesn't exist
+	configCM, err := r.getPatternsOperatorConfigMap()
+	if err != nil {
 		return r.actionPerformed(instance, "failed to get the configuration ConfigMap", err)
 	}
-	if configCM != nil {
+	if configCM == nil { // If the ConfigMap doesn't exist, we create it
+		if err = r.createPatternsOperatorConfigMap(instance); err != nil {
+			return r.actionPerformed(instance, "failed to create the configuration ConfigMap", err)
+		}
+	} else { // If the ConfigMap exists, we get the configuration from Data
 		patternsOperatorConfig = configCM.Data
 	}
 
@@ -398,8 +404,8 @@ func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.P
 		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, currentSub, r.Scheme); err == nil {
 			changed = true
 		}
-		operatorConfigMap, cmErr := GetPatternsOperatorConfigMap()
-		if cmErr == nil {
+		operatorConfigMap, cmErr := r.getPatternsOperatorConfigMap()
+		if cmErr == nil && operatorConfigMap != nil {
 			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, currentSub, r.Scheme); err == nil {
 				changed = true
 			}
@@ -1323,6 +1329,35 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 		return "prerequisite validation", err
 	}
 	return "", nil
+}
+
+func (r *PatternReconciler) createPatternsOperatorConfigMap(p *api.Pattern) error {
+	configMap := corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      OperatorConfigMap,
+			Namespace: DetectOperatorNamespace(),
+		},
+	}
+	if _, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), &configMap, metav1.CreateOptions{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *PatternReconciler) getPatternsOperatorConfigMap() (*corev1.ConfigMap, error) {
+	cm, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+	return cm, nil
 }
 
 func DropLocalGitPaths() error {
