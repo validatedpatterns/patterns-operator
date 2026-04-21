@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +24,7 @@ import (
 	"github.com/argoproj/gitops-engine/pkg/health"
 	synccommon "github.com/argoproj/gitops-engine/pkg/sync/common"
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
+	"github.com/cespare/xxhash/v2"
 	"github.com/robfig/cron/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -48,6 +51,10 @@ import (
 	"github.com/argoproj/argo-cd/v3/util/security"
 )
 
+// Note: Application and ApplicationSet share the same field structure (TypeMeta, ObjectMeta, spec, status)
+// for frontend abstraction (AbstractApplication), but spec and status have different types.
+// Operation is Application-specific and not present in ApplicationSet.
+
 // Application is a definition of Application resource.
 // +genclient
 // +genclient:noStatus
@@ -58,11 +65,11 @@ import (
 // +kubebuilder:printcolumn:name="Revision",type=string,JSONPath=`.status.sync.revision`,priority=10
 // +kubebuilder:printcolumn:name="Project",type=string,JSONPath=`.spec.project`,priority=10
 type Application struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
-	Spec              ApplicationSpec   `json:"spec" protobuf:"bytes,2,opt,name=spec"`
-	Status            ApplicationStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
-	Operation         *Operation        `json:"operation,omitempty" protobuf:"bytes,4,opt,name=operation"`
+	metav1.TypeMeta   `json:",inline"`                                       // Common: shared with ApplicationSet
+	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"` // Common: shared with ApplicationSet
+	Spec              ApplicationSpec                                        `json:"spec" protobuf:"bytes,2,opt,name=spec"`                     // Common: shared with ApplicationSet (different type)
+	Status            ApplicationStatus                                      `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`       // Common: shared with ApplicationSet (different type)
+	Operation         *Operation                                             `json:"operation,omitempty" protobuf:"bytes,4,opt,name=operation"` // Application-only: not in ApplicationSet
 }
 
 // ApplicationSpec represents desired application state. Contains link to repository with application definition and additional parameters link definition revision.
@@ -97,6 +104,10 @@ type ApplicationSpec struct {
 type IgnoreDifferences []ResourceIgnoreDifferences
 
 func (id IgnoreDifferences) Equals(other IgnoreDifferences) bool {
+	// Treat nil and empty slice as equivalent
+	if len(id) == 0 && len(other) == 0 {
+		return true
+	}
 	return reflect.DeepEqual(id, other)
 }
 
@@ -138,7 +149,7 @@ func (a *EnvEntry) IsZero() bool {
 func NewEnvEntry(text string) (*EnvEntry, error) {
 	parts := strings.SplitN(text, "=", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("Expected env entry of the form: param=value. Received: %s", text)
+		return nil, fmt.Errorf("expected env entry of the form: param=value but received: %s", text)
 	}
 	return &EnvEntry{
 		Name:  parts[0],
@@ -302,6 +313,10 @@ func (source *ApplicationSource) AllowsConcurrentProcessing() bool {
 	return true
 }
 
+func (source *ApplicationSource) IsOCI() bool {
+	return strings.HasPrefix(source.RepoURL, "oci://")
+}
+
 // IsRef returns true when the application source is of type Ref
 func (source *ApplicationSource) IsRef() bool {
 	return source.Ref != ""
@@ -420,7 +435,7 @@ func (s SourceHydrator) GetDrySource() ApplicationSource {
 
 // DeepEquals returns true if the SourceHydrator is deeply equal to the given SourceHydrator.
 func (s SourceHydrator) DeepEquals(hydrator SourceHydrator) bool {
-	return s.DrySource == hydrator.DrySource && s.SyncSource == hydrator.SyncSource && s.HydrateTo.DeepEquals(hydrator.HydrateTo)
+	return s.DrySource.Equals(hydrator.DrySource) && s.SyncSource == hydrator.SyncSource && s.HydrateTo.DeepEquals(hydrator.HydrateTo)
 }
 
 // DrySource specifies a location for dry "don't repeat yourself" manifest source information.
@@ -431,15 +446,43 @@ type DrySource struct {
 	TargetRevision string `json:"targetRevision" protobuf:"bytes,2,name=targetRevision"`
 	// Path is a directory path within the Git repository where the manifests are located
 	Path string `json:"path" protobuf:"bytes,3,name=path"`
+	// Helm specifies helm specific options
+	Helm *ApplicationSourceHelm `json:"helm,omitempty" protobuf:"bytes,4,opt,name=helm"`
+	// Kustomize specifies kustomize specific options
+	Kustomize *ApplicationSourceKustomize `json:"kustomize,omitempty" protobuf:"bytes,5,opt,name=kustomize"`
+	// Directory specifies path/directory specific options
+	Directory *ApplicationSourceDirectory `json:"directory,omitempty" protobuf:"bytes,6,opt,name=directory"`
+	// Plugin specifies config management plugin specific options
+	Plugin *ApplicationSourcePlugin `json:"plugin,omitempty" protobuf:"bytes,7,opt,name=plugin"`
+}
+
+func (in DrySource) Equals(other DrySource) bool {
+	// Equals compares two instances of ApplicationSource and return true if instances are equal.
+	if !in.Plugin.Equals(other.Plugin) {
+		return false
+	}
+	// reflect.DeepEqual works fine for the other fields. Since the plugin fields are equal, set them to null so they're
+	// not considered in the DeepEqual comparison.
+	sourceCopy := in
+	otherCopy := other
+	sourceCopy.Plugin = nil
+	otherCopy.Plugin = nil
+	return reflect.DeepEqual(sourceCopy, otherCopy)
 }
 
 // SyncSource specifies a location from which hydrated manifests may be synced. RepoURL is assumed based on the
 // associated DrySource config in the SourceHydrator.
 type SyncSource struct {
-	// TargetBranch is the branch to which hydrated manifests should be committed
+	// TargetBranch is the branch from which hydrated manifests will be synced.
+	// If HydrateTo is not set, this is also the branch to which hydrated manifests are committed.
 	TargetBranch string `json:"targetBranch" protobuf:"bytes,1,name=targetBranch"`
 	// Path is a directory path within the git repository where hydrated manifests should be committed to and synced
-	// from. If hydrateTo is set, this is just the path from which hydrated manifests will be synced.
+	// from. The Path should never point to the root of the repo. If hydrateTo is set, this is just the path from which
+	// hydrated manifests will be synced.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^.{2,}|[^./]$`
 	Path string `json:"path" protobuf:"bytes,2,name=path"`
 }
 
@@ -548,7 +591,7 @@ var helmParameterRx = regexp.MustCompile(`([^\\]),`)
 func NewHelmParameter(text string, forceString bool) (*HelmParameter, error) {
 	parts := strings.SplitN(text, "=", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("Expected helm parameter of the form: param=value. Received: %s", text)
+		return nil, fmt.Errorf("expected helm parameter of the form param=value but received: %s", text)
 	}
 	return &HelmParameter{
 		Name:        parts[0],
@@ -561,7 +604,7 @@ func NewHelmParameter(text string, forceString bool) (*HelmParameter, error) {
 func NewHelmFileParameter(text string) (*HelmFileParameter, error) {
 	parts := strings.SplitN(text, "=", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("Expected helm file parameter of the form: param=path. Received: %s", text)
+		return nil, fmt.Errorf("expected helm file parameter of the form param=path but received: %s", text)
 	}
 	return &HelmFileParameter{
 		Name: parts[0],
@@ -974,21 +1017,21 @@ func (p ApplicationSourcePluginParameter) MarshalJSON() ([]byte, error) {
 		out["string"] = p.String_
 	}
 	if p.OptionalMap != nil {
-		if p.OptionalMap.Map == nil {
+		if p.Map == nil {
 			// Nil is not the same as a nil map. Nil means the field was not set, while a nil map means the field was set to an empty map.
 			// Either way, we want to marshal it as "{}".
 			out["map"] = map[string]string{}
 		} else {
-			out["map"] = p.OptionalMap.Map
+			out["map"] = p.Map
 		}
 	}
 	if p.OptionalArray != nil {
-		if p.OptionalArray.Array == nil {
+		if p.Array == nil {
 			// Nil is not the same as a nil array. Nil means the field was not set, while a nil array means the field was set to an empty array.
 			// Either way, we want to marshal it as "[]".
 			out["array"] = []string{}
 		} else {
-			out["array"] = p.OptionalArray.Array
+			out["array"] = p.Array
 		}
 	}
 	bytes, err := json.Marshal(out)
@@ -1035,12 +1078,12 @@ func (p ApplicationSourcePluginParameters) Environ() ([]string, error) {
 			env = append(env, fmt.Sprintf("%s=%s", envBaseName, *param.String_))
 		}
 		if param.OptionalMap != nil {
-			for key, value := range param.OptionalMap.Map {
+			for key, value := range param.Map {
 				env = append(env, fmt.Sprintf("%s_%s=%s", envBaseName, escaped(key), value))
 			}
 		}
 		if param.OptionalArray != nil {
-			for i, value := range param.OptionalArray.Array {
+			for i, value := range param.Array {
 				env = append(env, fmt.Sprintf("%s_%d=%s", envBaseName, i, value))
 			}
 		}
@@ -1139,7 +1182,7 @@ type ApplicationStatus struct {
 	// Sync contains information about the application's current sync status
 	Sync SyncStatus `json:"sync,omitempty" protobuf:"bytes,2,opt,name=sync"`
 	// Health contains information about the application's current health status
-	Health HealthStatus `json:"health,omitempty" protobuf:"bytes,3,opt,name=health"`
+	Health AppHealthStatus `json:"health,omitempty" protobuf:"bytes,3,opt,name=health"`
 	// History contains information about the application's sync history
 	History RevisionHistories `json:"history,omitempty" protobuf:"bytes,4,opt,name=history"`
 	// Conditions is a list of currently observed application conditions
@@ -1237,15 +1280,15 @@ func (status *ApplicationStatus) GetRevisions() []string {
 
 // BuildComparedToStatus will build a ComparedTo object based on the current
 // Application state.
-func (spec *ApplicationSpec) BuildComparedToStatus() ComparedTo {
+func (spec *ApplicationSpec) BuildComparedToStatus(sources []ApplicationSource) ComparedTo {
 	ct := ComparedTo{
 		Destination:       spec.Destination,
 		IgnoreDifferences: spec.IgnoreDifferences,
 	}
 	if spec.HasMultipleSources() {
-		ct.Sources = spec.Sources
+		ct.Sources = sources
 	} else {
-		ct.Source = spec.GetSource()
+		ct.Source = sources[0]
 	}
 	return ct
 }
@@ -1302,6 +1345,9 @@ func (in RevisionHistories) LastRevisionHistory() RevisionHistory {
 
 // Trunc truncates the list of history items to size n
 func (in RevisionHistories) Trunc(n int) RevisionHistories {
+	if n < 0 {
+		n = 0
+	}
 	i := len(in) - n
 	if i > 0 {
 		in = in[i:]
@@ -1438,6 +1484,14 @@ type SyncPolicy struct {
 	// If you add a field here, be sure to update IsZero.
 }
 
+// IsAutomatedSyncEnabled checks if the automated sync is enabled or disabled
+func (p *SyncPolicy) IsAutomatedSyncEnabled() bool {
+	if p.Automated != nil && (p.Automated.Enabled == nil || *p.Automated.Enabled) {
+		return true
+	}
+	return false
+}
+
 // IsZero returns true if the sync policy is empty
 func (p *SyncPolicy) IsZero() bool {
 	return p == nil || (p.Automated == nil && len(p.SyncOptions) == 0 && p.Retry == nil && p.ManagedNamespaceMetadata == nil)
@@ -1449,6 +1503,8 @@ type RetryStrategy struct {
 	Limit int64 `json:"limit,omitempty" protobuf:"bytes,1,opt,name=limit"`
 	// Backoff controls how to backoff on subsequent retries of failed syncs
 	Backoff *Backoff `json:"backoff,omitempty" protobuf:"bytes,2,opt,name=backoff,casttype=Backoff"`
+	// Refresh indicates if the latest revision should be used on retry instead of the initial one (default: false)
+	Refresh bool `json:"refresh,omitempty" protobuf:"bytes,3,opt,name=refresh"`
 }
 
 func parseStringToDuration(durationString string) (time.Duration, error) {
@@ -1513,6 +1569,8 @@ type SyncPolicyAutomated struct {
 	SelfHeal bool `json:"selfHeal,omitempty" protobuf:"bytes,2,opt,name=selfHeal"`
 	// AllowEmpty allows apps have zero live resources (default: false)
 	AllowEmpty bool `json:"allowEmpty,omitempty" protobuf:"bytes,3,opt,name=allowEmpty"`
+	// Enable allows apps to explicitly control automated sync
+	Enabled *bool `json:"enabled,omitempty" protobuf:"bytes,4,opt,name=enabled"`
 }
 
 // SyncStrategy controls the manner in which a sync is performed
@@ -1552,14 +1610,48 @@ type SyncStrategyHook struct {
 	SyncStrategyApply `json:",inline" protobuf:"bytes,1,opt,name=syncStrategyApply"`
 }
 
-// RevisionMetadata contains metadata for a specific revision in a Git repository
+// CommitMetadata contains metadata about a commit that is related in some way to another commit.
+type CommitMetadata struct {
+	// Author is the author of the commit, i.e. `git show -s --format=%an <%ae>`.
+	// Must be formatted according to RFC 5322 (mail.Address.String()).
+	// Comes from the Argocd-reference-commit-author trailer.
+	Author string `json:"author,omitempty" protobuf:"bytes,1,opt,name=author"`
+	// Date is the date of the commit, formatted as by `git show -s --format=%aI` (RFC 3339).
+	// It can also be an empty string if the date is unknown.
+	// Comes from the Argocd-reference-commit-date trailer.
+	Date string `json:"date,omitempty" protobuf:"bytes,2,opt,name=date"`
+	// Subject is the commit message subject line, i.e. `git show -s --format=%s`.
+	// Comes from the Argocd-reference-commit-subject trailer.
+	Subject string `json:"subject,omitempty" protobuf:"bytes,3,opt,name=subject"`
+	// Body is the commit message body minus the subject line, i.e. `git show -s --format=%b`.
+	// Comes from the Argocd-reference-commit-body trailer.
+	Body string `json:"body,omitempty" protobuf:"bytes,4,opt,name=body"`
+	// SHA is the commit hash.
+	// Comes from the Argocd-reference-commit-sha trailer.
+	SHA string `json:"sha,omitempty" protobuf:"bytes,5,opt,name=sha"`
+	// RepoURL is the URL of the repository where the commit is located.
+	// Comes from the Argocd-reference-commit-repourl trailer.
+	// This value is not validated and should not be used to construct UI links unless it is properly
+	// validated and/or sanitized first.
+	RepoURL string `json:"repoUrl,omitempty" protobuf:"bytes,6,opt,name=repoUrl"`
+}
+
+// RevisionReference contains a reference to a some information that is related in some way to another commit. For now,
+// it supports only references to a commit. In the future, it may support other types of references.
+type RevisionReference struct {
+	// Commit contains metadata about the commit that is related in some way to another commit.
+	Commit *CommitMetadata `json:"commit,omitempty" protobuf:"bytes,1,opt,name=commit"`
+}
+
+// RevisionMetadata contains metadata for a specific revision in a Git repository. This field is used by the
+// Source Hydrator feature which may be removed in the future.
 type RevisionMetadata struct {
 	// who authored this revision,
 	// typically their name and email, e.g. "John Doe <john_doe@my-company.com>",
 	// but might not match this example
 	Author string `json:"author,omitempty" protobuf:"bytes,1,opt,name=author"`
 	// Date specifies when the revision was authored
-	Date metav1.Time `json:"date" protobuf:"bytes,2,opt,name=date"`
+	Date *metav1.Time `json:"date" protobuf:"bytes,2,opt,name=date"`
 	// Tags specifies any tags currently attached to the revision
 	// Floating tags can move from one revision to another
 	Tags []string `json:"tags,omitempty" protobuf:"bytes,3,opt,name=tags"`
@@ -1567,6 +1659,19 @@ type RevisionMetadata struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
 	// SignatureInfo contains a hint on the signer if the revision was signed with GPG, and signature verification is enabled.
 	SignatureInfo string `json:"signatureInfo,omitempty" protobuf:"bytes,5,opt,name=signatureInfo"`
+	// References contains references to information that's related to this commit in some way.
+	References []RevisionReference `json:"references,omitempty" protobuf:"bytes,6,opt,name=references"`
+}
+
+// OCIMetadata contains metadata for a specific revision in an OCI repository
+type OCIMetadata struct {
+	CreatedAt   string `json:"createdAt,omitempty" protobuf:"bytes,1,opt,name=createdAt"`
+	Authors     string `json:"authors,omitempty" protobuf:"bytes,2,opt,name=authors"`
+	ImageURL    string `json:"imageUrl,omitempty" protobuf:"bytes,3,opt,name=imageUrl"`
+	DocsURL     string `json:"docsUrl,omitempty" protobuf:"bytes,4,opt,name=docsUrl"`
+	SourceURL   string `json:"sourceUrl,omitempty" protobuf:"bytes,5,opt,name=sourceUrl"`
+	Version     string `json:"version,omitempty" protobuf:"bytes,6,opt,name=version"`
+	Description string `json:"description,omitempty" protobuf:"bytes,7,opt,name=description"`
 }
 
 // ChartDetails contains helm chart metadata for a specific version
@@ -1617,6 +1722,8 @@ type ResourceResult struct {
 	HookPhase synccommon.OperationPhase `json:"hookPhase,omitempty" protobuf:"bytes,9,opt,name=hookPhase"`
 	// SyncPhase indicates the particular phase of the sync that this result was acquired in
 	SyncPhase synccommon.SyncPhase `json:"syncPhase,omitempty" protobuf:"bytes,10,opt,name=syncPhase"`
+	// Images contains the images related to the ResourceResult
+	Images []string `json:"images,omitempty" protobuf:"bytes,11,opt,name=images"`
 }
 
 // GroupVersionKind returns the GVK schema information for a given resource within a sync result
@@ -1773,13 +1880,27 @@ type SyncStatus struct {
 	Revisions []string `json:"revisions,omitempty" protobuf:"bytes,4,opt,name=revisions"`
 }
 
-// HealthStatus contains information about the currently observed health state of an application or resource
+// AppHealthStatus contains information about the currently observed health state of an application
+type AppHealthStatus struct {
+	// Status holds the status code of the application
+	Status health.HealthStatusCode `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
+	// Message is a human-readable informational message describing the health status
+	//
+	// Deprecated: this field is not used and will be removed in a future release.
+	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
+	// LastTransitionTime is the time the HealthStatus was set or updated
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+}
+
+// HealthStatus contains information about the currently observed health state of a resource
 type HealthStatus struct {
-	// Status holds the status code of the application or resource
+	// Status holds the status code of the resource
 	Status health.HealthStatusCode `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
 	// Message is a human-readable informational message describing the health status
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 	// LastTransitionTime is the time the HealthStatus was set or updated
+	//
+	// Deprecated: this field is not used and will be removed in a future release.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 }
 
@@ -1826,6 +1947,8 @@ type HostInfo struct {
 	ResourcesInfo []HostResourceInfo `json:"resourcesInfo,omitempty" protobuf:"bytes,2,name=resourcesInfo"`
 	// SystemInfo contains detailed system-level information about the host, such as OS, kernel version, and architecture.
 	SystemInfo corev1.NodeSystemInfo `json:"systemInfo,omitempty" protobuf:"bytes,3,opt,name=systemInfo"`
+	// Labels holds the labels attached to the host.
+	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,4,opt,name=labels"`
 }
 
 // ApplicationTree represents the hierarchical structure of resources associated with an Argo CD application.
@@ -2150,6 +2273,11 @@ type Cluster struct {
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,12,opt,name=labels"`
 	// Annotations for cluster secret metadata
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,13,opt,name=annotations"`
+
+	// The embedded metav1.ObjectMeta field is purely here to please the informer when converting from a v1.Secret to a Cluster.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"-,omitempty"`
 }
 
 func (c *Cluster) Sanitized() *Cluster {
@@ -2471,23 +2599,16 @@ type ResourceAction struct {
 type ResourceActionParam struct {
 	// Name is the name of the parameter.
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-	// Value is the value of the parameter.
-	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
-	// Type is the type of the parameter (e.g., string, integer).
-	Type string `json:"type,omitempty" protobuf:"bytes,3,opt,name=type"`
-	// Default is the default value of the parameter, if any.
-	Default string `json:"default,omitempty" protobuf:"bytes,4,opt,name=default"`
 }
 
-// TODO: refactor to use rbac.ActionGet, rbac.ActionCreate, without import cycle
 var validActions = map[string]bool{
-	"get":      true,
-	"create":   true,
-	"update":   true,
-	"delete":   true,
-	"sync":     true,
-	"override": true,
-	"*":        true,
+	rbac.ActionGet:      true,
+	rbac.ActionCreate:   true,
+	rbac.ActionUpdate:   true,
+	rbac.ActionDelete:   true,
+	rbac.ActionSync:     true,
+	rbac.ActionOverride: true,
+	"*":                 true,
 }
 
 var validActionPatterns = []*regexp.Regexp{
@@ -2616,11 +2737,12 @@ type AppProjectSpec struct {
 	// Destinations contains list of destinations available for deployment
 	Destinations []ApplicationDestination `json:"destinations,omitempty" protobuf:"bytes,2,name=destination"`
 	// Description contains optional project description
+	// +kubebuilder:validation:MaxLength=255
 	Description string `json:"description,omitempty" protobuf:"bytes,3,opt,name=description"`
 	// Roles are user defined RBAC roles associated with this project
 	Roles []ProjectRole `json:"roles,omitempty" protobuf:"bytes,4,rep,name=roles"`
 	// ClusterResourceWhitelist contains list of whitelisted cluster level resources
-	ClusterResourceWhitelist []metav1.GroupKind `json:"clusterResourceWhitelist,omitempty" protobuf:"bytes,5,opt,name=clusterResourceWhitelist"`
+	ClusterResourceWhitelist []ClusterResourceRestrictionItem `json:"clusterResourceWhitelist,omitempty" protobuf:"bytes,5,opt,name=clusterResourceWhitelist"`
 	// NamespaceResourceBlacklist contains list of blacklisted namespace level resources
 	NamespaceResourceBlacklist []metav1.GroupKind `json:"namespaceResourceBlacklist,omitempty" protobuf:"bytes,6,opt,name=namespaceResourceBlacklist"`
 	// OrphanedResources specifies if controller should monitor orphaned resources of apps in this project
@@ -2632,13 +2754,22 @@ type AppProjectSpec struct {
 	// SignatureKeys contains a list of PGP key IDs that commits in Git must be signed with in order to be allowed for sync
 	SignatureKeys []SignatureKey `json:"signatureKeys,omitempty" protobuf:"bytes,10,opt,name=signatureKeys"`
 	// ClusterResourceBlacklist contains list of blacklisted cluster level resources
-	ClusterResourceBlacklist []metav1.GroupKind `json:"clusterResourceBlacklist,omitempty" protobuf:"bytes,11,opt,name=clusterResourceBlacklist"`
+	ClusterResourceBlacklist []ClusterResourceRestrictionItem `json:"clusterResourceBlacklist,omitempty" protobuf:"bytes,11,opt,name=clusterResourceBlacklist"`
 	// SourceNamespaces defines the namespaces application resources are allowed to be created in
 	SourceNamespaces []string `json:"sourceNamespaces,omitempty" protobuf:"bytes,12,opt,name=sourceNamespaces"`
 	// PermitOnlyProjectScopedClusters determines whether destinations can only reference clusters which are project-scoped
 	PermitOnlyProjectScopedClusters bool `json:"permitOnlyProjectScopedClusters,omitempty" protobuf:"bytes,13,opt,name=permitOnlyProjectScopedClusters"`
 	// DestinationServiceAccounts holds information about the service accounts to be impersonated for the application sync operation for each destination.
 	DestinationServiceAccounts []ApplicationDestinationServiceAccount `json:"destinationServiceAccounts,omitempty" protobuf:"bytes,14,name=destinationServiceAccounts"`
+}
+
+// ClusterResourceRestrictionItem is a cluster resource that is restricted by the project's whitelist or blacklist
+type ClusterResourceRestrictionItem struct {
+	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
+	Kind  string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// Name is the name of the restricted resource. Glob patterns using Go's filepath.Match syntax are supported.
+	// Unlike the group and kind fields, if no name is specified, all resources of the specified group/kind are matched.
+	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 }
 
 // SyncWindows is a collection of sync windows in this project
@@ -2664,6 +2795,8 @@ type SyncWindow struct {
 	TimeZone string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 	// UseAndOperator use AND operator for matching applications, namespaces and clusters instead of the default OR operator
 	UseAndOperator bool `json:"andOperator,omitempty" protobuf:"bytes,9,opt,name=andOperator"`
+	// Description of the sync that will be applied to the schedule, can be used to add any information such as a ticket number for example
+	Description string `json:"description,omitempty" protobuf:"bytes,10,opt,name=description"`
 }
 
 // HasWindows returns true if SyncWindows has one or more SyncWindow
@@ -2724,22 +2857,23 @@ func (w *SyncWindows) inactiveAllows(currentTime time.Time) (*SyncWindows, error
 		var inactive SyncWindows
 		specParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 		for _, w := range *w {
-			if w.Kind == "allow" {
-				schedule, sErr := specParser.Parse(w.Schedule)
-				if sErr != nil {
-					return nil, fmt.Errorf("cannot parse schedule '%s': %w", w.Schedule, sErr)
-				}
-				duration, dErr := time.ParseDuration(w.Duration)
-				if dErr != nil {
-					return nil, fmt.Errorf("cannot parse duration '%s': %w", w.Duration, dErr)
-				}
-				// Offset the nextWindow time to consider the timeZone of the sync window
-				timeZoneOffsetDuration := w.scheduleOffsetByTimeZone()
-				nextWindow := schedule.Next(currentTime.Add(timeZoneOffsetDuration - duration))
+			if w.Kind != "allow" {
+				continue
+			}
+			schedule, sErr := specParser.Parse(w.Schedule)
+			if sErr != nil {
+				return nil, fmt.Errorf("cannot parse schedule '%s': %w", w.Schedule, sErr)
+			}
+			duration, dErr := time.ParseDuration(w.Duration)
+			if dErr != nil {
+				return nil, fmt.Errorf("cannot parse duration '%s': %w", w.Duration, dErr)
+			}
+			// Offset the nextWindow time to consider the timeZone of the sync window
+			timeZoneOffsetDuration := w.scheduleOffsetByTimeZone()
+			nextWindow := schedule.Next(currentTime.Add(timeZoneOffsetDuration - duration))
 
-				if !nextWindow.Before(currentTime.Add(timeZoneOffsetDuration)) {
-					inactive = append(inactive, w)
-				}
+			if !nextWindow.Before(currentTime.Add(timeZoneOffsetDuration)) {
+				inactive = append(inactive, w)
 			}
 		}
 		if len(inactive) > 0 {
@@ -2760,8 +2894,8 @@ func (w *SyncWindow) scheduleOffsetByTimeZone() time.Duration {
 }
 
 // AddWindow adds a sync window with the given parameters to the AppProject
-func (spec *AppProjectSpec) AddWindow(knd string, sch string, dur string, app []string, ns []string, cl []string, ms bool, timeZone string, andOperator bool) error {
-	if len(knd) == 0 || len(sch) == 0 || len(dur) == 0 {
+func (spec *AppProjectSpec) AddWindow(knd string, sch string, dur string, app []string, ns []string, cl []string, ms bool, timeZone string, andOperator bool, description string) error {
+	if knd == "" || sch == "" || dur == "" {
 		return errors.New("cannot create window: require kind, schedule, duration and one or more of applications, namespaces and clusters")
 	}
 
@@ -2772,6 +2906,7 @@ func (spec *AppProjectSpec) AddWindow(knd string, sch string, dur string, app []
 		ManualSync:     ms,
 		TimeZone:       timeZone,
 		UseAndOperator: andOperator,
+		Description:    description,
 	}
 
 	if len(app) > 0 {
@@ -3002,28 +3137,35 @@ func (w SyncWindow) active(currentTime time.Time) (bool, error) {
 }
 
 // Update updates a sync window's settings with the given parameter
-func (w *SyncWindow) Update(s string, d string, a []string, n []string, c []string, tz string) error {
-	if len(s) == 0 && len(d) == 0 && len(a) == 0 && len(n) == 0 && len(c) == 0 {
-		return errors.New("cannot update: require one or more of schedule, duration, application, namespace, or cluster")
+func (w *SyncWindow) Update(s string, d string, a []string, n []string, c []string, tz string, description string) error {
+	if s == "" && d == "" && len(a) == 0 && len(n) == 0 && len(c) == 0 && description == "" {
+		return errors.New("cannot update: require one or more of schedule, duration, application, namespace, cluster or description")
 	}
 
-	if len(s) > 0 {
+	if s != "" {
 		w.Schedule = s
 	}
 
-	if len(d) > 0 {
+	if d != "" {
 		w.Duration = d
 	}
 
 	if len(a) > 0 {
 		w.Applications = a
 	}
+
 	if len(n) > 0 {
 		w.Namespaces = n
 	}
+
 	if len(c) > 0 {
 		w.Clusters = c
 	}
+
+	if description != "" {
+		w.Description = description
+	}
+
 	if tz == "" {
 		tz = "UTC"
 	}
@@ -3054,7 +3196,36 @@ func (w *SyncWindow) Validate() error {
 	if err != nil {
 		return fmt.Errorf("cannot parse duration '%s': %w", w.Duration, err)
 	}
+
+	if len(w.Description) > 255 {
+		return errors.New("description must not exceed 255 characters")
+	}
+
 	return nil
+}
+
+func (w *SyncWindow) HashIdentity() (uint64, error) {
+	// Create a copy of the window with only the core identity fields
+	// Excluding ManualSync and Description as they are behavioral/metadata fields
+	identityWindow := SyncWindow{
+		Kind:           w.Kind,
+		Schedule:       w.Schedule,
+		Duration:       w.Duration,
+		Applications:   w.Applications,
+		Namespaces:     w.Namespaces,
+		Clusters:       w.Clusters,
+		TimeZone:       w.TimeZone,
+		UseAndOperator: w.UseAndOperator,
+		// ManualSync and Description are excluded as they don't affect window identity
+	}
+
+	var windowBuffer bytes.Buffer
+	enc := gob.NewEncoder(&windowBuffer)
+	err := enc.Encode(identityWindow)
+	if err != nil {
+		return 0, fmt.Errorf("failed to encode sync window for hashing: %w", err)
+	}
+	return xxhash.Sum64(windowBuffer.Bytes()), nil
 }
 
 // DestinationClusters returns a list of cluster URLs allowed as destination in an AppProject
@@ -3108,12 +3279,30 @@ type HelmOptions struct {
 	ValuesFileSchemes []string `protobuf:"bytes,1,opt,name=valuesFileSchemes"`
 }
 
+// KustomizeVersion holds information about additional Kustomize versions
+type KustomizeVersion struct {
+	// Name holds Kustomize version name
+	Name string `protobuf:"bytes,1,opt,name=name"`
+	// Path holds the corresponding binary path
+	Path string `protobuf:"bytes,2,opt,name=path"`
+	// BuildOptions that are specific to a Kustomize version
+	BuildOptions string `protobuf:"bytes,3,opt,name=buildOptions"`
+}
+
 // KustomizeOptions are options for kustomize to use when building manifests
 type KustomizeOptions struct {
 	// BuildOptions is a string of build parameters to use when calling `kustomize build`
 	BuildOptions string `protobuf:"bytes,1,opt,name=buildOptions"`
+
 	// BinaryPath holds optional path to kustomize binary
+	//
+	// Deprecated: Use settings.Settings instead. See: settings.Settings.KustomizeVersions.
+	// If this field is set, it will be used as the Kustomize binary path.
+	// Otherwise, Versions is used.
 	BinaryPath string `protobuf:"bytes,2,opt,name=binaryPath"`
+
+	// Versions is a list of Kustomize versions and their corresponding binary paths and build options.
+	Versions []KustomizeVersion `protobuf:"bytes,3,rep,name=versions"`
 }
 
 // ApplicationDestinationServiceAccount holds information about the service account to be impersonated for the application sync operation.
@@ -3128,7 +3317,7 @@ type ApplicationDestinationServiceAccount struct {
 
 // CascadedDeletion indicates if the deletion finalizer is set and controller should delete the application and it's cascaded resources
 func (app *Application) CascadedDeletion() bool {
-	for _, finalizer := range app.ObjectMeta.Finalizers {
+	for _, finalizer := range app.Finalizers {
 		if isPropagationPolicyFinalizer(finalizer) {
 			return true
 		}
@@ -3168,6 +3357,26 @@ func (app *Application) IsHydrateRequested() bool {
 		return true
 	}
 	return false
+}
+
+func (app *Application) HasPreDeleteFinalizer(stage ...string) bool {
+	return getFinalizerIndex(app.ObjectMeta, strings.Join(append([]string{PreDeleteFinalizerName}, stage...), "/")) > -1
+}
+
+func (app *Application) SetPreDeleteFinalizer(stage ...string) {
+	setFinalizer(&app.ObjectMeta, strings.Join(append([]string{PreDeleteFinalizerName}, stage...), "/"), true)
+}
+
+func (app *Application) UnSetPreDeleteFinalizer(stage ...string) {
+	setFinalizer(&app.ObjectMeta, strings.Join(append([]string{PreDeleteFinalizerName}, stage...), "/"), false)
+}
+
+func (app *Application) UnSetPreDeleteFinalizerAll() {
+	for _, finalizer := range app.Finalizers {
+		if strings.HasPrefix(finalizer, PreDeleteFinalizerName) {
+			setFinalizer(&app.ObjectMeta, finalizer, false)
+		}
+	}
 }
 
 func (app *Application) HasPostDeleteFinalizer(stage ...string) bool {
@@ -3224,7 +3433,7 @@ func isPropagationPolicyFinalizer(finalizer string) bool {
 
 // GetPropagationPolicy returns the value of propagation policy finalizer
 func (app *Application) GetPropagationPolicy() string {
-	for _, finalizer := range app.ObjectMeta.Finalizers {
+	for _, finalizer := range app.Finalizers {
 		if isPropagationPolicyFinalizer(finalizer) {
 			return finalizer
 		}
@@ -3292,7 +3501,7 @@ func findConditionIndexByType(conditions []ApplicationCondition, t ApplicationCo
 	return -1
 }
 
-// GetErrorConditions returns list of application error conditions
+// GetConditions returns list of application error conditions
 func (status *ApplicationStatus) GetConditions(conditionTypes map[ApplicationConditionType]bool) []ApplicationCondition {
 	result := make([]ApplicationCondition, 0)
 	for i := range status.Conditions {
@@ -3387,6 +3596,28 @@ func isResourceInList(res metav1.GroupKind, list []metav1.GroupKind) bool {
 	return false
 }
 
+func isNamedResourceInList(res metav1.GroupKind, name string, list []ClusterResourceRestrictionItem) bool {
+	for _, item := range list {
+		ok, err := filepath.Match(item.Kind, res.Kind)
+		if !ok || err != nil {
+			continue
+		}
+		ok, err = filepath.Match(item.Group, res.Group)
+		if !ok || err != nil {
+			continue
+		}
+		if item.Name == "" {
+			return true
+		}
+		ok, err = filepath.Match(item.Name, name)
+		if !ok || err != nil {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 // getFinalizerIndex returns finalizer index in the list of object finalizers or -1 if finalizer does not exist
 func getFinalizerIndex(meta metav1.ObjectMeta, name string) int {
 	for i, finalizer := range meta.Finalizers {
@@ -3469,7 +3700,7 @@ func ParseProxyUrl(proxyUrl string) (*url.URL, error) { //nolint:revive //FIXME(
 	switch u.Scheme {
 	case "http", "https", "socks5":
 	default:
-		return nil, fmt.Errorf("Failed to parse proxy url, unsupported scheme %q, must be http, https, or socks5", u.Scheme)
+		return nil, fmt.Errorf("failed to parse proxy url, unsupported scheme %q, must be http, https, or socks5", u.Scheme)
 	}
 	return u, nil
 }
@@ -3504,11 +3735,11 @@ func (c *Cluster) RawRestConfig() (*rest.Config, error) {
 		}
 	default:
 		tlsClientConfig := rest.TLSClientConfig{
-			Insecure:   c.Config.TLSClientConfig.Insecure,
-			ServerName: c.Config.TLSClientConfig.ServerName,
-			CertData:   c.Config.TLSClientConfig.CertData,
-			KeyData:    c.Config.TLSClientConfig.KeyData,
-			CAData:     c.Config.TLSClientConfig.CAData,
+			Insecure:   c.Config.Insecure,
+			ServerName: c.Config.ServerName,
+			CertData:   c.Config.CertData,
+			KeyData:    c.Config.KeyData,
+			CAData:     c.Config.CAData,
 		}
 		switch {
 		case c.Config.AWSAuthConfig != nil:
@@ -3562,12 +3793,12 @@ func (c *Cluster) RawRestConfig() (*rest.Config, error) {
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create K8s REST config: %w", err)
+		return nil, fmt.Errorf("unable to create K8s REST config: %w", err)
 	}
 	if c.Config.ProxyUrl != "" {
 		u, err := ParseProxyUrl(c.Config.ProxyUrl)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to create K8s REST config, can`t parse proxy url: %w", err)
+			return nil, fmt.Errorf("unable to create K8s REST config, can`t parse proxy url: %w", err)
 		}
 		config.Proxy = http.ProxyURL(u)
 	}
@@ -3582,11 +3813,11 @@ func (c *Cluster) RawRestConfig() (*rest.Config, error) {
 func (c *Cluster) RESTConfig() (*rest.Config, error) {
 	config, err := c.RawRestConfig()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to get K8s RAW REST config: %w", err)
+		return nil, fmt.Errorf("unable to get K8s RAW REST config: %w", err)
 	}
 	err = SetK8SConfigDefaults(config)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to apply K8s REST config defaults: %w", err)
+		return nil, fmt.Errorf("unable to apply K8s REST config defaults: %w", err)
 	}
 	return config, nil
 }
