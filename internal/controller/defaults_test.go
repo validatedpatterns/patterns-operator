@@ -55,11 +55,6 @@ var _ = Describe("PatternsOperatorConfig getValueWithDefault", func() {
 			config := PatternsOperatorConfig{}
 			Expect(config.getValueWithDefault("gitea.chartVersion")).To(Equal(GiteaDefaultChartVersion))
 		})
-
-		It("should return the default value for analytics.enabled", func() {
-			config := PatternsOperatorConfig{}
-			Expect(config.getValueWithDefault("analytics.enabled")).To(Equal("true"))
-		})
 	})
 
 	Context("when the key does not exist in config or defaults", func() {
@@ -96,7 +91,6 @@ var _ = Describe("DefaultPatternsOperatorConfig", func() {
 			"gitea.chartName",
 			"gitea.helmRepoUrl",
 			"gitea.chartVersion",
-			"analytics.enabled",
 		}
 		for _, key := range expectedKeys {
 			Expect(DefaultPatternsOperatorConfig).To(HaveKey(key))
@@ -107,6 +101,5 @@ var _ = Describe("DefaultPatternsOperatorConfig", func() {
 		Expect(DefaultPatternsOperatorConfig["gitops.catalogSource"]).To(Equal("redhat-operators"))
 		Expect(DefaultPatternsOperatorConfig["gitops.sourceNamespace"]).To(Equal("openshift-marketplace"))
 		Expect(DefaultPatternsOperatorConfig["gitops.installApprovalPlan"]).To(Equal("Automatic"))
-		Expect(DefaultPatternsOperatorConfig["analytics.enabled"]).To(Equal("true"))
 	})
 })

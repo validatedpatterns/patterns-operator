@@ -120,7 +120,7 @@ func main() {
 		setupLog.Error(err, "unable to add console plugin runnable")
 	}
 
-	analyticsEnabled := areAnalyticsEnabled(mgr.GetAPIReader())
+	analyticsEnabled := strings.ToLower(os.Getenv("ANALYTICS")) != "false"
 	setupLog.Info("analytics enabled", "enabled", analyticsEnabled)
 	if err = (&controllers.PatternReconciler{
 		Client:          mgr.GetClient(),
@@ -207,23 +207,4 @@ func registerComponentOrExit(mgr manager.Manager, f func(*k8sruntime.Scheme) err
 		os.Exit(1)
 	}
 	setupLog.Info(fmt.Sprintf("Component registered: %v", reflect.ValueOf(f)))
-}
-
-// areAnalyticsEnabled determines whether analytics are enabled.
-// Precedence: Operator ConfigMap key "analytics.enabled" (true/false) > ENV ANALYTICS (false means disabled)
-func areAnalyticsEnabled(reader crclient.Reader) bool {
-	enabled := strings.ToLower(os.Getenv("ANALYTICS")) != "false"
-
-	var cm corev1.ConfigMap
-	err := reader.Get(context.Background(), crclient.ObjectKey{Namespace: controllers.DetectOperatorNamespace(), Name: controllers.OperatorConfigMap}, &cm)
-	if err != nil {
-		setupLog.Error(err, "error reading operator configmap for analytics setting")
-		return enabled
-	}
-
-	if v, ok := cm.Data["analytics.enabled"]; ok {
-		return strings.EqualFold(v, "true")
-	}
-
-	return enabled
 }
