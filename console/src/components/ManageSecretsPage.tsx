@@ -139,9 +139,10 @@ export default function ManageSecretsPage() {
         return secret;
       });
 
-      const vaultSecretStructure = {
+      const vaultSecretStructure: SecretTemplate = {
         version: '2.0',
         secrets: secretsList,
+        vaultPolicies: secretTemplate?.vaultPolicies || null
       };
 
       const valuesSecretYaml = yaml.dump(vaultSecretStructure);
