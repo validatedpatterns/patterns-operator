@@ -191,9 +191,10 @@ export default function InstallPatternPage() {
         return secret;
       });
 
-      const vaultSecretStructure = {
+      const vaultSecretStructure: SecretTemplate = {
         version: '2.0',
-        secrets: secretsList
+        secrets: secretsList,
+        vaultPolicies: secretTemplate?.vaultPolicies || null
       };
 
       const valuesSecretYaml = yaml.dump(vaultSecretStructure);
