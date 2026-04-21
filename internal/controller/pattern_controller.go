@@ -162,7 +162,10 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err = r.createPatternsOperatorConfigMap(instance); err != nil {
 			return r.actionPerformed(instance, "failed to create the configuration ConfigMap", err)
 		}
-	} else { // If the ConfigMap exists, we get the configuration from Data
+	} else { // If the ConfigMap exists, we set the ownership and get the configuration from Data
+		if err = r.setPatternsOperatorConfigMapOwnership(configCM, instance); err != nil {
+			return r.actionPerformed(instance, "failed to set ownership of configuration ConfigMap", err)
+		}
 		patternsOperatorConfig = configCM.Data
 	}
 
@@ -913,6 +916,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var ctrlErr error
 	r.ctrl, ctrlErr = ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
+		Owns(&corev1.ConfigMap{}).
 		Build(r)
 	return ctrlErr
 }
@@ -1342,6 +1346,9 @@ func (r *PatternReconciler) createPatternsOperatorConfigMap(p *api.Pattern) erro
 			Namespace: DetectOperatorNamespace(),
 		},
 	}
+	if err := controllerutil.SetControllerReference(p, &configMap, r.Scheme); err != nil {
+		return err
+	}
 	if _, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), &configMap, metav1.CreateOptions{}); err != nil {
 		return err
 	}
@@ -1358,6 +1365,21 @@ func (r *PatternReconciler) getPatternsOperatorConfigMap() (*corev1.ConfigMap, e
 		}
 	}
 	return cm, nil
+}
+
+func (r *PatternReconciler) setPatternsOperatorConfigMapOwnership(cm *corev1.ConfigMap, p *api.Pattern) error {
+	controllerRef := metav1.GetControllerOf(cm)
+	if controllerRef != nil && controllerRef.UID == p.GetUID() && controllerRef.Kind == p.Kind && controllerRef.APIVersion == p.APIVersion {
+		return nil
+	}
+	if err := controllerutil.SetControllerReference(p, cm, r.Scheme); err != nil {
+		return err
+	}
+	_, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Update(context.Background(), cm, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func DropLocalGitPaths() error {
