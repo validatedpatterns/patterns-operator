@@ -119,7 +119,9 @@ export default function UninstallPatternPage() {
         <title>{t('Uninstall Pattern')}</title>
       </Helmet>
       <PageSection>
-        <Title headingLevel="h1">{t('Uninstall Pattern')}: {name}</Title>
+        <Title headingLevel="h1">
+          {t('Uninstall Pattern')}: {name}
+        </Title>
       </PageSection>
       <PageSection>
         {deleted && (
@@ -195,9 +197,7 @@ export default function UninstallPatternPage() {
           </Card>
         )}
 
-        {!deleted && !status && !error && (
-          <Spinner aria-label={t('Loading pattern status')} />
-        )}
+        {!deleted && !status && !error && <Spinner aria-label={t('Loading pattern status')} />}
       </PageSection>
     </>
   );

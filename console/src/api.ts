@@ -8,9 +8,10 @@ declare const __PATTERN_OPERATOR_NS__: string;
 const DEFAULT_PATTERN_OPERATOR_NS = 'patterns-operator';
 export const PATTERN_OPERATOR_NS = __PATTERN_OPERATOR_NS__ || DEFAULT_PATTERN_OPERATOR_NS;
 
-const DEFAULT_PATTERN_UI_CATALOG_BASE_URL = '/api/proxy/plugin/patterns-operator-console-plugin/pattern-ui-catalog';
-const PATTERN_UI_CATALOG_BASE_URL = __PATTERN_UI_CATALOG_BASE_URL__ || DEFAULT_PATTERN_UI_CATALOG_BASE_URL;
-
+const DEFAULT_PATTERN_UI_CATALOG_BASE_URL =
+  '/api/proxy/plugin/patterns-operator-console-plugin/pattern-ui-catalog';
+const PATTERN_UI_CATALOG_BASE_URL =
+  __PATTERN_UI_CATALOG_BASE_URL__ || DEFAULT_PATTERN_UI_CATALOG_BASE_URL;
 
 async function fetchYAML<T>(url: string): Promise<T> {
   const response = await consoleFetch(url, { cache: 'no-store' });
@@ -28,9 +29,8 @@ export async function fetchPattern(name: string): Promise<Pattern> {
 
 export async function fetchCatalogImage(): Promise<string> {
   try {
-    var response = await consoleFetch(
+    const response = await consoleFetch(
       `/api/kubernetes/apis/apps/v1/namespaces/${PATTERN_OPERATOR_NS}/deployments/patterns-operator-pattern-ui-catalog`,
-
     );
     const data = await response.json();
     const containers = data.spec?.template?.spec?.containers || [];
@@ -39,12 +39,14 @@ export async function fetchCatalogImage(): Promise<string> {
     );
     return catalogContainer?.image || 'unknown';
   } catch (error) {
-    return 'unknown'
+    return 'unknown';
   }
-
 }
 
-export async function fetchAllPatterns(): Promise<{ patterns: Pattern[]; catalogDescription?: string }> {
+export async function fetchAllPatterns(): Promise<{
+  patterns: Pattern[];
+  catalogDescription?: string;
+}> {
   const catalog = await fetchCatalog();
   const patterns = await Promise.all(
     catalog.patterns.map(async (key) => {
@@ -78,7 +80,9 @@ export interface VaultInjectionResponse {
   secretName?: string;
 }
 
-export async function triggerVaultInjection(request: VaultInjectionRequest): Promise<VaultInjectionResponse> {
+export async function triggerVaultInjection(
+  request: VaultInjectionRequest,
+): Promise<VaultInjectionResponse> {
   try {
     console.log('🚀 [API] Starting vault injection for pattern:', request.patternName);
     console.log('📊 [API] Request details:', {
@@ -87,7 +91,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
       hasTemplate: !!request.templateYaml,
       vaultNamespace: request.vaultNamespace || 'vault',
       vaultPod: request.vaultPod || 'vault-0',
-      vaultHub: request.vaultHub || 'hub'
+      vaultHub: request.vaultHub || 'hub',
     });
 
     const timestamp = Date.now();
@@ -122,18 +126,25 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
     };
 
     // Create the secret
-    console.log('🔐 [API] Creating secret with payload size:', JSON.stringify(secret).length, 'bytes');
+    console.log(
+      '🔐 [API] Creating secret with payload size:',
+      JSON.stringify(secret).length,
+      'bytes',
+    );
     console.log('🔐 [API] Secret metadata:', {
       name: secret.metadata.name,
       namespace: secret.metadata.namespace,
-      labels: secret.metadata.labels
+      labels: secret.metadata.labels,
     });
 
-    const secretResponse = await consoleFetch(`/api/kubernetes/api/v1/namespaces/${PATTERN_OPERATOR_NS}/secrets`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(secret),
-    });
+    const secretResponse = await consoleFetch(
+      `/api/kubernetes/api/v1/namespaces/${PATTERN_OPERATOR_NS}/secrets`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(secret),
+      },
+    );
 
     if (!secretResponse.ok) {
       const errorText = await secretResponse.text();
@@ -146,7 +157,7 @@ export async function triggerVaultInjection(request: VaultInjectionRequest): Pro
     console.log('✅ [API] Secret creation result:', {
       name: secretResult.metadata?.name,
       uid: secretResult.metadata?.uid,
-      creationTimestamp: secretResult.metadata?.creationTimestamp
+      creationTimestamp: secretResult.metadata?.creationTimestamp,
     });
 
     // Now create a Job that uses this secret
@@ -329,14 +340,17 @@ PLAYBOOK_EOF
       namespace: job.metadata.namespace,
       labels: job.metadata.labels,
       serviceAccountName: job.spec.template.spec.serviceAccountName,
-      containerImage: job.spec.template.spec.containers[0].image
+      containerImage: job.spec.template.spec.containers[0].image,
     });
 
-    const jobResponse = await consoleFetch(`/api/kubernetes/apis/batch/v1/namespaces/${PATTERN_OPERATOR_NS}/jobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(job),
-    });
+    const jobResponse = await consoleFetch(
+      `/api/kubernetes/apis/batch/v1/namespaces/${PATTERN_OPERATOR_NS}/jobs`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(job),
+      },
+    );
 
     if (!jobResponse.ok) {
       const errorText = await jobResponse.text();
@@ -350,7 +364,7 @@ PLAYBOOK_EOF
       name: jobData.metadata?.name,
       uid: jobData.metadata?.uid,
       creationTimestamp: jobData.metadata?.creationTimestamp,
-      backoffLimit: jobData.spec?.backoffLimit
+      backoffLimit: jobData.spec?.backoffLimit,
     });
 
     console.log('🎉 [API] Vault injection setup completed successfully');
@@ -365,7 +379,7 @@ PLAYBOOK_EOF
     console.error('🔴 [API] Error details:', {
       name: error.name,
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return {
       success: false,
@@ -382,18 +396,21 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
 
     const response = await consoleFetch(url);
     if (!response.ok) {
-      console.error(`🔴 [API] Failed to fetch vault job status: ${response.status} ${response.statusText}`);
+      console.error(
+        `🔴 [API] Failed to fetch vault job status: ${response.status} ${response.statusText}`,
+      );
       throw new Error(`Failed to fetch vault job status: ${response.status}`);
     }
 
     const data = await response.json();
     console.log(`📋 [API] Jobs response received:`, {
       itemCount: data.items?.length || 0,
-      items: data.items?.map(job => ({
-        name: job.metadata?.name,
-        creationTimestamp: job.metadata?.creationTimestamp,
-        status: job.status
-      })) || []
+      items:
+        data.items?.map((job) => ({
+          name: job.metadata?.name,
+          creationTimestamp: job.metadata?.creationTimestamp,
+          status: job.status,
+        })) || [],
     });
 
     if (!data.items || data.items.length === 0) {
@@ -412,7 +429,9 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
       jobName: job.metadata?.name,
       creationTimestamp: job.metadata?.creationTimestamp,
       status: jobStatus,
-      conditions: jobStatus.conditions?.map(c => ({ type: c.type, status: c.status, reason: c.reason })) || []
+      conditions:
+        jobStatus.conditions?.map((c) => ({ type: c.type, status: c.status, reason: c.reason })) ||
+        [],
     });
 
     let status: VaultJobStatus['status'] = 'pending';
@@ -448,7 +467,7 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
     console.error(`🔴 [API] Error details:`, {
       name: error.name,
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return {
       status: 'not-found',
@@ -510,8 +529,11 @@ export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
     };
   } catch (err) {
     // consoleFetch may throw on 404 instead of returning a response
-    if (err?.response?.status === 404 || err?.status === 404 ||
-        (err?.message && /404|not found/i.test(err.message))) {
+    if (
+      err?.response?.status === 404 ||
+      err?.status === 404 ||
+      (err?.message && /404|not found/i.test(err.message))
+    ) {
       return { exists: false };
     }
     throw err;
@@ -531,7 +553,9 @@ export async function deletePattern(name: string): Promise<void> {
 
 export async function fetchSecretTemplate(name: string): Promise<SecretTemplate | null> {
   try {
-    return await fetchYAML<SecretTemplate>(`${PATTERN_UI_CATALOG_BASE_URL}/${name}/values-secret.yaml.template`);
+    return await fetchYAML<SecretTemplate>(
+      `${PATTERN_UI_CATALOG_BASE_URL}/${name}/values-secret.yaml.template`,
+    );
   } catch {
     return null; // Template doesn't exist
   }

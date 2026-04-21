@@ -85,7 +85,11 @@ function formatRoleLine(role: ClusterRoleRequirements, cloud: string): string {
   return parts.join(', ');
 }
 
-function getRequirementsTooltip(hub: ClusterRoleRequirements | undefined, spoke: ClusterRoleRequirements | undefined, clouds: string[]): string {
+function getRequirementsTooltip(
+  hub: ClusterRoleRequirements | undefined,
+  spoke: ClusterRoleRequirements | undefined,
+  clouds: string[],
+): string {
   return clouds
     .map((cloud) => {
       const lines: string[] = [];
@@ -117,14 +121,23 @@ function TierIcon({ tier }: { tier: string }) {
   // maintained: all 3 filled; tested: 2 filled + 1 outline; sandbox: 1 filled + 2 outline
   const filledCount = tier === 'maintained' ? 3 : tier === 'tested' ? 2 : 1;
   return (
-    <svg width="16" height="16" viewBox="0 0 48 48" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 48 48"
+      style={{ verticalAlign: 'middle', marginRight: '4px' }}
+    >
       {[0, 1, 2].map((i) => {
         const y = 34 - i * 14;
         const filled = i < filledCount;
         return (
           <rect
             key={i}
-            x="4" y={y} width="40" height="10" rx="5"
+            x="4"
+            y={y}
+            width="40"
+            height="10"
+            rx="5"
             fill={filled ? colors.filled : 'none'}
             stroke={colors.outline}
             strokeWidth={filled ? 0 : 3}
@@ -136,9 +149,12 @@ function TierIcon({ tier }: { tier: string }) {
 }
 
 const TIER_DESCRIPTIONS: Record<string, string> = {
-  maintained: 'Rigorously tested through an automated CI pipeline with continuous validation across OpenShift versions. Highest level of validation and prioritized for ongoing maintenance.',
-  tested: 'Undergoes a manual or automated test plan which passes at least once for each new OpenShift Container Platform minor version.',
-  sandbox: 'Entry-level patterns that are deployable onto a freshly installed OpenShift cluster without prior modification. May be work-in-progress.',
+  maintained:
+    'Rigorously tested through an automated CI pipeline with continuous validation across OpenShift versions. Highest level of validation and prioritized for ongoing maintenance.',
+  tested:
+    'Undergoes a manual or automated test plan which passes at least once for each new OpenShift Container Platform minor version.',
+  sandbox:
+    'Entry-level patterns that are deployable onto a freshly installed OpenShift cluster without prior modification. May be work-in-progress.',
 };
 
 export default function PatternCatalogPage() {
@@ -174,11 +190,14 @@ export default function PatternCatalogPage() {
   }, [loadData]);
 
   const filteredPatterns = React.useMemo(
-    () => selectedTiers.size === 0 ? patterns : patterns.filter((p) => selectedTiers.has(p.tier)),
+    () => (selectedTiers.size === 0 ? patterns : patterns.filter((p) => selectedTiers.has(p.tier))),
     [patterns, selectedTiers],
   );
 
-  const onTierSelect = (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
+  const onTierSelect = (
+    _event: React.MouseEvent | undefined,
+    value: string | number | undefined,
+  ) => {
     setSelectedTiers((prev) => {
       const next = new Set(prev);
       if (next.has(value as string)) {
@@ -190,9 +209,12 @@ export default function PatternCatalogPage() {
     });
   };
 
-  const tierToggleLabel = selectedTiers.size === 0
-    ? t('Tier')
-    : Array.from(selectedTiers).map((tier) => tier.charAt(0).toUpperCase() + tier.slice(1)).join(', ');
+  const tierToggleLabel =
+    selectedTiers.size === 0
+      ? t('Tier')
+      : Array.from(selectedTiers)
+          .map((tier) => tier.charAt(0).toUpperCase() + tier.slice(1))
+          .join(', ');
 
   return (
     <>
@@ -202,10 +224,18 @@ export default function PatternCatalogPage() {
       <PageSection>
         {catalogImage ? (
           <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
-            <Title headingLevel="h1" data-test="pattern-catalog-page-title" style={{ display: 'inline-block' }}>{t('Pattern Catalog')}</Title>
+            <Title
+              headingLevel="h1"
+              data-test="pattern-catalog-page-title"
+              style={{ display: 'inline-block' }}
+            >
+              {t('Pattern Catalog')}
+            </Title>
           </Tooltip>
         ) : (
-          <Title headingLevel="h1" data-test="pattern-catalog-page-title">{t('Pattern Catalog')}</Title>
+          <Title headingLevel="h1" data-test="pattern-catalog-page-title">
+            {t('Pattern Catalog')}
+          </Title>
         )}
       </PageSection>
       {catalogDescription && (
@@ -222,55 +252,67 @@ export default function PatternCatalogPage() {
         )}
         {!loading && !error && (
           <>
-          <Toolbar>
-            <ToolbarContent>
-              <ToolbarItem>
-                <Select
-                  role="menu"
-                  id="tier-filter"
-                  isOpen={tierSelectOpen}
-                  selected={Array.from(selectedTiers)}
-                  onSelect={onTierSelect}
-                  onOpenChange={setTierSelectOpen}
-                  toggle={(toggleRef) => (
-                    <MenuToggle
-                      ref={toggleRef}
-                      onClick={() => setTierSelectOpen((prev) => !prev)}
-                      isExpanded={tierSelectOpen}
-                    >
-                      {tierToggleLabel}
-                    </MenuToggle>
-                  )}
-                >
-                  <SelectList>
-                    {['maintained', 'tested', 'sandbox'].map((tier) => (
-                      <SelectOption
-                        key={tier}
-                        value={tier}
-                        hasCheckbox
-                        isSelected={selectedTiers.has(tier)}
+            <Toolbar>
+              <ToolbarContent>
+                <ToolbarItem>
+                  <Select
+                    role="menu"
+                    id="tier-filter"
+                    isOpen={tierSelectOpen}
+                    selected={Array.from(selectedTiers)}
+                    onSelect={onTierSelect}
+                    onOpenChange={setTierSelectOpen}
+                    toggle={(toggleRef) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        onClick={() => setTierSelectOpen((prev) => !prev)}
+                        isExpanded={tierSelectOpen}
                       >
-                        {tier.charAt(0).toUpperCase() + tier.slice(1)}
-                      </SelectOption>
-                    ))}
-                  </SelectList>
-                </Select>
-              </ToolbarItem>
-            </ToolbarContent>
-          </Toolbar>
-          <Gallery hasGutter minWidths={{ default: '300px' }}>
-                {filteredPatterns.map((pattern) => {
-                  const isInstalled = installedPatterns.has(pattern.name);
-                  const hasAnyInstalled = installedPatterns.size > 0;
-                  const isDisabled = hasAnyInstalled && !isInstalled;
-                  return (
-                  <Card key={pattern.name} className={`patterns-operator__card${isDisabled ? ' patterns-operator__card--disabled' : ''}`}>
+                        {tierToggleLabel}
+                      </MenuToggle>
+                    )}
+                  >
+                    <SelectList>
+                      {['maintained', 'tested', 'sandbox'].map((tier) => (
+                        <SelectOption
+                          key={tier}
+                          value={tier}
+                          hasCheckbox
+                          isSelected={selectedTiers.has(tier)}
+                        >
+                          {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                        </SelectOption>
+                      ))}
+                    </SelectList>
+                  </Select>
+                </ToolbarItem>
+              </ToolbarContent>
+            </Toolbar>
+            <Gallery hasGutter minWidths={{ default: '300px' }}>
+              {filteredPatterns.map((pattern) => {
+                const isInstalled = installedPatterns.has(pattern.name);
+                const hasAnyInstalled = installedPatterns.size > 0;
+                const isDisabled = hasAnyInstalled && !isInstalled;
+                return (
+                  <Card
+                    key={pattern.name}
+                    className={`patterns-operator__card${
+                      isDisabled ? ' patterns-operator__card--disabled' : ''
+                    }`}
+                  >
                     <CardHeader>
                       <Tooltip content={TIER_DESCRIPTIONS[pattern.tier] || pattern.tier}>
-                        <Label color={TIER_COLORS[pattern.tier] || 'grey'} icon={<TierIcon tier={pattern.tier} />}>{pattern.tier}</Label>
+                        <Label
+                          color={TIER_COLORS[pattern.tier] || 'grey'}
+                          icon={<TierIcon tier={pattern.tier} />}
+                        >
+                          {pattern.tier}
+                        </Label>
                       </Tooltip>
                       {isInstalled && (
-                        <Label color="green" className="patterns-operator__installed-label">{t('Installed')}</Label>
+                        <Label color="green" className="patterns-operator__installed-label">
+                          {t('Installed')}
+                        </Label>
                       )}
                     </CardHeader>
                     <Tooltip content={`Org: ${pattern.org}`}>
@@ -278,50 +320,76 @@ export default function PatternCatalogPage() {
                     </Tooltip>
                     <CardBody>
                       {pattern.description && (
-                        <div className="patterns-operator__card-description">{pattern.description}</div>
+                        <div className="patterns-operator__card-description">
+                          {pattern.description}
+                        </div>
                       )}
                     </CardBody>
                     <CardBody>
-                      {pattern.requirements && (() => {
-                        const clouds = getCloudProviders(pattern);
-                        const hub = pattern.requirements.hub;
-                        const spoke = pattern.requirements.spoke;
-                        const defaultCloud = clouds.includes('aws') ? 'aws' : clouds[0];
-                        const hubSummary = hub && defaultCloud ? getSizingSummary(hub, defaultCloud) : null;
-                        const spokeSummary = spoke && defaultCloud ? getSizingSummary(spoke, defaultCloud) : null;
-                        const fullTooltip = getRequirementsTooltip(hub, spoke, clouds);
-                        return (
-                          <div className="patterns-operator__requirements">
-                            <Tooltip content={t('This is the sizing that has been tested. The pattern is expected to work on any similarly-sized architecture.')}>
-                              <div className="patterns-operator__requirements-heading">{t('Tested Requirements:')}</div>
-                            </Tooltip>
-                            {clouds.length > 0 && (
-                              <div className="patterns-operator__cloud-labels">
-                                {clouds.map((cloud) => (
-                                  <Label key={cloud} color="blue" isCompact>{CLOUD_LABELS[cloud] || cloud}</Label>
-                                ))}
-                              </div>
-                            )}
-                            {hubSummary && (
-                              <Tooltip content={<pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{fullTooltip}</pre>}>
-                                <div className="patterns-operator__sizing-line">
-                                  {spoke
-                                    ? <>{t('Hub')}: {hubSummary}<br />{t('Spoke')}: {spokeSummary}</>
-                                    : `${t('Cluster')}: ${hubSummary}`
-                                  }
+                      {pattern.requirements &&
+                        (() => {
+                          const clouds = getCloudProviders(pattern);
+                          const hub = pattern.requirements.hub;
+                          const spoke = pattern.requirements.spoke;
+                          const defaultCloud = clouds.includes('aws') ? 'aws' : clouds[0];
+                          const hubSummary =
+                            hub && defaultCloud ? getSizingSummary(hub, defaultCloud) : null;
+                          const spokeSummary =
+                            spoke && defaultCloud ? getSizingSummary(spoke, defaultCloud) : null;
+                          const fullTooltip = getRequirementsTooltip(hub, spoke, clouds);
+                          return (
+                            <div className="patterns-operator__requirements">
+                              <Tooltip
+                                content={t(
+                                  'This is the sizing that has been tested. The pattern is expected to work on any similarly-sized architecture.',
+                                )}
+                              >
+                                <div className="patterns-operator__requirements-heading">
+                                  {t('Tested Requirements:')}
                                 </div>
                               </Tooltip>
-                            )}
-                            {pattern.external_requirements?.cluster_sizing_note && (
-                              <Tooltip content={pattern.external_requirements.cluster_sizing_note.trim()}>
-                                <span className="patterns-operator__sizing-note">
-                                  <InfoCircleIcon /> {t('Additional requirements')}
-                                </span>
-                              </Tooltip>
-                            )}
-                          </div>
-                        );
-                      })()}
+                              {clouds.length > 0 && (
+                                <div className="patterns-operator__cloud-labels">
+                                  {clouds.map((cloud) => (
+                                    <Label key={cloud} color="blue" isCompact>
+                                      {CLOUD_LABELS[cloud] || cloud}
+                                    </Label>
+                                  ))}
+                                </div>
+                              )}
+                              {hubSummary && (
+                                <Tooltip
+                                  content={
+                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                      {fullTooltip}
+                                    </pre>
+                                  }
+                                >
+                                  <div className="patterns-operator__sizing-line">
+                                    {spoke ? (
+                                      <>
+                                        {t('Hub')}: {hubSummary}
+                                        <br />
+                                        {t('Spoke')}: {spokeSummary}
+                                      </>
+                                    ) : (
+                                      `${t('Cluster')}: ${hubSummary}`
+                                    )}
+                                  </div>
+                                </Tooltip>
+                              )}
+                              {pattern.external_requirements?.cluster_sizing_note && (
+                                <Tooltip
+                                  content={pattern.external_requirements.cluster_sizing_note.trim()}
+                                >
+                                  <span className="patterns-operator__sizing-note">
+                                    <InfoCircleIcon /> {t('Additional requirements')}
+                                  </span>
+                                </Tooltip>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </CardBody>
                     <CardFooter className="patterns-operator__card-footer">
                       {(pattern.docs_url || pattern.repo_url) && (
@@ -359,7 +427,9 @@ export default function PatternCatalogPage() {
                           <Button
                             variant="secondary"
                             onClick={() =>
-                              history.push(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)
+                              history.push(
+                                `/patterns/secrets/${pattern.catalogKey || pattern.name}`,
+                              )
                             }
                           >
                             {t('Manage Secrets')}
@@ -368,23 +438,25 @@ export default function PatternCatalogPage() {
                         {isInstalled && (
                           <Button
                             variant="danger"
-                            onClick={() =>
-                            history.push(`/patterns/uninstall/${pattern.name}`)
-                            }
+                            onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
                           >
                             {t('Uninstall')}
                           </Button>
                         )}
                         {!isInstalled && (
                           <Tooltip
-                            content={t('Only one pattern can be installed at a time. Uninstall the current pattern first.')}
+                            content={t(
+                              'Only one pattern can be installed at a time. Uninstall the current pattern first.',
+                            )}
                             trigger={isDisabled ? 'mouseenter focus' : 'manual'}
                           >
                             <Button
                               variant="primary"
                               isDisabled={isDisabled}
                               onClick={() =>
-                                history.push(`/patterns/install/${pattern.catalogKey || pattern.name}`)
+                                history.push(
+                                  `/patterns/install/${pattern.catalogKey || pattern.name}`,
+                                )
                               }
                             >
                               {t('Install')}
@@ -394,9 +466,9 @@ export default function PatternCatalogPage() {
                       </div>
                     </CardFooter>
                   </Card>
-                  );
-                })}
-          </Gallery>
+                );
+              })}
+            </Gallery>
           </>
         )}
       </PageSection>

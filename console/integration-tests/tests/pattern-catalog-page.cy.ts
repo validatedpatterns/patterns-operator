@@ -25,9 +25,11 @@ describe('Pattern Catalog Page', () => {
 
   it('pattern cards show tier labels', () => {
     visitCatalog();
-    cy.get('.patterns-operator__card').first().within(() => {
-      cy.get('.pf-v6-c-label').should('exist');
-    });
+    cy.get('.patterns-operator__card')
+      .first()
+      .within(() => {
+        cy.get('.pf-v6-c-label').should('exist');
+      });
   });
 
   it('at least one pattern card displays a description', () => {
@@ -41,21 +43,21 @@ describe('Pattern Catalog Page', () => {
 
   it('pattern cards have external Docs and Repo links', () => {
     visitCatalog();
-    cy.get('.patterns-operator__card-links').first().within(() => {
-      cy.contains('a', 'Docs')
-        .should('have.attr', 'target', '_blank')
-        .and('have.attr', 'href');
-      cy.contains('a', 'Repo')
-        .should('have.attr', 'target', '_blank')
-        .and('have.attr', 'href');
-    });
+    cy.get('.patterns-operator__card-links')
+      .first()
+      .within(() => {
+        cy.contains('a', 'Docs').should('have.attr', 'target', '_blank').and('have.attr', 'href');
+        cy.contains('a', 'Repo').should('have.attr', 'target', '_blank').and('have.attr', 'href');
+      });
   });
 
   it('pattern cards have action buttons', () => {
     visitCatalog();
-    cy.get('.patterns-operator__card-actions').first().within(() => {
-      cy.get('button').should('have.length.greaterThan', 0);
-    });
+    cy.get('.patterns-operator__card-actions')
+      .first()
+      .within(() => {
+        cy.get('button').should('have.length.greaterThan', 0);
+      });
   });
 
   it('tier filter dropdown shows all tier options', () => {
@@ -71,24 +73,28 @@ describe('Pattern Catalog Page', () => {
 
   it('selecting all tiers shows at least as many cards as maintained only', () => {
     visitCatalog();
-    cy.get('.patterns-operator__card').its('length').then((maintainedCount) => {
-      // Open filter and add Tested
-      cy.contains('button', 'Maintained').click();
-      cy.contains('Tested').click();
-      // Dropdown may close after selection; re-open to add Sandbox
-      cy.contains('button', /Maintained/).click();
-      cy.contains('Sandbox').click();
-      // Close dropdown
-      cy.get('body').click(0, 0);
-      // With more tiers selected, card count should be >= maintained only
-      cy.get('.patterns-operator__card').should('have.length.gte', maintainedCount);
-    });
+    cy.get('.patterns-operator__card')
+      .its('length')
+      .then((maintainedCount) => {
+        // Open filter and add Tested
+        cy.contains('button', 'Maintained').click();
+        cy.contains('Tested').click();
+        // Dropdown may close after selection; re-open to add Sandbox
+        cy.contains('button', /Maintained/).click();
+        cy.contains('Sandbox').click();
+        // Close dropdown
+        cy.get('body').click(0, 0);
+        // With more tiers selected, card count should be >= maintained only
+        cy.get('.patterns-operator__card').should('have.length.gte', maintainedCount);
+      });
   });
 
   it('clicking Install navigates to the install page', () => {
     visitCatalog();
     cy.get('body').then(($body) => {
-      const installBtn = $body.find('.patterns-operator__card-actions button:not(:disabled):contains("Install")');
+      const installBtn = $body.find(
+        '.patterns-operator__card-actions button:not(:disabled):contains("Install")',
+      );
       if (installBtn.length === 0) {
         cy.log('No Install button available (a pattern may already be installed)');
         return;
