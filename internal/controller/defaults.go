@@ -85,29 +85,3 @@ const (
 
 // Experimental Capabilities that can be enabled
 // Currently none
-
-var DefaultPatternsOperatorConfig = map[string]string{
-	"gitops.catalogSource":                 GitOpsDefaultCatalogSource,
-	"gitops.channel":                       GitOpsDefaultChannel,
-	"gitops.sourceNamespace":               GitOpsDefaultCatalogSourceNamespace,
-	"gitops.installApprovalPlan":           GitOpsDefaultApprovalPlan,
-	"gitops.csv":                           GitOpsDefaultCSV,
-	"gitops.additionalArgoAdmins":          "",
-	"gitops.applicationHealthCheckEnabled": "false",
-	"gitea.chartName":                      GiteaChartName,
-	"gitea.helmRepoUrl":                    GiteaHelmRepoUrl,
-	"gitea.chartVersion":                   GiteaDefaultChartVersion,
-	"catalog.image":                        "",
-}
-
-type PatternsOperatorConfig map[string]string
-
-func (g PatternsOperatorConfig) getValueWithDefault(k string) string {
-	if v, present := g[k]; present {
-		return v
-	}
-	if defaultValue, present := DefaultPatternsOperatorConfig[k]; present {
-		return defaultValue
-	}
-	return ""
-}
