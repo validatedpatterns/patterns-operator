@@ -150,8 +150,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	// Set Patterns Operator config to defaults
-	patternsOperatorConfig := DefaultPatternsOperatorConfig
+	var patternsOperatorConfig PatternsOperatorConfig
 
 	// We try to get the configuration ConfigMap. The method getPatternsOperatorConfigMap returns nil, nil if the ConfigMap doesn't exist
 	configCM, err := r.getPatternsOperatorConfigMap()

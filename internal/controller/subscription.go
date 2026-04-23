@@ -34,18 +34,18 @@ func newSubscription(patternsOperatorConfig PatternsOperatorConfig, disableDefau
 
 	var installPlanApproval operatorv1alpha1.Approval
 
-	if patternsOperatorConfig.getValueWithDefault("gitops.installApprovalPlan") == "Manual" {
+	if patternsOperatorConfig.getStringValue("gitops.installApprovalPlan") == "Manual" {
 		installPlanApproval = operatorv1alpha1.ApprovalManual
 	} else {
 		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 	}
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          patternsOperatorConfig.getValueWithDefault("gitops.catalogSource"),
-		CatalogSourceNamespace: patternsOperatorConfig.getValueWithDefault("gitops.sourceNamespace"),
+		CatalogSource:          patternsOperatorConfig.getStringValue("gitops.catalogSource"),
+		CatalogSourceNamespace: patternsOperatorConfig.getStringValue("gitops.sourceNamespace"),
 		Package:                GitOpsDefaultPackageName,
-		Channel:                patternsOperatorConfig.getValueWithDefault("gitops.channel"),
-		StartingCSV:            patternsOperatorConfig.getValueWithDefault("gitops.csv"),
+		Channel:                patternsOperatorConfig.getStringValue("gitops.channel"),
+		StartingCSV:            patternsOperatorConfig.getStringValue("gitops.csv"),
 		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: newSubscriptionEnvVars(disableDefaultInstance),
