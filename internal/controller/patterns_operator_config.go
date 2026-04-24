@@ -23,19 +23,15 @@ var DefaultPatternsOperatorConfig = PatternsOperatorConfig{
 func (g PatternsOperatorConfig) getStringValue(k string) string {
 	if v, present := g[k]; present {
 		return v
+	} else {
+		return DefaultPatternsOperatorConfig[k]
 	}
-	if defaultValue, present := DefaultPatternsOperatorConfig[k]; present {
-		return defaultValue
-	}
-	return ""
 }
 
 func (g PatternsOperatorConfig) getBoolValue(k string) bool {
 	if v, present := g[k]; present {
 		return strings.EqualFold(v, "true")
+	} else {
+		return strings.EqualFold(DefaultPatternsOperatorConfig[k], "true")
 	}
-	if defaultValue, present := DefaultPatternsOperatorConfig[k]; present {
-		return strings.EqualFold(defaultValue, "true")
-	}
-	return false
 }
