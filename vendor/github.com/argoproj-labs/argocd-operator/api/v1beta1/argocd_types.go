@@ -268,6 +268,12 @@ type ArgoCDDexSpec struct {
 
 	// Env lets you specify environment variables for Dex.
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Volumes adds volumes to the dex server container
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// VolumeMounts adds volumeMounts to the dex server container
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 // ArgoCDGrafanaSpec defines the desired state for the Grafana component.
@@ -316,6 +322,18 @@ type ArgoCDHASpec struct {
 	RedisProxyVersion string `json:"redisProxyVersion,omitempty"`
 
 	// Resources defines the Compute Resources required by the container for HA.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// ArgoCDImageUpdaterSpec defines whether the Argo CD Image Updater controller should be installed.
+type ArgoCDImageUpdaterSpec struct {
+	// Enabled defines whether argocd image updater controller should be deployed or not
+	Enabled bool `json:"enabled"`
+
+	// Env let you specify environment variables for ImageUpdater pods
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Resources defines the Compute Resources required by the container for Argo CD Image Updater.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
@@ -392,6 +410,9 @@ type ArgoCDNotifications struct {
 
 	// Enabled defines whether argocd-notifications controller should be deployed or not
 	Enabled bool `json:"enabled"`
+
+	// SourceNamespaces is a list of namespaces from which the notifications controller will watch for ArgoCD Notification resources.
+	SourceNamespaces []string `json:"sourceNamespaces,omitempty"`
 
 	// Env let you specify environment variables for Notifications pods
 	Env []corev1.EnvVar `json:"env,omitempty"`
@@ -759,6 +780,7 @@ type ArgoCDSSOSpec struct {
 	Dex *ArgoCDDexSpec `json:"dex,omitempty"`
 
 	// Keycloak contains the configuration for Argo CD keycloak authentication
+	// Removed: This field is no longer supported and the related functionality has been removed.
 	Keycloak *ArgoCDKeycloakSpec `json:"keycloak,omitempty"`
 }
 
@@ -772,6 +794,32 @@ type KustomizeVersionSpec struct {
 	Version string `json:"version,omitempty"`
 	// Path is the path to a configured kustomize version on the filesystem of your repo server.
 	Path string `json:"path,omitempty"`
+}
+
+// LocalUserSpec is used to specify information about an ArgoCD local user to be created by the operator.
+type LocalUserSpec struct {
+	// Name of the local user
+	Name string `json:"name"`
+
+	// Enabled defines whether or not this local user is enabled. Default is
+	// true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ApiKey defines whether or not the user is configured to use an ArgoCD API
+	// key. Default is true
+	ApiKey *bool `json:"apiKey,omitempty"`
+
+	// Login defines whether or not the user is configured to be able to login. Default is false
+	Login bool `json:"login,omitempty"`
+
+	// TokenLifetime defines the how long the token issued to this user is valid
+	// for. An empty string or the value 0 indicates an infinite lifetime.
+	// Examples: "30m", "8760h"
+	TokenLifetime string `json:"tokenLifetime,omitempty"`
+
+	// AutoRenewToken specifies if a new token is to be issued once the existing
+	// one has expired. Default is true
+	AutoRenewToken *bool `json:"autoRenewToken,omitempty"`
 }
 
 // ArgoCDMonitoringSpec is used to configure workload status monitoring for a given Argo CD instance.
@@ -852,6 +900,15 @@ type ArgoCDSpec struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Image",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:ArgoCD","urn:alm:descriptor:com.tectonic.ui:text"}
 	Image string `json:"image,omitempty"`
 
+	// ImageUpdater defines whether the Argo CD ImageUpdater controller should be installed.
+	ImageUpdater ArgoCDImageUpdaterSpec `json:"imageUpdater,omitempty"`
+
+	// ImagePullPolicy is the image pull policy for all ArgoCD components.
+	// Valid values are Always, IfNotPresent, Never. If not specified, defaults to the operator's global setting.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Image Pull Policy",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:ArgoCD","urn:alm:descriptor:com.tectonic.ui:text","urn:alm:descriptor:com.tectonic.ui:fieldDependency:image:enable"}
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
 	// Import is the import/restore options for ArgoCD.
 	Import *ArgoCDImportSpec `json:"import,omitempty"`
 
@@ -868,6 +925,9 @@ type ArgoCDSpec struct {
 	// KustomizeVersions is a listing of configured versions of Kustomize to be made available within ArgoCD.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Kustomize Build Options'",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	KustomizeVersions []KustomizeVersionSpec `json:"kustomizeVersions,omitempty"`
+
+	// LocalUsers is a listing of local users to be created by the operator for the purpose of issuing ArgoCD API keys.
+	LocalUsers []LocalUserSpec `json:"localUsers,omitempty"`
 
 	// OIDCConfig is the OIDC configuration as an alternative to dex.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="OIDC Config'",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text","urn:alm:descriptor:com.tectonic.ui:advanced"}
@@ -960,6 +1020,18 @@ type ArgoCDSpec struct {
 
 	// ArgoCDAgent defines configurations for the ArgoCD Agent component.
 	ArgoCDAgent *ArgoCDAgentSpec `json:"argoCDAgent,omitempty"`
+
+	// NamespaceManagement defines the list of namespaces that Argo CD is allowed to manage.
+	NamespaceManagement []ManagedNamespaces `json:"namespaceManagement,omitempty"`
+}
+
+// NamespaceManagement defines the namespace management settings
+type ManagedNamespaces struct {
+	// Name of the namespace or pattern to be managed
+	Name string `json:"name"`
+
+	// Whether the namespace can be managed by ArgoCD
+	AllowManagedBy bool `json:"allowManagedBy"`
 }
 
 const (
@@ -1066,6 +1138,10 @@ type Banner struct {
 	Content string `json:"content"`
 	// URL defines an optional URL to be used as banner message link
 	URL string `json:"url,omitempty"`
+	// Permanent defines if the banner should be displayed permanently or only for a certain period of time
+	Permanent bool `json:"permanent,omitempty"`
+	// Position defines the position of the banner in the UI
+	Position string `json:"position,omitempty"`
 }
 
 // ArgoCDTLSSpec defines the TLS options for ArgCD.
@@ -1105,6 +1181,9 @@ type ArgoCDAgentSpec struct {
 
 	// Principal defines configurations for the Principal component of Argo CD Agent.
 	Principal *PrincipalSpec `json:"principal,omitempty"`
+
+	// Agent defines configurations for the Agent component of Argo CD Agent.
+	Agent *AgentSpec `json:"agent,omitempty"`
 }
 
 type PrincipalSpec struct {
@@ -1112,23 +1191,198 @@ type PrincipalSpec struct {
 	// Enabled is the flag to enable the Principal component during Argo CD installation. (optional, default `false`)
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// AllowedNamespaces is the list of namespaces that the Principal component is allowed to access.
-	AllowedNamespaces []string `json:"allowedNamespaces,omitempty"`
-
-	// JWTAllowGenerate is the flag to enable the JWT generation during Argo CD installation.
-	JWTAllowGenerate bool `json:"jwtAllowGenerate,omitempty"`
-
 	// Auth is the authentication method for the Principal component.
 	Auth string `json:"auth,omitempty"`
 
-	// LogLevel refers to the log level used by the Principal component. Defaults to info if not configured. Valid options are debug, info, trace, error, and warn.
+	// LogLevel refers to the log level used by the Principal component.
 	LogLevel string `json:"logLevel,omitempty"`
+
+	// LogFormat refers to the log format used by the Principal component.
+	LogFormat string `json:"logFormat,omitempty"`
 
 	// Image is the name of Argo CD Agent image
 	Image string `json:"image,omitempty"`
+
+	// Env lets you specify environment for principal pods
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Server defines the server options for the Principal component.
+	Server *PrincipalServerSpec `json:"server,omitempty"`
+
+	// Namespace is the configuration for the Principal component namespace.
+	Namespace *PrincipalNamespaceSpec `json:"namespace,omitempty"`
+
+	// ResourceProxy defines the Resource Proxy options for the Principal component.
+	ResourceProxy *PrincipalResourceProxySpec `json:"resourceProxy,omitempty"`
+
+	// Redis defines the Redis options for the Principal component.
+	Redis *PrincipalRedisSpec `json:"redis,omitempty"`
+
+	// TLS defines the TLS options for the Principal component.
+	TLS *PrincipalTLSSpec `json:"tls,omitempty"`
+
+	// JWT defines the JWT options for the Principal component.
+	JWT *PrincipalJWTSpec `json:"jwt,omitempty"`
+}
+
+type PrincipalServerSpec struct {
+	// EnableWebSocket is the flag to enable the WebSocket on gRPC to stream events to the Agent.
+	EnableWebSocket *bool `json:"enableWebSocket,omitempty"`
+
+	// KeepAliveMinInterval is the minimum interval between keep-alive messages sent by the Agent to the Principal.
+	KeepAliveMinInterval string `json:"keepAliveMinInterval,omitempty"`
+
+	// Service defines the options for the Service backing the ArgoCD Agent component.
+	// If not set, type ClusterIP will be used by default.
+	Service ArgoCDAgentPrincipalServiceSpec `json:"service,omitempty"`
+
+	// Route defines the options for the Route backing the ArgoCD Agent component.
+	// Route is disabled only when explicitly configured with Enabled: false
+	Route ArgoCDAgentPrincipalRouteSpec `json:"route,omitempty"`
+}
+
+type PrincipalRedisSpec struct {
+
+	// ServerAddress is the address of the Redis server to be used by the Principal component.
+	ServerAddress string `json:"serverAddress,omitempty"`
+
+	// CompressionType is the compression type to be used by Redis.
+	CompressionType string `json:"compressionType,omitempty"`
+}
+
+type PrincipalJWTSpec struct {
+
+	// InsecureGenerate is the flag to allow the principal to generate its own private key for signing JWT tokens (insecure).
+	InsecureGenerate *bool `json:"insecureGenerate,omitempty"`
+
+	// SecretName is the name of the secret containing the JWT signing key.
+	SecretName string `json:"secretName,omitempty"`
+}
+
+type PrincipalNamespaceSpec struct {
+
+	// AllowedNamespaces is a list of namespaces the principal shall watch and process Argo CD resources in.
+	AllowedNamespaces []string `json:"allowedNamespaces,omitempty"`
+
+	// EnableNamespaceCreate is the flag to enable namespace creation for agents.
+	EnableNamespaceCreate *bool `json:"enableNamespaceCreate,omitempty"`
+
+	// NamespaceCreatePattern is a regexp pattern to restrict the names of namespaces to be created.
+	NamespaceCreatePattern string `json:"namespaceCreatePattern,omitempty"`
+
+	// NamespaceCreateLabels is the set of labels to apply to namespaces created for agents. Ex: "foo=bar,bar=baz"
+	NamespaceCreateLabels []string `json:"namespaceCreateLabels,omitempty"`
+}
+
+type PrincipalResourceProxySpec struct {
+
+	// SecretName is the name of the secret containing the TLS certificate and key for the resource proxy.
+	SecretName string `json:"secretName,omitempty"`
+
+	// CASecretName is the name of the secret containing the CA certificate for the resource proxy.
+	CASecretName string `json:"caSecretName,omitempty"`
+}
+
+type PrincipalTLSSpec struct {
+
+	// SecretName is The name of the secret containing the TLS certificate and key.
+	SecretName string `json:"secretName,omitempty"`
+
+	// RootCASecretName is the name of the secret containing the root CA TLS certificate
+	RootCASecretName string `json:"rootCASecretName,omitempty"`
+
+	// InsecureGenerate is the flag to allow the principal to generate its own set of TLS cert and key on startup when none are configured
+	InsecureGenerate *bool `json:"insecureGenerate,omitempty"`
+}
+
+// ArgoCDAgentPrincipalServiceSpec defines the options for the Service backing the ArgoCD Agent Principalcomponent.
+type ArgoCDAgentPrincipalServiceSpec struct {
+	// Type is the ServiceType to use for the Service resource.
+	// If not set, type ClusterIP will be used by default.
+	Type corev1.ServiceType `json:"type"`
+}
+
+// ArgoCDAgentPrincipalRouteSpec defines the options for the Route backing the ArgoCD Agent Principal component.
+type ArgoCDAgentPrincipalRouteSpec struct {
+	// Enabled will toggle the creation of the OpenShift Route, ignored in case of non OpenShift cluster.
+	// Route is disabled only when explicitly configured with false
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 func (a *PrincipalSpec) IsEnabled() bool {
+	return a.Enabled != nil && *a.Enabled
+}
+
+type AgentSpec struct {
+
+	// Enabled is the flag to enable the Agent component during Argo CD installation. (optional, default `false`)
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Creds is the credential identifier for the agent authentication
+	Creds string `json:"creds,omitempty"`
+
+	// LogLevel refers to the log level used by the Agent component.
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// LogFormat refers to the log format used by the Agent component.
+	LogFormat string `json:"logFormat,omitempty"`
+
+	// Image is the name of Argo CD Agent image
+	Image string `json:"image,omitempty"`
+
+	// Env lets you specify environment for agent pods
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Client defines the client options for the Agent component.
+	Client *AgentClientSpec `json:"client,omitempty"`
+
+	// Redis defines the Redis options for the Agent component.
+	Redis *AgentRedisSpec `json:"redis,omitempty"`
+
+	// TLS defines the TLS options for the Agent component.
+	TLS *AgentTLSSpec `json:"tls,omitempty"`
+}
+
+type AgentClientSpec struct {
+
+	// PrincipalServerAddress is the remote address of the principal server to connect to.
+	PrincipalServerAddress string `json:"principalServerAddress,omitempty"`
+
+	// PrincipalServerPort is the remote port of the principal server to connect to.
+	PrincipalServerPort string `json:"principalServerPort,omitempty"`
+
+	// Mode is the operational mode for the agent (managed or autonomous)
+	Mode string `json:"mode,omitempty"`
+
+	// EnableWebSocket is the flag to enable WebSocket for event streaming
+	EnableWebSocket *bool `json:"enableWebSocket,omitempty"`
+
+	// EnableCompression is the flag to enable compression while sending data between Principal and Agent using gRPC
+	EnableCompression *bool `json:"enableCompression,omitempty"`
+
+	// KeepAliveInterval is the interval for keep-alive pings to the principal
+	KeepAliveInterval string `json:"keepAliveInterval,omitempty"`
+}
+
+type AgentRedisSpec struct {
+
+	// ServerAddress is the address of the Redis server to be used by the PrincAgentipal component.
+	ServerAddress string `json:"serverAddress,omitempty"`
+}
+
+type AgentTLSSpec struct {
+
+	// SecretName is the name of the secret containing the agent client TLS certificate
+	SecretName string `json:"secretName,omitempty"`
+
+	// RootCASecretName is the name of the secret containing the root CA certificate
+	RootCASecretName string `json:"rootCASecretName,omitempty"`
+
+	// Insecure is the flag to skip TLS certificate validation when connecting to the principal (insecure, for development only)
+	Insecure *bool `json:"insecure,omitempty"`
+}
+
+func (a *AgentSpec) IsEnabled() bool {
 	return a.Enabled != nil && *a.Enabled
 }
 
@@ -1198,16 +1452,16 @@ func (r ResourceTrackingMethod) String() string {
 		return stringResourceTrackingMethodAnnotationAndLabel
 	}
 
-	// Default is to use label
-	return stringResourceTrackingMethodLabel
+	// Default is to use Annotation
+	return stringResourceTrackingMethodAnnotation
 }
 
 // ParseResourceTrackingMethod parses a string into a resource tracking method
 func ParseResourceTrackingMethod(name string) ResourceTrackingMethod {
 	switch name {
-	case stringResourceTrackingMethodLabel, "":
+	case stringResourceTrackingMethodLabel:
 		return ResourceTrackingMethodLabel
-	case stringResourceTrackingMethodAnnotation:
+	case stringResourceTrackingMethodAnnotation, "":
 		return ResourceTrackingMethodAnnotation
 	case stringResourceTrackingMethodAnnotationAndLabel:
 		return ResourceTrackingMethodAnnotationAndLabel
