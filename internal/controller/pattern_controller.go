@@ -34,6 +34,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hybrid-cloud-patterns/patterns-operator/internal/controller/console"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -67,6 +68,7 @@ import (
 )
 
 const ReconcileLoopRequeueTime = 180 * time.Second
+const PruneAnnotation = "patterns.gitops.hybrid-cloud-patterns.io/prune"
 
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
@@ -149,14 +151,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return reconcile.Result{}, err
 	}
 
-	patternsOperatorConfig := DefaultPatternsOperatorConfig
+	var patternsOperatorConfig PatternsOperatorConfig
 
-	configCM, err := GetPatternsOperatorConfigMap()
-	// If we hit an error that is not related to the configmap not existing bubble it up
-	if err != nil && !kerrors.IsNotFound(err) {
+	// We try to get the configuration ConfigMap. The method getPatternsOperatorConfigMap returns nil, nil if the ConfigMap doesn't exist
+	configCM, err := r.getPatternsOperatorConfigMap()
+	if err != nil {
 		return r.actionPerformed(instance, "failed to get the configuration ConfigMap", err)
 	}
-	if configCM != nil {
+	if configCM == nil { // If the ConfigMap doesn't exist, we create it
+		if err = r.createPatternsOperatorConfigMap(instance); err != nil {
+			return r.actionPerformed(instance, "failed to create the configuration ConfigMap", err)
+		}
+	} else { // If the ConfigMap exists, we set the ownership and get the configuration from Data
+		if err = r.setPatternsOperatorConfigMapOwnership(configCM, instance); err != nil {
+			return r.actionPerformed(instance, "failed to set ownership of configuration ConfigMap", err)
+		}
 		patternsOperatorConfig = configCM.Data
 	}
 
@@ -398,8 +407,8 @@ func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.P
 		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, currentSub, r.Scheme); err == nil {
 			changed = true
 		}
-		operatorConfigMap, cmErr := GetPatternsOperatorConfigMap()
-		if cmErr == nil {
+		operatorConfigMap, cmErr := r.getPatternsOperatorConfigMap()
+		if cmErr == nil && operatorConfigMap != nil {
 			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, currentSub, r.Scheme); err == nil {
 				changed = true
 			}
@@ -740,11 +749,11 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
-	// Add finalizer when object is created
 	log.Printf("Finalizing pattern object")
 
-	// The object is being deleted
-	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
+	// The object is being deleted and, if prune is enabled, we want to delete all the dependent objects in cascade
+	if strings.EqualFold(instance.Annotations[PruneAnnotation], "true") &&
+		(controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents)) {
 		// Prepare the app for cascaded deletion
 		qualifiedInstance, err := r.applyDefaults(instance)
 		if err != nil {
@@ -907,6 +916,7 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var ctrlErr error
 	r.ctrl, ctrlErr = ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
+		Owns(&corev1.ConfigMap{}).
 		Build(r)
 	return ctrlErr
 }
@@ -1323,6 +1333,53 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 		return "prerequisite validation", err
 	}
 	return "", nil
+}
+
+func (r *PatternReconciler) createPatternsOperatorConfigMap(p *api.Pattern) error {
+	configMap := corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      OperatorConfigMap,
+			Namespace: DetectOperatorNamespace(),
+		},
+	}
+	if err := controllerutil.SetControllerReference(p, &configMap, r.Scheme); err != nil {
+		return err
+	}
+	if _, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), &configMap, metav1.CreateOptions{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *PatternReconciler) getPatternsOperatorConfigMap() (*corev1.ConfigMap, error) {
+	cm, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
+	if err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+	return cm, nil
+}
+
+func (r *PatternReconciler) setPatternsOperatorConfigMapOwnership(cm *corev1.ConfigMap, p *api.Pattern) error {
+	controllerRef := metav1.GetControllerOf(cm)
+	if controllerRef != nil && controllerRef.UID == p.GetUID() && controllerRef.Kind == p.Kind && controllerRef.APIVersion == p.APIVersion {
+		return nil
+	}
+	if err := controllerutil.SetControllerReference(p, cm, r.Scheme); err != nil {
+		return err
+	}
+	_, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Update(context.Background(), cm, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func DropLocalGitPaths() error {
