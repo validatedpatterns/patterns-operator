@@ -97,7 +97,6 @@ var DefaultPatternsOperatorConfig = map[string]string{
 	"gitea.chartName":                      GiteaChartName,
 	"gitea.helmRepoUrl":                    GiteaHelmRepoUrl,
 	"gitea.chartVersion":                   GiteaDefaultChartVersion,
-	"analytics.enabled":                    "true",
 	"catalog.image":                        "",
 }
 
