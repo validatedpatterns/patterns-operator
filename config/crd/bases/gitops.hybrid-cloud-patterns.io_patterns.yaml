@@ -174,8 +174,6 @@ spec:
                     This structure is part of the PatternStatus as an array
                     The Application Status will be included as part of the Observed state of Pattern
                   properties:
-                    healthMessage:
-                      type: string
                     healthStatus:
                       type: string
                     name:
