@@ -95,7 +95,8 @@
     "mocha": "^10.5.1"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^4.1.1",
+    "yaml": "^2.8.3"
   },
   "resolutions": {
     "braces": "^3.0.3"

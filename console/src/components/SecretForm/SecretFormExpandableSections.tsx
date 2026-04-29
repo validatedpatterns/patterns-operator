@@ -21,7 +21,7 @@ export type SecretFormExpandableSectionsProps = {
   secretFormData: SecretFormData;
   expandedSections: Record<string, boolean>;
   onToggleSection: (sectionName: string) => void;
-  onFieldChange: (secretName: string, fieldName: string, value: string | File | null) => void;
+  onFieldChange: (secretName: string, fieldName: string, value: string | null) => void;
 };
 
 /**
@@ -41,7 +41,7 @@ export function SecretFormExpandableSections({
     const commonProps = {
       field,
       value,
-      onChange: (newValue: string | File | null) =>
+      onChange: (newValue: string | null) =>
         onFieldChange(secret.name, field.name, newValue),
     };
 
@@ -78,7 +78,6 @@ export function SecretFormExpandableSections({
                 <FormGroup
                   key={field.name}
                   label={field.name}
-                  helperText={field.description}
                   isRequired={getFieldType(field) === 'prompt'}
                   fieldId={`secret-${secret.name}-${field.name}`}
                   className="patterns-operator__secret-field"

@@ -1,6 +1,12 @@
 import { consoleFetch } from '@openshift-console/dynamic-plugin-sdk';
 import { load } from 'js-yaml';
-import { Catalog, Pattern, SecretTemplate } from './types';
+import {
+  Catalog,
+  Pattern,
+  SecretTemplate,
+  VAULT_UPLOADS_MOUNT_PREFIX,
+  type VaultInjectionFileArtifact,
+} from './types';
 
 declare const __PATTERN_UI_CATALOG_BASE_URL__: string;
 declare const __PATTERN_OPERATOR_NS__: string;
@@ -67,7 +73,8 @@ export interface VaultJobStatus {
 export interface VaultInjectionRequest {
   patternName: string;
   valuesSecretYaml: string;
-  templateYaml?: string;
+  /** One Kubernetes Secret per entry, mounted under {@link VAULT_UPLOADS_MOUNT_PREFIX}/{slug}. */
+  fileArtifacts?: VaultInjectionFileArtifact[];
   vaultNamespace?: string;
   vaultPod?: string;
   vaultHub?: string;
@@ -85,10 +92,11 @@ export async function triggerVaultInjection(
 ): Promise<VaultInjectionResponse> {
   try {
     console.log('🚀 [API] Starting vault injection for pattern:', request.patternName);
+    const fileArtifacts = request.fileArtifacts ?? [];
     console.log('📊 [API] Request details:', {
       patternName: request.patternName,
       valuesSecretYamlLength: request.valuesSecretYaml?.length || 0,
-      hasTemplate: !!request.templateYaml,
+      fileArtifactCount: fileArtifacts.length,
       vaultNamespace: request.vaultNamespace || 'vault',
       vaultPod: request.vaultPod || 'vault-0',
       vaultHub: request.vaultHub || 'hub',
@@ -97,18 +105,57 @@ export async function triggerVaultInjection(
     const timestamp = Date.now();
     const secretName = `vault-secrets-${request.patternName}-${timestamp}`;
     const jobName = `vault-inject-${request.patternName}-${timestamp}`;
+    const runLabelKey = 'patterns.gitops.hybrid-cloud-patterns.io/vault-injection-run';
+    const runLabelValue = String(timestamp);
+
+    const commonSecretLabels = {
+      'patterns.gitops.hybrid-cloud-patterns.io/pattern': request.patternName,
+      'patterns.gitops.hybrid-cloud-patterns.io/component': 'secret-injector',
+      [runLabelKey]: runLabelValue,
+    };
 
     console.log('🔐 [API] Creating Kubernetes secret:', secretName);
     console.log('⚙️ [API] Creating Kubernetes job:', jobName);
 
-    // First, create a Secret with the values-secret.yaml content
-    const secretData: any = {
-      'values-secret.yaml': btoa(request.valuesSecretYaml), // base64 encode for Kubernetes
-    };
+    for (let i = 0; i < fileArtifacts.length; i++) {
+      const artifact = fileArtifacts[i];
+      const fileSecretName = `${secretName}-f${i}`;
+      const fileSecret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: fileSecretName,
+          namespace: PATTERN_OPERATOR_NS,
+          labels: { ...commonSecretLabels },
+        },
+        type: 'Opaque',
+        data: { content: artifact.dataBase64 },
+      };
 
-    if (request.templateYaml) {
-      secretData['values-secret.yaml.template'] = btoa(request.templateYaml);
+      const fileResp = await consoleFetch(
+        `/api/kubernetes/api/v1/namespaces/${PATTERN_OPERATOR_NS}/secrets`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fileSecret),
+        },
+      );
+
+      if (!fileResp.ok) {
+        const errorText = await fileResp.text();
+        console.error(
+          '🔴 [API] Failed to create file secret:',
+          fileSecretName,
+          fileResp.status,
+          errorText,
+        );
+        throw new Error(`Failed to create file secret: ${fileResp.status} ${errorText}`);
+      }
     }
+
+    const secretData: Record<string, string> = {
+      'values-secret.yaml': btoa(request.valuesSecretYaml),
+    };
 
     const secret = {
       apiVersion: 'v1',
@@ -116,26 +163,17 @@ export async function triggerVaultInjection(
       metadata: {
         name: secretName,
         namespace: PATTERN_OPERATOR_NS,
-        labels: {
-          'patterns.gitops.hybrid-cloud-patterns.io/pattern': request.patternName,
-          'patterns.gitops.hybrid-cloud-patterns.io/component': 'secret-injector',
-        },
+        labels: { ...commonSecretLabels },
       },
       type: 'Opaque',
       data: secretData,
     };
 
-    // Create the secret
     console.log(
-      '🔐 [API] Creating secret with payload size:',
+      '🔐 [API] Creating values-secret with payload size:',
       JSON.stringify(secret).length,
       'bytes',
     );
-    console.log('🔐 [API] Secret metadata:', {
-      name: secret.metadata.name,
-      namespace: secret.metadata.namespace,
-      labels: secret.metadata.labels,
-    });
 
     const secretResponse = await consoleFetch(
       `/api/kubernetes/api/v1/namespaces/${PATTERN_OPERATOR_NS}/secrets`,
@@ -160,7 +198,46 @@ export async function triggerVaultInjection(
       creationTimestamp: secretResult.metadata?.creationTimestamp,
     });
 
-    // Now create a Job that uses this secret
+    const volumes: Record<string, unknown>[] = [
+      {
+        name: 'vault-secrets',
+        secret: { secretName },
+      },
+    ];
+    if (fileArtifacts.length > 0) {
+      volumes.push({
+        name: 'vault-uploads',
+        projected: {
+          sources: fileArtifacts.map((art, i) => ({
+            secret: {
+              name: `${secretName}-f${i}`,
+              items: [{ key: 'content', path: art.slug }],
+            },
+          })),
+        },
+      });
+    }
+    volumes.push({ name: 'shared', emptyDir: {} });
+
+    const injectorVolumeMounts: Record<string, unknown>[] = [
+      {
+        name: 'vault-secrets',
+        mountPath: '/vault-secrets',
+        readOnly: true,
+      },
+    ];
+    if (fileArtifacts.length > 0) {
+      injectorVolumeMounts.push({
+        name: 'vault-uploads',
+        mountPath: VAULT_UPLOADS_MOUNT_PREFIX,
+        readOnly: true,
+      });
+    }
+    injectorVolumeMounts.push({
+      name: 'shared',
+      mountPath: '/shared',
+    });
+
     const job = {
       apiVersion: 'batch/v1',
       kind: 'Job',
@@ -170,6 +247,7 @@ export async function triggerVaultInjection(
         labels: {
           'patterns.gitops.hybrid-cloud-patterns.io/pattern': request.patternName,
           'patterns.gitops.hybrid-cloud-patterns.io/component': 'secret-injector',
+          [runLabelKey]: runLabelValue,
         },
       },
       spec: {
@@ -179,6 +257,7 @@ export async function triggerVaultInjection(
             labels: {
               'patterns.gitops.hybrid-cloud-patterns.io/pattern': request.patternName,
               'patterns.gitops.hybrid-cloud-patterns.io/component': 'secret-injector',
+              [runLabelKey]: runLabelValue,
             },
           },
           spec: {
@@ -194,15 +273,6 @@ export async function triggerVaultInjection(
                   `
                   echo "Starting vault secret injection for pattern: ${request.patternName}"
 
-                  # Copy mounted secret files to expected location
-                  mkdir -p /tmp/pattern
-                  cp /vault-secrets/values-secret.yaml /tmp/pattern/values-secret.yaml
-                  if [[ -f /vault-secrets/values-secret.yaml.template ]]; then
-                    cp /vault-secrets/values-secret.yaml.template /tmp/pattern/values-secret.yaml.template
-                  fi
-
-                  echo "Secret files prepared, running ansible to inject into vault..."
-
                   # Create a simplified playbook that calls the vault_load_secrets module directly
                   cat > /tmp/vault_injection_playbook.yaml << 'PLAYBOOK_EOF'
 ---
@@ -212,35 +282,21 @@ export async function triggerVaultInjection(
   gather_facts: false
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
-    values_secrets: "{{ pattern_dir }}/values-secret.yaml"
     check_missing_secrets: false
     namespace: "{{ vault_ns }}"
     pod: "{{ vault_pod }}"
   tasks:
-    - name: Check if values-secret.yaml.template exists
-      ansible.builtin.stat:
-        path: "{{ pattern_dir }}/values-secret.yaml.template"
-      register: template_file_check
-
-    - name: Set values-secret.yaml.template exists fact
-      ansible.builtin.set_fact:
-        values_secret_template: "{{ (template_file_check.stat.exists) | ternary(pattern_dir + '/values-secret.yaml.template', omit) }}"
-
     - name: Load secrets into vault using rhvp.cluster_utils module
       ansible.builtin.include_role:
         name: rhvp.cluster_utils.load_secrets
 PLAYBOOK_EOF
-
                   # Run the playbook and save the exit code
                   cd /pattern-home
                   ansible-playbook -v -i localhost, /tmp/vault_injection_playbook.yaml \\
-                    -e pattern_name="${request.patternName}" \\
                     -e pattern_dir="/tmp/pattern" \\
                     -e vault_ns="${request.vaultNamespace || 'vault'}" \\
                     -e vault_pod="${request.vaultPod || 'vault-0'}" \\
-                    -e vault_hub="${request.vaultHub || 'hub'}" \\
-                    -e found_file="/tmp/pattern/values-secret.yaml" \\
-                    -e secret_template="/tmp/pattern/values-secret.yaml.template"
+                    -e vault_hub="${request.vaultHub || 'hub'}"
                   rc=$?
 
                   echo $rc > /shared/rc
@@ -250,21 +306,9 @@ PLAYBOOK_EOF
                 ],
                 env: [
                   { name: 'PATTERN_NAME', value: request.patternName },
-                  { name: 'VAULT_NAMESPACE', value: request.vaultNamespace || 'vault' },
-                  { name: 'VAULT_POD', value: request.vaultPod || 'vault-0' },
-                  { name: 'VAULT_HUB', value: request.vaultHub || 'hub' },
+                  { name: 'VALUES_SECRET', value: '/vault-secrets/values-secret.yaml' },
                 ],
-                volumeMounts: [
-                  {
-                    name: 'vault-secrets',
-                    mountPath: '/vault-secrets',
-                    readOnly: true,
-                  },
-                  {
-                    name: 'shared',
-                    mountPath: '/shared',
-                  },
-                ],
+                volumeMounts: injectorVolumeMounts,
                 resources: {
                   requests: { cpu: '100m', memory: '256Mi' },
                   limits: { cpu: '500m', memory: '512Mi' },
@@ -276,13 +320,14 @@ PLAYBOOK_EOF
                 command: [
                   '/bin/bash',
                   '-c',
-                  `echo "Deleting temporary secret $SECRET_NAME in namespace $SECRET_NAMESPACE"
-                  kubectl delete secret "$SECRET_NAME" -n "$SECRET_NAMESPACE" --ignore-not-found
+                  `echo "Deleting temporary secrets for injection run $VAULT_INJECTION_RUN"
+                  kubectl delete secret -n "$SECRET_NAMESPACE" -l "${runLabelKey}=$VAULT_INJECTION_RUN,patterns.gitops.hybrid-cloud-patterns.io/pattern=$PATTERN_NAME" --ignore-not-found
                   echo "Cleanup complete"`,
                 ],
                 env: [
-                  { name: 'SECRET_NAME', value: secretName },
                   { name: 'SECRET_NAMESPACE', value: PATTERN_OPERATOR_NS },
+                  { name: 'VAULT_INJECTION_RUN', value: runLabelValue },
+                  { name: 'PATTERN_NAME', value: request.patternName },
                 ],
                 resources: {
                   requests: { cpu: '50m', memory: '64Mi' },
@@ -318,16 +363,7 @@ PLAYBOOK_EOF
                 },
               },
             ],
-            volumes: [
-              {
-                name: 'vault-secrets',
-                secret: { secretName: secretName },
-              },
-              {
-                name: 'shared',
-                emptyDir: {},
-              },
-            ],
+            volumes,
           },
         },
       },

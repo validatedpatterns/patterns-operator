@@ -17,7 +17,7 @@ import {
   triggerVaultInjection as apiTriggerVaultInjection,
 } from '../api';
 import { useVaultJobPolling } from '../hooks/useVaultJobPolling';
-import { buildVaultInjectionYaml } from '../vaultSecrets';
+import { buildVaultInjectionPayload } from '../vaultSecrets';
 import { SecretTemplate, SecretFormData } from '../types';
 import { SecretFormExpandableSections } from './SecretForm/SecretFormExpandableSections';
 import { VaultInjectionStatusAlert } from './SecretForm/VaultInjectionStatusAlert';
@@ -82,7 +82,7 @@ export default function ManageSecretsPage() {
     setVaultJobStatus(null);
 
     try {
-      const { valuesSecretYaml, templateYaml } = await buildVaultInjectionYaml(
+      const { valuesSecretYaml, fileArtifacts } = buildVaultInjectionPayload(
         secretTemplate,
         secretFormData,
       );
@@ -90,7 +90,7 @@ export default function ManageSecretsPage() {
       const request = {
         patternName,
         valuesSecretYaml,
-        templateYaml,
+        fileArtifacts,
       };
 
       const result = await apiTriggerVaultInjection(request);
@@ -110,11 +110,7 @@ export default function ManageSecretsPage() {
     }
   };
 
-  const handleFieldChange = (
-    secretName: string,
-    fieldName: string,
-    value: string | File | null,
-  ) => {
+  const handleFieldChange = (secretName: string, fieldName: string, value: string | null) => {
     setSecretFormData((prev) => ({
       ...prev,
       [secretName]: {
