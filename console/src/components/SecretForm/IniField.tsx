@@ -79,8 +79,8 @@ export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) =>
     return result;
   };
 
-  const handleFileInputChange = (file: File | null, filename: string) => {
-    setFilename(filename);
+  const handleFileInputChange = (_, file: File) => {
+    setFilename(file.name);
 
     if (!file) {
       setFileContent('');
@@ -162,9 +162,11 @@ export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) =>
     <>
       <FileUpload
         id={`ini-file-${field.name}`}
+        type="text"
+        hideDefaultPreview
         value={fileContent}
         filename={filename}
-        onChange={handleFileInputChange}
+        onFileInputChange={handleFileInputChange}
         onClearClick={handleClear}
         dropzoneProps={{
           accept: {
@@ -193,7 +195,7 @@ export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) =>
       )}
 
       {value && (
-        <TextArea value={value} isReadOnly aria-label={t('Extracted value preview')} rows={4} />
+        <TextArea value={value} readOnly={true} aria-label={t('Extracted value preview')} rows={4} />
       )}
 
       <FormHelperText>
