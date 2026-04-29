@@ -62,7 +62,7 @@ func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorCo
 		"g, cluster-admins, role:admin",
 		"g, admin, role:admin",
 	}
-	for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getValueWithDefault("gitops.additionalArgoAdmins"), ",") {
+	for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getStringValue("gitops.additionalArgoAdmins"), ",") {
 		argoAdmin = strings.TrimSpace(argoAdmin)
 		if argoAdmin != "" {
 			argoPolicies = append(argoPolicies, "g, "+argoAdmin+", role:admin")
@@ -160,7 +160,7 @@ health_status.message = "An install plan for a subscription is pending installat
 return health_status`,
 		},
 	}
-	if strings.EqualFold(patternsOperatorConfig.getValueWithDefault("gitops.applicationHealthCheckEnabled"), "true") {
+	if patternsOperatorConfig.getBoolValue("gitops.applicationHealthCheckEnabled") {
 		// As of ArgoCD 1.8 the Application health check was dropped (see https://github.com/argoproj/argo-cd/issues/3781),
 		// but in app-of-apps pattern this is needed in order to implement children apps dependencies via sync-waves
 		resourceHealthChecks = append(resourceHealthChecks, argooperator.ResourceHealthCheck{
@@ -978,9 +978,9 @@ func newArgoGiteaApplication(p *api.Pattern, patternsOperatorConfig PatternsOper
 		},
 		Project: "default",
 		Source: &argoapi.ApplicationSource{
-			RepoURL:        patternsOperatorConfig.getValueWithDefault("gitea.helmRepoUrl"),
-			TargetRevision: patternsOperatorConfig.getValueWithDefault("gitea.chartVersion"),
-			Chart:          patternsOperatorConfig.getValueWithDefault("gitea.chartName"),
+			RepoURL:        patternsOperatorConfig.getStringValue("gitea.helmRepoUrl"),
+			TargetRevision: patternsOperatorConfig.getStringValue("gitea.chartVersion"),
+			Chart:          patternsOperatorConfig.getStringValue("gitea.chartName"),
 			Helm: &argoapi.ApplicationSourceHelm{
 				Parameters: parameters,
 			},
