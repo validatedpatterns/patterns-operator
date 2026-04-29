@@ -15,13 +15,13 @@ Search OperatorHub for "pattern" and accept all the defaults
 ## Create the Multi-Cloud GitOps pattern
 
 ```
-kubectl create -f config/samples/gitops_v1alpha1_pattern.yaml
+oc create -f config/samples/gitops_v1alpha1_pattern.yaml
 ```
 
 ### Check the status
 
 ```
-kubectl get -f config/samples/gitops_v1alpha1_pattern.yaml -o yaml
+oc get -f config/samples/gitops_v1alpha1_pattern.yaml -o yaml
 oc get applications -A -w
 ```
 
@@ -36,20 +36,26 @@ secret and then add the secrets via the UI (this approach is a bit more work)
 ### Delete the pattern
 
 ```
-kubectl delete -f config/samples/gitops_v1alpha1_pattern.yaml
+oc delete -f config/samples/gitops_v1alpha1_pattern.yaml
 ```
 
-This will only remove the top-level application.
-The subscription and anything created by Argo will not be removed and canmust be removed manually.
-Removing the top-level application ensures that Argo won't try to put back anything you delete.
+This action removes the `Pattern` instance only.
 
-## Watch the logs
-
-When installing via UI the namespace will be `patterns-operator` (recommended)
+If you annotate the Pattern instance with `patterns.gitops.hybrid-cloud-patterns.io/prune: "true"`:
 
 ```
-oc logs -n patterns-operator `oc get -n patterns-operator pods -o name --field-selector status.phase=Running | grep patterns` -c manager -f
+oc annotate -f config/samples/gitops_v1alpha1_pattern.yaml patterns.gitops.hybrid-cloud-patterns.io/prune='true'
 ```
+
+Once the `Pattern` instance is deleted, the following resources will also be removed:
+
+- The top-level application of the hub cluster.
+- The child applications of the hub cluster.
+- The top-level application of the spoke clusters.
+- The child applications of the spoke clusters.
+- The `ManagedCluster` instances (excluding the `local-cluster`).
+
+**NOTE:** The GitOps Operator `Subscription` and the main `ArgoCD` instance will not be removed and must be removed manually.
 
 ## Development
 

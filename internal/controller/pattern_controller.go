@@ -68,6 +68,7 @@ import (
 )
 
 const ReconcileLoopRequeueTime = 180 * time.Second
+const PruneAnnotation = "patterns.gitops.hybrid-cloud-patterns.io/prune"
 
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
@@ -748,11 +749,11 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 }
 
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
-	// Add finalizer when object is created
 	log.Printf("Finalizing pattern object")
 
-	// The object is being deleted
-	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
+	// The object is being deleted and, if prune is enabled, we want to delete all the dependent objects in cascade
+	if strings.EqualFold(instance.Annotations[PruneAnnotation], "true") &&
+		(controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents)) {
 		// Prepare the app for cascaded deletion
 		qualifiedInstance, err := r.applyDefaults(instance)
 		if err != nil {
