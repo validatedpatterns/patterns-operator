@@ -53,7 +53,7 @@ var _ = Describe("CreateOrUpdateCatalog", func() {
 		})
 
 		It("should create a deployment with the default image", func() {
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, cm)).To(Succeed())
 
 			deploy := &appsv1.Deployment{}
 			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
@@ -68,7 +68,7 @@ var _ = Describe("CreateOrUpdateCatalog", func() {
 		})
 
 		It("should create a deployment with the overridden image", func() {
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, cm)).To(Succeed())
 
 			deploy := &appsv1.Deployment{}
 			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
@@ -83,14 +83,14 @@ var _ = Describe("CreateOrUpdateCatalog", func() {
 		})
 
 		It("should update the deployment image", func() {
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, cm)).To(Succeed())
 
 			// Change the override
 			cm.Data["catalog.image"] = "custom-catalog:v4"
 			Expect(cl.Update(ctx, cm)).To(Succeed())
 
 			// Second call updates
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, cm)).To(Succeed())
 
 			deploy := &appsv1.Deployment{}
 			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
@@ -105,7 +105,7 @@ var _ = Describe("CreateOrUpdateCatalog", func() {
 		})
 
 		It("should create the nginx ConfigMap", func() {
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, cm)).To(Succeed())
 
 			catalogCM := &corev1.ConfigMap{}
 			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogConfigMapName}, catalogCM)).To(Succeed())
@@ -113,7 +113,7 @@ var _ = Describe("CreateOrUpdateCatalog", func() {
 		})
 
 		It("should create the Service with the correct port", func() {
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, cm)).To(Succeed())
 
 			svc := &corev1.Service{}
 			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogServiceName}, svc)).To(Succeed())
@@ -127,7 +127,24 @@ var _ = Describe("CreateOrUpdateCatalog", func() {
 		})
 
 		It("should fall back to the default image", func() {
-			Expect(CreateOrUpdateCatalog(ctx, cl, cl)).To(Succeed())
+			Expect(CreateOrUpdateCatalog(ctx, cl, nil)).To(Succeed())
+
+			deploy := &appsv1.Deployment{}
+			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())
+			Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(Equal(CatalogDefaultImage))
+		})
+	})
+
+	Context("when the operator ConfigMap is empty (no data)", func() {
+		BeforeEach(func() {
+			cl = newFakeClient()
+
+		})
+
+		It("should fall back to the default image", func() {
+			configmap := &corev1.ConfigMap{}
+
+			Expect(CreateOrUpdateCatalog(ctx, cl, configmap)).To(Succeed())
 
 			deploy := &appsv1.Deployment{}
 			Expect(cl.Get(ctx, client.ObjectKey{Namespace: defaultNamespace, Name: CatalogDeploymentName}, deploy)).To(Succeed())

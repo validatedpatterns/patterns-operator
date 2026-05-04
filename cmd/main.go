@@ -27,6 +27,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -105,7 +106,17 @@ func main() {
 		if err := console.EnablePlugin(ctx, mgr.GetClient()); err != nil {
 			setupLog.Error(err, "unable to enable console plugin")
 		}
-		if err := console.CreateOrUpdateCatalog(ctx, mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+		cm, err := controllers.GetPatternsOperatorConfigMap(ctx, mgr.GetClient())
+		if err != nil {
+			setupLog.Error(err, "unable to get operator configmap")
+		}
+		if cm == nil {
+			cm, err = controllers.CreatePatternsOperatorConfigMap(ctx, mgr.GetClient())
+			if err != nil {
+				setupLog.Error(err, "unable to create operator configmap")
+			}
+		}
+		if err := console.CreateOrUpdateCatalog(ctx, mgr.GetClient(), cm); err != nil {
 			setupLog.Error(err, "unable to create/update catalog deployment")
 		}
 		return nil
