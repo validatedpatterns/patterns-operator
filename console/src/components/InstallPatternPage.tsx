@@ -14,7 +14,6 @@ import {
   DescriptionListDescription,
   DescriptionListGroup,
   DescriptionListTerm,
-  ExpandableSection,
   Form,
   FormGroup,
   Label,
@@ -23,32 +22,25 @@ import {
   TextInput,
   Title,
 } from '@patternfly/react-core';
-import {
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-} from '@patternfly/react-table';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import {
   fetchPattern,
   fetchPatternCR,
   fetchSecretTemplate,
-  fetchVaultJobStatus,
   triggerVaultInjection as apiTriggerVaultInjection,
   PATTERN_OPERATOR_NS,
   PatternCRStatus,
-  VaultJobStatus,
-  VaultInjectionRequest
 } from '../api';
-import { SecretTemplate, SecretFormData, SecretDefinition, SecretField } from '../types';
-import { GenerateField } from './SecretForm/GenerateField';
-import { PromptField } from './SecretForm/PromptField';
-import { FileField } from './SecretForm/FileField';
-import { IniField } from './SecretForm/IniField';
-import { StaticField } from './SecretForm/StaticField';
+import { useVaultJobPolling } from '../hooks/useVaultJobPolling';
+import {
+  buildVaultInjectionPayload,
+  getMissingFileAndIniFields,
+  secretTemplateHasFileOrIniFields,
+} from '../vaultSecrets';
+import { SecretTemplate, SecretFormData } from '../types';
+import { SecretFormExpandableSections } from './SecretForm/SecretFormExpandableSections';
+import { VaultInjectionStatusAlert } from './SecretForm/VaultInjectionStatusAlert';
 import './SecretForm/SecretForm.css';
 
 const PatternModel = {
@@ -85,8 +77,9 @@ export default function InstallPatternPage() {
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
-  const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
-  const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
+  const [secretsValidationAttempted, setSecretsValidationAttempted] = React.useState(false);
+  const { vaultJobStatus, setVaultJobStatus, checkingVaultStatus, checkVaultJobStatus } =
+    useVaultJobPolling(patternName);
   const [patternStatus, setPatternStatus] = React.useState<PatternCRStatus | null>(null);
 
   React.useEffect(() => {
@@ -97,7 +90,7 @@ export default function InstallPatternPage() {
         console.log('🟢 [InstallPatternPage] Pattern data loaded successfully:', {
           patternName: patternData.name,
           repoUrl: patternData.repo_url,
-          hasSecretTemplate: !!template
+          hasSecretTemplate: !!template,
         });
 
         setPatternName(patternData.name);
@@ -114,7 +107,9 @@ export default function InstallPatternPage() {
           const initialExpanded: Record<string, boolean> = {};
 
           template.secrets.forEach((secret, index) => {
-            console.log(`🔧 [InstallPatternPage] Processing secret: ${secret.name} with ${secret.fields.length} fields`);
+            console.log(
+              `🔧 [InstallPatternPage] Processing secret: ${secret.name} with ${secret.fields.length} fields`,
+            );
             initialData[secret.name] = {};
             secret.fields.forEach((field) => {
               initialData[secret.name][field.name] = '';
@@ -126,7 +121,7 @@ export default function InstallPatternPage() {
           console.log('🔧 [InstallPatternPage] Secret form initialized:', {
             secretCount: template.secrets.length,
             initialData: Object.keys(initialData),
-            expandedSections: Object.keys(initialExpanded).filter(key => initialExpanded[key])
+            expandedSections: Object.keys(initialExpanded).filter((key) => initialExpanded[key]),
           });
 
           setSecretFormData(initialData);
@@ -157,55 +152,23 @@ export default function InstallPatternPage() {
     console.log('✅ [InstallPatternPage] All required data present for vault injection:', {
       patternName,
       secretDataKeys: Object.keys(secretFormData),
-      templateSecrets: secretTemplate.secrets.map(s => s.name)
+      templateSecrets: secretTemplate.secrets.map((s) => s.name),
     });
 
     try {
-      // Convert secretFormData to YAML format with proper structure for vault_load_secrets
-      const yaml = await import('js-yaml');
-      console.log('🔄 [InstallPatternPage] Converting secretFormData to YAML:', secretFormData);
+      const { valuesSecretYaml, fileArtifacts } = buildVaultInjectionPayload(
+        secretTemplate,
+        secretFormData,
+      );
+      console.log(
+        '✅ [InstallPatternPage] Generated values YAML with vault structure:',
+        valuesSecretYaml,
+      );
 
-      // Build the v2.0 secrets list structure expected by parse_secrets_info
-      const secretsList = secretTemplate.secrets.map((secretDef) => {
-        const formValues = secretFormData[secretDef.name] || {};
-        const secret: any = { name: secretDef.name };
-        if (secretDef.vaultMount) secret.vaultMount = secretDef.vaultMount;
-        if (secretDef.vaultPrefixes) secret.vaultPrefixes = secretDef.vaultPrefixes;
-        secret.fields = secretDef.fields.map((fieldDef) => {
-          const field: any = { name: fieldDef.name };
-          if (fieldDef.onMissingValue) field.onMissingValue = fieldDef.onMissingValue;
-          if (fieldDef.vaultPolicy) field.vaultPolicy = fieldDef.vaultPolicy;
-          if (fieldDef.base64) field.base64 = fieldDef.base64;
-          if (fieldDef.override) field.override = fieldDef.override;
-          const val = formValues[fieldDef.name];
-          if (typeof val === 'string' && val !== '') {
-            field.value = val;
-            // User provided an explicit value, so don't auto-generate
-            if (fieldDef.onMissingValue === 'generate') {
-              delete field.onMissingValue;
-              delete field.vaultPolicy;
-            }
-          }
-          return field;
-        });
-        return secret;
-      });
-
-      const vaultSecretStructure: SecretTemplate = {
-        version: '2.0',
-        secrets: secretsList,
-        vaultPolicies: secretTemplate?.vaultPolicies || null
-      };
-
-      const valuesSecretYaml = yaml.dump(vaultSecretStructure);
-      const templateYaml = JSON.stringify(secretTemplate, null, 2);
-      console.log('✅ [InstallPatternPage] Generated values YAML with vault structure:', valuesSecretYaml);
-      console.log('✅ [InstallPatternPage] Generated template YAML:', templateYaml);
-
-      const request: VaultInjectionRequest = {
+      const request = {
         patternName,
         valuesSecretYaml,
-        templateYaml,
+        fileArtifacts,
       };
 
       console.log('🚀 [InstallPatternPage] Triggering vault injection with request:', request);
@@ -213,7 +176,9 @@ export default function InstallPatternPage() {
       console.log('📥 [InstallPatternPage] Vault injection result:', result);
 
       if (result.success) {
-        console.log('✅ [InstallPatternPage] Vault injection triggered successfully, starting job status polling');
+        console.log(
+          '✅ [InstallPatternPage] Vault injection triggered successfully, starting job status polling',
+        );
         // Start polling for job status
         setTimeout(() => {
           checkVaultJobStatus();
@@ -235,40 +200,13 @@ export default function InstallPatternPage() {
     }
   }, [patternName, secretFormData, secretTemplate]);
 
-  const checkVaultJobStatus = React.useCallback(async () => {
-    if (!patternName) {
-      console.log('🟡 [InstallPatternPage] No pattern name for vault job status check');
-      return;
-    }
-
-    try {
-      console.log('🔍 [InstallPatternPage] Checking vault job status for pattern:', patternName);
-      setCheckingVaultStatus(true);
-      const status = await fetchVaultJobStatus(patternName);
-      console.log('📋 [InstallPatternPage] Vault job status received:', status);
-      setVaultJobStatus(status);
-
-      // Continue polling if job is still running or pending
-      if (status.status === 'running' || status.status === 'pending') {
-        console.log('⏳ [InstallPatternPage] Job still in progress, will poll again in 5 seconds');
-        setTimeout(() => {
-          checkVaultJobStatus();
-        }, 5000); // Poll every 5 seconds
-      } else {
-        console.log('✅ [InstallPatternPage] Job finished with status:', status.status);
-      }
-    } catch (err) {
-      console.error('🔴 [InstallPatternPage] Error checking vault job status:', err);
-    } finally {
-      setCheckingVaultStatus(false);
-    }
-  }, [patternName]);
-
   // Check vault job status on component mount if secrets were configured
   React.useEffect(() => {
     const hasSecretData = secretFormData && Object.keys(secretFormData).length > 0;
     if (success && hasSecretData && secretTemplate && patternName) {
-      console.log('⏰ [InstallPatternPage] Pattern created successfully with secrets, starting vault job status check');
+      console.log(
+        '⏰ [InstallPatternPage] Pattern created successfully with secrets, starting vault job status check',
+      );
       const timer = setTimeout(() => {
         checkVaultJobStatus();
       }, 2000); // Wait 2 seconds after pattern creation
@@ -282,7 +220,9 @@ export default function InstallPatternPage() {
 
     // Initial fetch after a short delay to let the reconciler start
     const initialTimer = setTimeout(() => {
-      fetchPatternCR(patternName).then(setPatternStatus).catch(() => {});
+      fetchPatternCR(patternName)
+        .then(setPatternStatus)
+        .catch(() => undefined);
     }, 3000);
 
     const interval = setInterval(async () => {
@@ -319,8 +259,25 @@ export default function InstallPatternPage() {
 
   const handleSubmit = async () => {
     console.log('🚀 [InstallPatternPage] Starting pattern installation process');
-    setSubmitting(true);
+
+    if (secretTemplate) {
+      const missingUploads = getMissingFileAndIniFields(secretTemplate, secretFormData);
+      if (missingUploads.length > 0) {
+        setSecretsValidationAttempted(true);
+        setExpandedSections((prev) => {
+          const next = { ...prev };
+          missingUploads.forEach(({ secretName }) => {
+            next[secretName] = true;
+          });
+          return next;
+        });
+        return;
+      }
+    }
+    setSecretsValidationAttempted(false);
     setSubmitError(null);
+
+    setSubmitting(true);
 
     try {
       const hasSecrets = secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate;
@@ -330,7 +287,7 @@ export default function InstallPatternPage() {
         targetRepo,
         targetRevision,
         hasSecrets,
-        secretCount: hasSecrets ? Object.keys(secretFormData).length : 0
+        secretCount: hasSecrets ? Object.keys(secretFormData).length : 0,
       });
       const patternData: {
         apiVersion: string;
@@ -357,7 +314,10 @@ export default function InstallPatternPage() {
         },
       };
 
-      console.log('🔧 [InstallPatternPage] Creating Pattern CR with data:', JSON.stringify(patternData, null, 2));
+      console.log(
+        '🔧 [InstallPatternPage] Creating Pattern CR with data:',
+        JSON.stringify(patternData, null, 2),
+      );
 
       await k8sCreate({
         model: PatternModel,
@@ -384,12 +344,10 @@ export default function InstallPatternPage() {
   };
 
   // Secret form handling functions
-  const handleFieldChange = (
-    secretName: string,
-    fieldName: string,
-    value: string | File | null,
-  ) => {
-    console.log(`🔄 [InstallPatternPage] Secret field changed: ${secretName}.${fieldName}`, { value: value instanceof File ? `[File: ${value.name}]` : value });
+  const handleFieldChange = (secretName: string, fieldName: string, value: string | null) => {
+    console.log(`🔄 [InstallPatternPage] Secret field changed: ${secretName}.${fieldName}`, {
+      value: value,
+    });
     setSecretFormData((prev) => ({
       ...prev,
       [secretName]: {
@@ -405,41 +363,6 @@ export default function InstallPatternPage() {
       ...prev,
       [sectionName]: !prev[sectionName],
     }));
-  };
-
-  const getFieldType = (field: SecretField): 'generate' | 'prompt' | 'file' | 'ini' | 'static' => {
-    if (field.onMissingValue === 'generate') return 'generate';
-    if (field.path) return 'file';
-    if (field.ini_file) return 'ini';
-    if (field.value !== undefined && field.value !== null) return 'static';
-    return 'prompt'; // Default to prompt for required fields
-  };
-
-  const renderField = (secret: SecretDefinition, field: SecretField) => {
-    const fieldType = getFieldType(field);
-    const value = secretFormData[secret.name]?.[field.name] || '';
-
-    const commonProps = {
-      field,
-      value,
-      onChange: (newValue: string | File | null) =>
-        handleFieldChange(secret.name, field.name, newValue),
-    };
-
-    switch (fieldType) {
-      case 'generate':
-        return <GenerateField key={field.name} {...commonProps} />;
-      case 'prompt':
-        return <PromptField key={field.name} {...commonProps} />;
-      case 'file':
-        return <FileField key={field.name} {...commonProps} />;
-      case 'ini':
-        return <IniField key={field.name} {...commonProps} />;
-      case 'static':
-        return <StaticField key={field.name} {...commonProps} />;
-      default:
-        return <PromptField key={field.name} {...commonProps} />;
-    }
   };
 
   if (loading) {
@@ -474,7 +397,8 @@ export default function InstallPatternPage() {
             <Alert variant="success" title={t('Pattern created successfully')}>
               <p>
                 {(() => {
-                  const hasSecrets = secretTemplate && secretFormData && Object.keys(secretFormData).length > 0;
+                  const hasSecrets =
+                    secretTemplate && secretFormData && Object.keys(secretFormData).length > 0;
                   const reconcileComplete = patternStatus?.lastStep === 'reconcile complete';
                   const vaultDone = !hasSecrets || vaultJobStatus?.status === 'succeeded';
                   if (reconcileComplete && vaultDone) {
@@ -502,7 +426,9 @@ export default function InstallPatternPage() {
                         <DescriptionListTerm>{t('Current Step')}</DescriptionListTerm>
                         <DescriptionListDescription>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {!patternStatus.lastError && <Spinner size="md" aria-label={t('Reconciling')} />}
+                            {!patternStatus.lastError && (
+                              <Spinner size="md" aria-label={t('Reconciling')} />
+                            )}
                             <span>{patternStatus.lastStep}</span>
                           </div>
                         </DescriptionListDescription>
@@ -520,7 +446,9 @@ export default function InstallPatternPage() {
 
                   {patternStatus.applications && patternStatus.applications.length > 0 && (
                     <div style={{ marginTop: '16px' }}>
-                      <Title headingLevel="h4" style={{ marginBottom: '8px' }}>{t('Applications')}</Title>
+                      <Title headingLevel="h4" style={{ marginBottom: '8px' }}>
+                        {t('Applications')}
+                      </Title>
                       <Table aria-label={t('Pattern applications')} variant="compact">
                         <Thead>
                           <Tr>
@@ -536,12 +464,30 @@ export default function InstallPatternPage() {
                               <Td dataLabel={t('Name')}>{app.name}</Td>
                               <Td dataLabel={t('Namespace')}>{app.namespace}</Td>
                               <Td dataLabel={t('Sync')}>
-                                <Label color={app.syncStatus === 'Synced' ? 'green' : app.syncStatus === 'OutOfSync' ? 'orange' : 'grey'}>
+                                <Label
+                                  color={
+                                    app.syncStatus === 'Synced'
+                                      ? 'green'
+                                      : app.syncStatus === 'OutOfSync'
+                                      ? 'orange'
+                                      : 'grey'
+                                  }
+                                >
                                   {app.syncStatus || 'Unknown'}
                                 </Label>
                               </Td>
                               <Td dataLabel={t('Health')}>
-                                <Label color={app.healthStatus === 'Healthy' ? 'green' : app.healthStatus === 'Degraded' ? 'red' : app.healthStatus === 'Progressing' ? 'blue' : 'grey'}>
+                                <Label
+                                  color={
+                                    app.healthStatus === 'Healthy'
+                                      ? 'green'
+                                      : app.healthStatus === 'Degraded'
+                                      ? 'red'
+                                      : app.healthStatus === 'Progressing'
+                                      ? 'blue'
+                                      : 'grey'
+                                  }
+                                >
                                   {app.healthStatus || 'Unknown'}
                                 </Label>
                               </Td>
@@ -552,44 +498,37 @@ export default function InstallPatternPage() {
                     </div>
                   )}
 
-                  {(!patternStatus.applications || patternStatus.applications.length === 0) && !patternStatus.lastError && (
-                    <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Spinner size="md" aria-label={t('Waiting for applications')} />
-                      <span>{t('Waiting for ArgoCD applications to be created...')}</span>
-                    </div>
-                  )}
+                  {(!patternStatus.applications || patternStatus.applications.length === 0) &&
+                    !patternStatus.lastError && (
+                      <div
+                        style={{
+                          marginTop: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                      >
+                        <Spinner size="md" aria-label={t('Waiting for applications')} />
+                        <span>{t('Waiting for ArgoCD applications to be created...')}</span>
+                      </div>
+                    )}
                 </CardBody>
               </Card>
             )}
           </>
         )}
         {/* Vault injection status */}
-        {success && secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate && vaultJobStatus && (
-          <Alert
-            style={{ marginTop: '16px' }}
-            variant={
-              vaultJobStatus.status === 'succeeded'
-                ? 'success'
-                : vaultJobStatus.status === 'failed'
-                ? 'danger'
-                : 'info'
-            }
-            title={t('Vault Secret Injection')}
-            isInline
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {(vaultJobStatus.status === 'running' || vaultJobStatus.status === 'pending' || checkingVaultStatus) && (
-                <Spinner aria-label={t('Checking vault status')} size="md" />
-              )}
-              <span>{vaultJobStatus.message}</span>
-            </div>
-            {vaultJobStatus.jobName && (
-              <p style={{ marginTop: '8px', fontSize: '0.9em', color: '#4f5255' }}>
-                {t('Job')}: <a href={`/k8s/ns/${PATTERN_OPERATOR_NS}/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
-              </p>
-            )}
-          </Alert>
-        )}
+        {success &&
+          secretFormData &&
+          Object.keys(secretFormData).length > 0 &&
+          secretTemplate &&
+          vaultJobStatus && (
+            <VaultInjectionStatusAlert
+              style={{ marginTop: '16px' }}
+              vaultJobStatus={vaultJobStatus}
+              checkingVaultStatus={checkingVaultStatus}
+            />
+          )}
         {submitError && (
           <Alert variant="danger" title={t('Failed to create pattern')}>
             {submitError}
@@ -638,38 +577,29 @@ export default function InstallPatternPage() {
             {/* Secrets Configuration Section */}
             {secretTemplate && (
               <FormGroup label={t('Secrets Configuration')} fieldId="pattern-secrets">
-                <Alert variant="info" title={t('Optional Secret Configuration')} isInline>
-                  {t('Configure secrets that will be injected into Vault for this pattern.')}
+                <Alert
+                  variant="info"
+                  title={
+                    secretTemplateHasFileOrIniFields(secretTemplate)
+                      ? t('Secret configuration')
+                      : t('Optional Secret Configuration')
+                  }
+                  isInline
+                >
+                  {secretTemplateHasFileOrIniFields(secretTemplate)
+                    ? t(
+                        'Configure secrets for this pattern. File and INI fields are required before install.',
+                      )
+                    : t('Configure secrets that will be injected into Vault for this pattern.')}
                 </Alert>
-                <div className="patterns-operator__secret-form">
-                  {secretTemplate.secrets.map((secret) => (
-                    <ExpandableSection
-                      key={secret.name}
-                      toggleText={secret.name}
-                      isExpanded={expandedSections[secret.name] || false}
-                      onToggle={() => toggleSection(secret.name)}
-                      className="patterns-operator__secret-section"
-                    >
-                      <Card>
-                        <CardTitle>{secret.name}</CardTitle>
-                        <CardBody>
-                          {secret.fields.map((field) => (
-                            <FormGroup
-                              key={field.name}
-                              label={field.name}
-                              helperText={field.description}
-                              isRequired={getFieldType(field) === 'prompt'}
-                              fieldId={`secret-${secret.name}-${field.name}`}
-                              className="patterns-operator__secret-field"
-                            >
-                              {renderField(secret, field)}
-                            </FormGroup>
-                          ))}
-                        </CardBody>
-                      </Card>
-                    </ExpandableSection>
-                  ))}
-                </div>
+                <SecretFormExpandableSections
+                  secrets={secretTemplate.secrets}
+                  secretFormData={secretFormData}
+                  expandedSections={expandedSections}
+                  onToggleSection={toggleSection}
+                  onFieldChange={handleFieldChange}
+                  secretsValidationAttempted={secretsValidationAttempted}
+                />
               </FormGroup>
             )}
 

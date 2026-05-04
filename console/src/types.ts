@@ -82,6 +82,22 @@ export interface SecretField {
 
 export interface SecretFormData {
   [secretName: string]: {
-    [fieldName: string]: string | File | null;
+    [fieldName: string]: string | null;
   };
 }
+
+/** One user-uploaded file; becomes a dedicated Secret mounted under {@link VAULT_UPLOADS_MOUNT_PREFIX}. */
+export interface VaultInjectionFileArtifact {
+  /** Path segment under the uploads mount (unique per secret+field). */
+  slug: string;
+  /** Raw file bytes, base64-encoded (valid for Kubernetes Secret `data`). */
+  dataBase64: string;
+}
+
+export interface VaultInjectionPayload {
+  valuesSecretYaml: string;
+  fileArtifacts: VaultInjectionFileArtifact[];
+}
+
+/** Mount path in the vault injection Job pod; must match paths emitted in values-secret.yaml for file fields. */
+export const VAULT_UPLOADS_MOUNT_PREFIX = '/vault-uploads';

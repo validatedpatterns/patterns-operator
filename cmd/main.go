@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	argov1beta1api "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	gitopsv1alpha1 "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
@@ -85,6 +86,9 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "f2850479.hybrid-cloud-patterns.io",
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
 		//LeaderElectionNamespace: "default", // Use this if we ever want to enforce a single instance per cluster
 	})
 	if err != nil {

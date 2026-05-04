@@ -1,18 +1,13 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Checkbox,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  TextInput,
-} from '@patternfly/react-core';
+import { Checkbox, HelperText, HelperTextItem, TextInput } from '@patternfly/react-core';
 
 interface GenerateFieldProps {
   field: {
     name: string;
     description?: string;
     vaultPolicy?: string;
+    override?: boolean;
   };
   value: string;
   onChange: (value: string) => void;
@@ -21,11 +16,20 @@ interface GenerateFieldProps {
 export const GenerateField: React.FC<GenerateFieldProps> = ({ field, value, onChange }) => {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [autoGenerate, setAutoGenerate] = React.useState(true);
+  const [allowOverride, setAllowOverride] = React.useState(false);
 
   const handleAutoGenerateChange = (checked: boolean) => {
     setAutoGenerate(checked);
     if (checked) {
-      onChange(''); // Clear manual value when switching to auto-generate
+      onChange('');
+      setAllowOverride(false);
+    }
+  };
+
+  const handleAllowOverrideChange = (checked: boolean) => {
+    setAllowOverride(checked);
+    if (!checked) {
+      onChange('');
     }
   };
 
@@ -35,12 +39,32 @@ export const GenerateField: React.FC<GenerateFieldProps> = ({ field, value, onCh
 
   return (
     <>
+      <HelperText>
+        {field.description && <HelperTextItem>{field.description}</HelperTextItem>}
+      </HelperText>
       <Checkbox
         id={`auto-generate-${field.name}`}
         label={t('Auto-generate this value')}
         isChecked={autoGenerate}
         onChange={(_event, checked) => handleAutoGenerateChange(checked)}
+        body={t('If checked this value will be automatically generated using vault policies')}
+        description={
+          autoGenerate &&
+          field.vaultPolicy &&
+          t('Vault policy: {{policy}}', { policy: field.vaultPolicy })
+        }
       />
+      {autoGenerate && (
+        <Checkbox
+          id={`override-${field.name}`}
+          label={t('Allow override')}
+          isChecked={allowOverride}
+          onChange={(_event, checked) => handleAllowOverrideChange(checked)}
+          body={t(
+            'If the secret already exists in the vault it will be changed if override is set to true',
+          )}
+        />
+      )}
       {!autoGenerate && (
         <TextInput
           id={`manual-${field.name}`}
@@ -48,24 +72,8 @@ export const GenerateField: React.FC<GenerateFieldProps> = ({ field, value, onCh
           value={value}
           onChange={handleManualValueChange}
           placeholder={t('Enter manual value')}
-          style={{ marginTop: '8px' }}
         />
       )}
-      <FormHelperText>
-        <HelperText>
-          <HelperTextItem>
-            {autoGenerate
-              ? t('This value will be automatically generated using vault policies')
-              : t('You can manually override the auto-generated value')}
-          </HelperTextItem>
-          {field.vaultPolicy && (
-            <HelperTextItem>
-              {t('Vault policy: {{policy}}', { policy: field.vaultPolicy })}
-            </HelperTextItem>
-          )}
-          {field.description && <HelperTextItem>{field.description}</HelperTextItem>}
-        </HelperText>
-      </FormHelperText>
     </>
   );
 };

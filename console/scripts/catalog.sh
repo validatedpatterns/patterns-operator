@@ -3,6 +3,7 @@
 set -euo pipefail
 CONSOLE_IMAGE_PLATFORM=${CONSOLE_IMAGE_PLATFORM:="linux/amd64"}
 
+UI_CATALOG_IMG=${UI_CATALOG_IMG:="quay.io/validatedpatterns/pattern-ui-catalog:stable-v1"}
 
 echo "Starting local UI catalog image..."
 echo "Console Image: $UI_CATALOG_IMG"

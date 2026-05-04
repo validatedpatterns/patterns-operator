@@ -6,12 +6,7 @@ import {
   ActionGroup,
   Alert,
   Button,
-  Card,
-  CardBody,
-  CardTitle,
-  ExpandableSection,
   Form,
-  FormGroup,
   PageSection,
   Spinner,
   Title,
@@ -19,18 +14,17 @@ import {
 import {
   fetchPattern,
   fetchSecretTemplate,
-  fetchVaultJobStatus,
   triggerVaultInjection as apiTriggerVaultInjection,
-  PATTERN_OPERATOR_NS,
-  VaultJobStatus,
-  VaultInjectionRequest,
 } from '../api';
-import { SecretTemplate, SecretFormData, SecretDefinition, SecretField } from '../types';
-import { GenerateField } from './SecretForm/GenerateField';
-import { PromptField } from './SecretForm/PromptField';
-import { FileField } from './SecretForm/FileField';
-import { IniField } from './SecretForm/IniField';
-import { StaticField } from './SecretForm/StaticField';
+import { useVaultJobPolling } from '../hooks/useVaultJobPolling';
+import {
+  buildVaultInjectionPayload,
+  getMissingFileAndIniFields,
+  secretTemplateHasFileOrIniFields,
+} from '../vaultSecrets';
+import { SecretTemplate, SecretFormData } from '../types';
+import { SecretFormExpandableSections } from './SecretForm/SecretFormExpandableSections';
+import { VaultInjectionStatusAlert } from './SecretForm/VaultInjectionStatusAlert';
 import './SecretForm/SecretForm.css';
 
 export default function ManageSecretsPage() {
@@ -50,11 +44,11 @@ export default function ManageSecretsPage() {
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
-  const [vaultJobStatus, setVaultJobStatus] = React.useState<VaultJobStatus | null>(null);
-  const [checkingVaultStatus, setCheckingVaultStatus] = React.useState(false);
+  const [secretsValidationAttempted, setSecretsValidationAttempted] = React.useState(false);
+  const { vaultJobStatus, setVaultJobStatus, checkingVaultStatus, checkVaultJobStatus } =
+    useVaultJobPolling(patternName);
 
   React.useEffect(() => {
-
     Promise.all([fetchPattern(name), fetchSecretTemplate(name)])
       .then(([patternData, template]) => {
         setPatternName(patternData.name);
@@ -86,72 +80,38 @@ export default function ManageSecretsPage() {
       });
   }, [name]);
 
-  const checkVaultJobStatus = React.useCallback(async () => {
-    if (!patternName) return;
-
-    try {
-      setCheckingVaultStatus(true);
-      const status = await fetchVaultJobStatus(patternName);
-      setVaultJobStatus(status);
-
-      if (status.status === 'running' || status.status === 'pending') {
-        setTimeout(() => {
-          checkVaultJobStatus();
-        }, 5000);
-      }
-    } catch (err) {
-      console.error('Error checking vault job status:', err);
-    } finally {
-      setCheckingVaultStatus(false);
-    }
-  }, [patternName]);
-
   const handleSubmit = async () => {
-    setSubmitting(true);
-    setSubmitError(null);
+    if (!secretTemplate) return;
+
     setSuccess(false);
     setVaultJobStatus(null);
 
-    try {
-      const yaml = await import('js-yaml');
-
-      const secretsList = secretTemplate.secrets.map((secretDef) => {
-        const formValues = secretFormData[secretDef.name] || {};
-        const secret: any = { name: secretDef.name };
-        if (secretDef.vaultMount) secret.vaultMount = secretDef.vaultMount;
-        if (secretDef.vaultPrefixes) secret.vaultPrefixes = secretDef.vaultPrefixes;
-        secret.fields = secretDef.fields.map((fieldDef) => {
-          const field: any = { name: fieldDef.name };
-          if (fieldDef.onMissingValue) field.onMissingValue = fieldDef.onMissingValue;
-          if (fieldDef.vaultPolicy) field.vaultPolicy = fieldDef.vaultPolicy;
-          if (fieldDef.base64) field.base64 = fieldDef.base64;
-          if (fieldDef.override) field.override = fieldDef.override;
-          const val = formValues[fieldDef.name];
-          if (typeof val === 'string' && val !== '') {
-            field.value = val;
-            if (fieldDef.onMissingValue === 'generate') {
-              delete field.onMissingValue;
-              delete field.vaultPolicy;
-            }
-          }
-          return field;
+    const missingUploads = getMissingFileAndIniFields(secretTemplate, secretFormData);
+    if (missingUploads.length > 0) {
+      setSecretsValidationAttempted(true);
+      setExpandedSections((prev) => {
+        const next = { ...prev };
+        missingUploads.forEach(({ secretName }) => {
+          next[secretName] = true;
         });
-        return secret;
+        return next;
       });
+      return;
+    }
+    setSecretsValidationAttempted(false);
+    setSubmitError(null);
 
-      const vaultSecretStructure: SecretTemplate = {
-        version: '2.0',
-        secrets: secretsList,
-        vaultPolicies: secretTemplate?.vaultPolicies || null
-      };
+    setSubmitting(true);
+    try {
+      const { valuesSecretYaml, fileArtifacts } = buildVaultInjectionPayload(
+        secretTemplate,
+        secretFormData,
+      );
 
-      const valuesSecretYaml = yaml.dump(vaultSecretStructure);
-      const templateYaml = JSON.stringify(secretTemplate, null, 2);
-
-      const request: VaultInjectionRequest = {
+      const request = {
         patternName,
         valuesSecretYaml,
-        templateYaml,
+        fileArtifacts,
       };
 
       const result = await apiTriggerVaultInjection(request);
@@ -171,11 +131,7 @@ export default function ManageSecretsPage() {
     }
   };
 
-  const handleFieldChange = (
-    secretName: string,
-    fieldName: string,
-    value: string | File | null,
-  ) => {
+  const handleFieldChange = (secretName: string, fieldName: string, value: string | null) => {
     setSecretFormData((prev) => ({
       ...prev,
       [secretName]: {
@@ -190,41 +146,6 @@ export default function ManageSecretsPage() {
       ...prev,
       [sectionName]: !prev[sectionName],
     }));
-  };
-
-  const getFieldType = (field: SecretField): 'generate' | 'prompt' | 'file' | 'ini' | 'static' => {
-    if (field.onMissingValue === 'generate') return 'generate';
-    if (field.path) return 'file';
-    if (field.ini_file) return 'ini';
-    if (field.value !== undefined && field.value !== null) return 'static';
-    return 'prompt';
-  };
-
-  const renderField = (secret: SecretDefinition, field: SecretField) => {
-    const fieldType = getFieldType(field);
-    const value = secretFormData[secret.name]?.[field.name] || '';
-
-    const commonProps = {
-      field,
-      value,
-      onChange: (newValue: string | File | null) =>
-        handleFieldChange(secret.name, field.name, newValue),
-    };
-
-    switch (fieldType) {
-      case 'generate':
-        return <GenerateField key={field.name} {...commonProps} />;
-      case 'prompt':
-        return <PromptField key={field.name} {...commonProps} />;
-      case 'file':
-        return <FileField key={field.name} {...commonProps} />;
-      case 'ini':
-        return <IniField key={field.name} {...commonProps} />;
-      case 'static':
-        return <StaticField key={field.name} {...commonProps} />;
-      default:
-        return <PromptField key={field.name} {...commonProps} />;
-    }
   };
 
   if (loading) {
@@ -264,9 +185,7 @@ export default function ManageSecretsPage() {
         <title>{t('Manage Secrets')}</title>
       </Helmet>
       <PageSection>
-        <Title headingLevel="h1">
-          {t('Manage Secrets for {{displayName}}', { displayName })}
-        </Title>
+        <Title headingLevel="h1">{t('Manage Secrets for {{displayName}}', { displayName })}</Title>
       </PageSection>
       <PageSection>
         {success && (
@@ -275,30 +194,11 @@ export default function ManageSecretsPage() {
           </Alert>
         )}
         {success && vaultJobStatus && (
-          <Alert
+          <VaultInjectionStatusAlert
             style={{ marginTop: '16px' }}
-            variant={
-              vaultJobStatus.status === 'succeeded'
-                ? 'success'
-                : vaultJobStatus.status === 'failed'
-                ? 'danger'
-                : 'info'
-            }
-            title={t('Vault Secret Injection')}
-            isInline
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {(vaultJobStatus.status === 'running' || vaultJobStatus.status === 'pending' || checkingVaultStatus) && (
-                <Spinner aria-label={t('Checking vault status')} size="md" />
-              )}
-              <span>{vaultJobStatus.message}</span>
-            </div>
-            {vaultJobStatus.jobName && (
-              <p style={{ marginTop: '8px', fontSize: '0.9em', color: '#4f5255' }}>
-                {t('Job')}: <a href={`/k8s/ns/${PATTERN_OPERATOR_NS}/jobs/${vaultJobStatus.jobName}`}><code>{vaultJobStatus.jobName}</code></a>
-              </p>
-            )}
-          </Alert>
+            vaultJobStatus={vaultJobStatus}
+            checkingVaultStatus={checkingVaultStatus}
+          />
         )}
         {submitError && (
           <Alert variant="danger" title={t('Failed to inject secrets')}>
@@ -313,45 +213,25 @@ export default function ManageSecretsPage() {
           }}
         >
           <Alert variant="info" title={t('Secret Configuration')} isInline>
-            {t('Enter or update the secrets that will be injected into Vault for this pattern. Fields left empty will retain their existing values in Vault.')}
+            {secretTemplateHasFileOrIniFields(secretTemplate)
+              ? t(
+                  'Enter or update the secrets that will be injected into Vault for this pattern. File and INI fields must be uploaded each time. Other fields may be left empty to keep existing Vault values.',
+                )
+              : t(
+                  'Enter or update the secrets that will be injected into Vault for this pattern. Fields left empty will retain their existing values in Vault.',
+                )}
           </Alert>
-          <div className="patterns-operator__secret-form">
-            {secretTemplate.secrets.map((secret) => (
-              <ExpandableSection
-                key={secret.name}
-                toggleText={secret.name}
-                isExpanded={expandedSections[secret.name] || false}
-                onToggle={() => toggleSection(secret.name)}
-                className="patterns-operator__secret-section"
-              >
-                <Card>
-                  <CardTitle>{secret.name}</CardTitle>
-                  <CardBody>
-                    {secret.fields.map((field) => (
-                      <FormGroup
-                        key={field.name}
-                        label={field.name}
-                        helperText={field.description}
-                        isRequired={getFieldType(field) === 'prompt'}
-                        fieldId={`secret-${secret.name}-${field.name}`}
-                        className="patterns-operator__secret-field"
-                      >
-                        {renderField(secret, field)}
-                      </FormGroup>
-                    ))}
-                  </CardBody>
-                </Card>
-              </ExpandableSection>
-            ))}
-          </div>
+          <SecretFormExpandableSections
+            secrets={secretTemplate.secrets}
+            secretFormData={secretFormData}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onFieldChange={handleFieldChange}
+            secretsValidationAttempted={secretsValidationAttempted}
+          />
 
           <ActionGroup>
-            <Button
-              variant="primary"
-              type="submit"
-              isLoading={submitting}
-              isDisabled={submitting}
-            >
+            <Button variant="primary" type="submit" isLoading={submitting} isDisabled={submitting}>
               {t('Inject Secrets')}
             </Button>
             <Button variant="link" onClick={() => history.push('/patterns')}>

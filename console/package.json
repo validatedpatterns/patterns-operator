@@ -15,7 +15,7 @@
     "start": "concurrently --kill-others -c auto -n \"console,wds,ui-catalog\" -p \"{name}:{pid}\" \"yarn run start:console\" \"yarn run start:wds\" \"yarn run start:ui-catalog\"",
     "start:wds": "PATTERN_UI_CATALOG_BASE_URL=http://localhost:8080 yarn run webpack -- serve --progress",
     "start:console": "CONSOLE_VERSION=4.20.0 scripts/console.sh",
-    "start:ui-catalog": "UI_CATALOG_IMG=quay.io/validatedpatterns/pattern-ui-catalog:stable-v1 scripts/catalog.sh",
+    "start:ui-catalog": "scripts/catalog.sh",
     "i18n": "./i18n-scripts/build-i18n.sh && node ./i18n-scripts/set-english-defaults.js",
     "lint": "yarn eslint src integration-tests --fix && stylelint 'src/**/*.css' --allow-empty-input --fix",
     "test-cypress": "cd integration-tests && cypress open",
@@ -95,7 +95,8 @@
     "mocha": "^10.5.1"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^4.1.1",
+    "yaml": "^2.8.3"
   },
   "resolutions": {
     "braces": "^3.0.3"
