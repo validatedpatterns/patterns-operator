@@ -21,6 +21,8 @@ interface IniFieldProps {
   };
   value: string;
   onChange: (value: string) => void;
+  /** Shown under the upload; also sets FileUpload `validated` to error when set. */
+  fieldError?: string;
 }
 
 interface ParsedIni {
@@ -29,7 +31,7 @@ interface ParsedIni {
   };
 }
 
-export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) => {
+export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange, fieldError }) => {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [filename, setFilename] = React.useState('');
   const [fileContent, setFileContent] = React.useState('');
@@ -166,6 +168,8 @@ export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) =>
         hideDefaultPreview
         value={fileContent}
         filename={filename}
+        isRequired={true}
+        validated={fieldError ? 'error' : 'default'}
         onFileInputChange={handleFileInputChange}
         onClearClick={handleClear}
         dropzoneProps={{
@@ -174,6 +178,14 @@ export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) =>
           },
         }}
       />
+
+      {fieldError && (
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem variant="error">{fieldError}</HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+      )}
 
       {parseError && (
         <Alert variant="danger" title={t('Parse Error')} isInline>
@@ -195,7 +207,12 @@ export const IniField: React.FC<IniFieldProps> = ({ field, value, onChange }) =>
       )}
 
       {value && (
-        <TextArea value={value} readOnly={true} aria-label={t('Extracted value preview')} rows={4} />
+        <TextArea
+          value={value}
+          readOnly={true}
+          aria-label={t('Extracted value preview')}
+          rows={4}
+        />
       )}
 
       <FormHelperText>

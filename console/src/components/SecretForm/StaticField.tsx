@@ -33,6 +33,7 @@ export const StaticField: React.FC<StaticFieldProps> = ({ field, value, onChange
         <TextInput
           id={`static-${field.name}`}
           value={displayValue}
+          isRequired={true}
           onChange={handleValueChange}
           placeholder={t('Static value')}
         />

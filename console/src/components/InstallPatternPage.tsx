@@ -33,7 +33,11 @@ import {
   PatternCRStatus,
 } from '../api';
 import { useVaultJobPolling } from '../hooks/useVaultJobPolling';
-import { buildVaultInjectionPayload } from '../vaultSecrets';
+import {
+  buildVaultInjectionPayload,
+  getMissingFileAndIniFields,
+  secretTemplateHasFileOrIniFields,
+} from '../vaultSecrets';
 import { SecretTemplate, SecretFormData } from '../types';
 import { SecretFormExpandableSections } from './SecretForm/SecretFormExpandableSections';
 import { VaultInjectionStatusAlert } from './SecretForm/VaultInjectionStatusAlert';
@@ -73,6 +77,7 @@ export default function InstallPatternPage() {
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
+  const [secretsValidationAttempted, setSecretsValidationAttempted] = React.useState(false);
   const { vaultJobStatus, setVaultJobStatus, checkingVaultStatus, checkVaultJobStatus } =
     useVaultJobPolling(patternName);
   const [patternStatus, setPatternStatus] = React.useState<PatternCRStatus | null>(null);
@@ -254,8 +259,25 @@ export default function InstallPatternPage() {
 
   const handleSubmit = async () => {
     console.log('🚀 [InstallPatternPage] Starting pattern installation process');
-    setSubmitting(true);
+
+    if (secretTemplate) {
+      const missingUploads = getMissingFileAndIniFields(secretTemplate, secretFormData);
+      if (missingUploads.length > 0) {
+        setSecretsValidationAttempted(true);
+        setExpandedSections((prev) => {
+          const next = { ...prev };
+          missingUploads.forEach(({ secretName }) => {
+            next[secretName] = true;
+          });
+          return next;
+        });
+        return;
+      }
+    }
+    setSecretsValidationAttempted(false);
     setSubmitError(null);
+
+    setSubmitting(true);
 
     try {
       const hasSecrets = secretFormData && Object.keys(secretFormData).length > 0 && secretTemplate;
@@ -555,8 +577,20 @@ export default function InstallPatternPage() {
             {/* Secrets Configuration Section */}
             {secretTemplate && (
               <FormGroup label={t('Secrets Configuration')} fieldId="pattern-secrets">
-                <Alert variant="info" title={t('Optional Secret Configuration')} isInline>
-                  {t('Configure secrets that will be injected into Vault for this pattern.')}
+                <Alert
+                  variant="info"
+                  title={
+                    secretTemplateHasFileOrIniFields(secretTemplate)
+                      ? t('Secret configuration')
+                      : t('Optional Secret Configuration')
+                  }
+                  isInline
+                >
+                  {secretTemplateHasFileOrIniFields(secretTemplate)
+                    ? t(
+                        'Configure secrets for this pattern. File and INI fields are required before install.',
+                      )
+                    : t('Configure secrets that will be injected into Vault for this pattern.')}
                 </Alert>
                 <SecretFormExpandableSections
                   secrets={secretTemplate.secrets}
@@ -564,6 +598,7 @@ export default function InstallPatternPage() {
                   expandedSections={expandedSections}
                   onToggleSection={toggleSection}
                   onFieldChange={handleFieldChange}
+                  secretsValidationAttempted={secretsValidationAttempted}
                 />
               </FormGroup>
             )}

@@ -16,9 +16,11 @@ interface FileFieldProps {
   };
   value: string | null;
   onChange: (value: string | null) => void;
+  /** Shown under the control; also sets FileUpload `validated` to error when set. */
+  fieldError?: string;
 }
 
-export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange }) => {
+export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange, fieldError }) => {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
   const [filename, setFilename] = React.useState('');
 
@@ -30,7 +32,6 @@ export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange }) 
     reader.onload = () => {
       const base64filecontent = reader.result.toString().split(',')[1]; // Remove data:type;base64, prefix
       onChange(base64filecontent);
-      console.log(base64filecontent);
     };
   };
 
@@ -46,7 +47,9 @@ export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange }) 
         value={value}
         filename={filename}
         type="text"
+        isRequired={true}
         hideDefaultPreview
+        validated={fieldError ? 'error' : 'default'}
         filenamePlaceholder={t('Drag and drop a file or upload one')}
         onFileInputChange={handleFileInputChange}
         onClearClick={handleClear}
@@ -59,9 +62,14 @@ export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange }) 
       >
         <FileUploadHelperText>
           <HelperText>
-            <HelperTextItem id={`file-${field.name}-helpertext`}>
-              {field.description}
-            </HelperTextItem>
+            {fieldError && (
+              <HelperTextItem variant="error" id={`file-${field.name}-error`}>
+                {fieldError}
+              </HelperTextItem>
+            )}
+            {field.description && (
+              <HelperTextItem id={`file-${field.name}-helpertext`}>{field.description}</HelperTextItem>
+            )}
           </HelperText>
         </FileUploadHelperText>
       </FileUpload>

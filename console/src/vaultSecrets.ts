@@ -13,6 +13,47 @@ function isFileTemplateField(fieldDef: SecretField): boolean {
   return Boolean(fieldDef.path);
 }
 
+/** Mirrors {@link SecretFormExpandableSections} field routing: generate → file → ini → static. */
+export function getSecretFieldKind(field: SecretField): 'generate' | 'file' | 'ini' | 'static' {
+  if (field.onMissingValue === 'generate') return 'generate';
+  if (field.path) return 'file';
+  if (field.ini_file) return 'ini';
+  return 'static';
+}
+
+function isSecretFormValuePresent(val: string | null | undefined): boolean {
+  return val !== null && val !== undefined && val !== '';
+}
+
+/** Every catalog `file` and `ini` field must have a non-empty form value before vault injection. */
+export function getMissingFileAndIniFields(
+  secretTemplate: SecretTemplate,
+  secretFormData: SecretFormData,
+): Array<{ secretName: string; fieldName: string }> {
+  const missing: Array<{ secretName: string; fieldName: string }> = [];
+  for (const secretDef of secretTemplate.secrets) {
+    const formValues = secretFormData[secretDef.name] || {};
+    for (const fieldDef of secretDef.fields) {
+      const kind = getSecretFieldKind(fieldDef);
+      if (kind !== 'file' && kind !== 'ini') continue;
+      if (!isSecretFormValuePresent(formValues[fieldDef.name])) {
+        missing.push({ secretName: secretDef.name, fieldName: fieldDef.name });
+      }
+    }
+  }
+  return missing;
+}
+
+export function secretTemplateHasFileOrIniFields(secretTemplate: SecretTemplate): boolean {
+  for (const secretDef of secretTemplate.secrets) {
+    for (const fieldDef of secretDef.fields) {
+      const kind = getSecretFieldKind(fieldDef);
+      if (kind === 'file' || kind === 'ini') return true;
+    }
+  }
+  return false;
+}
+
 /** Slug used as relative path under {@link VAULT_UPLOADS_MOUNT_PREFIX} (projected volume `path`). */
 function fileUploadSlug(secretName: string, fieldName: string): string {
   const raw = `${secretName}_${fieldName}`;

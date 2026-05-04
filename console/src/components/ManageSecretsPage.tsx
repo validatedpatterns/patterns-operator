@@ -17,7 +17,11 @@ import {
   triggerVaultInjection as apiTriggerVaultInjection,
 } from '../api';
 import { useVaultJobPolling } from '../hooks/useVaultJobPolling';
-import { buildVaultInjectionPayload } from '../vaultSecrets';
+import {
+  buildVaultInjectionPayload,
+  getMissingFileAndIniFields,
+  secretTemplateHasFileOrIniFields,
+} from '../vaultSecrets';
 import { SecretTemplate, SecretFormData } from '../types';
 import { SecretFormExpandableSections } from './SecretForm/SecretFormExpandableSections';
 import { VaultInjectionStatusAlert } from './SecretForm/VaultInjectionStatusAlert';
@@ -40,6 +44,7 @@ export default function ManageSecretsPage() {
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
+  const [secretsValidationAttempted, setSecretsValidationAttempted] = React.useState(false);
   const { vaultJobStatus, setVaultJobStatus, checkingVaultStatus, checkVaultJobStatus } =
     useVaultJobPolling(patternName);
 
@@ -76,11 +81,27 @@ export default function ManageSecretsPage() {
   }, [name]);
 
   const handleSubmit = async () => {
-    setSubmitting(true);
-    setSubmitError(null);
+    if (!secretTemplate) return;
+
     setSuccess(false);
     setVaultJobStatus(null);
 
+    const missingUploads = getMissingFileAndIniFields(secretTemplate, secretFormData);
+    if (missingUploads.length > 0) {
+      setSecretsValidationAttempted(true);
+      setExpandedSections((prev) => {
+        const next = { ...prev };
+        missingUploads.forEach(({ secretName }) => {
+          next[secretName] = true;
+        });
+        return next;
+      });
+      return;
+    }
+    setSecretsValidationAttempted(false);
+    setSubmitError(null);
+
+    setSubmitting(true);
     try {
       const { valuesSecretYaml, fileArtifacts } = buildVaultInjectionPayload(
         secretTemplate,
@@ -192,9 +213,13 @@ export default function ManageSecretsPage() {
           }}
         >
           <Alert variant="info" title={t('Secret Configuration')} isInline>
-            {t(
-              'Enter or update the secrets that will be injected into Vault for this pattern. Fields left empty will retain their existing values in Vault.',
-            )}
+            {secretTemplateHasFileOrIniFields(secretTemplate)
+              ? t(
+                  'Enter or update the secrets that will be injected into Vault for this pattern. File and INI fields must be uploaded each time. Other fields may be left empty to keep existing Vault values.',
+                )
+              : t(
+                  'Enter or update the secrets that will be injected into Vault for this pattern. Fields left empty will retain their existing values in Vault.',
+                )}
           </Alert>
           <SecretFormExpandableSections
             secrets={secretTemplate.secrets}
@@ -202,6 +227,7 @@ export default function ManageSecretsPage() {
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onFieldChange={handleFieldChange}
+            secretsValidationAttempted={secretsValidationAttempted}
           />
 
           <ActionGroup>
