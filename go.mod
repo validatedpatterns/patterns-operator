@@ -205,7 +205,7 @@ require (
 	k8s.io/kube-aggregator v0.33.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20250610211856-8b98d1ed966a // indirect
 	k8s.io/kubectl v0.33.3 // indirect
-	k8s.io/kubernetes v1.32.2 // indirect
+	k8s.io/kubernetes v1.36.0 // indirect
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d // indirect
 	oras.land/oras-go/v2 v2.6.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
@@ -247,7 +247,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.33.4
 	k8s.io/kubectl => k8s.io/kubectl v0.33.4
 	k8s.io/kubelet => k8s.io/kubelet v0.33.4
-	k8s.io/kubernetes => k8s.io/kubernetes v1.33.4
+	k8s.io/kubernetes => k8s.io/kubernetes v1.36.0
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.33.4
 	k8s.io/metrics => k8s.io/metrics v0.33.4
 	k8s.io/mount-utils => k8s.io/mount-utils v0.33.4
