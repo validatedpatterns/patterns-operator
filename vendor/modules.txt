@@ -480,8 +480,8 @@ github.com/google/go-github/v66/github
 # github.com/google/go-github/v75 v75.0.0
 ## explicit; go 1.24.0
 github.com/google/go-github/v75/github
-# github.com/google/go-querystring v1.1.0
-## explicit; go 1.10
+# github.com/google/go-querystring v1.2.0
+## explicit; go 1.13
 github.com/google/go-querystring/query
 # github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83
 ## explicit; go 1.24.0
