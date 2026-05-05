@@ -29,7 +29,7 @@ require (
 )
 
 require (
-	github.com/argoproj/argo-cd/v3 v3.0.23
+	github.com/argoproj/argo-cd/v3 v3.4.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250308055145-5fe7bb3edc86
 	sigs.k8s.io/controller-tools v0.16.4
 )
