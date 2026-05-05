@@ -1096,11 +1096,10 @@ func (r *PatternReconciler) updatePatternCRDetails(input *api.Pattern) (bool, er
 	for _, app := range applications.Items { //nolint:gocritic // rangeValCopy: each iteration copies 936 bytes
 		// Add Application information to ApplicationInfo struct
 		var applicationInfo = api.PatternApplicationInfo{
-			Name:             app.Name,
-			Namespace:        app.Namespace,
-			AppHealthStatus:  string(app.Status.Health.Status),
-			AppHealthMessage: app.Status.Health.Message,
-			AppSyncStatus:    string(app.Status.Sync.Status),
+			Name:            app.Name,
+			Namespace:       app.Namespace,
+			AppHealthStatus: string(app.Status.Health.Status),
+			AppSyncStatus:   string(app.Status.Sync.Status),
 		}
 
 		// Now let's append the Application Information

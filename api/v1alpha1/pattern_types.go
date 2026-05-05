@@ -160,11 +160,10 @@ type GitOpsConfig struct {
 // This structure is part of the PatternStatus as an array
 // The Application Status will be included as part of the Observed state of Pattern
 type PatternApplicationInfo struct {
-	Name             string `json:"name,omitempty"`
-	Namespace        string `json:"namespace,omitempty"`
-	AppSyncStatus    string `json:"syncStatus,omitempty"`
-	AppHealthStatus  string `json:"healthStatus,omitempty"`
-	AppHealthMessage string `json:"healthMessage,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+	AppSyncStatus   string `json:"syncStatus,omitempty"`
+	AppHealthStatus string `json:"healthStatus,omitempty"`
 }
 
 // PatternStatus defines the observed state of Pattern
