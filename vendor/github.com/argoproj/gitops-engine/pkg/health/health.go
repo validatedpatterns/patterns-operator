@@ -1,11 +1,9 @@
 package health
 
 import (
+	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/argoproj/gitops-engine/pkg/sync/hook"
-	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 )
 
 // Represents resource health status
@@ -66,7 +64,7 @@ func IsWorse(current, new HealthStatusCode) bool {
 
 // GetResourceHealth returns the health of a k8s resource
 func GetResourceHealth(obj *unstructured.Unstructured, healthOverride HealthOverride) (health *HealthStatus, err error) {
-	if obj.GetDeletionTimestamp() != nil && !hook.HasHookFinalizer(obj) {
+	if obj.GetDeletionTimestamp() != nil {
 		return &HealthStatus{
 			Status:  HealthStatusProgressing,
 			Message: "Pending deletion",
@@ -96,6 +94,7 @@ func GetResourceHealth(obj *unstructured.Unstructured, healthOverride HealthOver
 		}
 	}
 	return health, err
+
 }
 
 // GetHealthCheckFunc returns built-in health check function or nil if health check is not supported
@@ -113,19 +112,23 @@ func GetHealthCheckFunc(gvk schema.GroupVersionKind) func(obj *unstructured.Unst
 			return getDaemonSetHealth
 		}
 	case "extensions":
-		if gvk.Kind == kube.IngressKind {
+		switch gvk.Kind {
+		case kube.IngressKind:
 			return getIngressHealth
 		}
 	case "argoproj.io":
-		if gvk.Kind == "Workflow" {
+		switch gvk.Kind {
+		case "Workflow":
 			return getArgoWorkflowHealth
 		}
 	case "apiregistration.k8s.io":
-		if gvk.Kind == kube.APIServiceKind {
+		switch gvk.Kind {
+		case kube.APIServiceKind:
 			return getAPIServiceHealth
 		}
 	case "networking.k8s.io":
-		if gvk.Kind == kube.IngressKind {
+		switch gvk.Kind {
+		case kube.IngressKind:
 			return getIngressHealth
 		}
 	case "":
@@ -138,11 +141,13 @@ func GetHealthCheckFunc(gvk schema.GroupVersionKind) func(obj *unstructured.Unst
 			return getPodHealth
 		}
 	case "batch":
-		if gvk.Kind == kube.JobKind {
+		switch gvk.Kind {
+		case kube.JobKind:
 			return getJobHealth
 		}
 	case "autoscaling":
-		if gvk.Kind == kube.HorizontalPodAutoscalerKind {
+		switch gvk.Kind {
+		case kube.HorizontalPodAutoscalerKind:
 			return getHPAHealth
 		}
 	}
