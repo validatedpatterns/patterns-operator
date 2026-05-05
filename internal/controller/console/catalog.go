@@ -55,11 +55,12 @@ const (
 // CreateOrUpdateCatalog creates or updates the pattern-ui-catalog ConfigMap, Service,
 // and Deployment. If the operator ConfigMap contains a "catalog.image" key, that
 // image is used instead of the built-in default.
-func CreateOrUpdateCatalog(ctx context.Context, cl client.Client, reader client.Reader) error {
+// func CreateOrUpdateCatalog(ctx context.Context, cl client.Client, reader client.Reader) error {
+func CreateOrUpdateCatalog(ctx context.Context, cl client.Client, operatorConfigMap *corev1.ConfigMap) error {
 	logger := log.FromContext(ctx).WithName("catalog")
 	ns := getDeploymentNamespace()
 
-	image := getCatalogImage(ctx, reader)
+	image := getCatalogImage(operatorConfigMap)
 	logger.Info("using catalog image", "image", image)
 
 	if err := createOrUpdateCatalogConfigMap(ctx, cl, ns); err != nil {
@@ -77,17 +78,13 @@ func CreateOrUpdateCatalog(ctx context.Context, cl client.Client, reader client.
 
 // getCatalogImage reads the optional "catalog.image" override from the operator
 // ConfigMap. Returns the default image when the key is absent or empty.
-func getCatalogImage(ctx context.Context, reader client.Reader) string {
-	var cm corev1.ConfigMap
-	if err := reader.Get(ctx, client.ObjectKey{
-		Namespace: getDeploymentNamespace(),
-		Name:      operatorConfigMap,
-	}, &cm); err != nil {
-		return CatalogDefaultImage
+func getCatalogImage(operatorConfigMap *corev1.ConfigMap) string {
+	if operatorConfigMap != nil {
+		if image, ok := operatorConfigMap.Data["catalog.image"]; ok && image != "" {
+			return image
+		}
 	}
-	if image := cm.Data["catalog.image"]; image != "" {
-		return image
-	}
+
 	return CatalogDefaultImage
 }
 

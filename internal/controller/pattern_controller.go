@@ -44,11 +44,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	klog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -153,20 +155,22 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var patternsOperatorConfig PatternsOperatorConfig
 
-	// We try to get the configuration ConfigMap. The method getPatternsOperatorConfigMap returns nil, nil if the ConfigMap doesn't exist
-	configCM, err := r.getPatternsOperatorConfigMap()
+	// We try to get the configuration ConfigMap. The method GetPatternsOperatorConfigMap returns nil, nil if the ConfigMap doesn't exist
+	operatorConfigMap, err := GetPatternsOperatorConfigMap(ctx, r.Client)
 	if err != nil {
 		return r.actionPerformed(instance, "failed to get the configuration ConfigMap", err)
 	}
-	if configCM == nil { // If the ConfigMap doesn't exist, we create it
-		if err = r.createPatternsOperatorConfigMap(instance); err != nil {
+	if operatorConfigMap == nil { // If the ConfigMap doesn't exist, we create it
+		operatorConfigMap, err = CreatePatternsOperatorConfigMap(ctx, r.Client)
+		if err != nil {
 			return r.actionPerformed(instance, "failed to create the configuration ConfigMap", err)
 		}
 	} else { // If the ConfigMap exists, we set the ownership and get the configuration from Data
-		if err = r.setPatternsOperatorConfigMapOwnership(configCM, instance); err != nil {
-			return r.actionPerformed(instance, "failed to set ownership of configuration ConfigMap", err)
-		}
-		patternsOperatorConfig = configCM.Data
+		patternsOperatorConfig = operatorConfigMap.Data
+	}
+
+	if err := console.CreateOrUpdateCatalog(ctx, r.Client, operatorConfigMap); err != nil {
+		return r.actionPerformed(instance, "unable to create/update catalog deployment", err)
 	}
 
 	// Remove the ArgoCD application on deletion
@@ -407,7 +411,7 @@ func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.P
 		if err := controllerutil.RemoveOwnerReference(qualifiedInstance, currentSub, r.Scheme); err == nil {
 			changed = true
 		}
-		operatorConfigMap, cmErr := r.getPatternsOperatorConfigMap()
+		operatorConfigMap, cmErr := GetPatternsOperatorConfigMap(context.Background(), r.Client)
 		if cmErr == nil && operatorConfigMap != nil {
 			if err := controllerutil.RemoveOwnerReference(operatorConfigMap, currentSub, r.Scheme); err == nil {
 				changed = true
@@ -916,9 +920,47 @@ func (r *PatternReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var ctrlErr error
 	r.ctrl, ctrlErr = ctrl.NewControllerManagedBy(mgr).
 		For(&api.Pattern{}).
-		Owns(&corev1.ConfigMap{}).
+		// Use Watches instead of Owns: EnqueueRequestForOwner runs RESTMapping on the owner ref; failures
+		// there enqueue nothing and can be hard to spot. We only care about the operator config ConfigMap
+		// and a singleton Pattern in the operator namespace (enforced by webhook), so map directly.
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueuePatternForOperatorConfigMap),
+			builder.WithPredicates(predicate.NewPredicateFuncs(isPatternsOperatorConfigMap)),
+		).
 		Build(r)
 	return ctrlErr
+}
+
+func isPatternsOperatorConfigMap(obj client.Object) bool {
+	return obj != nil && obj.GetName() == OperatorConfigMap && obj.GetNamespace() == DetectOperatorNamespace()
+}
+
+// enqueuePatternForOperatorConfigMap enqueues reconcile for Pattern(s) in the operator namespace when
+// patterns-operator-config changes. Webhook ensures a single Pattern; List is used to avoid owner-ref + RESTMapping.
+func (r *PatternReconciler) enqueuePatternForOperatorConfigMap(ctx context.Context, obj client.Object) []reconcile.Request {
+	if !isPatternsOperatorConfigMap(obj) {
+		return nil
+	}
+	var list api.PatternList
+	ns := DetectOperatorNamespace()
+	if err := r.List(ctx, &list, client.InNamespace(ns)); err != nil {
+		ctrl.Log.Error(err, "failed to list Patterns after operator ConfigMap change", "namespace", ns)
+		return nil
+	}
+	if len(list.Items) == 0 {
+		return nil
+	}
+	out := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		out = append(out, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: list.Items[i].Namespace,
+				Name:      list.Items[i].Name,
+			},
+		})
+	}
+	return out
 }
 
 // startArgoCDWatch dynamically adds a watch on ArgoCD instances so that if
@@ -1333,53 +1375,6 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 		return "prerequisite validation", err
 	}
 	return "", nil
-}
-
-func (r *PatternReconciler) createPatternsOperatorConfigMap(p *api.Pattern) error {
-	configMap := corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      OperatorConfigMap,
-			Namespace: DetectOperatorNamespace(),
-		},
-	}
-	if err := controllerutil.SetControllerReference(p, &configMap, r.Scheme); err != nil {
-		return err
-	}
-	if _, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Create(context.Background(), &configMap, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *PatternReconciler) getPatternsOperatorConfigMap() (*corev1.ConfigMap, error) {
-	cm, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Get(context.Background(), OperatorConfigMap, metav1.GetOptions{})
-	if err != nil {
-		if kerrors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return nil, err
-		}
-	}
-	return cm, nil
-}
-
-func (r *PatternReconciler) setPatternsOperatorConfigMapOwnership(cm *corev1.ConfigMap, p *api.Pattern) error {
-	controllerRef := metav1.GetControllerOf(cm)
-	if controllerRef != nil && controllerRef.UID == p.GetUID() && controllerRef.Kind == p.Kind && controllerRef.APIVersion == p.APIVersion {
-		return nil
-	}
-	if err := controllerutil.SetControllerReference(p, cm, r.Scheme); err != nil {
-		return err
-	}
-	_, err := r.fullClient.CoreV1().ConfigMaps(DetectOperatorNamespace()).Update(context.Background(), cm, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func DropLocalGitPaths() error {
