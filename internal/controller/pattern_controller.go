@@ -755,9 +755,17 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	log.Printf("Finalizing pattern object")
 
-	// The object is being deleted and, if prune is enabled, we want to delete all the dependent objects in cascade
-	if strings.EqualFold(instance.Annotations[PruneAnnotation], "true") &&
-		(controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents)) {
+	// Without explicit prune=true we must not drop the finalizer: that would delete the Pattern CR
+	// without running the cascaded GitOps cleanup below.
+	if !strings.EqualFold(instance.Annotations[PruneAnnotation], "true") {
+		return fmt.Errorf(
+			`pattern deletion blocked: set annotation %s="true" to prune managed Argo CD Applications and related resources, or clear deletion to keep the Pattern`,
+			PruneAnnotation,
+		)
+	}
+
+	// Prune is enabled: delete dependent objects in cascade, then allow the Pattern CR to be removed.
+	if controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents) {
 		// Prepare the app for cascaded deletion
 		qualifiedInstance, err := r.applyDefaults(instance)
 		if err != nil {
