@@ -142,7 +142,35 @@ func TestValidateUpdate_Allows(t *testing.T) {
 	}
 }
 
-func TestValidateDelete_Allows(t *testing.T) {
+func TestValidateDelete_AllowsWithPruneAnnotation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	validator := &PatternValidator{Client: fakeClient}
+
+	p := &Pattern{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pattern",
+			Namespace: "default",
+			Annotations: map[string]string{
+				PruneAnnotation: "true",
+			},
+		},
+	}
+
+	warnings, err := validator.ValidateDelete(context.Background(), p)
+	if err != nil {
+		t.Errorf("expected no error on delete, got: %v", err)
+	}
+	if warnings != nil {
+		t.Errorf("expected no warnings, got: %v", warnings)
+	}
+}
+
+func TestValidateDelete_DeniesWithoutPruneAnnotation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := AddToScheme(scheme); err != nil {
 		t.Fatalf("failed to add scheme: %v", err)
@@ -158,11 +186,8 @@ func TestValidateDelete_Allows(t *testing.T) {
 		},
 	}
 
-	warnings, err := validator.ValidateDelete(context.Background(), p)
-	if err != nil {
-		t.Errorf("expected no error on delete, got: %v", err)
-	}
-	if warnings != nil {
-		t.Errorf("expected no warnings, got: %v", warnings)
+	_, err := validator.ValidateDelete(context.Background(), p)
+	if err == nil {
+		t.Error("expected error on delete without prune annotation, got nil")
 	}
 }
