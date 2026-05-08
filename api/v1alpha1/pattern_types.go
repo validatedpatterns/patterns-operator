@@ -24,6 +24,7 @@ import (
 const (
 	// NodeMaintenanceFinalizer is a finalizer for a NodeMaintenance CR deletion
 	PatternFinalizer string = "foregroundDeletePattern"
+	PruneAnnotation  string = "patterns.gitops.hybrid-cloud-patterns.io/prune"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.

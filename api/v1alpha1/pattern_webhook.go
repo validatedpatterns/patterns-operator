@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,7 +40,7 @@ type PatternValidator struct {
 }
 
 //nolint:lll
-// +kubebuilder:webhook:verbs=create,path=/validate-gitops-hybrid-cloud-patterns-io-v1alpha1-pattern,mutating=false,failurePolicy=fail,groups=gitops.hybrid-cloud-patterns.io,resources=patterns,versions=v1alpha1,name=vpattern.gitops.hybrid-cloud-patterns.io,admissionReviewVersions=v1,sideEffects=none
+// +kubebuilder:webhook:verbs=create;delete,path=/validate-gitops-hybrid-cloud-patterns-io-v1alpha1-pattern,mutating=false,failurePolicy=fail,groups=gitops.hybrid-cloud-patterns.io,resources=patterns,versions=v1alpha1,name=vpattern.gitops.hybrid-cloud-patterns.io,admissionReviewVersions=v1,sideEffects=none
 
 var _ webhook.CustomValidator = &PatternValidator{}
 
@@ -88,6 +89,12 @@ func (r *PatternValidator) ValidateDelete(_ context.Context, obj runtime.Object)
 		return nil, err
 	}
 	patternlog.Info("validate delete", "name", p.Name)
+
+	if !strings.EqualFold(p.Annotations[PruneAnnotation], "true") {
+		return nil, fmt.Errorf("deletion denied: set annotation %s=\"true\" on %s/%s before deleting",
+			PruneAnnotation, p.Namespace, p.Name)
+	}
+
 	return nil, nil
 }
 

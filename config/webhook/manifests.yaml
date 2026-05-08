@@ -20,6 +20,7 @@ webhooks:
     - v1alpha1
     operations:
     - CREATE
+    - DELETE
     resources:
     - patterns
   sideEffects: None

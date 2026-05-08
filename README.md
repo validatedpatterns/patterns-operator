@@ -35,19 +35,23 @@ secret and then add the secrets via the UI (this approach is a bit more work)
 
 ### Delete the pattern
 
-```
-oc delete -f config/samples/gitops_v1alpha1_pattern.yaml
-```
+Deletion is protected by a validating webhook. Without `patterns.gitops.hybrid-cloud-patterns.io/prune: "true"`, `oc delete` is denied by the API server and the `Pattern` is not marked for deletion.
 
-This action removes the `Pattern` instance only.
-
-If you annotate the Pattern instance with `patterns.gitops.hybrid-cloud-patterns.io/prune: "true"`:
+**Recommended flow:** set the annotation, then delete:
 
 ```
 oc annotate -f config/samples/gitops_v1alpha1_pattern.yaml patterns.gitops.hybrid-cloud-patterns.io/prune='true'
+oc delete -f config/samples/gitops_v1alpha1_pattern.yaml
 ```
 
-Once the `Pattern` instance is deleted, the following resources will also be removed:
+If you already tried `oc delete` without the annotation, add the annotation and retry the delete:
+
+```
+oc annotate patterns <pattern-name> -n <namespace> patterns.gitops.hybrid-cloud-patterns.io/prune='true'
+oc delete patterns <pattern-name> -n <namespace>
+```
+
+With `prune: "true"`, deleting the `Pattern` also removes the following resources (after the controller runs its phased cleanup):
 
 - The top-level application of the hub cluster.
 - The child applications of the hub cluster.
