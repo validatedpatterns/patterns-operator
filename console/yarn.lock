@@ -589,7 +589,7 @@
     semver "^7.3.7"
     yup "^0.32.11"
 
-"@patternfly/react-core@^6.0.0", "@patternfly/react-core@^6.2.2", "@patternfly/react-core@^6.4.1":
+"@patternfly/react-core@^6.0.0", "@patternfly/react-core@^6.2.2", "@patternfly/react-core@^6.4.3":
   version "6.4.3"
   resolved "https://registry.yarnpkg.com/@patternfly/react-core/-/react-core-6.4.3.tgz#ce08ce1685a646eead45678b1728458f31578d08"
   integrity sha512-CYf+DFmcV5LCTQh7ZNBhHgqaEbDKwKOxBB/3Si6xFn8fIH8h/Wj3ZHSm6rYslQS7dJUusqyv5gJ2dR9LixT3TA==
@@ -612,11 +612,11 @@
   integrity sha512-EXmHA67s5sy+Wy/0uxWoUQ52jr9lsH2wV3QcgtvVc5zxpyBX89gShpqv4jfVqaowznHGDoL6fVBBrSe9BYOliQ==
 
 "@patternfly/react-table@^6.2.2":
-  version "6.4.1"
-  resolved "https://registry.yarnpkg.com/@patternfly/react-table/-/react-table-6.4.1.tgz#9074101de89d4c22abc49a7a90314cc9ffba2a71"
-  integrity sha512-dceS5X1I5gmhRfEf6gsLIdFhrQd5hY+SWRIYzEvI19rrdN9VwCVWg+bhSsNv05pQnGs8uOlzYVBI25p7PJtFeA==
+  version "6.4.3"
+  resolved "https://registry.yarnpkg.com/@patternfly/react-table/-/react-table-6.4.3.tgz#1b99673c3f1c2cf92262f8b2d59e1ae80e95ccfc"
+  integrity sha512-lPHjVOEkJpCtXMtE48pLGwMmLsCgYJvoiZpuW2/Vlg0y0pmg0nfYUVDBBTXfQ3dgskn/zb5SAgZr158VQQoBtw==
   dependencies:
-    "@patternfly/react-core" "^6.4.1"
+    "@patternfly/react-core" "^6.4.3"
     "@patternfly/react-icons" "^6.4.0"
     "@patternfly/react-styles" "^6.4.0"
     "@patternfly/react-tokens" "^6.4.0"
