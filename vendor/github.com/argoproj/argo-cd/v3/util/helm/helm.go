@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -84,11 +85,11 @@ func (h *helm) DependencyBuild() error {
 		repo := h.repos[i]
 		if repo.EnableOci {
 			h.cmd.IsHelmOci = true
-			helmPassword, err := repo.Creds.GetPassword()
+			helmPassword, err := repo.GetPassword()
 			if err != nil {
 				return fmt.Errorf("failed to get password for helm registry: %w", err)
 			}
-			if repo.Creds.GetUsername() != "" && helmPassword != "" {
+			if repo.GetUsername() != "" && helmPassword != "" {
 				_, err := h.cmd.RegistryLogin(repo.Repo, repo.Creds)
 
 				defer func() {
@@ -119,7 +120,7 @@ func (h *helm) Dispose() {
 }
 
 func Version() (string, error) {
-	cmd := exec.Command("helm", "version", "--client", "--short")
+	cmd := exec.CommandContext(context.Background(), "helm", "version", "--client", "--short")
 	// example version output:
 	// short: "v3.3.1+g249e521"
 	version, err := executil.RunWithRedactor(cmd, redactor)
