@@ -4,7 +4,7 @@ cloud.google.com/go/compute/metadata
 # code.gitea.io/sdk/gitea v0.23.2
 ## explicit; go 1.23.0
 code.gitea.io/sdk/gitea
-# cyphar.com/go-pathrs v0.2.1
+# cyphar.com/go-pathrs v0.2.4
 ## explicit; go 1.18
 cyphar.com/go-pathrs
 cyphar.com/go-pathrs/internal/fdutils
