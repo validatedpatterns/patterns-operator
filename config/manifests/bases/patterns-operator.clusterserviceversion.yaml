@@ -219,7 +219,7 @@ spec:
   - Blueprint
   - Architecture
   links:
-  - name: Hybrid Cloud Patterns
+  - name: Validated Patterns
     url: https://validatedpatterns.io
   maintainers:
   - email: validatedpatterns@googlegroups.com
