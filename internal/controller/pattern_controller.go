@@ -721,17 +721,21 @@ func (r *PatternReconciler) deleteHubApps(targetApp, app *argoapi.Application, n
 	// Delete managed clusters (excluding local-cluster)
 	// These must be removed before hub deletion can proceed because ACM won't delete properly if they exist
 	// we do not care about the error, since we might be on a standalone cluster
-	managedClusters, _ := r.listManagedClusters(context.Background())
+	// Only do this if the pattern is in charge of the acm hub
 
-	if len(managedClusters) > 0 {
-		deletedCount, err := r.deleteManagedClusters(context.TODO())
-		if err != nil {
-			return fmt.Errorf("failed to delete managed clusters: %w", err)
-		}
+	if haveACMHub(r) {
+		managedClusters, _ := r.listManagedClusters(context.Background())
 
-		if deletedCount > 0 {
-			log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
-			return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
+		if len(managedClusters) > 0 {
+			deletedCount, err := r.deleteManagedClusters(context.TODO())
+			if err != nil {
+				return fmt.Errorf("failed to delete managed clusters: %w", err)
+			}
+
+			if deletedCount > 0 {
+				log.Printf("Deleted %d managed cluster(s), waiting for them to be fully removed", deletedCount)
+				return fmt.Errorf("deleted %d managed cluster(s), waiting for removal to complete before proceeding with hub deletion", deletedCount)
+			}
 		}
 	}
 
@@ -784,17 +788,9 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		// Initialize deletion phase if not set
 		if qualifiedInstance.Status.DeletionPhase == api.InitializeDeletion {
 			log.Printf("Initializing deletion phase")
-			if haveACMHub(r) {
-				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpokeChildApps); err != nil {
-					return err
-				}
-			} else {
-				// There is no acm/spoke, we can directly start cleaning up child apps (from hub)
-				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHubChildApps); err != nil {
-					return err
-				}
+			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpokeChildApps); err != nil {
+				return err
 			}
-
 			return fmt.Errorf("initialized deletion phase, requeueing now")
 		}
 

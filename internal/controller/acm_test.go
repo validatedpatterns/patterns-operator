@@ -41,7 +41,32 @@ var _ = Describe("HaveACMHub", func() {
 
 	})
 
-	Context("when the ACM Hub exists", func() {
+	Context("when the ACM Hub exists, and owned by the pattern operator", func() {
+		BeforeEach(func() {
+			hub := &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "operator.open-cluster-management.io/v1",
+					"kind":       "MultiClusterHub",
+					"metadata": map[string]any{
+						"name":      "multiclusterhub",
+						"namespace": "open-cluster-management",
+						"annotations": map[string]any{
+							"patterns.gitops.validatedpatterns.io/managed": "true",
+						},
+					},
+				},
+			}
+			_, err := dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Create(context.Background(), hub, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return true", func() {
+			result := haveACMHub(patternReconciler)
+			Expect(result).To(BeTrue())
+		})
+	})
+
+	Context("when the ACM Hub exists, and NOT owned by the pattern operator", func() {
 		BeforeEach(func() {
 			hub := &unstructured.Unstructured{
 				Object: map[string]any{
@@ -57,27 +82,14 @@ var _ = Describe("HaveACMHub", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should return true", func() {
-			result := haveACMHub(patternReconciler)
-			Expect(result).To(BeTrue())
-		})
-	})
-
-	Context("when the ACM Hub does not exist", func() {
 		It("should return false", func() {
 			result := haveACMHub(patternReconciler)
 			Expect(result).To(BeFalse())
 		})
 	})
 
-	Context("when there is an error listing ConfigMaps", func() {
-		BeforeEach(func() {
-			kubeClient.PrependReactor("list", "configmaps", func(testing.Action) (handled bool, ret runtime.Object, err error) {
-				return true, nil, fmt.Errorf("config map error")
-			})
-		})
-
-		It("should return false and log the error", func() {
+	Context("when the ACM Hub does not exist", func() {
+		It("should return false", func() {
 			result := haveACMHub(patternReconciler)
 			Expect(result).To(BeFalse())
 		})
