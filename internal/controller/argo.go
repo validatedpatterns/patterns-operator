@@ -474,8 +474,6 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 			return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, errGet)
 		}
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
-		argo.Spec.ImageUpdater = oldArgo.Spec.ImageUpdater
-
 		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		if errConvert != nil {
 			return fmt.Errorf("failed to convert ArgoCD to unstructured for update: %v", errConvert)
