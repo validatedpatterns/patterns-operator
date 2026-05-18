@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,12 +31,16 @@ import (
 func haveACMHub(r *PatternReconciler) bool {
 	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
 
-	_, err := r.dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Get(context.Background(), "multiclusterhub", metav1.GetOptions{})
+	mch, err := r.dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Get(context.Background(), "multiclusterhub", metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
 		return false
 	}
-	return true
+
+	return strings.EqualFold(
+		mch.GetAnnotations()["patterns.gitops.validatedpatterns.io/managed"],
+		"true",
+	)
 }
 
 // listManagedClusters lists all ManagedCluster resources (excluding local-cluster)
