@@ -788,9 +788,17 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 		// Initialize deletion phase if not set
 		if qualifiedInstance.Status.DeletionPhase == api.InitializeDeletion {
 			log.Printf("Initializing deletion phase")
-			if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpokeChildApps); err != nil {
-				return err
+			if haveACMHub(r) {
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteSpokeChildApps); err != nil {
+					return err
+				}
+			} else {
+				// There is no acm/spoke, we can directly start cleaning up child apps (from hub)
+				if err := r.updateDeletionPhase(qualifiedInstance, api.DeleteHubChildApps); err != nil {
+					return err
+				}
 			}
+
 			return fmt.Errorf("initialized deletion phase, requeueing now")
 		}
 
