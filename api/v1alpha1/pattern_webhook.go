@@ -91,8 +91,8 @@ func (r *PatternValidator) ValidateDelete(_ context.Context, obj runtime.Object)
 	patternlog.Info("validate delete", "name", p.Name)
 
 	if !strings.EqualFold(p.Annotations[PruneAnnotation], "true") {
-		return nil, fmt.Errorf("deletion denied: set annotation %s=\"true\" on %s/%s before deleting",
-			PruneAnnotation, p.Namespace, p.Name)
+		return nil, fmt.Errorf("deletion denied: set the annotation %s=\"true\" on the pattern \"%s\" CR in the \"%s\" namespace before deleting",
+			PruneAnnotation, p.Name, p.Namespace)
 	}
 
 	return nil, nil
