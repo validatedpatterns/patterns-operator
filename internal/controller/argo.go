@@ -469,7 +469,7 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 		newArgo := &unstructured.Unstructured{Object: obj}
 		_, err = client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
 	} else { // update it
-		oldArgo, errGet := getArgoCDFunc(client, name, namespace)
+		oldArgo, oldUnstructured, errGet := getArgoCDFunc(client, name, namespace)
 		if errGet != nil {
 			return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, errGet)
 		}
@@ -483,14 +483,11 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 		// Preserve spec fields not known to this vendored argocd-operator version
 		// (e.g. networkPolicy added in gitops-operator v1.20.3) to avoid
 		// stripping them and causing infinite reconciliation loops.
-		oldUnstructured, errGet2 := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		if errGet2 == nil {
-			oldSpec, _, _ := unstructured.NestedMap(oldUnstructured.Object, "spec")
-			newSpec, _, _ := unstructured.NestedMap(newArgo.Object, "spec")
-			for key, val := range oldSpec {
-				if _, exists := newSpec[key]; !exists {
-					_ = unstructured.SetNestedField(newArgo.Object, val, "spec", key)
-				}
+		oldSpec, _, _ := unstructured.NestedMap(oldUnstructured.Object, "spec")
+		newSpec, _, _ := unstructured.NestedMap(newArgo.Object, "spec")
+		for key, val := range oldSpec {
+			if _, exists := newSpec[key]; !exists {
+				_ = unstructured.SetNestedField(newArgo.Object, val, "spec", key)
 			}
 		}
 
@@ -555,15 +552,15 @@ func removeConsoleLink(client dynamic.Interface, argoName string) error {
 
 var getArgoCDFunc = getArgoCD
 
-func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, error) {
+func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.ArgoCD, *unstructured.Unstructured, error) {
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 	argo := &argooperator.ArgoCD{}
 	unstructuredArgo, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredArgo.UnstructuredContent(), argo)
-	return argo, err
+	return argo, unstructuredArgo, err
 }
 
 func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
