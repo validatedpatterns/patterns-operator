@@ -1020,6 +1020,53 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 		})
 	})
 
+    Context("when the ArgoCD instance exists with additional spec fields not managed by patterns-operator", func() {
+    BeforeEach(func() {
+        argoCD := &unstructured.Unstructured{
+            Object: map[string]any{
+                "apiVersion": "argoproj.io/v1beta1",
+                "kind":       "ArgoCD",
+                "metadata": map[string]any{
+                    "name":            name,
+                    "namespace":       namespace,
+                    "resourceVersion": "1",
+                },
+                "spec": map[string]any{
+                    "networkPolicy": map[string]any{
+                        "enabled": true,
+                    },
+                    "imageUpdater": map[string]any{
+                        "enabled": false,
+                    },
+                },
+            },
+        }
+        _, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), argoCD, metav1.CreateOptions{})
+        Expect(err).ToNot(HaveOccurred())
+    })
+
+    It("should preserve spec fields not managed by patterns-operator during update", func() {
+        err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig)
+        Expect(err).ToNot(HaveOccurred())
+
+        argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+        Expect(err).ToNot(HaveOccurred())
+
+        // networkPolicy should be preserved — it is managed by gitops-operator
+        // not by patterns-operator, so the update must not strip it
+        networkPolicy, found, err := unstructured.NestedMap(argoCD.Object, "spec", "networkPolicy")
+        Expect(err).ToNot(HaveOccurred())
+        Expect(found).To(BeTrue(), "networkPolicy should be preserved after update")
+        Expect(networkPolicy["enabled"]).To(BeTrue())
+
+        // imageUpdater should also be preserved
+        imageUpdater, found, err := unstructured.NestedMap(argoCD.Object, "spec", "imageUpdater")
+        Expect(err).ToNot(HaveOccurred())
+        Expect(found).To(BeTrue(), "imageUpdater should be preserved after update")
+        Expect(imageUpdater["enabled"]).To(BeFalse())
+    })
+})
+
 	Context("when there is an error in the getArgoCD fn but there is an argocd", func() {
 
 		BeforeEach(func() {

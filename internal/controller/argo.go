@@ -480,6 +480,20 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 		}
 		newArgo := &unstructured.Unstructured{Object: obj}
 
+		// Preserve spec fields not known to this vendored argocd-operator version
+		// (e.g. networkPolicy added in gitops-operator v1.20.3) to avoid
+		// stripping them and causing infinite reconciliation loops.
+		oldUnstructured, errGet2 := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if errGet2 == nil {
+			oldSpec, _, _ := unstructured.NestedMap(oldUnstructured.Object, "spec")
+			newSpec, _, _ := unstructured.NestedMap(newArgo.Object, "spec")
+			for key, val := range oldSpec {
+				if _, exists := newSpec[key]; !exists {
+					_ = unstructured.SetNestedField(newArgo.Object, val, "spec", key)
+				}
+			}
+		}
+
 		_, err = client.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
 	}
 	return err
