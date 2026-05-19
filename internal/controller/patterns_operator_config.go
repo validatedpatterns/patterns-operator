@@ -12,19 +12,32 @@ import (
 
 type PatternsOperatorConfig map[string]string
 
+const (
+	configKeyCatalogSource    = "gitops.catalogSource"
+	configKeyChannel          = "gitops.channel"
+	configKeySourceNamespace  = "gitops.sourceNamespace"
+	configKeyApprovalPlan     = "gitops.installApprovalPlan"
+	configKeyCSV              = "gitops.csv"
+	configKeyAdditionalAdmins = "gitops.additionalArgoAdmins"
+	configKeyHealthCheck      = "gitops.applicationHealthCheckEnabled"
+	configMapKind             = "ConfigMap"
+	boolTrue                  = "true"
+	boolFalse                 = "false"
+)
+
 var DefaultPatternsOperatorConfig = PatternsOperatorConfig{
-	"gitops.catalogSource":                 GitOpsDefaultCatalogSource,
-	"gitops.channel":                       GitOpsDefaultChannel,
-	"gitops.sourceNamespace":               GitOpsDefaultCatalogSourceNamespace,
-	"gitops.installApprovalPlan":           GitOpsDefaultApprovalPlan,
-	"gitops.csv":                           GitOpsDefaultCSV,
-	"gitops.additionalArgoAdmins":          "",
-	"gitops.applicationHealthCheckEnabled": "false",
-	"gitops.customHealthChecks":            "",
-	"gitea.chartName":                      GiteaChartName,
-	"gitea.helmRepoUrl":                    GiteaHelmRepoUrl,
-	"gitea.chartVersion":                   GiteaDefaultChartVersion,
-	"catalog.image":                        "",
+	configKeyCatalogSource:         GitOpsDefaultCatalogSource,
+	configKeyChannel:               GitOpsDefaultChannel,
+	configKeySourceNamespace:       GitOpsDefaultCatalogSourceNamespace,
+	configKeyApprovalPlan:          GitOpsDefaultApprovalPlan,
+	configKeyCSV:                   GitOpsDefaultCSV,
+	configKeyAdditionalAdmins:      "",
+	configKeyHealthCheck:           boolFalse,
+	"gitops.customHealthChecks":    "",
+	"gitea.chartName":              GiteaChartName,
+	"gitea.helmRepoUrl":            GiteaHelmRepoUrl,
+	"gitea.chartVersion":           GiteaDefaultChartVersion,
+	"catalog.image":                "",
 }
 
 func (g PatternsOperatorConfig) getStringValue(k string) string {
@@ -37,9 +50,9 @@ func (g PatternsOperatorConfig) getStringValue(k string) string {
 
 func (g PatternsOperatorConfig) getBoolValue(k string) bool {
 	if v, present := g[k]; present {
-		return strings.EqualFold(v, "true")
+		return strings.EqualFold(v, boolTrue)
 	} else {
-		return strings.EqualFold(DefaultPatternsOperatorConfig[k], "true")
+		return strings.EqualFold(DefaultPatternsOperatorConfig[k], boolTrue)
 	}
 }
 
@@ -49,8 +62,8 @@ func (g PatternsOperatorConfig) getBoolValue(k string) bool {
 func CreatePatternsOperatorConfigMap(ctx context.Context, cl client.Client) (*corev1.ConfigMap, error) {
 	configMap := corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
+			Kind:       configMapKind,
+			APIVersion: apiVersionV1,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      OperatorConfigMap,

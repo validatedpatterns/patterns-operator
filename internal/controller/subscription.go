@@ -34,18 +34,18 @@ func newSubscription(patternsOperatorConfig PatternsOperatorConfig, disableDefau
 
 	var installPlanApproval operatorv1alpha1.Approval
 
-	if patternsOperatorConfig.getStringValue("gitops.installApprovalPlan") == "Manual" {
+	if patternsOperatorConfig.getStringValue(configKeyApprovalPlan) == "Manual" {
 		installPlanApproval = operatorv1alpha1.ApprovalManual
 	} else {
 		installPlanApproval = operatorv1alpha1.ApprovalAutomatic
 	}
 
 	spec := &operatorv1alpha1.SubscriptionSpec{
-		CatalogSource:          patternsOperatorConfig.getStringValue("gitops.catalogSource"),
-		CatalogSourceNamespace: patternsOperatorConfig.getStringValue("gitops.sourceNamespace"),
+		CatalogSource:          patternsOperatorConfig.getStringValue(configKeyCatalogSource),
+		CatalogSourceNamespace: patternsOperatorConfig.getStringValue(configKeySourceNamespace),
 		Package:                GitOpsDefaultPackageName,
-		Channel:                patternsOperatorConfig.getStringValue("gitops.channel"),
-		StartingCSV:            patternsOperatorConfig.getStringValue("gitops.csv"),
+		Channel:                patternsOperatorConfig.getStringValue(configKeyChannel),
+		StartingCSV:            patternsOperatorConfig.getStringValue(configKeyCSV),
 		InstallPlanApproval:    installPlanApproval,
 		Config: &operatorv1alpha1.SubscriptionConfig{
 			Env: newSubscriptionEnvVars(disableDefaultInstance),
@@ -79,7 +79,7 @@ func newSubscriptionEnvVars(disableDefaultInstance bool) []corev1.EnvVar {
 	if disableDefaultInstance {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "DISABLE_DEFAULT_ARGOCD_INSTANCE",
-			Value: "true",
+			Value: boolTrue,
 		})
 	}
 	return envVars

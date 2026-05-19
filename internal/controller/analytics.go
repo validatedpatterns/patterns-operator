@@ -17,6 +17,8 @@ import (
 	"github.com/hybrid-cloud-patterns/patterns-operator/version"
 )
 
+const analyticsPattern = "Pattern"
+
 type VpAnalyticsInterface interface {
 	SendPatternInstallationInfo(p *api.Pattern) bool
 	SendPatternStartEventInfo(p *api.Pattern) bool
@@ -98,7 +100,7 @@ func getAnalyticsContext(p *api.Pattern) *analytics.Context {
 
 	ctx := &analytics.Context{
 		Extra: map[string]any{
-			"Pattern":         p.Name,
+			analyticsPattern:  p.Name,
 			"Domain":          getSimpleDomain(p),
 			"OperatorVersion": version.Version,
 			"RepoBaseName":    getBaseGitRepo(p),
