@@ -1083,8 +1083,8 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			}
 			_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), argoCD, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
-			getArgoCDFunc = func(_ dynamic.Interface, _, _ string) (*argooperator.ArgoCD, error) {
-				return nil, fmt.Errorf("forced error")
+			getArgoCDFunc = func(_ dynamic.Interface, _, _ string) (*argooperator.ArgoCD, *unstructured.Unstructured, error) {
+				return nil, nil, fmt.Errorf("forced error")
 			}
 		})
 
