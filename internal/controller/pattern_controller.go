@@ -71,6 +71,16 @@ import (
 
 const ReconcileLoopRequeueTime = 180 * time.Second
 
+const (
+	secretFieldUsername   = "username"
+	secretFieldPassword   = "password"
+	acmNamespace          = "open-cluster-management"
+	searchFilterProperty  = "property"
+	searchFilterCluster   = "cluster"
+	searchFilterNamespace = "namespace"
+	searchFilterValues    = "values"
+)
+
 // PatternReconciler reconciles a Pattern object
 type PatternReconciler struct {
 	client.Client
@@ -457,8 +467,8 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern, patternsOper
 	}
 
 	secretData := map[string][]byte{
-		"username": []byte(GiteaAdminUser),
-		"password": []byte(giteaAdminPassword),
+		secretFieldUsername: []byte(GiteaAdminUser),
+		secretFieldPassword: []byte(giteaAdminPassword),
 	}
 	giteaAdminSecret := newSecret(GiteaAdminSecretName, GiteaNamespace, secretData, nil)
 	err = r.Create(context.Background(), giteaAdminSecret)
@@ -512,8 +522,8 @@ func (r *PatternReconciler) createGiteaInstance(input *api.Pattern, patternsOper
 	}
 
 	// Let's attempt to migrate the repo to Gitea
-	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data["username"]),
-		string(secret.Data["password"]),
+	_, _, err = r.giteaOperations.MigrateGiteaRepo(r.fullClient, string(secret.Data[secretFieldUsername]),
+		string(secret.Data[secretFieldPassword]),
 		input.Spec.GitConfig.OriginRepo,
 		giteaRouteURL)
 	if err != nil {
@@ -565,7 +575,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 
 	// Cluster platform
 	// oc get Infrastructure.config.openshift.io/cluster  -o jsonpath='{.spec.platformSpec.type}'
-	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), "cluster", metav1.GetOptions{})
+	clusterInfra, err := r.configClient.ConfigV1().Infrastructures().Get(context.Background(), searchFilterCluster, metav1.GetOptions{})
 	if err != nil {
 		return output, err
 	} else {
@@ -600,7 +610,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 
 	// Derive cluster and domain names
 	// oc get Ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'
-	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), "cluster", metav1.GetOptions{})
+	clusterIngress, err := r.configClient.ConfigV1().Ingresses().Get(context.Background(), searchFilterCluster, metav1.GetOptions{})
 	if err != nil {
 		return output, err
 	}
@@ -640,7 +650,7 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.ClusterGroupName = "default" //nolint:goconst
 	}
 	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
-		output.Spec.MultiSourceConfig.HelmRepoUrl = "https://charts.validatedpatterns.io/"
+		output.Spec.MultiSourceConfig.HelmRepoUrl = GiteaHelmRepoUrl
 	}
 
 	localCheckoutPath := getLocalGitPath(output.Spec.GitConfig.TargetRepo)
@@ -759,7 +769,7 @@ func (r *PatternReconciler) finalizeObject(instance *api.Pattern) error {
 	log.Printf("Finalizing pattern object")
 
 	// The object is being deleted and, if prune is enabled, we want to delete all the dependent objects in cascade
-	if strings.EqualFold(instance.Annotations[api.PruneAnnotation], "true") &&
+	if strings.EqualFold(instance.Annotations[api.PruneAnnotation], boolTrue) &&
 		(controllerutil.ContainsFinalizer(instance, api.PatternFinalizer) || controllerutil.ContainsFinalizer(instance, metav1.FinalizerOrphanDependents)) {
 		// Prepare the app for cascaded deletion
 		qualifiedInstance, err := r.applyDefaults(instance)
@@ -984,7 +994,7 @@ func (r *PatternReconciler) startArgoCDWatch() {
 	argoCD.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   ArgoCDGroup,
 		Version: ArgoCDVersion,
-		Kind:    "ArgoCD",
+		Kind:    ArgoCDKind,
 	})
 
 	err := r.ctrl.Watch(source.Kind(r.mgr.GetCache(), argoCD,
@@ -1153,7 +1163,7 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	// User should run: kubectl port-forward -n open-cluster-management svc/search-search-api 4010:4010
 	searchURL := os.Getenv("ACM_SEARCH_API_URL")
 	if searchURL == "" {
-		searchNamespace := "open-cluster-management" // Default namespace for ACM
+		searchNamespace := acmNamespace
 		searchURL = fmt.Sprintf("https://search-search-api.%s.svc.cluster.local:4010/searchapi/graphql", searchNamespace)
 	}
 
@@ -1194,23 +1204,23 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 				{
 					"filters": []map[string]any{
 						{
-							"property": "apigroup",
-							"values":   []string{"argoproj.io"},
+							searchFilterProperty: "apigroup",
+							searchFilterValues:   []string{ArgoCDGroup},
 						},
 						{
-							"property": "kind",
-							"values":   []string{"Application"},
+							searchFilterProperty: FieldKind,
+							searchFilterValues:   []string{ApplicationKind},
 						},
 						{
-							"property": "cluster",
-							"values":   []string{"!local-cluster"},
+							searchFilterProperty: searchFilterCluster,
+							searchFilterValues:   []string{"!local-cluster"},
 						},
 						{
-							"property": "namespace",
-							"values":   ns,
+							searchFilterProperty: searchFilterNamespace,
+							searchFilterValues:   ns,
 						},
 					},
-					"relatedKinds": []string{"Application"},
+					"relatedKinds": []string{ApplicationKind},
 					"limit":        20000,
 				},
 			},
@@ -1338,10 +1348,10 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 	// Here we dump all the CAs in kube-root-ca.crt and in openshift-config-managed/trusted-ca-bundle to a file
 	// and then we call git config --global http.sslCAInfo /path/to/your/cacert.pem
 	// This makes us trust our self-signed CAs or any custom CAs a customer might have. We try and ignore any errors here
-	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt", GitCustomCAFile, false); err != nil {
+	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", KubeRootCACM, "ca.crt", GitCustomCAFile, false); err != nil {
 		fmt.Printf("Error while writing kube-root-ca.crt configmap to file: %v", err)
 	}
-	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt", GitCustomCAFile, true); err != nil {
+	if err = writeConfigMapKeyToFile(r.fullClient, "openshift-config-managed", trustedBundleCM, "ca-bundle.crt", GitCustomCAFile, true); err != nil {
 		fmt.Printf("Error while appending trusted-ca-bundle configmap to file: %v", err)
 	}
 
@@ -1352,7 +1362,7 @@ func (r *PatternReconciler) getLocalGit(p *api.Pattern) (string, error) {
 			return "cloning pattern repo", err
 		}
 	} else { // If the cloned repository directory already existed we check if the URL changed
-		localURL, err := getGitRemoteURL(gitDir, "origin")
+		localURL, err := getGitRemoteURL(gitDir, gitRemoteOrigin)
 		if err != nil {
 			return "getting remote URL pattern repo", err
 		}

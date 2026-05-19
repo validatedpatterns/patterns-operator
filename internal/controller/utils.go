@@ -50,6 +50,7 @@ var (
 )
 
 const trustedBundleCM = "trusted-ca-bundle"
+const clusterVersionCompleted = "Completed"
 
 func logOnce(message string) {
 	if _, ok := logKeys[message]; ok {
@@ -110,7 +111,7 @@ func getPatternConditionByType(conditions []api.PatternCondition, conditionType 
 func getCurrentClusterVersion(clusterversion *configv1.ClusterVersion) (*semver.Version, error) {
 	// First, check the history for completed versions
 	for _, v := range clusterversion.Status.History {
-		if v.State == "Completed" {
+		if v.State == clusterVersionCompleted {
 			return parseAndReturnVersion(v.Version)
 		}
 	}
@@ -242,7 +243,7 @@ func createTrustedBundleCM(fullClient kubernetes.Interface, namespace string) er
 			Name:      trustedBundleCM,
 			Namespace: namespace,
 			Labels: map[string]string{
-				"config.openshift.io/inject-trusted-cabundle": "true",
+				"config.openshift.io/inject-trusted-cabundle": boolTrue,
 			},
 		},
 	}
@@ -374,12 +375,12 @@ func getHTTPSTransport(fullClient kubernetes.Interface) *nethttp.Transport {
 	var trustedcabundle = ""
 
 	if fullClient != nil {
-		kuberoot, err = getConfigMapKey(fullClient, "openshift-config-managed", "kube-root-ca.crt", "ca.crt")
+		kuberoot, err = getConfigMapKey(fullClient, "openshift-config-managed", KubeRootCACM, "ca.crt")
 		if err != nil {
 			fmt.Printf("Could not get kube-root-ca.crt configmap: %v\n", err)
 		}
 
-		trustedcabundle, err = getConfigMapKey(fullClient, "openshift-config-managed", "trusted-ca-bundle", "ca-bundle.crt")
+		trustedcabundle, err = getConfigMapKey(fullClient, "openshift-config-managed", trustedBundleCM, "ca-bundle.crt")
 		if err != nil {
 			fmt.Printf("Could not get trusted-ca-bundle configmap: %v\n", err)
 		}

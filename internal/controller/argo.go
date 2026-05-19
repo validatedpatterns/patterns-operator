@@ -44,9 +44,43 @@ import (
 
 // Which ArgoCD objects we're creating
 const (
-	ArgoCDGroup    = "argoproj.io"
-	ArgoCDVersion  = "v1beta1"
-	ArgoCDResource = "argocds"
+	ArgoCDGroup      = "argoproj.io"
+	ArgoCDVersion    = "v1beta1"
+	ArgoCDResource   = "argocds"
+	ArgoCDKind       = "ArgoCD"
+	ArgoCDAPIVersion = ArgoCDGroup + "/" + ArgoCDVersion
+
+	ApplicationKind = "Application"
+
+	DefaultProject       = "default"
+	InClusterDestination = "in-cluster"
+	PatternRef           = "patternref"
+	SyncOptionForce      = "Force=true"
+)
+
+// Unstructured map keys
+const (
+	FieldAPIVersion = "apiVersion"
+	FieldKind       = "kind"
+	FieldMetadata   = "metadata"
+	FieldName       = "name"
+)
+
+// Volume/ConfigMap names for CA bundle handling
+const (
+	KubeRootCACM = "kube-root-ca.crt"
+	CaBundlesVol = "ca-bundles"
+)
+
+// Helm parameter names
+const (
+	ParamMultiSourceSupport        = "global.multiSourceSupport"
+	ParamMultiSourceRepoUrl        = "global.multiSourceRepoUrl"
+	ParamExperimentalCapabilities  = "global.experimentalCapabilities"
+	ParamGitOpsSubNamespace        = "global.gitOpsSubNamespace"
+	ParamVpArgoNamespace           = "global.vpArgoNamespace"
+	ParamMultiSourceTargetRevision = "global.multiSourceTargetRevision"
+	ParamDeletePattern             = "global.deletePattern"
 )
 
 // ConsoleLink constants
@@ -62,7 +96,7 @@ func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorCo
 		"g, cluster-admins, role:admin",
 		"g, admin, role:admin",
 	}
-	for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getStringValue("gitops.additionalArgoAdmins"), ",") {
+	for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getStringValue(configKeyAdditionalAdmins), ",") {
 		argoAdmin = strings.TrimSpace(argoAdmin)
 		if argoAdmin != "" {
 			argoPolicies = append(argoPolicies, "g, "+argoAdmin+", role:admin")
@@ -160,12 +194,12 @@ health_status.message = "An install plan for a subscription is pending installat
 return health_status`,
 		},
 	}
-	if patternsOperatorConfig.getBoolValue("gitops.applicationHealthCheckEnabled") {
+	if patternsOperatorConfig.getBoolValue(configKeyHealthCheck) {
 		// As of ArgoCD 1.8 the Application health check was dropped (see https://github.com/argoproj/argo-cd/issues/3781),
 		// but in app-of-apps pattern this is needed in order to implement children apps dependencies via sync-waves
 		resourceHealthChecks = append(resourceHealthChecks, argooperator.ResourceHealthCheck{
-			Group: "argoproj.io",
-			Kind:  "Application",
+			Group: ArgoCDGroup,
+			Kind:  ApplicationKind,
 			Check: `local health_status = {}
 health_status.status = "Progressing"
 health_status.message = ""
@@ -199,24 +233,24 @@ return health_status`,
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: "kube-root-ca.crt",
+						Name: KubeRootCACM,
 					},
 				},
 			},
 		},
 		{
-			Name: "trusted-ca-bundle",
+			Name: trustedBundleCM,
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: "trusted-ca-bundle",
+						Name: trustedBundleCM,
 					},
 					Optional: &trueBool,
 				},
 			},
 		},
 		{
-			Name: "ca-bundles",
+			Name: CaBundlesVol,
 			VolumeSource: v1.VolumeSource{
 				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
@@ -224,7 +258,7 @@ return health_status`,
 	}
 	initVolumeMounts := []v1.VolumeMount{
 		{
-			Name:      "ca-bundles",
+			Name:      CaBundlesVol,
 			MountPath: "/etc/pki/tls/certs",
 		},
 	}
@@ -239,11 +273,11 @@ return health_status`,
 					MountPath: "/var/run/kube-root-ca", // ca.crt field
 				},
 				{
-					Name:      "trusted-ca-bundle",
+					Name:      trustedBundleCM,
 					MountPath: "/var/run/trusted-ca", // ca-bundle.crt field
 				},
 				{
-					Name:      "ca-bundles",
+					Name:      CaBundlesVol,
 					MountPath: "/tmp/ca-bundles",
 				},
 			},
@@ -257,8 +291,8 @@ return health_status`,
 
 	s := argooperator.ArgoCD{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ArgoCD",
-			APIVersion: "argoproj.io/v1beta1",
+			Kind:       ArgoCDKind,
+			APIVersion: ArgoCDAPIVersion,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       name,
@@ -509,10 +543,10 @@ func createOrUpdateConsoleLink(client dynamic.Interface, argoName, argoNamespace
 
 	consoleLinkObj := &unstructured.Unstructured{
 		Object: map[string]any{
-			"apiVersion": ConsoleLinkGroup + "/" + ConsoleLinkVersion,
-			"kind":       "ConsoleLink",
-			"metadata": map[string]any{
-				"name": linkName,
+			FieldAPIVersion: ConsoleLinkGroup + "/" + ConsoleLinkVersion,
+			FieldKind:       "ConsoleLink",
+			FieldMetadata: map[string]any{
+				FieldName: linkName,
 			},
 			"spec": map[string]any{
 				"applicationMenu": map[string]any{
@@ -614,28 +648,28 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			Value: strconv.FormatBool(p.Spec.GitConfig.TokenSecret != ""),
 		},
 		{
-			Name:  "global.multiSourceSupport",
+			Name:  ParamMultiSourceSupport,
 			Value: strconv.FormatBool(*p.Spec.MultiSourceConfig.Enabled),
 		},
 		{
-			Name:  "global.multiSourceRepoUrl",
+			Name:  ParamMultiSourceRepoUrl,
 			Value: p.Spec.MultiSourceConfig.HelmRepoUrl,
 		},
 
 		{
-			Name:  "global.experimentalCapabilities",
+			Name:  ParamExperimentalCapabilities,
 			Value: p.Spec.ExperimentalCapabilities,
 		},
 	}
 	_, gitOpsSubNamespace := DetectGitOpsSubscription()
 	parameters = append(parameters, argoapi.HelmParameter{
-		Name:  "global.gitOpsSubNamespace",
+		Name:  ParamGitOpsSubNamespace,
 		Value: gitOpsSubNamespace,
 	}, argoapi.HelmParameter{
-		Name:  "global.vpArgoNamespace",
+		Name:  ParamVpArgoNamespace,
 		Value: getClusterWideArgoNamespace(),
 	}, argoapi.HelmParameter{
-		Name:  "global.multiSourceTargetRevision",
+		Name:  ParamMultiSourceTargetRevision,
 		Value: getClusterGroupChartVersion(p),
 	})
 	for _, extra := range p.Spec.ExtraParameters {
@@ -662,7 +696,7 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 			deletePatternValue = "DeleteChildApps"
 		}
 		parameters = append(parameters, argoapi.HelmParameter{
-			Name:        "global.deletePattern",
+			Name:        ParamDeletePattern,
 			Value:       string(deletePatternValue),
 			ForceString: true,
 		})
@@ -807,12 +841,12 @@ func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) *argoapi.ApplicationSpec {
 	spec := &argoapi.ApplicationSpec{
 		Destination: argoapi.ApplicationDestination{
-			Name:      "in-cluster",
+			Name:      InClusterDestination,
 			Namespace: p.Namespace,
 		},
 		// Project is a reference to the project this application belongs to.
 		// The empty string means that application belongs to the 'default' project.
-		Project: "default",
+		Project: DefaultProject,
 
 		// IgnoreDifferences is a list of resources and their fields which should be ignored during comparison
 		// IgnoreDifferences []ResourceIgnoreDifferences `json:"ignoreDifferences,omitempty" protobuf:"bytes,5,name=ignoreDifferences"`
@@ -909,7 +943,7 @@ func newMultiSourceApplication(p *api.Pattern) *argoapi.Application {
 	valuesSource := &argoapi.ApplicationSource{
 		RepoURL:        p.Spec.GitConfig.TargetRepo,
 		TargetRevision: p.Spec.GitConfig.TargetRevision,
-		Ref:            "patternref",
+		Ref:            PatternRef,
 	}
 	sources = append(sources, *valuesSource)
 
@@ -984,10 +1018,10 @@ func newArgoGiteaApplication(p *api.Pattern, patternsOperatorConfig PatternsOper
 	}
 	spec := &argoapi.ApplicationSpec{
 		Destination: argoapi.ApplicationDestination{
-			Name:      "in-cluster",
+			Name:      InClusterDestination,
 			Namespace: GiteaNamespace,
 		},
-		Project: "default",
+		Project: DefaultProject,
 		Source: &argoapi.ApplicationSource{
 			RepoURL:        patternsOperatorConfig.getStringValue("gitea.helmRepoUrl"),
 			TargetRevision: patternsOperatorConfig.getStringValue("gitea.chartVersion"),
@@ -1296,14 +1330,14 @@ func updateHelmParameter(goal api.PatternParameter, actual []argoapi.HelmParamet
 // syncApplication syncs the application with prune and force options if such a sync is not already in progress.
 // Returns nil if a sync is already in progress, error otherwise
 func syncApplication(client argoclient.Interface, app *argoapi.Application, withPrune bool) error {
-	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune == withPrune && slices.Contains(app.Operation.Sync.SyncOptions, "Force=true") {
+	if app.Operation != nil && app.Operation.Sync != nil && app.Operation.Sync.Prune == withPrune && slices.Contains(app.Operation.Sync.SyncOptions, SyncOptionForce) {
 		return nil
 	}
 
 	app.Operation = &argoapi.Operation{
 		Sync: &argoapi.SyncOperation{
 			Prune:       withPrune,
-			SyncOptions: []string{"Force=true"},
+			SyncOptions: []string{SyncOptionForce},
 		},
 	}
 

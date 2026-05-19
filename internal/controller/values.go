@@ -11,6 +11,12 @@ import (
 	"helm.sh/helm/v3/pkg/engine"
 )
 
+const (
+	appSetKeyDestServer = "destinationServer"
+	appSetKeyGenerators = "generators"
+	helmChartAPIVersion = "v2"
+)
+
 func mergeHelmValues(files ...string) (map[string]any, error) {
 	mergedValues := make(map[string]any)
 
@@ -50,7 +56,7 @@ func helmTpl(templateString string, valueFiles []string, values map[string]any) 
 	// Create a fake chart with the template.
 	fakeChart := &chart.Chart{
 		Metadata: &chart.Metadata{
-			APIVersion: "v2",
+			APIVersion: helmChartAPIVersion,
 			Name:       "fake",
 			Version:    "0.1.0",
 		},
@@ -87,7 +93,7 @@ func helmTpl(templateString string, valueFiles []string, values map[string]any) 
 	// Render the template.
 	options := chartutil.ReleaseOptions{
 		Name:      "fake-release",
-		Namespace: "default",
+		Namespace: DefaultProject,
 		IsInstall: true,
 		IsUpgrade: false,
 	}
@@ -113,7 +119,7 @@ func helmTpl(templateString string, valueFiles []string, values map[string]any) 
 func countApplicationsAndSets(a any) (appCount, appSetsCount int) {
 	applicationCount := 0
 	applicationSetsCount := 0
-	applicationSetsKeys := []string{"generators", "generatorFile", "useGeneratorValues", "destinationServer", "destinationNamespace"}
+	applicationSetsKeys := []string{appSetKeyGenerators, "generatorFile", "useGeneratorValues", appSetKeyDestServer, "destinationNamespace"}
 
 	m, ok := a.(map[string]any)
 	if !ok {
