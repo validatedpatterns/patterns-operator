@@ -42,7 +42,7 @@
     "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^6.7.1",
-    "cypress": "^13.16.1",
+    "cypress": "^15.0.0",
     "cypress-multi-reporters": "^1.6.2",
     "dotenv": "^16.0.0",
     "eslint": "^8.10.0",
