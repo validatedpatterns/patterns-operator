@@ -51,6 +51,7 @@ const (
 	GitAuthGitHubApp GitAuthenticationBackend = 3
 )
 
+const gitRemoteOrigin = "origin"
 const ContextTimeout = 15 * time.Second
 const GitCustomCAFile = "/tmp/vp-git-cas.pem"
 const GitHEAD = "HEAD"
@@ -162,7 +163,7 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	if h, err := getHashFromReference(repo, plumbing.NewRemoteHEADReferenceName(name)); err == nil {
 		return h, nil
 	}
-	if h, err := getHashFromReference(repo, plumbing.NewRemoteReferenceName("origin", name)); err == nil {
+	if h, err := getHashFromReference(repo, plumbing.NewRemoteReferenceName(gitRemoteOrigin, name)); err == nil {
 		return h, nil
 	}
 
@@ -267,7 +268,7 @@ func cloneRepo(fullClient kubernetes.Interface, gitOps GitOperations, url, direc
 
 func getFetchOptions(fullClient kubernetes.Interface, url string, secret map[string][]byte) (*git.FetchOptions, error) {
 	var foptions = &git.FetchOptions{
-		RemoteName:      "origin",
+		RemoteName:      gitRemoteOrigin,
 		Force:           true,
 		InsecureSkipTLS: true,
 		Tags:            git.AllTags,
@@ -297,7 +298,7 @@ func getCloneOptions(fullClient kubernetes.Interface, url string, secret map[str
 	// Clone the given repository to the given directory
 	var options = &git.CloneOptions{
 		URL:          url,
-		RemoteName:   "origin",
+		RemoteName:   gitRemoteOrigin,
 		Progress:     os.Stdout,
 		Depth:        0,
 		SingleBranch: false,
@@ -330,8 +331,8 @@ func getHttpAuth(secret map[string][]byte) *http.BasicAuth {
 	// because access tokens can easily be revoked.
 	// https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
 	auth := &http.BasicAuth{
-		Username: string(getField(secret, "username")),
-		Password: string(getField(secret, "password")),
+		Username: string(getField(secret, secretFieldUsername)),
+		Password: string(getField(secret, secretFieldPassword)),
 	}
 
 	return auth
@@ -444,8 +445,8 @@ func detectGitAuthType(secret map[string][]byte) GitAuthenticationBackend {
 	}
 
 	// Username + Password
-	_, hasUser := secret["username"]
-	_, hasPassword := secret["password"]
+	_, hasUser := secret[secretFieldUsername]
+	_, hasPassword := secret[secretFieldPassword]
 	if hasUser && hasPassword {
 		return GitAuthPassword
 	}

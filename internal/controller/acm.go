@@ -28,10 +28,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func haveACMHub(r *PatternReconciler) bool {
-	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: "v1", Resource: "multiclusterhubs"}
+const (
+	apiVersionV1         = "v1"
+	acmGroup             = "cluster.open-cluster-management.io"
+	acmManagedClusterRes = "managedclusters"
+	acmLocalCluster      = "local-cluster"
+)
 
-	mch, err := r.dynamicClient.Resource(gvrMCH).Namespace("open-cluster-management").Get(context.Background(), "multiclusterhub", metav1.GetOptions{})
+func haveACMHub(r *PatternReconciler) bool {
+	gvrMCH := schema.GroupVersionResource{Group: "operator.open-cluster-management.io", Version: apiVersionV1, Resource: "multiclusterhubs"}
+
+	mch, err := r.dynamicClient.Resource(gvrMCH).Namespace(acmNamespace).Get(context.Background(), "multiclusterhub", metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Error obtaining hub: %s\n", err)
 		return false
@@ -39,7 +46,7 @@ func haveACMHub(r *PatternReconciler) bool {
 
 	return strings.EqualFold(
 		mch.GetAnnotations()["patterns.gitops.validatedpatterns.io/managed"],
-		"true",
+		boolTrue,
 	)
 }
 
@@ -47,9 +54,9 @@ func haveACMHub(r *PatternReconciler) bool {
 // Returns a list of cluster names and an error
 func (r *PatternReconciler) listManagedClusters(ctx context.Context) ([]string, error) {
 	gvrMC := schema.GroupVersionResource{
-		Group:    "cluster.open-cluster-management.io",
-		Version:  "v1",
-		Resource: "managedclusters",
+		Group:    acmGroup,
+		Version:  apiVersionV1,
+		Resource: acmManagedClusterRes,
 	}
 
 	// ManagedCluster is a cluster-scoped resource, so no namespace needed
@@ -62,7 +69,7 @@ func (r *PatternReconciler) listManagedClusters(ctx context.Context) ([]string, 
 	for _, item := range mcList.Items {
 		name := item.GetName()
 		// Exclude local-cluster (hub cluster)
-		if name != "local-cluster" {
+		if name != acmLocalCluster {
 			clusterNames = append(clusterNames, name)
 		}
 	}
@@ -74,9 +81,9 @@ func (r *PatternReconciler) listManagedClusters(ctx context.Context) ([]string, 
 // Returns the number of clusters deleted and an error
 func (r *PatternReconciler) deleteManagedClusters(ctx context.Context) (int, error) {
 	gvrMC := schema.GroupVersionResource{
-		Group:    "cluster.open-cluster-management.io",
-		Version:  "v1",
-		Resource: "managedclusters",
+		Group:    acmGroup,
+		Version:  apiVersionV1,
+		Resource: acmManagedClusterRes,
 	}
 
 	// ManagedCluster is a cluster-scoped resource, so no namespace needed
@@ -89,7 +96,7 @@ func (r *PatternReconciler) deleteManagedClusters(ctx context.Context) (int, err
 	for _, item := range mcList.Items {
 		name := item.GetName()
 		// Exclude local-cluster (hub cluster)
-		if name == "local-cluster" {
+		if name == acmLocalCluster {
 			continue
 		}
 
