@@ -379,8 +379,8 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
-github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a h1:v/W0YkbADTv9bfubadSNIOftvDIA/JwN8zaK79K5Wyc=
-github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
+github.com/openshift/api v0.0.0-20260520123312-30525d574efa h1:Igi4WlU/HbrLCN9J5TLe6t3Gdb+iOCu0YW6Kxr0Q9rM=
+github.com/openshift/api v0.0.0-20260520123312-30525d574efa/go.mod h1:pyVjK0nZ4sRs4fuQVQ4rubsJdahI1PB94LnQ8sGdvxo=
 github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c h1:TBE0Gl+oCo/SNEhLKZQNNH/SWHXrpGyhAw7P0lAqdHg=
 github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c/go.mod h1:IsynOWZAfdH+BgWimcFQRtI41Id9sgdhsCEjIk8ACLw=
 github.com/operator-framework/api v0.33.0 h1:Tdu9doXz6Key2riIiP3/JPahHEgFBXAqyWQN4kOITS8=

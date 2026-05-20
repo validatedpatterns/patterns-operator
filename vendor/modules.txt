@@ -628,8 +628,8 @@ github.com/opencontainers/go-digest
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a
-## explicit; go 1.24.0
+# github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20260520123312-30525d574efa
+## explicit; go 1.25.0
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
 github.com/openshift/api/config/v1alpha2
@@ -1974,7 +1974,7 @@ sigs.k8s.io/structured-merge-diff/v6/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v3
 sigs.k8s.io/yaml/kyaml
-# github.com/openshift/api => github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a
+# github.com/openshift/api => github.com/openshift/api v0.0.0-20260520123312-30525d574efa
 # github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c
 # k8s.io/api => k8s.io/api v0.34.2
 # k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.34.2
