@@ -1252,9 +1252,9 @@
     csstype "^3.2.2"
 
 "@types/react@^17.0.37":
-  version "17.0.91"
-  resolved "https://registry.yarnpkg.com/@types/react/-/react-17.0.91.tgz#0a972a41c430f56d2feb7c15368bc51642495e0b"
-  integrity sha512-xauZca6qMeCU3Moy0KxCM9jtf1vyk6qRYK39Ryf3afUqwgNUjRIGoDdS9BcGWgAMGSg1hvP4XcmlYrM66PtqeA==
+  version "17.0.92"
+  resolved "https://registry.yarnpkg.com/@types/react/-/react-17.0.92.tgz#85887e3bff12c978975d3894d522e060e653185c"
+  integrity sha512-TqKlM6WfeXFUV0rKnRhe7yYctmCNfLHhJGyN3FRr70nwQmCM4pYRO1l0W8979K0Va72KGF1d8MPtT1kt0pw0ng==
   dependencies:
     "@types/prop-types" "*"
     "@types/scheduler" "^0.16"
