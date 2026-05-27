@@ -115,11 +115,18 @@ const TIER_SVG_COLORS: Record<string, { filled: string; outline: string }> = {
   sandbox: { filled: '#f0ab00', outline: '#f0ab00' },
 };
 
-function TierIcon({ tier }: { tier: string }) {
-  const colors = TIER_SVG_COLORS[tier] || TIER_SVG_COLORS.sandbox;
-  // 3 horizontal bars: bottom=bar1, middle=bar2, top=bar3
-  // maintained: all 3 filled; tested: 2 filled + 1 outline; sandbox: 1 filled + 2 outline
-  const filledCount = tier === 'maintained' ? 3 : tier === 'tested' ? 2 : 1;
+const KNOWN_TIER_ORDER = ['maintained', 'tested', 'sandbox'];
+
+const TIER_FILLED_BARS: Record<string, number> = {
+  maintained: 3,
+  tested: 2,
+  sandbox: 1,
+};
+
+function TierIcon({ tier }: { tier: string }): React.ReactElement | null {
+  const colors = TIER_SVG_COLORS[tier];
+  if (!colors) return null;
+  const filledCount = TIER_FILLED_BARS[tier] ?? 1;
   return (
     <svg
       width="16"
@@ -167,7 +174,7 @@ export default function PatternCatalogPage() {
   const [catalogImage, setCatalogImage] = React.useState<string | null>(null);
   const [catalogDescription, setCatalogDescription] = React.useState<string | undefined>();
   const [catalogLogo, setCatalogLogo] = React.useState<string | undefined>();
-  const [selectedTiers, setSelectedTiers] = React.useState<Set<string>>(new Set(['maintained']));
+  const [selectedTiers, setSelectedTiers] = React.useState<Set<string>>(new Set());
   const [tierSelectOpen, setTierSelectOpen] = React.useState(false);
 
   const loadData = React.useCallback(() => {
@@ -190,6 +197,29 @@ export default function PatternCatalogPage() {
   React.useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const availableTiers = React.useMemo(() => {
+    const tierSet = new Set(patterns.map((p) => p.tier));
+    return Array.from(tierSet).sort((a, b) => {
+      const ai = KNOWN_TIER_ORDER.indexOf(a);
+      const bi = KNOWN_TIER_ORDER.indexOf(b);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
+  }, [patterns]);
+
+  const defaultsApplied = React.useRef(false);
+  React.useEffect(() => {
+    if (defaultsApplied.current || availableTiers.length === 0) return;
+    defaultsApplied.current = true;
+    if (availableTiers.includes('maintained')) {
+      setSelectedTiers(new Set(['maintained']));
+    } else {
+      setSelectedTiers(new Set(availableTiers));
+    }
+  }, [availableTiers]);
 
   const filteredPatterns = React.useMemo(
     () => (selectedTiers.size === 0 ? patterns : patterns.filter((p) => selectedTiers.has(p.tier))),
@@ -284,7 +314,7 @@ export default function PatternCatalogPage() {
                     )}
                   >
                     <SelectList>
-                      {['maintained', 'tested', 'sandbox'].map((tier) => (
+                      {availableTiers.map((tier) => (
                         <SelectOption
                           key={tier}
                           value={tier}
@@ -315,7 +345,11 @@ export default function PatternCatalogPage() {
                       <Tooltip content={TIER_DESCRIPTIONS[pattern.tier] || pattern.tier}>
                         <Label
                           color={TIER_COLORS[pattern.tier] || 'grey'}
-                          icon={<TierIcon tier={pattern.tier} />}
+                          icon={
+                            TIER_SVG_COLORS[pattern.tier] ? (
+                              <TierIcon tier={pattern.tier} />
+                            ) : undefined
+                          }
                         >
                           {pattern.tier}
                         </Label>

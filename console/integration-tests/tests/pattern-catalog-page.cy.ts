@@ -60,32 +60,36 @@ describe('Pattern Catalog Page', () => {
       });
   });
 
-  it('tier filter dropdown shows all tier options', () => {
+  it('tier filter dropdown shows tier options', () => {
     visitCatalog();
-    // Default filter shows "Maintained"; click the toggle button
-    cy.contains('button', 'Maintained').click();
-    // Options are capitalized ("Tested", "Sandbox") and unique to the dropdown
-    cy.contains('Tested').should('be.visible');
-    cy.contains('Sandbox').should('be.visible');
-    // Close dropdown by clicking the toggle again
-    cy.contains('button', 'Maintained').click();
+    // Open the tier filter dropdown
+    cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
+    // At least one selectable option should be visible
+    cy.get('[role="option"]').should('have.length.greaterThan', 0);
+    // Close dropdown
+    cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
   });
 
-  it('selecting all tiers shows at least as many cards as maintained only', () => {
+  it('selecting all tiers shows at least as many cards as the default selection', () => {
     visitCatalog();
     cy.get('.patterns-operator__card')
       .its('length')
-      .then((maintainedCount) => {
-        // Open filter and add Tested
-        cy.contains('button', 'Maintained').click();
-        cy.contains('Tested').click();
-        // Dropdown may close after selection; re-open to add Sandbox
-        cy.contains('button', /Maintained/).click();
-        cy.contains('Sandbox').click();
+      .then((defaultCount) => {
+        // Open filter dropdown
+        cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
+        // Select every unchecked tier option
+        cy.get('[role="option"]').each(($option) => {
+          const checkbox = $option.find('input[type="checkbox"]');
+          if (checkbox.length && !checkbox.is(':checked')) {
+            cy.wrap($option).click();
+            // Re-open dropdown if it closed
+            cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
+          }
+        });
         // Close dropdown
         cy.get('body').click(0, 0);
-        // With more tiers selected, card count should be >= maintained only
-        cy.get('.patterns-operator__card').should('have.length.gte', maintainedCount);
+        // With all tiers selected, card count should be >= default selection
+        cy.get('.patterns-operator__card').should('have.length.gte', defaultCount);
       });
   });
 

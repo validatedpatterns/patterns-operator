@@ -68,7 +68,9 @@ export const FileField: React.FC<FileFieldProps> = ({ field, value, onChange, fi
               </HelperTextItem>
             )}
             {field.description && (
-              <HelperTextItem id={`file-${field.name}-helpertext`}>{field.description}</HelperTextItem>
+              <HelperTextItem id={`file-${field.name}-helpertext`}>
+                {field.description}
+              </HelperTextItem>
             )}
           </HelperText>
         </FileUploadHelperText>
