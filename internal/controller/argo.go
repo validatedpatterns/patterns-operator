@@ -1367,8 +1367,7 @@ func getChildApplications(client argoclient.Interface, parentApp *argoapi.Applic
 	// Example:
 	// multicloud-gitops-hub:argoproj.io/Application:multicloud-gitops-hub/
 	expectedPrefix := fmt.Sprintf(
-		"%s:argoproj.io/Application:%s/",
-		parentApp.Name,
+		"%s:argoproj.io/Application:",
 		parentApp.Name,
 	)
 
