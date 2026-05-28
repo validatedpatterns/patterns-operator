@@ -225,6 +225,13 @@ export default function PatternCatalogPage() {
       </Helmet>
       <PageSection>
         <div className="patterns-operator__catalog-header">
+          {catalogLogo && (
+            <img
+              src={catalogLogo}
+              alt={t('Catalog logo')}
+              className="patterns-operator__catalog-logo"
+            />
+          )}
           {catalogImage ? (
             <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
               <Title
@@ -239,13 +246,6 @@ export default function PatternCatalogPage() {
             <Title headingLevel="h1" data-test="pattern-catalog-page-title">
               {t('Pattern Catalog')}
             </Title>
-          )}
-          {catalogLogo && (
-            <img
-              src={catalogLogo}
-              alt={t('Catalog logo')}
-              className="patterns-operator__catalog-logo"
-            />
           )}
         </div>
       </PageSection>

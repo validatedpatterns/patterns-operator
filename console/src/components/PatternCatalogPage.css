@@ -1,7 +1,7 @@
 .patterns-operator__catalog-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
 .patterns-operator__catalog-logo {
