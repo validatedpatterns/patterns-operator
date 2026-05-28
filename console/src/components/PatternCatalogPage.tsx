@@ -306,6 +306,7 @@ export default function PatternCatalogPage() {
                     toggle={(toggleRef) => (
                       <MenuToggle
                         ref={toggleRef}
+                        id="tier-filter-toggle"
                         onClick={() => setTierSelectOpen((prev) => !prev)}
                         isExpanded={tierSelectOpen}
                       >
