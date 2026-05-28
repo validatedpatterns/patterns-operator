@@ -48,6 +48,7 @@ export interface Pattern {
   requirements?: PatternRequirements;
   extra_features?: ExtraFeatures;
   external_requirements?: ExternalRequirements;
+  logo?: string;
   /** The catalog directory key used to fetch this pattern. */
   catalogKey?: string;
 }

@@ -341,7 +341,22 @@ export default function PatternCatalogPage() {
                       isDisabled ? ' patterns-operator__card--disabled' : ''
                     }`}
                   >
-                    <CardHeader>
+                    <CardHeader
+                      actions={
+                        pattern.logo
+                          ? {
+                              actions: (
+                                <img
+                                  src={pattern.logo}
+                                  alt={`${pattern.display_name} logo`}
+                                  className="patterns-operator__pattern-logo"
+                                />
+                              ),
+                              hasNoOffset: true,
+                            }
+                          : undefined
+                      }
+                    >
                       <Tooltip content={TIER_DESCRIPTIONS[pattern.tier] || pattern.tier}>
                         <Label
                           color={TIER_COLORS[pattern.tier] || 'grey'}
