@@ -52,6 +52,7 @@ export async function fetchCatalogImage(): Promise<string> {
 export async function fetchAllPatterns(): Promise<{
   patterns: Pattern[];
   catalogDescription?: string;
+  catalogLogo?: string;
 }> {
   const catalog = await fetchCatalog();
   const patterns = await Promise.all(
@@ -60,7 +61,11 @@ export async function fetchAllPatterns(): Promise<{
       return { ...pattern, catalogKey: key };
     }),
   );
-  return { patterns, catalogDescription: catalog.catalog_description };
+  return {
+    patterns,
+    catalogDescription: catalog.catalog_description,
+    catalogLogo: catalog.catalog_logo,
+  };
 }
 
 export interface VaultJobStatus {

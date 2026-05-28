@@ -166,6 +166,7 @@ export default function PatternCatalogPage() {
   const [installedPatterns, setInstalledPatterns] = React.useState<Set<string>>(new Set());
   const [catalogImage, setCatalogImage] = React.useState<string | null>(null);
   const [catalogDescription, setCatalogDescription] = React.useState<string | undefined>();
+  const [catalogLogo, setCatalogLogo] = React.useState<string | undefined>();
   const [selectedTiers, setSelectedTiers] = React.useState<Set<string>>(new Set(['maintained']));
   const [tierSelectOpen, setTierSelectOpen] = React.useState(false);
 
@@ -175,6 +176,7 @@ export default function PatternCatalogPage() {
       .then(([catalogData, installed, image]) => {
         setPatterns(catalogData.patterns);
         setCatalogDescription(catalogData.catalogDescription);
+        setCatalogLogo(catalogData.catalogLogo);
         setInstalledPatterns(new Set(installed));
         setCatalogImage(image);
         setLoading(false);
@@ -222,21 +224,30 @@ export default function PatternCatalogPage() {
         <title data-test="pattern-catalog-page-title">{t('Pattern Catalog')}</title>
       </Helmet>
       <PageSection>
-        {catalogImage ? (
-          <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
-            <Title
-              headingLevel="h1"
-              data-test="pattern-catalog-page-title"
-              style={{ display: 'inline-block' }}
-            >
+        <div className="patterns-operator__catalog-header">
+          {catalogImage ? (
+            <Tooltip content={`${t('Catalog source')}: ${catalogImage}`}>
+              <Title
+                headingLevel="h1"
+                data-test="pattern-catalog-page-title"
+                style={{ display: 'inline-block' }}
+              >
+                {t('Pattern Catalog')}
+              </Title>
+            </Tooltip>
+          ) : (
+            <Title headingLevel="h1" data-test="pattern-catalog-page-title">
               {t('Pattern Catalog')}
             </Title>
-          </Tooltip>
-        ) : (
-          <Title headingLevel="h1" data-test="pattern-catalog-page-title">
-            {t('Pattern Catalog')}
-          </Title>
-        )}
+          )}
+          {catalogLogo && (
+            <img
+              src={catalogLogo}
+              alt={t('Catalog logo')}
+              className="patterns-operator__catalog-logo"
+            />
+          )}
+        </div>
       </PageSection>
       {catalogDescription && (
         <PageSection>

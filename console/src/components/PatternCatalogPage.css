@@ -1,3 +1,14 @@
+.patterns-operator__catalog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.patterns-operator__catalog-logo {
+  max-height: 48px;
+  object-fit: contain;
+}
+
 .patterns-operator__card-field {
   margin-bottom: 4px;
 }
