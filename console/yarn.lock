@@ -606,27 +606,17 @@
     react-dropzone "^14.3.5"
     tslib "^2.8.1"
 
-"@patternfly/react-icons@^6.0.0", "@patternfly/react-icons@^6.2.2":
-  version "6.4.0"
-  resolved "https://registry.yarnpkg.com/@patternfly/react-icons/-/react-icons-6.4.0.tgz#563d5a51e76084dea8c752b587fc479dfe10fc31"
-  integrity sha512-SPjzatm73NUYv/BL6A/cjRA5sFQ15NkiyPAcT8gmklI7HY+ptd6/eg49uBDFmxTQcSwbb5ISW/R6wwCQBY2M+Q==
-
-"@patternfly/react-icons@^6.5.1":
+"@patternfly/react-icons@^6.0.0", "@patternfly/react-icons@^6.2.2", "@patternfly/react-icons@^6.5.1":
   version "6.5.1"
   resolved "https://registry.yarnpkg.com/@patternfly/react-icons/-/react-icons-6.5.1.tgz#9c607cc8450e28478c239c6a337f3779c54dfa41"
   integrity sha512-CnuPvTTs4MMWx8CAUkmnY690ouN1bbHjunsyXu3QxvGOmzbztP+wS4BdiLS8TIXOIH80Yb7KPhnF8VkA+CduOA==
 
-"@patternfly/react-styles@^6.0.0":
-  version "6.4.0"
-  resolved "https://registry.yarnpkg.com/@patternfly/react-styles/-/react-styles-6.4.0.tgz#2e29d59a4e3df737e742de58dc1525a27287415d"
-  integrity sha512-EXmHA67s5sy+Wy/0uxWoUQ52jr9lsH2wV3QcgtvVc5zxpyBX89gShpqv4jfVqaowznHGDoL6fVBBrSe9BYOliQ==
-
-"@patternfly/react-styles@^6.5.1":
+"@patternfly/react-styles@^6.0.0", "@patternfly/react-styles@^6.5.1":
   version "6.5.1"
   resolved "https://registry.yarnpkg.com/@patternfly/react-styles/-/react-styles-6.5.1.tgz#9e858d15a60586f0872d6af6a9c2db11c46337dc"
   integrity sha512-yQMzUbbf6qYM/v3JbPvaCJTgxRbOKoEw229XZmnnM8gDvp8ECiI7LqihrAOK/NA6T6M3DDgsRMd2JurUBhPDEw==
 
-"@patternfly/react-table@6.5.1":
+"@patternfly/react-table@^6.2.2":
   version "6.5.1"
   resolved "https://registry.yarnpkg.com/@patternfly/react-table/-/react-table-6.5.1.tgz#39ac5a2c5dc4d89bd51acd4161131e95821c0a04"
   integrity sha512-JpX66ctLsg5snRRheDhuF2fHvXDG4UDKYfP5403kCAQ4Dz2dPu3PhlHi4AJol+egEBD2HfS/U37j7noQ1Y7mpA==
