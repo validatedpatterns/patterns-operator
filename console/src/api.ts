@@ -64,7 +64,11 @@ export async function fetchAllPatterns(): Promise<{
   return {
     patterns,
     catalogDescription: catalog.catalog_description,
-    catalogLogo: catalog.catalog_logo,
+    catalogLogo: catalog.catalog_logo
+      ? /^https?:\/\//.test(catalog.catalog_logo)
+        ? catalog.catalog_logo
+        : `${PATTERN_UI_CATALOG_BASE_URL}/${catalog.catalog_logo}`
+      : undefined,
   };
 }
 
