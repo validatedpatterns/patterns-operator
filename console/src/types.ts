@@ -2,6 +2,7 @@ export interface Catalog {
   generated_at: string;
   generator_version: string;
   catalog_description?: string;
+  catalog_logo?: string;
   patterns: string[];
 }
 

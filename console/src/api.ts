@@ -52,6 +52,7 @@ export async function fetchCatalogImage(): Promise<string> {
 export async function fetchAllPatterns(): Promise<{
   patterns: Pattern[];
   catalogDescription?: string;
+  catalogLogo?: string;
 }> {
   const catalog = await fetchCatalog();
   const patterns = await Promise.all(
@@ -60,7 +61,15 @@ export async function fetchAllPatterns(): Promise<{
       return { ...pattern, catalogKey: key };
     }),
   );
-  return { patterns, catalogDescription: catalog.catalog_description };
+  return {
+    patterns,
+    catalogDescription: catalog.catalog_description,
+    catalogLogo: catalog.catalog_logo
+      ? /^https?:\/\//.test(catalog.catalog_logo)
+        ? catalog.catalog_logo
+        : `${PATTERN_UI_CATALOG_BASE_URL}/${catalog.catalog_logo}`
+      : undefined,
+  };
 }
 
 export interface VaultJobStatus {
