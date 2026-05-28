@@ -38,7 +38,7 @@ export interface Pattern {
   issues_url: string;
   docs_url: string;
   ci_url: string;
-  tier: 'maintained' | 'tested' | 'sandbox';
+  tier: string;
   owners: string[];
   org: string;
   clustergroupname: string;

@@ -32,11 +32,7 @@ export function SecretFormExpandableSections({
 }: SecretFormExpandableSectionsProps) {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
 
-  const renderField = (
-    secret: SecretDefinition,
-    field: SecretField,
-    uploadFieldError?: string,
-  ) => {
+  const renderField = (secret: SecretDefinition, field: SecretField, uploadFieldError?: string) => {
     const fieldType = getSecretFieldKind(field);
     const value = secretFormData[secret.name]?.[field.name] || '';
 
