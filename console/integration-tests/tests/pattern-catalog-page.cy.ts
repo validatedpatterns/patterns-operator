@@ -63,11 +63,11 @@ describe('Pattern Catalog Page', () => {
   it('tier filter dropdown shows tier options', () => {
     visitCatalog();
     // Open the tier filter dropdown
-    cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
+    cy.get('#tier-filter-toggle').click();
     // At least one selectable option should be visible
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
+    cy.get('[role="menuitem"]').should('have.length.greaterThan', 0);
     // Close dropdown
-    cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
+    cy.get('#tier-filter-toggle').click();
   });
 
   it('selecting all tiers shows at least as many cards as the default selection', () => {
@@ -75,17 +75,22 @@ describe('Pattern Catalog Page', () => {
     cy.get('.patterns-operator__card')
       .its('length')
       .then((defaultCount) => {
-        // Open filter dropdown
-        cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
-        // Select every unchecked tier option
-        cy.get('[role="option"]').each(($option) => {
-          const checkbox = $option.find('input[type="checkbox"]');
-          if (checkbox.length && !checkbox.is(':checked')) {
-            cy.wrap($option).click();
-            // Re-open dropdown if it closed
-            cy.get('#tier-filter').closest('.pf-v6-c-select').find('button').first().click();
-          }
-        });
+        // Open filter dropdown once (checkbox select stays open on item click)
+        cy.get('#tier-filter-toggle').click();
+        cy.get('[role="menuitem"]')
+          .its('length')
+          .then((optionCount) => {
+            for (let i = 0; i < optionCount; i++) {
+              cy.get('[role="menuitem"]')
+                .eq(i)
+                .find('input[type="checkbox"]')
+                .then(($cb) => {
+                  if (!$cb.is(':checked')) {
+                    cy.get('[role="menuitem"]').eq(i).click();
+                  }
+                });
+            }
+          });
         // Close dropdown
         cy.get('body').click(0, 0);
         // With all tiers selected, card count should be >= default selection
