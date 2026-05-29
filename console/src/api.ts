@@ -58,7 +58,12 @@ export async function fetchAllPatterns(): Promise<{
   const patterns = await Promise.all(
     catalog.patterns.map(async (key) => {
       const pattern = await fetchPattern(key);
-      return { ...pattern, catalogKey: key };
+      const logo = pattern.logo
+        ? /^https?:\/\//.test(pattern.logo)
+          ? pattern.logo
+          : `${PATTERN_UI_CATALOG_BASE_URL}/${key}/${pattern.logo}`
+        : undefined;
+      return { ...pattern, catalogKey: key, logo };
     }),
   );
   return {

@@ -9,6 +9,11 @@
   object-fit: contain;
 }
 
+.patterns-operator__pattern-logo {
+  max-height: 32px;
+  object-fit: contain;
+}
+
 .patterns-operator__card-field {
   margin-bottom: 4px;
 }
