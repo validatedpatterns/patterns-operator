@@ -1032,7 +1032,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 						"resourceVersion": "1",
 					},
 					"spec": map[string]any{
-						"networkPolicy": map[string]any{
+						"someCustomPlugin": map[string]any{
 							"enabled": true,
 						},
 						"imageUpdater": map[string]any{
@@ -1052,12 +1052,12 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			// networkPolicy should be preserved — it is managed by gitops-operator
-			// not by patterns-operator, so the update must not strip it
-			networkPolicy, found, err := unstructured.NestedMap(argoCD.Object, "spec", "networkPolicy")
+			// someCustomPlugin should be preserved — it is not managed by
+			// patterns-operator, so the update must not strip it
+			someCustomPlugin, found, err := unstructured.NestedMap(argoCD.Object, "spec", "someCustomPlugin")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(found).To(BeTrue(), "networkPolicy should be preserved after update")
-			Expect(networkPolicy["enabled"]).To(BeTrue())
+			Expect(found).To(BeTrue(), "someCustomPlugin should be preserved after update")
+			Expect(someCustomPlugin["enabled"]).To(BeTrue())
 
 			// imageUpdater should also be preserved
 			imageUpdater, found, err := unstructured.NestedMap(argoCD.Object, "spec", "imageUpdater")
