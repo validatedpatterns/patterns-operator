@@ -473,6 +473,9 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 		if errGet != nil {
 			return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, errGet)
 		}
+		if oldArgo == nil || oldUnstructured == nil {
+			return fmt.Errorf("getArgoCD returned nil ArgoCD object for %s/%s", namespace, name)
+		}
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
 		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		if errConvert != nil {
@@ -560,7 +563,10 @@ func getArgoCD(client dynamic.Interface, name, namespace string) (*argooperator.
 		return nil, nil, err
 	}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredArgo.UnstructuredContent(), argo)
-	return argo, unstructuredArgo, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return argo, unstructuredArgo, nil
 }
 
 func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
