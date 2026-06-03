@@ -2241,6 +2241,56 @@ var _ = Describe("newArgoCD", func() {
 		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Application"))
 	})
 
+	It("should append custom health checks from gitops.customHealthChecks", func() {
+		customYAML := `- group: apps
+  kind: Deployment
+  check: |
+    hs = {}
+    hs.status = "Healthy"
+    return hs
+- group: batch
+  kind: Job
+  check: |
+    hs = {}
+    hs.status = "Progressing"
+    return hs`
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": customYAML})
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(3))
+		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("apps"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Deployment"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("batch"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Kind).To(Equal("Job"))
+	})
+
+	It("should append custom health checks alongside Application health check when both are enabled", func() {
+		customYAML := `- group: apps
+  kind: Deployment
+  check: |
+    hs = {}
+    hs.status = "Healthy"
+    return hs`
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{
+			"gitops.applicationHealthCheckEnabled": "true",
+			"gitops.customHealthChecks":            customYAML,
+		})
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(3))
+		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("argoproj.io"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("apps"))
+	})
+
+	It("should handle invalid YAML in gitops.customHealthChecks gracefully", func() {
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": "not: valid: yaml: list"})
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
+		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
+	})
+
+	It("should not add custom health checks when gitops.customHealthChecks is empty", func() {
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": ""})
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
+	})
+
 })
 
 var _ = Describe("commonSyncPolicy", func() {

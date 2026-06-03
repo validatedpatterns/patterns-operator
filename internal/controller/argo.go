@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/yaml"
 
 	argooperator "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	argoapi "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
@@ -190,6 +191,15 @@ if obj.status ~= nil then
 end
 return health_status`,
 		})
+	}
+
+	if customChecksYAML := patternsOperatorConfig.getStringValue("gitops.customHealthChecks"); customChecksYAML != "" {
+		var customChecks []argooperator.ResourceHealthCheck
+		if err := yaml.Unmarshal([]byte(customChecksYAML), &customChecks); err != nil {
+			log.Printf("Failed to parse gitops.customHealthChecks: %v", err)
+		} else {
+			resourceHealthChecks = append(resourceHealthChecks, customChecks...)
+		}
 	}
 
 	trueBool := true

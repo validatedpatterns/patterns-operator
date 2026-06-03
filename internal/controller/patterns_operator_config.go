@@ -20,6 +20,7 @@ var DefaultPatternsOperatorConfig = PatternsOperatorConfig{
 	"gitops.csv":                           GitOpsDefaultCSV,
 	"gitops.additionalArgoAdmins":          "",
 	"gitops.applicationHealthCheckEnabled": "false",
+	"gitops.customHealthChecks":            "",
 	"gitea.chartName":                      GiteaChartName,
 	"gitea.helmRepoUrl":                    GiteaHelmRepoUrl,
 	"gitea.chartVersion":                   GiteaDefaultChartVersion,
