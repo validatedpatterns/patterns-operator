@@ -2199,11 +2199,12 @@ var _ = Describe("newArgoCD", func() {
 		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("PipelineRun"))
 	})
 
-	It("should have resource health checks for Subscription", func() {
+	It("should have resource health checks for PersistentVolumeClaim and Subscription", func() {
 		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
-		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
-		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("Subscription"))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Subscription"))
 	})
 
 	It("should have init containers for CA cert fetching", func() {
@@ -2225,20 +2226,21 @@ var _ = Describe("newArgoCD", func() {
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("test-admins"))
 	})
 
-	It("should have only Subscription ResourceHealthChecks", func() {
+	It("should have PersistentVolumeClaim and Subscription ResourceHealthChecks", func() {
 		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
 		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
-		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
-		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("Subscription"))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Subscription"))
 	})
 
 	It("should have also Application ResourceHealthChecks when gitops.applicationHealthCheckEnabled is set to true", func() {
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.applicationHealthCheckEnabled": "true"})
 		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
-		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("argoproj.io"))
-		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Application"))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(3))
+		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("argoproj.io"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Kind).To(Equal("Application"))
 	})
 
 	It("should append custom health checks from gitops.customHealthChecks", func() {
@@ -2255,12 +2257,13 @@ var _ = Describe("newArgoCD", func() {
     hs.status = "Progressing"
     return hs`
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": customYAML})
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(3))
-		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
-		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("apps"))
-		Expect(argo.Spec.ResourceHealthChecks[1].Kind).To(Equal("Deployment"))
-		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("batch"))
-		Expect(argo.Spec.ResourceHealthChecks[2].Kind).To(Equal("Job"))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(4))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("apps"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Kind).To(Equal("Deployment"))
+		Expect(argo.Spec.ResourceHealthChecks[3].Group).To(Equal("batch"))
+		Expect(argo.Spec.ResourceHealthChecks[3].Kind).To(Equal("Job"))
 	})
 
 	It("should append custom health checks alongside Application health check when both are enabled", func() {
@@ -2274,21 +2277,23 @@ var _ = Describe("newArgoCD", func() {
 			"gitops.applicationHealthCheckEnabled": "true",
 			"gitops.customHealthChecks":            customYAML,
 		})
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(3))
-		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
-		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("argoproj.io"))
-		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("apps"))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(4))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("argoproj.io"))
+		Expect(argo.Spec.ResourceHealthChecks[3].Group).To(Equal("apps"))
 	})
 
 	It("should handle invalid YAML in gitops.customHealthChecks gracefully", func() {
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": "not: valid: yaml: list"})
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
-		Expect(argo.Spec.ResourceHealthChecks[0].Group).To(Equal("operators.coreos.com"))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
+		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
+		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
 	})
 
 	It("should not add custom health checks when gitops.customHealthChecks is empty", func() {
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": ""})
-		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(1))
+		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 	})
 
 })
