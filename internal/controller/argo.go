@@ -75,6 +75,27 @@ func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorCo
 
 	resourceHealthChecks := []argooperator.ResourceHealthCheck{
 		{
+			// https://www.github.com/argoproj/argo-cd/issues/12840 is related
+			Kind: "PersistentVolumeClaim",
+			Check: `hs = {}
+if obj.status ~= nil then
+  if obj.status.phase ~= nil then
+    if obj.status.phase == "Pending" then
+      hs.status = "Healthy"
+      hs.message = obj.status.phase
+      return hs
+    elseif obj.status.phase == "Bound" then
+      hs.status = "Healthy"
+      hs.message = obj.status.phase
+      return hs
+    end
+  end
+end
+hs.status = "Progressing"
+hs.message = "Waiting for PVC"
+return hs`,
+		},
+		{
 			// We can drop this custom Subscription healthcheck once https://www.github.com/argoproj/argo-cd/issues/25921 is fixed
 			Group: "operators.coreos.com",
 			Kind:  "Subscription",
