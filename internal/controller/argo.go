@@ -292,8 +292,12 @@ return health_status`,
 			APIVersion: "argoproj.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       name,
-			Namespace:  namespace,
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"notice.argocd.argoproj.io/severity": "info",
+				"notice.argocd.argoproj.io/content":  "App of Apps",
+			},
 			Finalizers: []string{"argoproj.io/finalizer"},
 		},
 		Spec: argooperator.ArgoCDSpec{
