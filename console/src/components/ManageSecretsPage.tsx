@@ -1,7 +1,8 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { useHistory, useRouteMatch } from 'react-router-dom';
+import { useNavigateCompat } from '../hooks/useNavigateCompat';
+import { useParamsCompat } from '../hooks/useParamsCompat';
 import {
   ActionGroup,
   Alert,
@@ -29,9 +30,8 @@ import './SecretForm/SecretForm.css';
 
 export default function ManageSecretsPage() {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
-  const history = useHistory();
-  const match = useRouteMatch<{ name: string }>('/patterns/secrets/:name');
-  const name = match?.params?.name;
+  const navigate = useNavigateCompat();
+  const { name } = useParamsCompat('/patterns/secrets/:name');
 
   const [loading, setLoading] = React.useState(true);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
@@ -171,7 +171,7 @@ export default function ManageSecretsPage() {
       <PageSection>
         <Alert variant="info" title={t('No secrets configured')}>
           <p>{t('This pattern does not have a secret template defined.')}</p>
-          <Button variant="link" onClick={() => history.push('/patterns')}>
+          <Button variant="link" onClick={() => navigate('/patterns')}>
             {t('Back to catalog')}
           </Button>
         </Alert>
@@ -234,7 +234,7 @@ export default function ManageSecretsPage() {
             <Button variant="primary" type="submit" isLoading={submitting} isDisabled={submitting}>
               {t('Inject Secrets')}
             </Button>
-            <Button variant="link" onClick={() => history.push('/patterns')}>
+            <Button variant="link" onClick={() => navigate('/patterns')}>
               {t('Back to catalog')}
             </Button>
           </ActionGroup>
