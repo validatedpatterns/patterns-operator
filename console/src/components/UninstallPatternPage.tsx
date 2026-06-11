@@ -1,7 +1,8 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { useHistory, useRouteMatch } from 'react-router-dom';
+import { useNavigateCompat } from '../hooks/useNavigateCompat';
+import { useParamsCompat } from '../hooks/useParamsCompat';
 import {
   Alert,
   Button,
@@ -29,9 +30,8 @@ const DELETION_PHASES: Record<string, { label: string; order: number }> = {
 
 export default function UninstallPatternPage() {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
-  const history = useHistory();
-  const match = useRouteMatch<{ name: string }>('/patterns/uninstall/:name');
-  const name = match?.params?.name;
+  const navigate = useNavigateCompat();
+  const { name } = useParamsCompat('/patterns/uninstall/:name');
 
   const [status, setStatus] = React.useState<PatternCRStatus | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -127,7 +127,7 @@ export default function UninstallPatternPage() {
         {deleted && (
           <Alert variant="success" title={t('Pattern successfully removed')}>
             <p>{t('The pattern and all its associated resources have been fully deleted.')}</p>
-            <Button variant="link" onClick={() => history.push('/patterns')}>
+            <Button variant="link" onClick={() => navigate('/patterns')}>
               {t('Back to catalog')}
             </Button>
           </Alert>
@@ -187,7 +187,7 @@ export default function UninstallPatternPage() {
                     >
                       {t('Confirm Uninstall')}
                     </Button>
-                    <Button variant="link" onClick={() => history.push('/patterns')}>
+                    <Button variant="link" onClick={() => navigate('/patterns')}>
                       {t('Cancel')}
                     </Button>
                   </div>

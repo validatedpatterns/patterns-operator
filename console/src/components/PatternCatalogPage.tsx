@@ -1,7 +1,7 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { useHistory } from 'react-router-dom';
+import { useNavigateCompat } from '../hooks/useNavigateCompat';
 
 import {
   Alert,
@@ -166,7 +166,7 @@ const TIER_DESCRIPTIONS: Record<string, string> = {
 
 export default function PatternCatalogPage() {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
-  const history = useHistory();
+  const navigate = useNavigateCompat();
   const [patterns, setPatterns] = React.useState<Pattern[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -488,7 +488,7 @@ export default function PatternCatalogPage() {
                           <Button
                             variant="secondary"
                             onClick={() =>
-                              history.push(
+                              navigate(
                                 `/patterns/secrets/${pattern.catalogKey || pattern.name}`,
                               )
                             }
@@ -499,7 +499,7 @@ export default function PatternCatalogPage() {
                         {isInstalled && (
                           <Button
                             variant="danger"
-                            onClick={() => history.push(`/patterns/uninstall/${pattern.name}`)}
+                            onClick={() => navigate(`/patterns/uninstall/${pattern.name}`)}
                           >
                             {t('Uninstall')}
                           </Button>
@@ -515,7 +515,7 @@ export default function PatternCatalogPage() {
                               variant="primary"
                               isDisabled={isDisabled}
                               onClick={() =>
-                                history.push(
+                                navigate(
                                   `/patterns/install/${pattern.catalogKey || pattern.name}`,
                                 )
                               }

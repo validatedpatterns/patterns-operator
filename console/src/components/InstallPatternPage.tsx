@@ -1,7 +1,8 @@
 import * as React from 'react';
 import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { useHistory, useRouteMatch } from 'react-router-dom';
+import { useNavigateCompat } from '../hooks/useNavigateCompat';
+import { useParamsCompat } from '../hooks/useParamsCompat';
 import {
   ActionGroup,
   Alert,
@@ -56,9 +57,8 @@ const PatternModel = {
 
 export default function InstallPatternPage() {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
-  const history = useHistory();
-  const match = useRouteMatch<{ name: string }>('/patterns/install/:name');
-  const name = match?.params?.name;
+  const navigate = useNavigateCompat();
+  const { name } = useParamsCompat('/patterns/install/:name');
 
   // Secret form state (integrated inline instead of separate page)
 
@@ -251,11 +251,11 @@ export default function InstallPatternPage() {
     if (hasSecrets && vaultJobStatus?.status !== 'succeeded') return;
 
     const timer = setTimeout(() => {
-      history.push('/patterns');
+      navigate('/patterns');
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [patternStatus, history, secretTemplate, secretFormData, vaultJobStatus]);
+  }, [patternStatus, navigate, secretTemplate, secretFormData, vaultJobStatus]);
 
   const handleSubmit = async () => {
     console.log('🚀 [InstallPatternPage] Starting pattern installation process');
@@ -410,7 +410,7 @@ export default function InstallPatternPage() {
                   return t('Your pattern has been created. The operator is now reconciling it.');
                 })()}
               </p>
-              <Button variant="link" onClick={() => history.push('/patterns')}>
+              <Button variant="link" onClick={() => navigate('/patterns')}>
                 {t('Back to catalog')}
               </Button>
             </Alert>
@@ -612,7 +612,7 @@ export default function InstallPatternPage() {
               >
                 {t('Install')}
               </Button>
-              <Button variant="link" onClick={() => history.push('/patterns')}>
+              <Button variant="link" onClick={() => navigate('/patterns')}>
                 {t('Cancel')}
               </Button>
             </ActionGroup>
