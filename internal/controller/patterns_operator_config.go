@@ -13,31 +13,32 @@ import (
 type PatternsOperatorConfig map[string]string
 
 const (
-	configKeyCatalogSource    = "gitops.catalogSource"
-	configKeyChannel          = "gitops.channel"
-	configKeySourceNamespace  = "gitops.sourceNamespace"
-	configKeyApprovalPlan     = "gitops.installApprovalPlan"
-	configKeyCSV              = "gitops.csv"
-	configKeyAdditionalAdmins = "gitops.additionalArgoAdmins"
-	configKeyHealthCheck      = "gitops.applicationHealthCheckEnabled"
-	configMapKind             = "ConfigMap"
-	boolTrue                  = "true"
-	boolFalse                 = "false"
+	configKeyCatalogSource     = "gitops.catalogSource"
+	configKeyChannel           = "gitops.channel"
+	configKeySourceNamespace   = "gitops.sourceNamespace"
+	configKeyApprovalPlan      = "gitops.installApprovalPlan"
+	configKeyCSV               = "gitops.csv"
+	configKeyAdditionalAdmins  = "gitops.additionalArgoAdmins"
+	configKeyHealthCheck       = "gitops.applicationHealthCheckEnabled"
+	configKeyCustomHealthCheck = "gitops.customHealthChecks"
+	configMapKind              = "ConfigMap"
+	boolTrue                   = "true"
+	boolFalse                  = "false"
 )
 
 var DefaultPatternsOperatorConfig = PatternsOperatorConfig{
-	configKeyCatalogSource:         GitOpsDefaultCatalogSource,
-	configKeyChannel:               GitOpsDefaultChannel,
-	configKeySourceNamespace:       GitOpsDefaultCatalogSourceNamespace,
-	configKeyApprovalPlan:          GitOpsDefaultApprovalPlan,
-	configKeyCSV:                   GitOpsDefaultCSV,
-	configKeyAdditionalAdmins:      "",
-	configKeyHealthCheck:           boolFalse,
-	"gitops.customHealthChecks":    "",
-	"gitea.chartName":              GiteaChartName,
-	"gitea.helmRepoUrl":            GiteaHelmRepoUrl,
-	"gitea.chartVersion":           GiteaDefaultChartVersion,
-	"catalog.image":                "",
+	configKeyCatalogSource:     GitOpsDefaultCatalogSource,
+	configKeyChannel:           GitOpsDefaultChannel,
+	configKeySourceNamespace:   GitOpsDefaultCatalogSourceNamespace,
+	configKeyApprovalPlan:      GitOpsDefaultApprovalPlan,
+	configKeyCSV:               GitOpsDefaultCSV,
+	configKeyAdditionalAdmins:  "",
+	configKeyHealthCheck:       boolFalse,
+	configKeyCustomHealthCheck: "",
+	"gitea.chartName":          GiteaChartName,
+	"gitea.helmRepoUrl":        GiteaHelmRepoUrl,
+	"gitea.chartVersion":       GiteaDefaultChartVersion,
+	"catalog.image":            "",
 }
 
 func (g PatternsOperatorConfig) getStringValue(k string) string {

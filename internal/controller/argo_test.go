@@ -2256,7 +2256,7 @@ var _ = Describe("newArgoCD", func() {
     hs = {}
     hs.status = "Progressing"
     return hs`
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": customYAML})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: customYAML})
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(4))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
 		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
@@ -2275,7 +2275,7 @@ var _ = Describe("newArgoCD", func() {
     return hs`
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{
 			"gitops.applicationHealthCheckEnabled": "true",
-			"gitops.customHealthChecks":            customYAML,
+			configKeyCustomHealthCheck:             customYAML,
 		})
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(4))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
@@ -2285,14 +2285,14 @@ var _ = Describe("newArgoCD", func() {
 	})
 
 	It("should handle invalid YAML in gitops.customHealthChecks gracefully", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": "not: valid: yaml: list"})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: "not: valid: yaml: list"})
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
 		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
 	})
 
 	It("should not add custom health checks when gitops.customHealthChecks is empty", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.customHealthChecks": ""})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: ""})
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 	})
 

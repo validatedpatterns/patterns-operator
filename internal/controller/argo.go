@@ -248,10 +248,10 @@ return health_status`,
 		})
 	}
 
-	if customChecksYAML := patternsOperatorConfig.getStringValue("gitops.customHealthChecks"); customChecksYAML != "" {
+	if customChecksYAML := patternsOperatorConfig.getStringValue(configKeyCustomHealthCheck); customChecksYAML != "" {
 		var customChecks []argooperator.ResourceHealthCheck
 		if err := yaml.Unmarshal([]byte(customChecksYAML), &customChecks); err != nil {
-			log.Printf("Failed to parse gitops.customHealthChecks: %v", err)
+			log.Printf("Failed to parse %s: %v", configKeyCustomHealthCheck, err)
 		} else {
 			resourceHealthChecks = append(resourceHealthChecks, customChecks...)
 		}
