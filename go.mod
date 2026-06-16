@@ -32,6 +32,7 @@ require (
 	github.com/argoproj/argo-cd/v3 v3.3.10
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250308055145-5fe7bb3edc86
 	sigs.k8s.io/controller-tools v0.16.4
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -210,7 +211,6 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.20.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.1-0.20251003215857-446d8398e19c // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
 replace (
@@ -236,7 +236,7 @@ replace (
 	k8s.io/cri-client => k8s.io/cri-client v0.34.2
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.34.2
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.34.2
-	k8s.io/endpointslice => k8s.io/endpointslice v0.34.2
+	k8s.io/endpointslice => k8s.io/endpointslice v0.36.2
 	k8s.io/externaljwt => k8s.io/externaljwt v0.34.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.34.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.34.2
