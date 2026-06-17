@@ -235,9 +235,9 @@ KUSTOMIZE_VERSION ?= v5.3.0
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v2.0.2
-GOVULNCHECK_VERSION ?= v1.1.4
+GOVULNCHECK_VERSION ?= v1.3.0
 # parameters to pass to govulnscan
-GOVULNCHECK_OPTS ?=
+GOVULNCHECK_OPTS ?= -show verbose
 # update for major version updates to YQ_VERSION!
 YQ_API_VERSION = v4
 YQ_VERSION = v4.41.1
@@ -284,7 +284,7 @@ $(GOVULNCHECK): $(LOCALBIN)
 	$(call go-install-tool,$(GOVULNCHECK),golang.org/x/vuln/cmd/govulncheck,$(GOVULNCHECK_VERSION))
 
 .PHONY: govulnscan
-govulnscan: govulncheck
+govulnscan: govulncheck ## Run govulncheck scan
 	$(GOVULNCHECK) $(GOVULNCHECK_OPTS) ./... 2>&1 | tee govulncheck.results
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
