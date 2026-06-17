@@ -1,11 +1,11 @@
 module github.com/hybrid-cloud-patterns/patterns-operator
 
-go 1.25.5
+go 1.25.9
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/argoproj-labs/argocd-operator v0.17.0
+	github.com/argoproj-labs/argocd-operator v0.18.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.18.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.19.1
@@ -25,13 +25,14 @@ require (
 	k8s.io/api v0.35.1
 	k8s.io/apimachinery v0.36.0-alpha.1
 	k8s.io/client-go v12.0.0+incompatible
-	sigs.k8s.io/controller-runtime v0.21.0
+	sigs.k8s.io/controller-runtime v0.22.3
 )
 
 require (
 	github.com/argoproj/argo-cd/v3 v3.3.10
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250308055145-5fe7bb3edc86
 	sigs.k8s.io/controller-tools v0.16.4
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -50,12 +51,12 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20250908182407-97ad5b59a627 // indirect
+	github.com/argoproj/gitops-engine v0.7.1-0.20251217140045-5baed5604d2d // indirect
 	github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5 // indirect
 	github.com/argoproj/pkg/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/bombsimon/logrusr/v4 v4.1.0 // indirect
 	github.com/casbin/casbin/v2 v2.135.0 // indirect
@@ -155,7 +156,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/segmentio/backo-go v1.0.0 // indirect
-	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
+	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
@@ -172,7 +173,7 @@ require (
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.35.0 // indirect
@@ -206,11 +207,10 @@ require (
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
 	oras.land/oras-go/v2 v2.6.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
-	sigs.k8s.io/kustomize/api v0.20.1 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.20.1 // indirect
+	sigs.k8s.io/kustomize/api v0.21.0 // indirect
+	sigs.k8s.io/kustomize/kyaml v0.21.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.1-0.20251003215857-446d8398e19c // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
 replace (
