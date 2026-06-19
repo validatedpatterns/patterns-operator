@@ -88,8 +88,8 @@
     }
   },
   "peerDependencies": {
-    "@babel/core": "^7.0.1",
-    "@babel/preset-env": "^7.0.0",
+    "@babel/core": "^7.0.1 || ^8.0.0",
+    "@babel/preset-env": "^7.0.0 || ^8.0.0",
     "babel-loader": "^8.0.2",
     "i18next": "^23.11.5",
     "mocha": "^10.5.1"
