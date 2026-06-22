@@ -239,8 +239,8 @@ github.com/chai2010/gettext-go/po
 # github.com/chainguard-dev/git-urls v1.0.2
 ## explicit; go 1.19
 github.com/chainguard-dev/git-urls
-# github.com/cloudflare/circl v1.6.3
-## explicit; go 1.22.0
+# github.com/cloudflare/circl v1.6.4
+## explicit; go 1.24.0
 github.com/cloudflare/circl/dh/x25519
 github.com/cloudflare/circl/dh/x448
 github.com/cloudflare/circl/ecc/goldilocks
