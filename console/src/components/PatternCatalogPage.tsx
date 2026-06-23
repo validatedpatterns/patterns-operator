@@ -488,9 +488,7 @@ export default function PatternCatalogPage() {
                           <Button
                             variant="secondary"
                             onClick={() =>
-                              navigate(
-                                `/patterns/secrets/${pattern.catalogKey || pattern.name}`,
-                              )
+                              navigate(`/patterns/secrets/${pattern.catalogKey || pattern.name}`)
                             }
                           >
                             {t('Manage Secrets')}
@@ -515,9 +513,7 @@ export default function PatternCatalogPage() {
                               variant="primary"
                               isDisabled={isDisabled}
                               onClick={() =>
-                                navigate(
-                                  `/patterns/install/${pattern.catalogKey || pattern.name}`,
-                                )
+                                navigate(`/patterns/install/${pattern.catalogKey || pattern.name}`)
                               }
                             >
                               {t('Install')}

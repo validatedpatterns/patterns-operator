@@ -17,6 +17,8 @@ import {
   DescriptionListTerm,
   Form,
   FormGroup,
+  FormSelect,
+  FormSelectOption,
   Label,
   PageSection,
   Spinner,
@@ -39,7 +41,7 @@ import {
   getMissingFileAndIniFields,
   secretTemplateHasFileOrIniFields,
 } from '../vaultSecrets';
-import { SecretTemplate, SecretFormData } from '../types';
+import { SecretTemplate, SecretFormData, Variant } from '../types';
 import { SecretFormExpandableSections } from './SecretForm/SecretFormExpandableSections';
 import { VaultInjectionStatusAlert } from './SecretForm/VaultInjectionStatusAlert';
 import './SecretForm/SecretForm.css';
@@ -73,6 +75,7 @@ export default function InstallPatternPage() {
   const [useOwnFork, setUseOwnFork] = React.useState(false);
   const [targetRevision, setTargetRevision] = React.useState('main');
   const [clusterGroupName, setClusterGroupName] = React.useState('hub');
+  const [variants, setVariants] = React.useState<Variant[]>([]);
 
   const [secretTemplate, setSecretTemplate] = React.useState<SecretTemplate | null>(null);
   const [secretFormData, setSecretFormData] = React.useState<SecretFormData>({});
@@ -94,7 +97,14 @@ export default function InstallPatternPage() {
         });
 
         setPatternName(patternData.name);
-        setClusterGroupName(patternData.clustergroupname);
+        if (patternData.variants && patternData.variants.length > 0) {
+          setVariants(patternData.variants);
+          const defaultVariant =
+            patternData.variants.find((v) => v.default) || patternData.variants[0];
+          setClusterGroupName(defaultVariant.name);
+        } else {
+          setClusterGroupName(patternData.clustergroupname);
+        }
         setTargetRepo(patternData.repo_url || '');
         // Only use the template if it has actual secrets defined
         const hasSecrets = template && template.secrets && template.secrets.length > 0;
@@ -573,6 +583,25 @@ export default function InstallPatternPage() {
                 onChange={(_event, value) => setTargetRevision(value)}
               />
             </FormGroup>
+
+            {variants.length > 1 && (
+              <FormGroup label={t('Variant')} isRequired fieldId="pattern-variant">
+                <FormSelect
+                  id="pattern-variant"
+                  value={clusterGroupName}
+                  onChange={(_event, value) => setClusterGroupName(value)}
+                  aria-label={t('Select variant')}
+                >
+                  {variants.map((v) => (
+                    <FormSelectOption
+                      key={v.name}
+                      value={v.name}
+                      label={v.description ? `${v.name} — ${v.description}` : v.name}
+                    />
+                  ))}
+                </FormSelect>
+              </FormGroup>
+            )}
 
             {/* Secrets Configuration Section */}
             {secretTemplate && (
