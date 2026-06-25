@@ -29,6 +29,12 @@ export interface ExternalRequirements {
   cluster_sizing_note?: string;
 }
 
+export interface Variant {
+  name: string;
+  default?: boolean;
+  description?: string;
+}
+
 export interface Pattern {
   metadata_version: string;
   name: string;
@@ -49,6 +55,7 @@ export interface Pattern {
   extra_features?: ExtraFeatures;
   external_requirements?: ExternalRequirements;
   logo?: string;
+  variants?: Variant[];
   /** The catalog directory key used to fetch this pattern. */
   catalogKey?: string;
 }
