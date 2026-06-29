@@ -12,6 +12,7 @@ metadata:
           },
           "spec": {
             "clusterGroupName": "hub",
+            "variant": "hub",
             "gitSpec": {
               "targetRepo": "https://github.com/validatedpatterns/multicloud-gitops",
               "targetRevision": "main"
@@ -67,6 +68,9 @@ spec:
         path: extraParameters[0].value
       - displayName: Cluster Group Name
         path: clusterGroupName
+      - description: Alias for Cluster Group Name
+        displayName: Variant
+        path: variant
       - displayName: Git Config
         path: gitSpec
       - displayName: Multi Source Config

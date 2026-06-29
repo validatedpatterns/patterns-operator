@@ -48,6 +48,7 @@ export interface Pattern {
   owners: string[];
   org: string;
   clustergroupname: string;
+  variant?: string;
   description?: string;
   docs_repo_url?: string;
   spoke?: unknown;

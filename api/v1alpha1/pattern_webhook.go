@@ -61,6 +61,10 @@ func (r *PatternValidator) ValidateCreate(ctx context.Context, obj runtime.Objec
 	}
 	patternlog.Info("validate create", "name", p.Name)
 
+	if err := validateVariantAlias(p); err != nil {
+		return nil, err
+	}
+
 	var patterns PatternList
 	if err = r.Client.List(ctx, &patterns); err != nil {
 		return nil, fmt.Errorf("failed to list Pattern resources: %v", err)
@@ -79,6 +83,11 @@ func (r *PatternValidator) ValidateUpdate(_ context.Context, _, newObj runtime.O
 		return nil, err
 	}
 	patternlog.Info("validate update", "name", p.Name)
+
+	if err := validateVariantAlias(p); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -104,4 +113,14 @@ func convertToPattern(obj runtime.Object) (*Pattern, error) {
 		return nil, fmt.Errorf("expected a Pattern object but got %T", obj)
 	}
 	return p, nil
+}
+
+func validateVariantAlias(p *Pattern) error {
+	if p.Spec.ClusterGroupName != "" && p.Spec.Variant != "" {
+		return fmt.Errorf("spec.variant and spec.clusterGroupName are mutually exclusive, set only one")
+	}
+	if p.Spec.ClusterGroupName == "" && p.Spec.Variant == "" {
+		return fmt.Errorf("one of spec.variant or spec.clusterGroupName must be set")
+	}
+	return nil
 }

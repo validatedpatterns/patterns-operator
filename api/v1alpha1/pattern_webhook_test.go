@@ -100,6 +100,122 @@ func TestValidateCreate_DeniesSecondPattern(t *testing.T) {
 	}
 }
 
+func TestValidateCreate_AllowsVariantOnly(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	validator := &PatternValidator{Client: fakeClient}
+
+	p := &Pattern{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pattern",
+			Namespace: "default",
+		},
+		Spec: PatternSpec{
+			Variant: "hub",
+			GitConfig: GitConfig{
+				TargetRepo:     "https://github.com/example/repo",
+				TargetRevision: "main",
+			},
+		},
+	}
+
+	warnings, err := validator.ValidateCreate(context.Background(), p)
+	if err != nil {
+		t.Errorf("expected no error when only variant is set, got: %v", err)
+	}
+	if warnings != nil {
+		t.Errorf("expected no warnings, got: %v", warnings)
+	}
+}
+
+func TestValidateCreate_RejectsBothSet(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	validator := &PatternValidator{Client: fakeClient}
+
+	p := &Pattern{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pattern",
+			Namespace: "default",
+		},
+		Spec: PatternSpec{
+			ClusterGroupName: "hub",
+			Variant:          "hub",
+			GitConfig: GitConfig{
+				TargetRepo:     "https://github.com/example/repo",
+				TargetRevision: "main",
+			},
+		},
+	}
+
+	_, err := validator.ValidateCreate(context.Background(), p)
+	if err == nil {
+		t.Error("expected error when both variant and clusterGroupName are set, got nil")
+	}
+}
+
+func TestValidateCreate_RejectsBothEmpty(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	validator := &PatternValidator{Client: fakeClient}
+
+	p := &Pattern{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pattern",
+			Namespace: "default",
+		},
+		Spec: PatternSpec{
+			GitConfig: GitConfig{
+				TargetRepo:     "https://github.com/example/repo",
+				TargetRevision: "main",
+			},
+		},
+	}
+
+	_, err := validator.ValidateCreate(context.Background(), p)
+	if err == nil {
+		t.Error("expected error when neither variant nor clusterGroupName is set, got nil")
+	}
+}
+
+func TestValidateUpdate_RejectsBothSet(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add scheme: %v", err)
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	validator := &PatternValidator{Client: fakeClient}
+
+	p := &Pattern{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pattern",
+			Namespace: "default",
+		},
+		Spec: PatternSpec{
+			ClusterGroupName: "hub",
+			Variant:          "factory",
+		},
+	}
+
+	_, err := validator.ValidateUpdate(context.Background(), p, p)
+	if err == nil {
+		t.Error("expected error when both variant and clusterGroupName are set on update, got nil")
+	}
+}
+
 func TestValidateCreate_RejectsNonPatternObject(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := AddToScheme(scheme); err != nil {
@@ -130,6 +246,9 @@ func TestValidateUpdate_Allows(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pattern",
 			Namespace: "default",
+		},
+		Spec: PatternSpec{
+			Variant: "hub",
 		},
 	}
 

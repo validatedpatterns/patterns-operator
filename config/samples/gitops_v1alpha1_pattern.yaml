@@ -4,6 +4,7 @@ metadata:
   name: pattern-sample
 spec:
   clusterGroupName: hub
+  variant: hub
   gitSpec:
     targetRepo: "https://github.com/validatedpatterns/multicloud-gitops"
     targetRevision: "main"

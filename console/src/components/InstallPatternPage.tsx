@@ -305,6 +305,7 @@ export default function InstallPatternPage() {
         metadata: { name: string; namespace: string };
         spec: {
           clusterGroupName: string;
+          variant: string;
           gitSpec: { targetRepo: string; targetRevision: string };
           secretsConfig?: { template: string; values: string };
         };
@@ -317,6 +318,7 @@ export default function InstallPatternPage() {
         },
         spec: {
           clusterGroupName: clusterGroupName,
+          variant: clusterGroupName,
           gitSpec: {
             targetRepo,
             targetRevision,

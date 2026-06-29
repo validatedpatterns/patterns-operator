@@ -152,8 +152,11 @@ spec:
                       in order to deploy the pattern. Defaults to https://charts.validatedpatterns.io/
                     type: string
                 type: object
+              variant:
+                description: Variant is an alias for ClusterGroupName. Only one of
+                  the two may be set.
+                type: string
             required:
-            - clusterGroupName
             - gitSpec
             type: object
           status:
