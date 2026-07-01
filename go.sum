@@ -47,8 +47,8 @@ github.com/argoproj-labs/argocd-operator v0.17.0 h1:hsCjIT8F6bZhrzq3hHNjQxv7fesT
 github.com/argoproj-labs/argocd-operator v0.17.0/go.mod h1:NQ382HBjCxWnDAvg/4nn2SXZ+RHPFhH96rglup3Wi6Y=
 github.com/argoproj/argo-cd/v3 v3.3.10 h1:3QE36lhN/0ntjwl2TH13xL23w2J2AaXgC0Dxn0469h4=
 github.com/argoproj/argo-cd/v3 v3.3.10/go.mod h1:LdPjAnIFbx0khaB6vLsOKrGoSWeJ8kzOt//jF1ltCPg=
-github.com/argoproj/gitops-engine v0.7.1-0.20250908182407-97ad5b59a627 h1:yntvA+uaFz62HRfWGGwlvs4ErdxoLQjCpDXufdEt2FI=
-github.com/argoproj/gitops-engine v0.7.1-0.20250908182407-97ad5b59a627/go.mod h1:yJ3t/GRn9Gx2LEyMrh9X0roL7zzVlk3nvuJt6G1o6jI=
+github.com/argoproj/gitops-engine v0.7.3 h1:0ZlRTReAJG5Y1PviQ8ZIJq/+VowxWe2uFwoXqYcbtXU=
+github.com/argoproj/gitops-engine v0.7.3/go.mod h1:pRgVpLW7pZqf7n3COJ7UcDepk4cI61LAcJd64Q3Jq/c=
 github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5 h1:YBoLSjpoaJXaXAldVvBRKJuOPvIXz9UOv6S96gMJM/Q=
 github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5/go.mod h1:ebVOzFJphdN1p6EG2mIMECv/3Rk/almSaxIYuFAmsSw=
 github.com/argoproj/pkg/v2 v2.0.1 h1:O/gCETzB/3+/hyFL/7d/VM/6pSOIRWIiBOTb2xqAHvc=
