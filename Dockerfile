@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.25.7
+ARG GO_VERSION=1.26.4-1782910875
 FROM registry.access.redhat.com/ubi9/go-toolset:${GO_VERSION} AS builder
 ARG GOARCH=amd64
 
