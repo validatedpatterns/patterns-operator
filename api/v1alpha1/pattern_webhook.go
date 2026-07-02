@@ -62,6 +62,7 @@ func (r *PatternValidator) ValidateCreate(ctx context.Context, obj runtime.Objec
 	patternlog.Info("validate create", "name", p.Name)
 
 	if err := validateVariantAlias(p); err != nil {
+		patternlog.Error(err, "validate create failed", "name", p.Name)
 		return nil, err
 	}
 
@@ -85,6 +86,7 @@ func (r *PatternValidator) ValidateUpdate(_ context.Context, _, newObj runtime.O
 	patternlog.Info("validate update", "name", p.Name)
 
 	if err := validateVariantAlias(p); err != nil {
+		patternlog.Error(err, "validate update failed", "name", p.Name)
 		return nil, err
 	}
 
