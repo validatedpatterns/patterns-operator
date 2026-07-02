@@ -308,6 +308,7 @@ PLAYBOOK_EOF
                   cd /pattern-home
                   ansible-playbook -v -i localhost, /tmp/vault_injection_playbook.yaml \\
                     -e pattern_dir="/tmp/pattern" \\
+                    -e pattern_name="${request.patternName}" \\
                     -e vault_ns="${request.vaultNamespace || 'vault'}" \\
                     -e vault_pod="${request.vaultPod || 'vault-0'}" \\
                     -e vault_hub="${request.vaultHub || 'hub'}"
