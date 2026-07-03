@@ -45,7 +45,8 @@ spec:
         path: extraParameters[0].value
       - displayName: Cluster Group Name
         path: clusterGroupName
-      - description: Alias for Cluster Group Name
+      - description: Variant is an alias for ClusterGroupName. Only one of the two
+          may be set.
         displayName: Variant
         path: variant
       - displayName: Git Config
