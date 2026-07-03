@@ -40,7 +40,7 @@ type PatternValidator struct {
 }
 
 //nolint:lll
-// +kubebuilder:webhook:verbs=create;delete,path=/validate-gitops-hybrid-cloud-patterns-io-v1alpha1-pattern,mutating=false,failurePolicy=fail,groups=gitops.hybrid-cloud-patterns.io,resources=patterns,versions=v1alpha1,name=vpattern.gitops.hybrid-cloud-patterns.io,admissionReviewVersions=v1,sideEffects=none
+// +kubebuilder:webhook:verbs=create;update;delete,path=/validate-gitops-hybrid-cloud-patterns-io-v1alpha1-pattern,mutating=false,failurePolicy=fail,groups=gitops.hybrid-cloud-patterns.io,resources=patterns,versions=v1alpha1,name=vpattern.gitops.hybrid-cloud-patterns.io,admissionReviewVersions=v1,sideEffects=none
 
 var _ webhook.CustomValidator = &PatternValidator{}
 
