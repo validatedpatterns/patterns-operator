@@ -153,8 +153,8 @@ spec:
                     type: string
                 type: object
               variant:
-                description: Variant is an alias for ClusterGroupName. If both are
-                  set, they must match.
+                description: Variant is an alias for ClusterGroupName. Only one of
+                  the two may be set.
                 type: string
             required:
             - gitSpec
