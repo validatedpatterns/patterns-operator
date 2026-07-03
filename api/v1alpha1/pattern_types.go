@@ -56,7 +56,11 @@ type PatternSpec struct {
 	// Important: Run "make generate" to regenerate code after modifying this file
 
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=3
-	ClusterGroupName string `json:"clusterGroupName"`
+	ClusterGroupName string `json:"clusterGroupName,omitempty"`
+
+	// Variant is an alias for ClusterGroupName. Only one of the two may be set.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=3
+	Variant string `json:"variant,omitempty"`
 
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,order=4
 	GitConfig GitConfig `json:"gitSpec"`

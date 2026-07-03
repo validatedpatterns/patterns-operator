@@ -304,7 +304,8 @@ export default function InstallPatternPage() {
         kind: string;
         metadata: { name: string; namespace: string };
         spec: {
-          clusterGroupName: string;
+          clusterGroupName?: string;
+          variant: string;
           gitSpec: { targetRepo: string; targetRevision: string };
           secretsConfig?: { template: string; values: string };
         };
@@ -316,7 +317,7 @@ export default function InstallPatternPage() {
           namespace: PATTERN_OPERATOR_NS,
         },
         spec: {
-          clusterGroupName: clusterGroupName,
+          variant: clusterGroupName,
           gitSpec: {
             targetRepo,
             targetRevision,

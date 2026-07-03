@@ -45,6 +45,9 @@ spec:
         path: extraParameters[0].value
       - displayName: Cluster Group Name
         path: clusterGroupName
+      - description: Alias for Cluster Group Name
+        displayName: Variant
+        path: variant
       - displayName: Git Config
         path: gitSpec
       - displayName: Multi Source Config
