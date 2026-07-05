@@ -92,20 +92,34 @@ const (
 )
 
 func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorConfig) *argooperator.ArgoCD {
-	argoPolicies := []string{
-		"g, system:cluster-admins, role:admin",
-		"g, cluster-admins, role:admin",
-		"g, admin, role:admin",
-	}
-	for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getStringValue(configKeyAdditionalAdmins), ",") {
-		argoAdmin = strings.TrimSpace(argoAdmin)
-		if argoAdmin != "" {
-			argoPolicies = append(argoPolicies, "g, "+argoAdmin+", role:admin")
+	var argoRBAC argooperator.ArgoCDRBACSpec
+	if argoRBACYAML := patternsOperatorConfig.getStringValue(configKeyArgoRBAC); argoRBACYAML != "" {
+		if err := yaml.Unmarshal([]byte(argoRBACYAML), &argoRBAC); err != nil {
+			log.Printf("Failed to parse %s: %v", configKeyArgoRBAC, err)
+			argoRBAC = argooperator.ArgoCDRBACSpec{}
 		}
 	}
-	argoPolicy := strings.Join(argoPolicies, "\n")
-	defaultPolicy := "role:readonly"
-	argoScopes := "[groups,email]"
+	if argoRBAC == (argooperator.ArgoCDRBACSpec{}) {
+		argoPolicies := []string{
+			"g, system:cluster-admins, role:admin",
+			"g, cluster-admins, role:admin",
+			"g, admin, role:admin",
+		}
+		for argoAdmin := range strings.SplitSeq(patternsOperatorConfig.getStringValue(configKeyAdditionalAdmins), ",") {
+			argoAdmin = strings.TrimSpace(argoAdmin)
+			if argoAdmin != "" {
+				argoPolicies = append(argoPolicies, "g, "+argoAdmin+", role:admin")
+			}
+		}
+		argoPolicy := strings.Join(argoPolicies, "\n")
+		defaultPolicy := "role:readonly"
+		argoScopes := "[groups,email]"
+		argoRBAC = argooperator.ArgoCDRBACSpec{
+			DefaultPolicy: &defaultPolicy,
+			Policy:        &argoPolicy,
+			Scopes:        &argoScopes,
+		}
+	}
 
 	resourceHealthChecks := []argooperator.ResourceHealthCheck{
 		{
@@ -414,11 +428,7 @@ return health_status`,
 					Enabled: false,
 				},
 			},
-			RBAC: argooperator.ArgoCDRBACSpec{
-				DefaultPolicy: &defaultPolicy,
-				Policy:        &argoPolicy,
-				Scopes:        &argoScopes,
-			},
+			RBAC: argoRBAC,
 			Redis: argooperator.ArgoCDRedisSpec{
 				Resources: &v1.ResourceRequirements{
 					Limits: v1.ResourceList{

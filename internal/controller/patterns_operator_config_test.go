@@ -114,6 +114,7 @@ var _ = Describe("DefaultPatternsOperatorConfig", func() {
 			"gitea.helmRepoUrl",
 			"gitea.chartVersion",
 			"catalog.image",
+			"gitops.argoRBAC",
 		}
 		for _, key := range expectedKeys {
 			Expect(DefaultPatternsOperatorConfig).To(HaveKey(key))

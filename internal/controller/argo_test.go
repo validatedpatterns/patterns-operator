@@ -2226,6 +2226,48 @@ var _ = Describe("newArgoCD", func() {
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("test-admins"))
 	})
 
+	It("should override RBAC when gitops.argoRBAC is set", func() {
+		rbacYAML := `defaultPolicy: "role:admin"
+policy: |
+  g, my-custom-group, role:admin
+  p, role:viewer, applications, get, */*, allow
+scopes: "[groups]"
+policyMatcherMode: "glob"`
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: rbacYAML})
+		Expect(*argo.Spec.RBAC.DefaultPolicy).To(Equal("role:admin"))
+		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("my-custom-group"))
+		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("role:viewer"))
+		Expect(*argo.Spec.RBAC.Policy).NotTo(ContainSubstring("cluster-admins"))
+		Expect(*argo.Spec.RBAC.Scopes).To(Equal("[groups]"))
+		Expect(*argo.Spec.RBAC.PolicyMatcherMode).To(Equal("glob"))
+	})
+
+	It("should ignore additionalArgoAdmins when gitops.argoRBAC is set", func() {
+		rbacYAML := `defaultPolicy: "role:readonly"
+policy: "g, custom-admins, role:admin"
+scopes: "[groups,email]"`
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{
+			configKeyArgoRBAC:         rbacYAML,
+			configKeyAdditionalAdmins: "extra-admin-group",
+		})
+		Expect(*argo.Spec.RBAC.Policy).To(Equal("g, custom-admins, role:admin"))
+		Expect(*argo.Spec.RBAC.Policy).NotTo(ContainSubstring("extra-admin-group"))
+	})
+
+	It("should fall back to defaults when gitops.argoRBAC has invalid YAML", func() {
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: "not: valid: {yaml"})
+		Expect(*argo.Spec.RBAC.DefaultPolicy).To(Equal("role:readonly"))
+		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
+		Expect(*argo.Spec.RBAC.Scopes).To(Equal("[groups,email]"))
+	})
+
+	It("should use default RBAC when gitops.argoRBAC is empty", func() {
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: ""})
+		Expect(*argo.Spec.RBAC.DefaultPolicy).To(Equal("role:readonly"))
+		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
+		Expect(*argo.Spec.RBAC.Scopes).To(Equal("[groups,email]"))
+	})
+
 	It("should have PersistentVolumeClaim and Subscription ResourceHealthChecks", func() {
 		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
 		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())

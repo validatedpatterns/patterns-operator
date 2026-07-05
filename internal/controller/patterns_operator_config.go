@@ -21,6 +21,7 @@ const (
 	configKeyAdditionalAdmins  = "gitops.additionalArgoAdmins"
 	configKeyHealthCheck       = "gitops.applicationHealthCheckEnabled"
 	configKeyCustomHealthCheck = "gitops.customHealthChecks"
+	configKeyArgoRBAC          = "gitops.argoRBAC"
 	configMapKind              = "ConfigMap"
 	boolTrue                   = "true"
 	boolFalse                  = "false"
@@ -35,6 +36,7 @@ var DefaultPatternsOperatorConfig = PatternsOperatorConfig{
 	configKeyAdditionalAdmins:  "",
 	configKeyHealthCheck:       boolFalse,
 	configKeyCustomHealthCheck: "",
+	configKeyArgoRBAC:          "",
 	"gitea.chartName":          GiteaChartName,
 	"gitea.helmRepoUrl":        GiteaHelmRepoUrl,
 	"gitea.chartVersion":       GiteaDefaultChartVersion,
