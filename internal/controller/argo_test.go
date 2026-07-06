@@ -1102,6 +1102,97 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 	})
 })
 
+var _ = Describe("CompareArgoCD", func() {
+	Context("when both are nil", func() {
+		It("should return true", func() {
+			Expect(compareArgoCD(nil, nil)).To(BeTrue())
+		})
+	})
+
+	Context("when one is nil and the other is not", func() {
+		It("should return false when goal is nil", func() {
+			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			Expect(compareArgoCD(nil, argo)).To(BeFalse())
+		})
+		It("should return false when actual is nil", func() {
+			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			Expect(compareArgoCD(argo, nil)).To(BeFalse())
+		})
+	})
+
+	Context("when both are identical", func() {
+		It("should return true", func() {
+			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			Expect(compareArgoCD(argo, argo)).To(BeTrue())
+		})
+	})
+
+	Context("when spec fields differ", func() {
+		It("should return false when Controller resources change", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual.Spec.Controller.Resources.Limits[v1.ResourceMemory] = resource.MustParse("16Gi")
+			Expect(compareArgoCD(goal, actual)).To(BeFalse())
+		})
+		It("should return false when RBAC policy changes", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			newPolicy := "role:admin"
+			actual.Spec.RBAC.DefaultPolicy = &newPolicy
+			Expect(compareArgoCD(goal, actual)).To(BeFalse())
+		})
+		It("should return false when Server route changes", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual.Spec.Server.Route.Enabled = false
+			Expect(compareArgoCD(goal, actual)).To(BeFalse())
+		})
+		It("should return false when SSO changes", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual.Spec.SSO = nil
+			Expect(compareArgoCD(goal, actual)).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("CreateOrUpdateArgoCD skips update when unchanged", func() {
+	var (
+		dynamicClient *dynamicfake.FakeDynamicClient
+		gvr           schema.GroupVersionResource
+		name          string
+		namespace     string
+	)
+
+	BeforeEach(func() {
+		s := runtime.NewScheme()
+		gvr = schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(s,
+			map[schema.GroupVersionResource]string{gvr: "ArgoCDList"})
+		name = argoName
+		namespace = argoNS
+		getArgoCDFunc = getArgoCD
+	})
+
+	It("should skip the update when the existing ArgoCD matches desired state", func() {
+		config := DefaultPatternsOperatorConfig
+
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		rvAfterCreate := argoCD.GetResourceVersion()
+
+		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		argoCD, err = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(argoCD.GetResourceVersion()).To(Equal(rvAfterCreate))
+	})
+})
+
 var _ = Describe("CompareApplication", func() {
 	var pattern *api.Pattern
 	BeforeEach(func() {
