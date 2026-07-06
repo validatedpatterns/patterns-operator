@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -520,6 +521,20 @@ return health_status`,
 	return &s
 }
 
+func compareArgoCD(goal, actual *argooperator.ArgoCD) bool {
+	if goal == nil && actual == nil {
+		return true
+	}
+	if (goal == nil) != (actual == nil) {
+		return false
+	}
+	if !apiequality.Semantic.DeepEqual(goal.Spec, actual.Spec) {
+		log.Printf("ArgoCD %s/%s spec has changed, updating", goal.Namespace, goal.Name)
+		return false
+	}
+	return true
+}
+
 func haveArgo(client dynamic.Interface, name, namespace string) bool {
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 	_, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -555,6 +570,12 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 		if oldArgo == nil || oldUnstructured == nil {
 			return fmt.Errorf("getArgoCD returned nil ArgoCD object for %s/%s", namespace, name)
 		}
+
+		// ArgoCD is up to date, skipping update
+		if compareArgoCD(argo, oldArgo) {
+			return nil
+		}
+
 		argo.SetResourceVersion(oldArgo.GetResourceVersion())
 		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		if errConvert != nil {
@@ -615,7 +636,14 @@ func createOrUpdateConsoleLink(client dynamic.Interface, argoName, argoNamespace
 		_, err = client.Resource(gvr).Create(context.TODO(), consoleLinkObj, metav1.CreateOptions{})
 		return err
 	}
-	// Update: carry over resourceVersion
+
+	existingSpec, _, _ := unstructured.NestedMap(existing.Object, "spec")
+	desiredSpec, _, _ := unstructured.NestedMap(consoleLinkObj.Object, "spec")
+	if apiequality.Semantic.DeepEqual(existingSpec, desiredSpec) {
+		return nil
+	}
+
+	log.Printf("ConsoleLink %s spec has changed, updating", linkName)
 	consoleLinkObj.SetResourceVersion(existing.GetResourceVersion())
 	_, err = client.Resource(gvr).Update(context.TODO(), consoleLinkObj, metav1.UpdateOptions{})
 	return err
