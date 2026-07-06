@@ -561,8 +561,8 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 			return fmt.Errorf("getArgoCD returned nil ArgoCD object for %s/%s", namespace, name)
 		}
 
+		// ArgoCD is up to date, skipping update
 		if compareArgoCD(argo, oldArgo) {
-			log.Printf("ArgoCD %s/%s is up to date, skipping update", namespace, name)
 			return nil
 		}
 
@@ -626,7 +626,14 @@ func createOrUpdateConsoleLink(client dynamic.Interface, argoName, argoNamespace
 		_, err = client.Resource(gvr).Create(context.TODO(), consoleLinkObj, metav1.CreateOptions{})
 		return err
 	}
-	// Update: carry over resourceVersion
+
+	existingSpec, _, _ := unstructured.NestedMap(existing.Object, "spec")
+	desiredSpec, _, _ := unstructured.NestedMap(consoleLinkObj.Object, "spec")
+	if apiequality.Semantic.DeepEqual(existingSpec, desiredSpec) {
+		return nil
+	}
+
+	log.Printf("ConsoleLink %s spec has changed, updating", linkName)
 	consoleLinkObj.SetResourceVersion(existing.GetResourceVersion())
 	_, err = client.Resource(gvr).Update(context.TODO(), consoleLinkObj, metav1.UpdateOptions{})
 	return err
