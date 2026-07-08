@@ -248,6 +248,173 @@ var _ = Describe("pattern controller - preValidation", func() {
 		err := reconciler.preValidation(p)
 		Expect(err).ToNot(HaveOccurred())
 	})
+
+	Context("values file validation", func() {
+		var tempDir string
+
+		BeforeEach(func() {
+			var err error
+			tempDir, err = os.MkdirTemp("", "pattern-test-")
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			if tempDir != "" {
+				os.RemoveAll(tempDir)
+			}
+		})
+
+		It("should pass when cluster group values file exists", func() {
+			// Create the required values file
+			valuesFile := tempDir + "/values-test-cluster.yaml"
+			err := os.WriteFile(valuesFile, []byte("# Test values file\nglobal:\n  key: value\n"), 0600)
+			Expect(err).ToNot(HaveOccurred())
+
+			p := &api.Pattern{
+				Spec: api.PatternSpec{
+					ClusterGroupName: "test-cluster",
+					GitConfig: api.GitConfig{
+						TargetRepo: "https://github.com/test/repo",
+					},
+				},
+				Status: api.PatternStatus{
+					LocalCheckoutPath: tempDir,
+				},
+			}
+			err = reconciler.preValidation(p)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should fail when cluster group values file is missing", func() {
+			p := &api.Pattern{
+				Spec: api.PatternSpec{
+					ClusterGroupName: "missing-cluster",
+					GitConfig: api.GitConfig{
+						TargetRepo: "https://github.com/test/repo",
+					},
+				},
+				Status: api.PatternStatus{
+					LocalCheckoutPath: tempDir,
+				},
+			}
+			err := reconciler.preValidation(p)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("required values file not found: values-missing-cluster.yaml"))
+		})
+
+		It("should pass when cluster group is empty (no validation needed)", func() {
+			p := &api.Pattern{
+				Spec: api.PatternSpec{
+					ClusterGroupName: "",
+					GitConfig: api.GitConfig{
+						TargetRepo: "https://github.com/test/repo",
+					},
+				},
+				Status: api.PatternStatus{
+					LocalCheckoutPath: tempDir,
+				},
+			}
+			err := reconciler.preValidation(p)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should pass when local checkout path is empty (validation skipped)", func() {
+			p := &api.Pattern{
+				Spec: api.PatternSpec{
+					ClusterGroupName: "test-cluster",
+					GitConfig: api.GitConfig{
+						TargetRepo: "https://github.com/test/repo",
+					},
+				},
+				Status: api.PatternStatus{
+					LocalCheckoutPath: "",
+				},
+			}
+			err := reconciler.preValidation(p)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("pattern controller - condition utilities", func() {
+	var pattern *api.Pattern
+
+	BeforeEach(func() {
+		pattern = &api.Pattern{
+			Status: api.PatternStatus{
+				Conditions: []api.PatternCondition{},
+			},
+		}
+	})
+
+	Context("setPatternCondition", func() {
+		It("should add a new condition when none exists", func() {
+			setPatternCondition(pattern, api.Missing, corev1.ConditionTrue, "values file missing")
+
+			Expect(pattern.Status.Conditions).To(HaveLen(1))
+			condition := pattern.Status.Conditions[0]
+			Expect(condition.Type).To(Equal(api.Missing))
+			Expect(condition.Status).To(Equal(corev1.ConditionTrue))
+			Expect(condition.Message).To(Equal("values file missing"))
+			Expect(condition.LastUpdateTime).ToNot(BeZero())
+			Expect(condition.LastTransitionTime).ToNot(BeZero())
+		})
+
+		It("should update an existing condition with new status", func() {
+			// Add initial condition
+			setPatternCondition(pattern, api.Missing, corev1.ConditionFalse, "initial message")
+			initialTransitionTime := pattern.Status.Conditions[0].LastTransitionTime
+
+			// Update with new status
+			setPatternCondition(pattern, api.Missing, corev1.ConditionTrue, "updated message")
+
+			Expect(pattern.Status.Conditions).To(HaveLen(1))
+			condition := pattern.Status.Conditions[0]
+			Expect(condition.Type).To(Equal(api.Missing))
+			Expect(condition.Status).To(Equal(corev1.ConditionTrue))
+			Expect(condition.Message).To(Equal("updated message"))
+			Expect(condition.LastTransitionTime).ToNot(Equal(initialTransitionTime))
+		})
+
+		It("should preserve transition time when status doesn't change", func() {
+			// Add initial condition
+			setPatternCondition(pattern, api.Missing, corev1.ConditionTrue, "initial message")
+			initialTransitionTime := pattern.Status.Conditions[0].LastTransitionTime
+
+			// Update with same status but different message
+			setPatternCondition(pattern, api.Missing, corev1.ConditionTrue, "updated message")
+
+			Expect(pattern.Status.Conditions).To(HaveLen(1))
+			condition := pattern.Status.Conditions[0]
+			Expect(condition.Status).To(Equal(corev1.ConditionTrue))
+			Expect(condition.Message).To(Equal("updated message"))
+			Expect(condition.LastTransitionTime).To(Equal(initialTransitionTime))
+		})
+	})
+
+	Context("removePatternCondition", func() {
+		It("should remove an existing condition", func() {
+			// Add multiple conditions
+			setPatternCondition(pattern, api.Missing, corev1.ConditionTrue, "missing message")
+			setPatternCondition(pattern, api.Progressing, corev1.ConditionTrue, "progressing message")
+			Expect(pattern.Status.Conditions).To(HaveLen(2))
+
+			// Remove one condition
+			removePatternCondition(pattern, api.Missing)
+
+			Expect(pattern.Status.Conditions).To(HaveLen(1))
+			Expect(pattern.Status.Conditions[0].Type).To(Equal(api.Progressing))
+		})
+
+		It("should handle removing non-existent condition gracefully", func() {
+			setPatternCondition(pattern, api.Progressing, corev1.ConditionTrue, "progressing message")
+
+			removePatternCondition(pattern, api.Missing) // This doesn't exist
+
+			Expect(pattern.Status.Conditions).To(HaveLen(1))
+			Expect(pattern.Status.Conditions[0].Type).To(Equal(api.Progressing))
+		})
+	})
 })
 
 var _ = Describe("pattern controller - applyDefaults", func() {

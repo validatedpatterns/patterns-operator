@@ -86,6 +86,46 @@ func getPatternConditionByType(conditions []api.PatternCondition, conditionType 
 	return -1, nil
 }
 
+// setPatternCondition sets a condition on the pattern status
+func setPatternCondition(pattern *api.Pattern, conditionType api.PatternConditionType, status corev1.ConditionStatus, message string) {
+	now := metav1.Now()
+
+	// Find existing condition
+	idx, existingCondition := getPatternConditionByType(pattern.Status.Conditions, conditionType)
+
+	newCondition := api.PatternCondition{
+		Type:           conditionType,
+		Status:         status,
+		LastUpdateTime: now,
+		Message:        message,
+	}
+
+	// Set transition time if status is changing
+	if existingCondition == nil || existingCondition.Status != status {
+		newCondition.LastTransitionTime = now
+	} else if existingCondition != nil {
+		// Preserve the transition time if status hasn't changed
+		newCondition.LastTransitionTime = existingCondition.LastTransitionTime
+	}
+
+	// Add or update the condition
+	if idx == -1 {
+		// Add new condition
+		pattern.Status.Conditions = append(pattern.Status.Conditions, newCondition)
+	} else {
+		// Update existing condition
+		pattern.Status.Conditions[idx] = newCondition
+	}
+}
+
+// removePatternCondition removes a condition from the pattern status
+func removePatternCondition(pattern *api.Pattern, conditionType api.PatternConditionType) { //nolint:unparam
+	idx, _ := getPatternConditionByType(pattern.Status.Conditions, conditionType)
+	if idx != -1 {
+		pattern.Status.Conditions = append(pattern.Status.Conditions[:idx], pattern.Status.Conditions[idx+1:]...)
+	}
+}
+
 // status:
 //  history:
 //   - completionTime: null

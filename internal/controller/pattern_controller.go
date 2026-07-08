@@ -302,8 +302,19 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ret, err := r.getLocalGit(qualifiedInstance)
 	if err != nil {
+		// Handle validation errors with appropriate status conditions
+		if ret == "prerequisite validation" && strings.Contains(err.Error(), "required values file not found") {
+			// Set Missing condition for missing values files
+			setPatternCondition(qualifiedInstance, api.Missing, corev1.ConditionTrue, err.Error())
+		} else {
+			// Clear Missing condition for other types of errors
+			removePatternCondition(qualifiedInstance, api.Missing)
+		}
 		return r.actionPerformed(qualifiedInstance, ret, err)
 	}
+
+	// Clear Missing condition on successful validation
+	removePatternCondition(qualifiedInstance, api.Missing)
 
 	targetApp := newArgoApplication(qualifiedInstance)
 	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
@@ -551,9 +562,24 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 		}
 	}
 	if gc.TargetRepo != "" {
-		return validGitRepoURL(gc.TargetRepo)
+		if err := validGitRepoURL(gc.TargetRepo); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("TargetRepo cannot be empty")
 	}
-	return fmt.Errorf("TargetRepo cannot be empty")
+
+	// Validate that the required values file exists for the cluster group
+	if input.Spec.ClusterGroupName != "" && input.Status.LocalCheckoutPath != "" {
+		valuesFile := filepath.Join(input.Status.LocalCheckoutPath,
+			fmt.Sprintf("values-%s.yaml", input.Spec.ClusterGroupName))
+		if _, err := os.Stat(valuesFile); os.IsNotExist(err) {
+			return fmt.Errorf("required values file not found: values-%s.yaml",
+				input.Spec.ClusterGroupName)
+		}
+	}
+
+	return nil
 	// Check the url is reachable
 }
 
