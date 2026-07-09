@@ -151,7 +151,11 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 		return headRef.Hash(), nil
 	}
 
-	// Try various reference types...
+	// Try remote tracking ref first — after a fetch this is the most up-to-date.
+	if h, err := getHashFromReference(repo, plumbing.NewRemoteReferenceName(gitRemoteOrigin, name)); err == nil {
+		return h, nil
+	}
+
 	if h, err := getHashFromReference(repo, plumbing.NewBranchReferenceName(name)); err == nil {
 		return h, nil
 	}
@@ -161,9 +165,6 @@ func getCommitFromTarget(repo *git.Repository, name string) (plumbing.Hash, erro
 	}
 
 	if h, err := getHashFromReference(repo, plumbing.NewRemoteHEADReferenceName(name)); err == nil {
-		return h, nil
-	}
-	if h, err := getHashFromReference(repo, plumbing.NewRemoteReferenceName(gitRemoteOrigin, name)); err == nil {
 		return h, nil
 	}
 

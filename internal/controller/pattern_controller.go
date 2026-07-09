@@ -239,49 +239,8 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// and the CRD is available. This is a no-op after the first successful call.
 	r.startArgoCDWatch()
 
-	clusterWideNS := getClusterWideArgoNamespace()
-	if !haveNamespace(r.Client, clusterWideNS) {
-		if isLegacyArgoNamespace() {
-			// Legacy mode: wait for the gitops-operator to create the openshift-gitops namespace
-			return r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
-		}
-		// Greenfield: create the namespace ourselves
-		if err = createNamespace(r.fullClient, clusterWideNS); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error creating ArgoCD namespace", err)
-		}
-		return r.actionPerformed(qualifiedInstance, "created ArgoCD namespace", nil)
-	}
-	logOnce("namespace found")
-
-	// Create the trusted-bundle configmap inside the clusterwide namespace
-	errCABundle := createTrustedBundleCM(r.fullClient, getClusterWideArgoNamespace())
-	if errCABundle != nil {
-		return r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
-	}
-
-	// Wait for the trusted-ca-bundle configmap to be populated by the cluster network operator
-	// before creating the ArgoCD CR. This prevents a race where the repo-server init container
-	// runs before the CA bundle is injected, leaving ArgoCD unable to verify public TLS certs.
-	populated, errPopulated := isTrustedBundleCMPopulated(r.fullClient, getClusterWideArgoNamespace())
-	if errPopulated != nil {
-		return r.actionPerformed(qualifiedInstance, "error checking trusted-ca-bundle population", errPopulated)
-	}
-	if !populated {
-		return r.actionPerformed(qualifiedInstance, "waiting for trusted-ca-bundle to be populated",
-			fmt.Errorf("trusted-ca-bundle configmap in %s not yet populated by cluster network operator", getClusterWideArgoNamespace()))
-	}
-
-	// We only update the clusterwide argo instance so we can define our own 'initcontainers' section
-	err = createOrUpdateArgoCD(r.dynamicClient, r.fullClient, getClusterWideArgoName(), clusterWideNS, patternsOperatorConfig)
-	if err != nil {
-		return r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", err)
-	}
-
-	// Create/update the ConsoleLink so the ArgoCD instance appears in the OpenShift console nine-box menu
-	if !isLegacyArgoNamespace() && qualifiedInstance.Status.AppClusterDomain != "" {
-		if err = createOrUpdateConsoleLink(r.dynamicClient, getClusterWideArgoName(), clusterWideNS, qualifiedInstance.Status.AppClusterDomain); err != nil {
-			return r.actionPerformed(qualifiedInstance, "error creating ConsoleLink for ArgoCD", err)
-		}
+	if done, result, argoErr := r.reconcileArgoInfra(qualifiedInstance, patternsOperatorConfig); done {
+		return result, argoErr
 	}
 
 	// Copy the bootstrap secret to the namespaced argo namespace
@@ -302,30 +261,22 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ret, err := r.getLocalGit(qualifiedInstance)
 	if err != nil {
+		// Handle validation errors with appropriate status conditions
+		if ret == "prerequisite validation" && strings.Contains(err.Error(), "required values file not found") {
+			// Set Missing condition for missing values files
+			setPatternCondition(qualifiedInstance, api.Missing, corev1.ConditionTrue, err.Error())
+		} else {
+			// Clear Missing condition for other types of errors
+			removePatternCondition(qualifiedInstance, api.Missing)
+		}
 		return r.actionPerformed(qualifiedInstance, ret, err)
 	}
 
-	targetApp := newArgoApplication(qualifiedInstance)
-	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
-	app, err := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
-	if app == nil {
-		log.Printf("App not found: %s\n", err.Error())
-		err = createApplication(r.argoClient, targetApp, clusterWideNS)
-		return r.actionPerformed(qualifiedInstance, "create application", err)
-	} else if ownedBySame(targetApp, app) {
-		// Check values
-		changed, errApp := updateApplication(r.argoClient, targetApp, app, clusterWideNS)
-		if changed {
-			if errApp != nil {
-				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
-			}
-			_ = DropLocalGitPaths()
+	// Clear Missing condition on successful validation
+	removePatternCondition(qualifiedInstance, api.Missing)
 
-			return r.actionPerformed(qualifiedInstance, "updated application", errApp)
-		}
-	} else {
-		// Someone manually removed the owner ref
-		return r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", targetApp.Name))
+	if done, result, appErr := r.reconcileApplication(qualifiedInstance); done {
+		return result, appErr
 	}
 
 	// Copy the bootstrap secret to the namespaced argo namespace
@@ -446,6 +397,85 @@ func (r *PatternReconciler) reconcileGitOpsSubscription(qualifiedInstance *api.P
 	return false, ctrl.Result{}, nil
 }
 
+// reconcileArgoInfra ensures the ArgoCD namespace, trusted CA bundle, ArgoCD instance, and
+// ConsoleLink are created/updated. Returns (done, result, err) — when done is true the
+// caller should return result/err immediately.
+func (r *PatternReconciler) reconcileArgoInfra(qualifiedInstance *api.Pattern, patternsOperatorConfig PatternsOperatorConfig) (done bool, result ctrl.Result, err error) {
+	clusterWideNS := getClusterWideArgoNamespace()
+	if !haveNamespace(r.Client, clusterWideNS) {
+		if isLegacyArgoNamespace() {
+			res, e := r.actionPerformed(qualifiedInstance, "check application namespace", fmt.Errorf("waiting for creation"))
+			return true, res, e
+		}
+		if nsErr := createNamespace(r.fullClient, clusterWideNS); nsErr != nil {
+			res, e := r.actionPerformed(qualifiedInstance, "error creating ArgoCD namespace", nsErr)
+			return true, res, e
+		}
+		res, e := r.actionPerformed(qualifiedInstance, "created ArgoCD namespace", nil)
+		return true, res, e
+	}
+	logOnce("namespace found")
+
+	if errCABundle := createTrustedBundleCM(r.fullClient, clusterWideNS); errCABundle != nil {
+		res, e := r.actionPerformed(qualifiedInstance, "error while creating trustedbundle cm", errCABundle)
+		return true, res, e
+	}
+
+	populated, errPopulated := isTrustedBundleCMPopulated(r.fullClient, clusterWideNS)
+	if errPopulated != nil {
+		res, e := r.actionPerformed(qualifiedInstance, "error checking trusted-ca-bundle population", errPopulated)
+		return true, res, e
+	}
+	if !populated {
+		res, e := r.actionPerformed(qualifiedInstance, "waiting for trusted-ca-bundle to be populated",
+			fmt.Errorf("trusted-ca-bundle configmap in %s not yet populated by cluster network operator", clusterWideNS))
+		return true, res, e
+	}
+
+	if argoErr := createOrUpdateArgoCD(r.dynamicClient, r.fullClient, getClusterWideArgoName(), clusterWideNS, patternsOperatorConfig); argoErr != nil {
+		res, e := r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", argoErr)
+		return true, res, e
+	}
+
+	if !isLegacyArgoNamespace() && qualifiedInstance.Status.AppClusterDomain != "" {
+		if clErr := createOrUpdateConsoleLink(r.dynamicClient, getClusterWideArgoName(), clusterWideNS, qualifiedInstance.Status.AppClusterDomain); clErr != nil {
+			res, e := r.actionPerformed(qualifiedInstance, "error creating ConsoleLink for ArgoCD", clErr)
+			return true, res, e
+		}
+	}
+
+	return false, ctrl.Result{}, nil
+}
+
+// reconcileApplication ensures the ArgoCD Application for the pattern is created or updated.
+// Returns (done, result, err) — when done is true the caller should return result/err immediately.
+func (r *PatternReconciler) reconcileApplication(qualifiedInstance *api.Pattern) (done bool, result ctrl.Result, err error) {
+	clusterWideNS := getClusterWideArgoNamespace()
+	targetApp := newArgoApplication(qualifiedInstance)
+	_ = controllerutil.SetOwnerReference(qualifiedInstance, targetApp, r.Scheme)
+	app, appErr := getApplication(r.argoClient, applicationName(qualifiedInstance), clusterWideNS)
+	if app == nil {
+		log.Printf("App not found: %s\n", appErr.Error())
+		createErr := createApplication(r.argoClient, targetApp, clusterWideNS)
+		res, e := r.actionPerformed(qualifiedInstance, "create application", createErr)
+		return true, res, e
+	} else if ownedBySame(targetApp, app) {
+		changed, errApp := updateApplication(r.argoClient, targetApp, app, clusterWideNS)
+		if changed {
+			if errApp != nil {
+				qualifiedInstance.Status.Version = 1 + qualifiedInstance.Status.Version
+			}
+			_ = DropLocalGitPaths()
+			res, e := r.actionPerformed(qualifiedInstance, "updated application", errApp)
+			return true, res, e
+		}
+	} else {
+		res, e := r.actionPerformed(qualifiedInstance, "create application", fmt.Errorf("we no longer own Application %q", targetApp.Name))
+		return true, res, e
+	}
+	return false, ctrl.Result{}, nil
+}
+
 func (r *PatternReconciler) createGiteaInstance(input *api.Pattern, patternsOperatorConfig PatternsOperatorConfig) error {
 	gitConfig := input.Spec.GitConfig
 	clusterWideNS := getClusterWideArgoNamespace()
@@ -551,9 +581,24 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 		}
 	}
 	if gc.TargetRepo != "" {
-		return validGitRepoURL(gc.TargetRepo)
+		if err := validGitRepoURL(gc.TargetRepo); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("TargetRepo cannot be empty")
 	}
-	return fmt.Errorf("TargetRepo cannot be empty")
+
+	// Validate that the required values file exists for the cluster group
+	if input.Spec.ClusterGroupName != "" && input.Status.LocalCheckoutPath != "" {
+		valuesFile := filepath.Join(input.Status.LocalCheckoutPath,
+			fmt.Sprintf("values-%s.yaml", input.Spec.ClusterGroupName))
+		if _, err := os.Stat(valuesFile); os.IsNotExist(err) {
+			return fmt.Errorf("required values file not found: values-%s.yaml",
+				input.Spec.ClusterGroupName)
+		}
+	}
+
+	return nil
 	// Check the url is reachable
 }
 
