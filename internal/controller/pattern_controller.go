@@ -73,13 +73,14 @@ import (
 const ReconcileLoopRequeueTime = 180 * time.Second
 
 const (
-	secretFieldUsername   = "username"
-	secretFieldPassword   = "password"
-	acmNamespace          = "open-cluster-management"
-	searchFilterProperty  = "property"
-	searchFilterCluster   = "cluster"
-	searchFilterNamespace = "namespace"
-	searchFilterValues    = "values"
+	secretFieldUsername       = "username"
+	secretFieldPassword       = "password"
+	acmNamespace              = "open-cluster-management"
+	searchFilterProperty      = "property"
+	searchFilterCluster       = "cluster"
+	searchFilterNamespace     = "namespace"
+	searchFilterValues        = "values"
+	searchResultOperationName = "searchResult"
 )
 
 // PatternReconciler reconciles a Pattern object
@@ -1246,8 +1247,8 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 		ns = []string{getClusterWideArgoNamespace()}
 	}
 	query := map[string]any{
-		"operationName": "searchResult",
-		"query":         "query searchResult($input: [SearchInput]) { searchResult: search(input: $input) { items related { kind items } } }",
+		"operationName": searchResultOperationName,
+		"query":         "query " + searchResultOperationName + "($input: [SearchInput]) { " + searchResultOperationName + ": search(input: $input) { items related { kind items } } }",
 		"variables": map[string]any{
 			"input": []map[string]any{
 				{

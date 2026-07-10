@@ -18,6 +18,10 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 
 	"github.com/go-git/go-git/v5"
@@ -606,5 +610,294 @@ var _ = Describe("pattern controller - fetching pattern", func() {
 		err := reconciler.Client.Get(context.Background(),
 			types.NamespacedName{Name: "nonexistent", Namespace: namespace}, p)
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("pattern controller - checkSpokeApplicationsGone", func() {
+	var (
+		reconciler  *PatternReconciler
+		server      *httptest.Server
+		originalURL string
+		originalTok string
+		hasURL      bool
+		hasTok      bool
+	)
+
+	BeforeEach(func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler = newFakeReconciler(nsOperators, buildPatternManifest())
+		originalURL, hasURL = os.LookupEnv("ACM_SEARCH_API_URL")
+		originalTok, hasTok = os.LookupEnv("ACM_SEARCH_API_TOKEN")
+		os.Setenv("ACM_SEARCH_API_TOKEN", "test-token")
+	})
+
+	AfterEach(func() {
+		if server != nil {
+			server.Close()
+		}
+		if hasURL {
+			os.Setenv("ACM_SEARCH_API_URL", originalURL)
+		} else {
+			os.Unsetenv("ACM_SEARCH_API_URL")
+		}
+		if hasTok {
+			os.Setenv("ACM_SEARCH_API_TOKEN", originalTok)
+		} else {
+			os.Unsetenv("ACM_SEARCH_API_TOKEN")
+		}
+	})
+
+	startServer := func(handler http.HandlerFunc) {
+		server = httptest.NewServer(handler)
+		os.Setenv("ACM_SEARCH_API_URL", server.URL+"/searchapi/graphql")
+	}
+
+	emptySearchResponse := func() []byte {
+		resp := map[string]any{
+			"data": map[string]any{
+				"searchResult": []any{
+					map[string]any{
+						"items": []any{},
+					},
+				},
+			},
+		}
+		b, _ := json.Marshal(resp)
+		return b
+	}
+
+	appsSearchResponse := func(apps []map[string]string) []byte {
+		items := make([]any, 0, len(apps))
+		for _, app := range apps {
+			items = append(items, app)
+		}
+		resp := map[string]any{
+			"data": map[string]any{
+				"searchResult": []any{
+					map[string]any{
+						"items": items,
+					},
+				},
+			},
+		}
+		b, _ := json.Marshal(resp)
+		return b
+	}
+
+	Context("when all spoke applications are gone", func() {
+		It("should return true with empty search results", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(emptySearchResponse())
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(gone).To(BeTrue())
+		})
+
+		It("should return true when searchResult has no items array", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				resp := map[string]any{
+					"data": map[string]any{
+						"searchResult": []any{},
+					},
+				}
+				b, _ := json.Marshal(resp)
+				_, _ = w.Write(b)
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(gone).To(BeTrue())
+		})
+	})
+
+	Context("when spoke applications still exist", func() {
+		It("should return false with app names in error", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(appsSearchResponse([]map[string]string{
+					{"name": "myapp", "namespace": "myns", "cluster": "spoke1"},
+				}))
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("spoke cluster apps still exist"))
+			Expect(err.Error()).To(ContainSubstring("myns/myapp in spoke1"))
+			Expect(gone).To(BeFalse())
+		})
+
+		It("should list multiple remaining applications", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(appsSearchResponse([]map[string]string{
+					{"name": "app1", "namespace": "ns1", "cluster": "spoke1"},
+					{"name": "app2", "namespace": "ns2", "cluster": "spoke2"},
+				}))
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ns1/app1 in spoke1"))
+			Expect(err.Error()).To(ContainSubstring("ns2/app2 in spoke2"))
+			Expect(gone).To(BeFalse())
+		})
+	})
+
+	Context("appOfApps parameter", func() {
+		It("should filter for child apps when appOfApps is false", func() {
+			var receivedBody map[string]any
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				Expect(json.NewDecoder(r.Body).Decode(&receivedBody)).To(Succeed())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(emptySearchResponse())
+			})
+
+			_, _ = reconciler.checkSpokeApplicationsGone(false)
+
+			variables := receivedBody["variables"].(map[string]any)
+			input := variables["input"].([]any)[0].(map[string]any)
+			filters := input["filters"].([]any)
+			var nsFilter map[string]any
+			for _, f := range filters {
+				fm := f.(map[string]any)
+				if fm["property"] == "namespace" {
+					nsFilter = fm
+					break
+				}
+			}
+			Expect(nsFilter).ToNot(BeNil())
+			nsValues := nsFilter["values"].([]any)
+			Expect(nsValues).To(HaveLen(1))
+			Expect(nsValues[0]).To(Equal(fmt.Sprintf("!%s", getClusterWideArgoNamespace())))
+		})
+
+		It("should filter for app-of-apps when appOfApps is true", func() {
+			var receivedBody map[string]any
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				Expect(json.NewDecoder(r.Body).Decode(&receivedBody)).To(Succeed())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(emptySearchResponse())
+			})
+
+			_, _ = reconciler.checkSpokeApplicationsGone(true)
+
+			variables := receivedBody["variables"].(map[string]any)
+			input := variables["input"].([]any)[0].(map[string]any)
+			filters := input["filters"].([]any)
+			var nsFilter map[string]any
+			for _, f := range filters {
+				fm := f.(map[string]any)
+				if fm["property"] == "namespace" {
+					nsFilter = fm
+					break
+				}
+			}
+			Expect(nsFilter).ToNot(BeNil())
+			nsValues := nsFilter["values"].([]any)
+			Expect(nsValues).To(HaveLen(1))
+			Expect(nsValues[0]).To(Equal(getClusterWideArgoNamespace()))
+		})
+	})
+
+	Context("request validation", func() {
+		It("should send correct headers", func() {
+			var receivedHeaders http.Header
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				receivedHeaders = r.Header
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(emptySearchResponse())
+			})
+
+			_, _ = reconciler.checkSpokeApplicationsGone(false)
+
+			Expect(receivedHeaders.Get("Authorization")).To(Equal("Bearer test-token"))
+			Expect(receivedHeaders.Get("Content-Type")).To(Equal("application/json"))
+			Expect(receivedHeaders.Get("Accept")).To(Equal("application/json"))
+		})
+
+		It("should send a POST request", func() {
+			var receivedMethod string
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				receivedMethod = r.Method
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(emptySearchResponse())
+			})
+
+			_, _ = reconciler.checkSpokeApplicationsGone(false)
+
+			Expect(receivedMethod).To(Equal("POST"))
+		})
+	})
+
+	Context("error handling", func() {
+		It("should return error for invalid URL scheme", func() {
+			os.Setenv("ACM_SEARCH_API_URL", "ftp://invalid-scheme/api")
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid search API URL"))
+			Expect(gone).To(BeFalse())
+		})
+
+		It("should return error when server returns non-200 status", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("internal error"))
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("search service returned status 500"))
+			Expect(gone).To(BeFalse())
+		})
+
+		It("should return error when server returns 403", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte("forbidden"))
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("search service returned status 403"))
+			Expect(gone).To(BeFalse())
+		})
+
+		It("should return error for malformed JSON response", func() {
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte("not valid json"))
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to parse JSON response"))
+			Expect(gone).To(BeFalse())
+		})
+
+		It("should return error when token env var is empty and token file is missing", func() {
+			os.Unsetenv("ACM_SEARCH_API_TOKEN")
+			startServer(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write(emptySearchResponse())
+			})
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to read serviceaccount token"))
+			Expect(gone).To(BeFalse())
+		})
+
+		It("should return error when server is unreachable", func() {
+			os.Setenv("ACM_SEARCH_API_URL", "http://127.0.0.1:1/searchapi/graphql")
+
+			gone, err := reconciler.checkSpokeApplicationsGone(false)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to make HTTP request to search service"))
+			Expect(gone).To(BeFalse())
+		})
 	})
 })
