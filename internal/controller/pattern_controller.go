@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1292,13 +1293,28 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	// Create HTTP client
-	// Use insecure TLS (self-signed certs)
+	caCertPool := x509.NewCertPool()
+	caLoaded := false
+	for _, caPath := range []string{
+		"/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+		"/run/secrets/kubernetes.io/serviceaccount/service-ca.crt",
+	} {
+		if caCert, err := os.ReadFile(caPath); err == nil {
+			caCertPool.AppendCertsFromPEM(caCert)
+			caLoaded = true
+		}
+	}
+	tlsConfig := &tls.Config{}
+	if caLoaded {
+		tlsConfig.RootCAs = caCertPool
+	} else {
+		// No in-cluster CA bundles found; assume a development environment
+		// where the API server uses self-signed certificates.
+		tlsConfig.InsecureSkipVerify = true //nolint:gosec
+	}
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, //nolint:gosec
-			},
+			TLSClientConfig: tlsConfig,
 		},
 	}
 
