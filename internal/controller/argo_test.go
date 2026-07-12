@@ -96,7 +96,7 @@ var _ = Describe("Argo Pattern", func() {
 			Path:           "common/clustergroup",
 			TargetRevision: pattern.Spec.GitConfig.TargetRevision,
 			Helm: &argoapi.ApplicationSourceHelm{
-				ValueFiles:              newApplicationValueFiles(pattern, ""),
+				ValueFiles:              newApplicationValueFiles(pattern, "", false),
 				Parameters:              newApplicationParameters(pattern),
 				Values:                  newApplicationValues(pattern),
 				IgnoreMissingValueFiles: true,
@@ -167,7 +167,7 @@ var _ = Describe("Argo Pattern", func() {
 					},
 					*appSource,
 				}
-				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref")
+				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref", false)
 				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
@@ -191,7 +191,7 @@ var _ = Describe("Argo Pattern", func() {
 					},
 					*appSource,
 				}
-				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref")
+				multiSourceArgoApp.Spec.Sources[1].Helm.ValueFiles = newApplicationValueFiles(pattern, "$patternref", false)
 				Expect(newMultiSourceApplication(pattern)).To(Equal(multiSourceArgoApp))
 			})
 		})
@@ -200,11 +200,11 @@ var _ = Describe("Argo Pattern", func() {
 	Describe("Testing newApplicationValueFiles function", func() {
 		Context("Default", func() {
 			It("Returns a default set of values", func() {
-				valueFiles := newApplicationValueFiles(pattern, "")
+				valueFiles := newApplicationValueFiles(pattern, "", false)
 				Expect(valueFiles).To(Equal(defaultValueFiles))
 			})
 			It("Returns a default set of values with prefix", func() {
-				valueFiles := newApplicationValueFiles(pattern, "myprefix")
+				valueFiles := newApplicationValueFiles(pattern, "myprefix", false)
 				Expect(valueFiles).To(Equal(prefixArray(defaultValueFiles, "myprefix")))
 			})
 		})
@@ -217,13 +217,13 @@ var _ = Describe("Argo Pattern", func() {
 				}
 			})
 			It("Returns a default set of values and extravaluefiles without prefix", func() {
-				valueFiles := newApplicationValueFiles(pattern, "")
+				valueFiles := newApplicationValueFiles(pattern, "", false)
 				Expect(valueFiles).To(Equal(append(defaultValueFiles,
 					"/test1.yaml",
 					"/test2.yaml")))
 			})
 			It("Returns a default set of values and extravaluefiles with prefix", func() {
-				valueFiles := newApplicationValueFiles(pattern, "myprefix")
+				valueFiles := newApplicationValueFiles(pattern, "myprefix", false)
 				Expect(valueFiles).To(Equal(append(prefixArray(defaultValueFiles, "myprefix"),
 					"myprefix/test1.yaml",
 					"myprefix/test2.yaml")))
@@ -238,16 +238,46 @@ var _ = Describe("Argo Pattern", func() {
 				}
 			})
 			It("Returns a default set of values and extravaluefiles", func() {
-				valueFiles := newApplicationValueFiles(pattern, "")
+				valueFiles := newApplicationValueFiles(pattern, "", false)
 				Expect(valueFiles).To(Equal(append(defaultValueFiles,
 					"/test1.yaml",
 					"/test2.yaml")))
 			})
 			It("Returns a default set of values and extravaluefiles with prefix", func() {
-				valueFiles := newApplicationValueFiles(pattern, "myprefix")
+				valueFiles := newApplicationValueFiles(pattern, "myprefix", false)
 				Expect(valueFiles).To(Equal(append(prefixArray(defaultValueFiles, "myprefix"),
 					"myprefix/test1.yaml",
 					"myprefix/test2.yaml")))
+			})
+		})
+
+		Context("With variants directory layout", func() {
+			var variantsDirFiles []string
+			BeforeEach(func() {
+				variantsDirFiles = []string{
+					"/values-global.yaml",
+					"/variants/foogroup/values-foogroup.yaml",
+					"/variants/foogroup/values-AWS.yaml",
+					"/variants/foogroup/values-AWS-4.12.yaml",
+					"/variants/foogroup/values-AWS-foogroup.yaml",
+					"/variants/foogroup/values-4.12-foogroup.yaml",
+					"/variants/foogroup/values-barcluster.yaml",
+				}
+			})
+			It("Returns variants dir layout paths without prefix", func() {
+				valueFiles := newApplicationValueFiles(pattern, "", true)
+				Expect(valueFiles).To(Equal(variantsDirFiles))
+			})
+			It("Returns variants dir layout paths with prefix", func() {
+				valueFiles := newApplicationValueFiles(pattern, "$patternref", true)
+				Expect(valueFiles).To(Equal(prefixArray(variantsDirFiles, "$patternref")))
+			})
+			It("Appends extra value files unchanged", func() {
+				pattern.Spec.ExtraValueFiles = []string{"extra.yaml", "/leading.yaml"}
+				valueFiles := newApplicationValueFiles(pattern, "", true)
+				Expect(valueFiles).To(Equal(append(variantsDirFiles,
+					"/extra.yaml",
+					"/leading.yaml")))
 			})
 		})
 	})
@@ -546,6 +576,35 @@ var _ = Describe("Argo Pattern", func() {
 						Name:  "global.multiSourceTargetRevision",
 						Value: "0.0.*",
 					})))
+			})
+
+			It("Test newApplicationParameters includes vpNewFolderDir when values/ dir exists", func() {
+				td, err := os.MkdirTemp("", "vp-param-test")
+				Expect(err).ToNot(HaveOccurred())
+				defer os.RemoveAll(td)
+				Expect(os.MkdirAll(filepath.Join(td, "variants"), 0755)).To(Succeed())
+				pattern.Status.LocalCheckoutPath = td
+				params := newApplicationParameters(pattern)
+				found := false
+				for _, p := range params {
+					if p.Name == ParamVpNewFolderDir {
+						Expect(p.Value).To(Equal("true"))
+						found = true
+						break
+					}
+				}
+				Expect(found).To(BeTrue())
+			})
+
+			It("Test newApplicationParameters omits vpNewFolderDir when no values/ dir", func() {
+				td, err := os.MkdirTemp("", "vp-param-test")
+				Expect(err).ToNot(HaveOccurred())
+				defer os.RemoveAll(td)
+				pattern.Status.LocalCheckoutPath = td
+				params := newApplicationParameters(pattern)
+				for _, p := range params {
+					Expect(p.Name).ToNot(Equal(ParamVpNewFolderDir))
+				}
 			})
 		})
 

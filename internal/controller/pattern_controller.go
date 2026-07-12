@@ -590,11 +590,20 @@ func (r *PatternReconciler) preValidation(input *api.Pattern) error {
 
 	// Validate that the required values file exists for the cluster group
 	if input.Spec.ClusterGroupName != "" && input.Status.LocalCheckoutPath != "" {
-		valuesFile := filepath.Join(input.Status.LocalCheckoutPath,
-			fmt.Sprintf("values-%s.yaml", input.Spec.ClusterGroupName))
+		var valuesFile, displayName string
+		if HasVariantsFolderLayout(input.Status.LocalCheckoutPath) {
+			valuesFile = filepath.Join(input.Status.LocalCheckoutPath,
+				"variants", input.Spec.ClusterGroupName,
+				fmt.Sprintf("values-%s.yaml", input.Spec.ClusterGroupName))
+			displayName = fmt.Sprintf("variants/%s/values-%s.yaml",
+				input.Spec.ClusterGroupName, input.Spec.ClusterGroupName)
+		} else {
+			valuesFile = filepath.Join(input.Status.LocalCheckoutPath,
+				fmt.Sprintf("values-%s.yaml", input.Spec.ClusterGroupName))
+			displayName = fmt.Sprintf("values-%s.yaml", input.Spec.ClusterGroupName)
+		}
 		if _, err := os.Stat(valuesFile); os.IsNotExist(err) {
-			return fmt.Errorf("required values file not found: values-%s.yaml",
-				input.Spec.ClusterGroupName)
+			return fmt.Errorf("required values file not found: %s", displayName)
 		}
 	}
 
