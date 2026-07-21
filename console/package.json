@@ -57,7 +57,7 @@
     "pluralize": "^8.0.0",
     "prettier": "^2.7.1",
     "react": "^17.0.1",
-    "react-dom": "^17.0.1",
+    "react-dom": "^19.0.0",
     "react-helmet": "^6.1.0",
     "react-i18next": "^11.7.3",
     "react-router": "5.3.x",
