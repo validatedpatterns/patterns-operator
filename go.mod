@@ -1,11 +1,11 @@
 module github.com/hybrid-cloud-patterns/patterns-operator
 
-go 1.25.5
+go 1.25.9
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/argoproj-labs/argocd-operator v0.17.0
+	github.com/argoproj-labs/argocd-operator v0.18.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-git/go-git/v5 v5.19.1
@@ -25,7 +25,7 @@ require (
 	k8s.io/api v0.35.1
 	k8s.io/apimachinery v0.36.0-alpha.1
 	k8s.io/client-go v12.0.0+incompatible
-	sigs.k8s.io/controller-runtime v0.21.0
+	sigs.k8s.io/controller-runtime v0.22.3
 )
 
 require (
@@ -51,7 +51,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20250908182407-97ad5b59a627 // indirect
+	github.com/argoproj/gitops-engine v0.7.1-0.20251217140045-5baed5604d2d // indirect
 	github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5 // indirect
 	github.com/argoproj/pkg/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
