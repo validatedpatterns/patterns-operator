@@ -1,16 +1,5 @@
-// Copyright 2015 go-swagger maintainers
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-FileCopyrightText: Copyright 2015-2025 go-swagger maintainers
+// SPDX-License-Identifier: Apache-2.0
 
 package jsonname
 
@@ -21,10 +10,12 @@ import (
 )
 
 // DefaultJSONNameProvider is the default cache for types.
-var DefaultJSONNameProvider = NewNameProvider()
+var DefaultJSONNameProvider = NewNameProvider() //nolint:gochecknoglobals // default settings, for backward compatible package-level settings
 
-// NameProvider represents an object capable of translating from go property names
-// to json property names.
+var _ providerIface = (*NameProvider)(nil)
+
+// NameProvider represents an object capable of translating from go property names to json property
+// names.
 //
 // This type is thread-safe.
 //
@@ -39,7 +30,7 @@ type nameIndex struct {
 	goNames   map[string]string
 }
 
-// NewNameProvider creates a new name provider
+// NewNameProvider creates a new name provider.
 func NewNameProvider() *NameProvider {
 	return &NameProvider{
 		lock:  &sync.Mutex{},
@@ -48,7 +39,7 @@ func NewNameProvider() *NameProvider {
 }
 
 func buildnameIndex(tpe reflect.Type, idx, reverseIdx map[string]string) {
-	for i := 0; i < tpe.NumField(); i++ {
+	for i := range tpe.NumField() {
 		targetDes := tpe.Field(i)
 
 		if targetDes.PkgPath != "" { // unexported
@@ -82,15 +73,15 @@ func buildnameIndex(tpe reflect.Type, idx, reverseIdx map[string]string) {
 }
 
 func newNameIndex(tpe reflect.Type) nameIndex {
-	var idx = make(map[string]string, tpe.NumField())
-	var reverseIdx = make(map[string]string, tpe.NumField())
+	idx := make(map[string]string, tpe.NumField())
+	reverseIdx := make(map[string]string, tpe.NumField())
 
 	buildnameIndex(tpe, idx, reverseIdx)
 	return nameIndex{jsonNames: idx, goNames: reverseIdx}
 }
 
-// GetJSONNames gets all the json property names for a type
-func (n *NameProvider) GetJSONNames(subject interface{}) []string {
+// GetJSONNames gets all the json property names for a type.
+func (n *NameProvider) GetJSONNames(subject any) []string {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
@@ -106,13 +97,13 @@ func (n *NameProvider) GetJSONNames(subject interface{}) []string {
 	return res
 }
 
-// GetJSONName gets the json name for a go property name
-func (n *NameProvider) GetJSONName(subject interface{}, name string) (string, bool) {
+// GetJSONName gets the json name for a go property name.
+func (n *NameProvider) GetJSONName(subject any, name string) (string, bool) {
 	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
 	return n.GetJSONNameForType(tpe, name)
 }
 
-// GetJSONNameForType gets the json name for a go property name on a given type
+// GetJSONNameForType gets the json name for a go property name on a given type.
 func (n *NameProvider) GetJSONNameForType(tpe reflect.Type, name string) (string, bool) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
@@ -124,13 +115,13 @@ func (n *NameProvider) GetJSONNameForType(tpe reflect.Type, name string) (string
 	return nme, ok
 }
 
-// GetGoName gets the go name for a json property name
-func (n *NameProvider) GetGoName(subject interface{}, name string) (string, bool) {
+// GetGoName gets the go name for a json property name.
+func (n *NameProvider) GetGoName(subject any, name string) (string, bool) {
 	tpe := reflect.Indirect(reflect.ValueOf(subject)).Type()
 	return n.GetGoNameForType(tpe, name)
 }
 
-// GetGoNameForType gets the go name for a given type for a json property name
+// GetGoNameForType gets the go name for a given type for a json property name.
 func (n *NameProvider) GetGoNameForType(tpe reflect.Type, name string) (string, bool) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
