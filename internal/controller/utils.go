@@ -480,6 +480,13 @@ func IsCommonSlimmed(patternPath string) bool {
 	return true
 }
 
+// HasVariantsFolderLayout returns true if the pattern repo has a top-level "variants" directory,
+// indicating the new organized layout for values files.
+func HasVariantsFolderLayout(patternPath string) bool {
+	info, err := os.Stat(filepath.Join(patternPath, "variants"))
+	return err == nil && info.IsDir()
+}
+
 // IntOrZero retrieves an integer value from a map by key.
 func IntOrZero(secret map[string][]byte, key string) (int64, error) {
 	val, present := secret[key]

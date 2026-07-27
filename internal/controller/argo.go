@@ -83,6 +83,7 @@ const (
 	ParamVpArgoNamespace           = "global.vpArgoNamespace"
 	ParamMultiSourceTargetRevision = "global.multiSourceTargetRevision"
 	ParamDeletePattern             = "global.deletePattern"
+	ParamVpNewFolderDir            = "global.vpNewFolderDir"
 )
 
 // ConsoleLink constants
@@ -751,6 +752,12 @@ func newApplicationParameters(p *api.Pattern) []argoapi.HelmParameter {
 		Name:  ParamMultiSourceTargetRevision,
 		Value: getClusterGroupChartVersion(p),
 	})
+	if HasVariantsFolderLayout(p.Status.LocalCheckoutPath) {
+		parameters = append(parameters, argoapi.HelmParameter{
+			Name:  ParamVpNewFolderDir,
+			Value: boolTrue,
+		})
+	}
 	for _, extra := range p.Spec.ExtraParameters {
 		if !updateHelmParameter(extra, parameters) {
 			log.Printf("Parameter %q = %q added", extra.Name, extra.Value)
@@ -805,15 +812,29 @@ func convertArgoHelmParametersToMap(params []argoapi.HelmParameter) map[string]a
 	return result
 }
 
-func newApplicationValueFiles(p *api.Pattern, prefix string) []string {
-	files := []string{
-		fmt.Sprintf("%s/values-global.yaml", prefix),
-		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Spec.ClusterGroupName),
-		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterPlatform),
-		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Status.ClusterVersion),
-		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Spec.ClusterGroupName),
-		fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterVersion, p.Spec.ClusterGroupName),
-		fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterName),
+func newApplicationValueFiles(p *api.Pattern, prefix string, useVariantsDir bool) []string {
+	variant := p.Spec.ClusterGroupName
+	var files []string
+	if useVariantsDir {
+		files = []string{
+			fmt.Sprintf("%s/values-global.yaml", prefix),
+			fmt.Sprintf("%s/variants/%s/values-%s.yaml", prefix, variant, variant),
+			fmt.Sprintf("%s/variants/%s/values-%s.yaml", prefix, variant, p.Status.ClusterPlatform),
+			fmt.Sprintf("%s/variants/%s/values-%s-%s.yaml", prefix, variant, p.Status.ClusterPlatform, p.Status.ClusterVersion),
+			fmt.Sprintf("%s/variants/%s/values-%s-%s.yaml", prefix, variant, p.Status.ClusterPlatform, variant),
+			fmt.Sprintf("%s/variants/%s/values-%s-%s.yaml", prefix, variant, p.Status.ClusterVersion, variant),
+			fmt.Sprintf("%s/variants/%s/values-%s.yaml", prefix, variant, p.Status.ClusterName),
+		}
+	} else {
+		files = []string{
+			fmt.Sprintf("%s/values-global.yaml", prefix),
+			fmt.Sprintf("%s/values-%s.yaml", prefix, variant),
+			fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterPlatform),
+			fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, p.Status.ClusterVersion),
+			fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterPlatform, variant),
+			fmt.Sprintf("%s/values-%s-%s.yaml", prefix, p.Status.ClusterVersion, variant),
+			fmt.Sprintf("%s/values-%s.yaml", prefix, p.Status.ClusterName),
+		}
 	}
 
 	for _, extra := range p.Spec.ExtraValueFiles {
@@ -846,7 +867,8 @@ func getSharedValueFiles(p *api.Pattern, prefix string) ([]string, error) {
 		return nil, fmt.Errorf("%s path does not exist", gitDir)
 	}
 
-	valueFiles := newApplicationValueFiles(p, gitDir)
+	useVariantsDir := HasVariantsFolderLayout(gitDir)
+	valueFiles := newApplicationValueFiles(p, gitDir, useVariantsDir)
 
 	helmValues, err := mergeHelmValues(valueFiles...)
 	if err != nil {
@@ -949,7 +971,8 @@ func commonApplicationSpec(p *api.Pattern, sources []argoapi.ApplicationSource) 
 }
 
 func commonApplicationSourceHelm(p *api.Pattern, prefix string) *argoapi.ApplicationSourceHelm {
-	valueFiles := newApplicationValueFiles(p, prefix)
+	useVariantsDir := HasVariantsFolderLayout(p.Status.LocalCheckoutPath)
+	valueFiles := newApplicationValueFiles(p, prefix, useVariantsDir)
 	sharedValueFiles, err := getSharedValueFiles(p, prefix)
 	if err != nil {
 		log.Printf("Could not fetch sharedValueFiles: %s", err)
@@ -1130,7 +1153,8 @@ func countVPApplications(p *api.Pattern) (appCount, appSetsCount int, err error)
 	if _, err := os.Stat(gitDir); err != nil {
 		return -1, -1, fmt.Errorf("%s path does not exist", gitDir)
 	}
-	valueFiles := newApplicationValueFiles(p, gitDir)
+	useVariantsDir := HasVariantsFolderLayout(gitDir)
+	valueFiles := newApplicationValueFiles(p, gitDir, useVariantsDir)
 	helmValues, helmErr := mergeHelmValues(valueFiles...)
 	if helmErr != nil {
 		return -2, -2, fmt.Errorf("error reading value file: %s", helmErr)

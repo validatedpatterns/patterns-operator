@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
@@ -332,6 +333,45 @@ var _ = Describe("pattern controller - preValidation", func() {
 			}
 			err := reconciler.preValidation(p)
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should pass when variants dir layout exists and variant file is present", func() {
+			Expect(os.MkdirAll(filepath.Join(tempDir, "variants", "hub"), 0755)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(tempDir, "variants", "hub", "values-hub.yaml"),
+				[]byte("clusterGroup:\n  name: hub\n"), 0600)).To(Succeed())
+
+			p := &api.Pattern{
+				Spec: api.PatternSpec{
+					ClusterGroupName: "hub",
+					GitConfig: api.GitConfig{
+						TargetRepo: "https://github.com/test/repo",
+					},
+				},
+				Status: api.PatternStatus{
+					LocalCheckoutPath: tempDir,
+				},
+			}
+			err := reconciler.preValidation(p)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should fail when variants dir layout exists but variant file is missing", func() {
+			Expect(os.MkdirAll(filepath.Join(tempDir, "variants"), 0755)).To(Succeed())
+
+			p := &api.Pattern{
+				Spec: api.PatternSpec{
+					ClusterGroupName: "hub",
+					GitConfig: api.GitConfig{
+						TargetRepo: "https://github.com/test/repo",
+					},
+				},
+				Status: api.PatternStatus{
+					LocalCheckoutPath: tempDir,
+				},
+			}
+			err := reconciler.preValidation(p)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("required values file not found: variants/hub/values-hub.yaml"))
 		})
 	})
 })

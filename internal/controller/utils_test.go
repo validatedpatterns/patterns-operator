@@ -1647,6 +1647,45 @@ var _ = Describe("IsCommonSlimmed", func() {
 	})
 })
 
+var _ = Describe("HasVariantsFolderLayout", func() {
+	var td string
+
+	BeforeEach(func() {
+		td = createTempDir("vp-variants-layout-test")
+	})
+	AfterEach(func() {
+		cleanupTempDir(td)
+	})
+
+	Context("when variants/ directory exists", func() {
+		It("should return true", func() {
+			err := os.MkdirAll(filepath.Join(td, "variants"), 0755)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(HasVariantsFolderLayout(td)).To(BeTrue())
+		})
+	})
+
+	Context("when variants/ directory does not exist", func() {
+		It("should return false", func() {
+			Expect(HasVariantsFolderLayout(td)).To(BeFalse())
+		})
+	})
+
+	Context("when variants is a file not a directory", func() {
+		It("should return false", func() {
+			err := os.WriteFile(filepath.Join(td, "variants"), []byte("not a dir"), 0600)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(HasVariantsFolderLayout(td)).To(BeFalse())
+		})
+	})
+
+	Context("when path does not exist", func() {
+		It("should return false", func() {
+			Expect(HasVariantsFolderLayout("/nonexistent/path")).To(BeFalse())
+		})
+	})
+})
+
 var _ = Describe("IntOrZero", func() {
 	Context("when key exists with valid integer", func() {
 		It("should return the integer value", func() {
