@@ -184,7 +184,7 @@ podman-build-arm64: buildah-manifest ## build the container in arm64
 .PHONY: buildah-push
 buildah-push: ## Uploads the container to quay.io/validatedpatterns/${OPERATOR_IMG}
 	@echo "Uploading the ${REGISTRY}/${OPERATOR_IMG} container to ${UPLOADREGISTRY}/${OPERATOR_IMG}"
-	buildah manifest push --all "${REGISTRY}/${OPERATOR_IMG}" "docker://${UPLOADREGISTRY}/${OPERATOR_IMG}"
+	buildah manifest push --all --format v2s2 "${REGISTRY}/${OPERATOR_IMG}" "docker://${UPLOADREGISTRY}/${OPERATOR_IMG}"
 
 .PHONY: golangci-lint
 golangci-lint: apikey ## Run golangci-lint locally
@@ -427,7 +427,7 @@ console-build-arm64: generate-dockerfile-console-plugin console-multiarch-manife
 .PHONY: console-push
 console-push: ## Uploads the container to quay.io/validatedpatterns/${CONSOLE_PLUGIN_IMAGE}
 	@echo "Uploading the ${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE} container to ${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}"
-	buildah manifest push --all "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}"
+	buildah manifest push --all --format v2s2 "${REGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}" "docker://${UPLOADREGISTRY}/${CONSOLE_PLUGIN_IMAGE_BASE}"
 
 .PHONY: console-integration-tests
 console-integration-tests: ## Run console integration tests (requires running cluster)
