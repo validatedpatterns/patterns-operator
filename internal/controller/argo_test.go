@@ -40,6 +40,14 @@ const (
 	argoName = "test-argocd"
 )
 
+func mustGetArgoCD(client dynamic.Interface, gvr schema.GroupVersionResource, name, namespace string) *unstructured.Unstructured {
+	obj, err := client.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		panic(fmt.Sprintf("mustGetArgoCD: %v", err))
+	}
+	return obj
+}
+
 func prefixArray(a []string, prefix string) []string {
 	b := []string{}
 	for _, i := range a {
@@ -1211,6 +1219,25 @@ var _ = Describe("CompareArgoCD", func() {
 			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
 			actual.Spec.SSO = nil
 			Expect(compareArgoCD(goal, actual)).To(BeFalse())
+		})
+	})
+
+	Context("when overlay is applied to typed spec", func() {
+		It("should return false when overlay changes a known field", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			overlay := `controller:
+  resources:
+    limits:
+      memory: "16Gi"`
+			Expect(applyCustomArgoOverlayToSpec(goal, overlay)).To(Succeed())
+			Expect(compareArgoCD(goal, actual)).To(BeFalse())
+		})
+		It("should return true when overlay matches existing values", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			Expect(applyCustomArgoOverlayToSpec(goal, "")).To(Succeed())
+			Expect(compareArgoCD(goal, actual)).To(BeTrue())
 		})
 	})
 })
@@ -2488,6 +2515,199 @@ scopes: "[groups,email]"`
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 	})
 
+})
+
+var _ = Describe("applyCustomArgoOverlay", func() {
+	var baseArgo *unstructured.Unstructured
+
+	BeforeEach(func() {
+		argo := newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+		Expect(err).ToNot(HaveOccurred())
+		baseArgo = &unstructured.Unstructured{Object: obj}
+	})
+
+	It("should override a nested value while preserving siblings", func() {
+		overlay := `controller:
+  resources:
+    limits:
+      cpu: "4"`
+		err := applyCustomArgoOverlay(baseArgo, overlay)
+		Expect(err).ToNot(HaveOccurred())
+
+		cpu, found, err := unstructured.NestedString(baseArgo.Object, "spec", "controller", "resources", "limits", "cpu")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(cpu).To(Equal("4"))
+
+		mem, found, err := unstructured.NestedString(baseArgo.Object, "spec", "controller", "resources", "limits", "memory")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(mem).To(Equal("8Gi"))
+	})
+
+	It("should add a new top-level spec key", func() {
+		overlay := `extraConfig:
+  someKey: someValue`
+		err := applyCustomArgoOverlay(baseArgo, overlay)
+		Expect(err).ToNot(HaveOccurred())
+
+		val, found, err := unstructured.NestedString(baseArgo.Object, "spec", "extraConfig", "someKey")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(val).To(Equal("someValue"))
+	})
+
+	It("should replace slices entirely", func() {
+		overlay := `resourceHealthChecks:
+- kind: MyCustomResource
+  check: |
+    hs = {}
+    hs.status = "Healthy"
+    return hs`
+		err := applyCustomArgoOverlay(baseArgo, overlay)
+		Expect(err).ToNot(HaveOccurred())
+
+		checks, found, err := unstructured.NestedSlice(baseArgo.Object, "spec", "resourceHealthChecks")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(checks).To(HaveLen(1))
+
+		checkMap := checks[0].(map[string]any)
+		Expect(checkMap["kind"]).To(Equal("MyCustomResource"))
+	})
+
+	It("should override boolean values", func() {
+		overlay := `ha:
+  enabled: true`
+		err := applyCustomArgoOverlay(baseArgo, overlay)
+		Expect(err).ToNot(HaveOccurred())
+
+		enabled, found, err := unstructured.NestedBool(baseArgo.Object, "spec", "ha", "enabled")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(enabled).To(BeTrue())
+	})
+
+	It("should return error for invalid YAML", func() {
+		err := applyCustomArgoOverlay(baseArgo, "not: valid: {yaml")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to parse"))
+	})
+})
+
+var _ = Describe("createOrUpdateArgoCD with custom overlay", func() {
+	var (
+		dynamicClient *dynamicfake.FakeDynamicClient
+		gvr           schema.GroupVersionResource
+		name          string
+		namespace     string
+	)
+
+	BeforeEach(func() {
+		s := runtime.NewScheme()
+		gvr = schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
+		dynamicClient = dynamicfake.NewSimpleDynamicClientWithCustomListKinds(s,
+			map[schema.GroupVersionResource]string{gvr: "ArgoCDList"})
+		name = argoName
+		namespace = argoNS
+		getArgoCDFunc = getArgoCD
+	})
+
+	It("should include overlay fields when creating a new ArgoCD", func() {
+		config := PatternsOperatorConfig{
+			configKeyCustomArgoYaml: `extraConfig:
+  customField: customValue`,
+		}
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		val, found, err := unstructured.NestedString(argoCD.Object, "spec", "extraConfig", "customField")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(val).To(Equal("customValue"))
+	})
+
+	It("should detect overlay-only changes and trigger an update", func() {
+		config := PatternsOperatorConfig{
+			configKeyCustomArgoYaml: `controller:
+  resources:
+    limits:
+      cpu: "2"`,
+		}
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		cpu, found, err := unstructured.NestedString(
+			mustGetArgoCD(dynamicClient, gvr, name, namespace).Object,
+			"spec", "controller", "resources", "limits", "cpu")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(cpu).To(Equal("2"))
+
+		config[configKeyCustomArgoYaml] = `controller:
+  resources:
+    limits:
+      cpu: "16"`
+		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		cpu, found, err = unstructured.NestedString(
+			mustGetArgoCD(dynamicClient, gvr, name, namespace).Object,
+			"spec", "controller", "resources", "limits", "cpu")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(cpu).To(Equal("16"))
+	})
+
+	It("should skip update when overlay and base are unchanged", func() {
+		config := PatternsOperatorConfig{
+			configKeyCustomArgoYaml: `controller:
+  resources:
+    limits:
+      cpu: "4"`,
+		}
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		rvAfterCreate := argoCD.GetResourceVersion()
+
+		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		argoCD, err = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(argoCD.GetResourceVersion()).To(Equal(rvAfterCreate))
+	})
+
+	It("should override operator defaults with overlay values", func() {
+		config := PatternsOperatorConfig{
+			configKeyCustomArgoYaml: `controller:
+  resources:
+    limits:
+      cpu: "8"`,
+		}
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		Expect(err).ToNot(HaveOccurred())
+
+		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
+
+		cpu, found, err := unstructured.NestedString(argoCD.Object, "spec", "controller", "resources", "limits", "cpu")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(cpu).To(Equal("8"))
+
+		mem, found, err := unstructured.NestedString(argoCD.Object, "spec", "controller", "resources", "limits", "memory")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(mem).To(Equal("8Gi"))
+	})
 })
 
 var _ = Describe("commonSyncPolicy", func() {

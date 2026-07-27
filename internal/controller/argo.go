@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"dario.cat/mergo"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -522,6 +523,39 @@ return health_status`,
 	return &s
 }
 
+func applyCustomArgoOverlay(argoCD *unstructured.Unstructured, customYAML string) error {
+	var overlay map[string]any
+	if err := yaml.Unmarshal([]byte(customYAML), &overlay); err != nil {
+		return fmt.Errorf("failed to parse custom ArgoCD YAML: %w", err)
+	}
+
+	spec, found, err := unstructured.NestedMap(argoCD.Object, "spec")
+	if err != nil {
+		return fmt.Errorf("failed to get spec from ArgoCD: %w", err)
+	}
+	if !found {
+		spec = make(map[string]any)
+	}
+
+	if err := mergo.Merge(&spec, overlay, mergo.WithOverride); err != nil {
+		return fmt.Errorf("failed to merge custom ArgoCD overlay: %w", err)
+	}
+
+	argoCD.Object["spec"] = spec
+	return nil
+}
+
+func applyCustomArgoOverlayToSpec(argo *argooperator.ArgoCD, customYAML string) error {
+	var overlay argooperator.ArgoCDSpec
+	if err := yaml.Unmarshal([]byte(customYAML), &overlay); err != nil {
+		return fmt.Errorf("failed to parse custom ArgoCD YAML into spec: %w", err)
+	}
+	if err := mergo.Merge(&argo.Spec, overlay, mergo.WithOverride); err != nil {
+		return fmt.Errorf("failed to merge custom ArgoCD overlay: %w", err)
+	}
+	return nil
+}
+
 func compareArgoCD(goal, actual *argooperator.ArgoCD) bool {
 	if goal == nil && actual == nil {
 		return true
@@ -546,57 +580,63 @@ func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interf
 	argo := newArgoCD(name, namespace, patternsOperatorConfig)
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 
-	var err error
 	// we skip this check if fullClient is explicitly nil for simpler testing
 	if fullClient != nil {
-		err = checkAPIVersion(fullClient, ArgoCDGroup, ArgoCDVersion)
-		if err != nil {
+		if err := checkAPIVersion(fullClient, ArgoCDGroup, ArgoCDVersion); err != nil {
 			return fmt.Errorf("cannot find a sufficiently recent argocd crd version: %v", err)
 		}
 	}
 
-	if !haveArgo(client, name, namespace) {
-		// create it
-		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
-		if errConvert != nil {
-			return fmt.Errorf("failed to convert ArgoCD to unstructured for create: %v", errConvert)
+	customYAML := patternsOperatorConfig.getStringValue(configKeyCustomArgoYaml)
+	if customYAML != "" {
+		if err := applyCustomArgoOverlayToSpec(argo, customYAML); err != nil {
+			log.Printf("Failed to apply %s overlay to spec: %v", configKeyCustomArgoYaml, err)
 		}
-		newArgo := &unstructured.Unstructured{Object: obj}
-		_, err = client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
-	} else { // update it
-		oldArgo, oldUnstructured, errGet := getArgoCDFunc(client, name, namespace)
-		if errGet != nil {
-			return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, errGet)
-		}
-		if oldArgo == nil || oldUnstructured == nil {
-			return fmt.Errorf("getArgoCD returned nil ArgoCD object for %s/%s", namespace, name)
-		}
-
-		// ArgoCD is up to date, skipping update
-		if compareArgoCD(argo, oldArgo) {
-			return nil
-		}
-
-		argo.SetResourceVersion(oldArgo.GetResourceVersion())
-		obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
-		if errConvert != nil {
-			return fmt.Errorf("failed to convert ArgoCD to unstructured for update: %v", errConvert)
-		}
-		newArgo := &unstructured.Unstructured{Object: obj}
-
-		// Preserve spec fields not known to this vendored argocd-operator version
-		// (e.g. networkPolicy added in gitops-operator v1.20.3) to avoid
-		// stripping them and causing infinite reconciliation loops.
-		oldSpec, _, _ := unstructured.NestedMap(oldUnstructured.Object, "spec")
-		newSpec, _, _ := unstructured.NestedMap(newArgo.Object, "spec")
-		for key, val := range oldSpec {
-			if _, exists := newSpec[key]; !exists {
-				_ = unstructured.SetNestedField(newArgo.Object, val, "spec", key)
-			}
-		}
-
-		_, err = client.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
 	}
+
+	obj, errConvert := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
+	if errConvert != nil {
+		return fmt.Errorf("failed to convert ArgoCD to unstructured: %v", errConvert)
+	}
+	newArgo := &unstructured.Unstructured{Object: obj}
+
+	// Apply overlay at the unstructured level to preserve fields not in the vendored Go types
+	if customYAML != "" {
+		if err := applyCustomArgoOverlay(newArgo, customYAML); err != nil {
+			log.Printf("Failed to apply %s unstructured overlay: %v", configKeyCustomArgoYaml, err)
+		}
+	}
+
+	if !haveArgo(client, name, namespace) {
+		_, err := client.Resource(gvr).Namespace(namespace).Create(context.TODO(), newArgo, metav1.CreateOptions{})
+		return err
+	}
+
+	oldArgo, oldUnstructured, errGet := getArgoCDFunc(client, name, namespace)
+	if errGet != nil {
+		return fmt.Errorf("failed to get existing ArgoCD %s/%s: %v", namespace, name, errGet)
+	}
+	if oldUnstructured == nil {
+		return fmt.Errorf("getArgoCD returned nil ArgoCD object for %s/%s", namespace, name)
+	}
+
+	// Preserve spec fields not known to this vendored argocd-operator version
+	// (e.g. networkPolicy added in gitops-operator v1.20.3) to avoid
+	// stripping them and causing infinite reconciliation loops.
+	oldSpec, _, _ := unstructured.NestedMap(oldUnstructured.Object, "spec")
+	newSpec, _, _ := unstructured.NestedMap(newArgo.Object, "spec")
+	for key, val := range oldSpec {
+		if _, exists := newSpec[key]; !exists {
+			_ = unstructured.SetNestedField(newArgo.Object, val, "spec", key)
+		}
+	}
+
+	if compareArgoCD(argo, oldArgo) {
+		return nil
+	}
+
+	newArgo.SetResourceVersion(oldUnstructured.GetResourceVersion())
+	_, err := client.Resource(gvr).Namespace(namespace).Update(context.TODO(), newArgo, metav1.UpdateOptions{})
 	return err
 }
 
