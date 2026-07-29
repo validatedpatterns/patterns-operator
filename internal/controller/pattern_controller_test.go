@@ -921,6 +921,7 @@ var _ = Describe("pattern controller - checkSpokeApplicationsGone", func() {
 
 		It("should return error when token env var is empty and token file is missing", func() {
 			os.Unsetenv("ACM_SEARCH_API_TOKEN")
+			reconciler.tokenPath = "/nonexistent/path/token"
 			startServer(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write(emptySearchResponse())
 			})

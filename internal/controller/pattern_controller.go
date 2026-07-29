@@ -105,6 +105,8 @@ type PatternReconciler struct {
 	mgr                ctrl.Manager
 	ctrl               crcontroller.Controller
 	argoCDWatchStarted bool
+
+	tokenPath string
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -1241,7 +1243,10 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 		var tokenBytes []byte
 		var err error
 
-		tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
+		tokenPath := r.tokenPath
+		if tokenPath == "" {
+			tokenPath = "/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
+		}
 
 		if tokenBytes, err = os.ReadFile(tokenPath); err != nil {
 			return false, fmt.Errorf("failed to read serviceaccount token: %w", err)
