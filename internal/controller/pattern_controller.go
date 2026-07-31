@@ -701,6 +701,10 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		output.Spec.MultiSourceConfig.Enabled = &multiSourceBool
 	}
 	if output.Spec.Variant != "" {
+		if output.Spec.ClusterGroupName != "" && output.Spec.ClusterGroupName != output.Spec.Variant {
+			logOnce(fmt.Sprintf("Both spec.variant (%q) and spec.clusterGroupName (%q) are set, spec.variant will take precedence",
+				output.Spec.Variant, output.Spec.ClusterGroupName))
+		}
 		output.Spec.ClusterGroupName = output.Spec.Variant
 	}
 	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
