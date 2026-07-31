@@ -700,11 +700,8 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		multiSourceBool := true
 		output.Spec.MultiSourceConfig.Enabled = &multiSourceBool
 	}
-	switch {
-	case output.Spec.ClusterGroupName == "" && output.Spec.Variant != "":
+	if output.Spec.Variant != "" {
 		output.Spec.ClusterGroupName = output.Spec.Variant
-	case output.Spec.ClusterGroupName != "" && output.Spec.Variant == "":
-		output.Spec.Variant = output.Spec.ClusterGroupName
 	}
 	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
 		output.Spec.MultiSourceConfig.HelmRepoUrl = GiteaHelmRepoUrl

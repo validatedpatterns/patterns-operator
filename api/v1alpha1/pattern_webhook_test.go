@@ -132,7 +132,7 @@ func TestValidateCreate_AllowsVariantOnly(t *testing.T) {
 	}
 }
 
-func TestValidateCreate_RejectsBothSet(t *testing.T) {
+func TestValidateCreate_AllowsBothSet(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := AddToScheme(scheme); err != nil {
 		t.Fatalf("failed to add scheme: %v", err)
@@ -156,9 +156,12 @@ func TestValidateCreate_RejectsBothSet(t *testing.T) {
 		},
 	}
 
-	_, err := validator.ValidateCreate(context.Background(), p)
-	if err == nil {
-		t.Error("expected error when both variant and clusterGroupName are set, got nil")
+	warnings, err := validator.ValidateCreate(context.Background(), p)
+	if err != nil {
+		t.Errorf("expected no error when both variant and clusterGroupName are set, got: %v", err)
+	}
+	if warnings != nil {
+		t.Errorf("expected no warnings, got: %v", warnings)
 	}
 }
 
@@ -190,7 +193,7 @@ func TestValidateCreate_RejectsBothEmpty(t *testing.T) {
 	}
 }
 
-func TestValidateUpdate_RejectsBothSet(t *testing.T) {
+func TestValidateUpdate_AllowsBothSet(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := AddToScheme(scheme); err != nil {
 		t.Fatalf("failed to add scheme: %v", err)
@@ -210,9 +213,12 @@ func TestValidateUpdate_RejectsBothSet(t *testing.T) {
 		},
 	}
 
-	_, err := validator.ValidateUpdate(context.Background(), p, p)
-	if err == nil {
-		t.Error("expected error when both variant and clusterGroupName are set on update, got nil")
+	warnings, err := validator.ValidateUpdate(context.Background(), p, p)
+	if err != nil {
+		t.Errorf("expected no error when both variant and clusterGroupName are set on update, got: %v", err)
+	}
+	if warnings != nil {
+		t.Errorf("expected no warnings, got: %v", warnings)
 	}
 }
 

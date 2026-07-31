@@ -513,14 +513,13 @@ var _ = Describe("pattern controller - applyDefaults", func() {
 		Expect(*output.Spec.MultiSourceConfig.Enabled).To(BeTrue())
 	})
 
-	It("should sync Variant from ClusterGroupName when Variant is empty", func() {
+	It("should keep ClusterGroupName when Variant is empty", func() {
 		p := buildPatternManifest()
 		p.Spec.ClusterGroupName = "hub"
 		p.Spec.Variant = ""
 		output, err := reconciler.applyDefaults(p)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(output.Spec.ClusterGroupName).To(Equal("hub"))
-		Expect(output.Spec.Variant).To(Equal("hub"))
 	})
 
 	It("should sync ClusterGroupName from Variant when ClusterGroupName is empty", func() {
@@ -530,7 +529,15 @@ var _ = Describe("pattern controller - applyDefaults", func() {
 		output, err := reconciler.applyDefaults(p)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(output.Spec.ClusterGroupName).To(Equal("factory"))
-		Expect(output.Spec.Variant).To(Equal("factory"))
+	})
+
+	It("should let Variant win when both are set", func() {
+		p := buildPatternManifest()
+		p.Spec.ClusterGroupName = "hub"
+		p.Spec.Variant = "factory"
+		output, err := reconciler.applyDefaults(p)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(output.Spec.ClusterGroupName).To(Equal("factory"))
 	})
 
 	It("should default HelmRepoUrl when empty", func() {
