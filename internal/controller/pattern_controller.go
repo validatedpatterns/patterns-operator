@@ -125,6 +125,7 @@ type PatternReconciler struct {
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;create;update;watch
 //+kubebuilder:rbac:groups="view.open-cluster-management.io",resources=managedclusterviews,verbs=create
 //+kubebuilder:rbac:groups="cluster.open-cluster-management.io",resources=managedclusters,verbs=list;delete
+//+kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=list;get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -700,11 +701,12 @@ func (r *PatternReconciler) applyDefaults(input *api.Pattern) (*api.Pattern, err
 		multiSourceBool := true
 		output.Spec.MultiSourceConfig.Enabled = &multiSourceBool
 	}
-	switch {
-	case output.Spec.ClusterGroupName == "" && output.Spec.Variant != "":
+	if output.Spec.Variant != "" {
+		if output.Spec.ClusterGroupName != "" && output.Spec.ClusterGroupName != output.Spec.Variant {
+			logOnce(fmt.Sprintf("Both spec.variant (%q) and spec.clusterGroupName (%q) are set, spec.variant will take precedence",
+				output.Spec.Variant, output.Spec.ClusterGroupName))
+		}
 		output.Spec.ClusterGroupName = output.Spec.Variant
-	case output.Spec.ClusterGroupName != "" && output.Spec.Variant == "":
-		output.Spec.Variant = output.Spec.ClusterGroupName
 	}
 	if output.Spec.MultiSourceConfig.HelmRepoUrl == "" {
 		output.Spec.MultiSourceConfig.HelmRepoUrl = GiteaHelmRepoUrl

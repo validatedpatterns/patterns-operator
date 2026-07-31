@@ -118,9 +118,6 @@ func convertToPattern(obj runtime.Object) (*Pattern, error) {
 }
 
 func validateVariantAlias(p *Pattern) error {
-	if p.Spec.ClusterGroupName != "" && p.Spec.Variant != "" {
-		return fmt.Errorf("spec.variant and spec.clusterGroupName are mutually exclusive, set only one")
-	}
 	if p.Spec.ClusterGroupName == "" && p.Spec.Variant == "" {
 		return fmt.Errorf("one of spec.variant or spec.clusterGroupName must be set")
 	}
