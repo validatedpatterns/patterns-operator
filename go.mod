@@ -1,6 +1,6 @@
 module github.com/hybrid-cloud-patterns/patterns-operator
 
-go 1.25.5
+go 1.26.0
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -23,7 +23,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.20.2
 	k8s.io/api v0.35.1
-	k8s.io/apimachinery v0.36.0-alpha.1
+	k8s.io/apimachinery v0.36.0
 	k8s.io/client-go v12.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.21.0
 )
@@ -31,7 +31,7 @@ require (
 require (
 	dario.cat/mergo v1.0.2
 	github.com/argoproj/argo-cd/v3 v3.3.10
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250308055145-5fe7bb3edc86
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.24.1
 	sigs.k8s.io/controller-tools v0.16.4
 	sigs.k8s.io/yaml v1.6.0
 )
