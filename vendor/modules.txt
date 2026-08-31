@@ -775,8 +775,8 @@ github.com/shopspring/decimal
 # github.com/sirupsen/logrus v1.9.4
 ## explicit; go 1.17
 github.com/sirupsen/logrus
-# github.com/skeema/knownhosts v1.3.2
-## explicit; go 1.24.0
+# github.com/skeema/knownhosts v1.3.3
+## explicit; go 1.25.0
 github.com/skeema/knownhosts
 # github.com/spf13/afero v1.15.0
 ## explicit; go 1.23.0
