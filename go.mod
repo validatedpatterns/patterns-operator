@@ -38,7 +38,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cyphar.com/go-pathrs v0.2.5 // indirect
+	cyphar.com/go-pathrs v0.2.6 // indirect
 	github.com/42wim/httpsig v1.2.4 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0 // indirect
