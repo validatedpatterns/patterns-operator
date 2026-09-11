@@ -29,14 +29,15 @@
     "@cypress/webpack-preprocessor": "^5.15.5",
     "@openshift-console/dynamic-plugin-sdk": "4.19.1",
     "@openshift-console/dynamic-plugin-sdk-webpack": "4.19.0",
-    "@patternfly/react-core": "^6.2.2",
-    "@patternfly/react-icons": "^6.2.2",
-    "@patternfly/react-table": "^6.2.2",
+    "@patternfly/react-core": "^6.5.1",
+    "@patternfly/react-icons": "^6.5.1",
+    "@patternfly/react-table": "^6.5.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^18.0.0",
     "@types/react": "^17.0.37",
     "@types/react-helmet": "^6.1.4",
     "@types/react-router-dom": "^5.3.2",
+    "@types/sanitize-html": "^2.16.1",
     "@typescript-eslint/eslint-plugin": "^5.14.0",
     "@typescript-eslint/parser": "^5.14.0",
     "concurrently": "^10.0.3",
@@ -96,6 +97,7 @@
   },
   "dependencies": {
     "js-yaml": "^4.3.2",
+    "sanitize-html": "^2.17.7",
     "yaml": "^2.8.3"
   },
   "resolutions": {

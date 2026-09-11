@@ -1,0 +1,21 @@
+.patterns-operator__pattern-logo {
+  max-height: 32px;
+  object-fit: contain;
+}
+
+.patterns-operator__card-header {
+  height: 32px;
+}
+
+.patterns-operator__pattern-description {
+  min-height: 105px;
+}
+
+.patterns-operator__card--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.patterns-operator__card--disabled .patterns-operator__card-actions {
+  pointer-events: auto;
+}
