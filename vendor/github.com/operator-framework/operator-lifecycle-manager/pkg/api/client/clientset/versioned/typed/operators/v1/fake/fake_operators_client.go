@@ -1,6 +1,4 @@
 /*
-Copyright Red Hat, Inc.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -29,19 +27,19 @@ type FakeOperatorsV1 struct {
 }
 
 func (c *FakeOperatorsV1) OLMConfigs() v1.OLMConfigInterface {
-	return &FakeOLMConfigs{c}
+	return newFakeOLMConfigs(c)
 }
 
 func (c *FakeOperatorsV1) Operators() v1.OperatorInterface {
-	return &FakeOperators{c}
+	return newFakeOperators(c)
 }
 
 func (c *FakeOperatorsV1) OperatorConditions(namespace string) v1.OperatorConditionInterface {
-	return &FakeOperatorConditions{c, namespace}
+	return newFakeOperatorConditions(c, namespace)
 }
 
 func (c *FakeOperatorsV1) OperatorGroups(namespace string) v1.OperatorGroupInterface {
-	return &FakeOperatorGroups{c, namespace}
+	return newFakeOperatorGroups(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
