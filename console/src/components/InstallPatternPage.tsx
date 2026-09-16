@@ -1,8 +1,6 @@
 import * as React from 'react';
-import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
-import { useNavigateCompat } from '../hooks/useNavigateCompat';
-import { useParamsCompat } from '../hooks/useParamsCompat';
+import { useNavigate, useParams } from 'react-router';
 import {
   ActionGroup,
   Alert,
@@ -26,7 +24,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
-import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
+import { DocumentTitle, k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import {
   fetchPattern,
   fetchPatternCR,
@@ -59,8 +57,8 @@ const PatternModel = {
 
 export default function InstallPatternPage() {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
-  const navigate = useNavigateCompat();
-  const { name } = useParamsCompat('/patterns/install/:name');
+  const navigate = useNavigate();
+  const { name } = useParams();
 
   // Secret form state (integrated inline instead of separate page)
 
@@ -396,9 +394,7 @@ export default function InstallPatternPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{t('Install Pattern')}</title>
-      </Helmet>
+      <DocumentTitle>{t('Install Pattern')}</DocumentTitle>
       <PageSection>
         <Title headingLevel="h1">{t('Install Pattern')}</Title>
       </PageSection>

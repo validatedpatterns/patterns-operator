@@ -1,8 +1,7 @@
 import * as React from 'react';
-import Helmet from 'react-helmet';
+import { DocumentTitle } from '@openshift-console/dynamic-plugin-sdk';
 import { useTranslation } from 'react-i18next';
-import { useNavigateCompat } from '../hooks/useNavigateCompat';
-import { useParamsCompat } from '../hooks/useParamsCompat';
+import { useNavigate, useParams } from 'react-router';
 import {
   Alert,
   Button,
@@ -30,8 +29,8 @@ const DELETION_PHASES: Record<string, { label: string; order: number }> = {
 
 export default function UninstallPatternPage() {
   const { t } = useTranslation('plugin__patterns-operator-console-plugin');
-  const navigate = useNavigateCompat();
-  const { name } = useParamsCompat('/patterns/uninstall/:name');
+  const navigate = useNavigate();
+  const { name } = useParams();
 
   const [status, setStatus] = React.useState<PatternCRStatus | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -115,9 +114,7 @@ export default function UninstallPatternPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{t('Uninstall Pattern')}</title>
-      </Helmet>
+      <DocumentTitle>{t('Uninstall Pattern')}</DocumentTitle>
       <PageSection>
         <Title headingLevel="h1">
           {t('Uninstall Pattern')}: {name}
