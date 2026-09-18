@@ -1,5 +1,5 @@
 import * as React from 'react';
-import Helmet from 'react-helmet';
+import { DocumentTitle } from '@openshift-console/dynamic-plugin-sdk';
 import { useTranslation } from 'react-i18next';
 import { useNavigateCompat } from '../hooks/useNavigateCompat';
 import { useParamsCompat } from '../hooks/useParamsCompat';
@@ -115,9 +115,7 @@ export default function UninstallPatternPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{t('Uninstall Pattern')}</title>
-      </Helmet>
+      <DocumentTitle>{t('Uninstall Pattern')}</DocumentTitle>
       <PageSection>
         <Title headingLevel="h1">
           {t('Uninstall Pattern')}: {name}

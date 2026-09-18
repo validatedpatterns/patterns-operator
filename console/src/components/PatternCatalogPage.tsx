@@ -1,5 +1,5 @@
 import * as React from 'react';
-import Helmet from 'react-helmet';
+import { DocumentTitle } from '@openshift-console/dynamic-plugin-sdk';
 import { useTranslation } from 'react-i18next';
 import { useNavigateCompat } from '../hooks/useNavigateCompat';
 
@@ -124,9 +124,7 @@ export default function PatternCatalogPage() {
 
   return (
     <>
-      <Helmet>
-        <title data-test="pattern-catalog-page-title">{t('Pattern Catalog')}</title>
-      </Helmet>
+      <DocumentTitle>{t('Pattern Catalog')}</DocumentTitle>
       <PageSection>
         <div className="patterns-operator__catalog-header">
           {catalogLogo && (
