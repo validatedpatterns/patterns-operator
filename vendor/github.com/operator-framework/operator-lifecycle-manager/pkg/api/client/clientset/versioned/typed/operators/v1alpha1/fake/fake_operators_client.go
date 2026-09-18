@@ -1,6 +1,4 @@
 /*
-Copyright Red Hat, Inc.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -29,19 +27,19 @@ type FakeOperatorsV1alpha1 struct {
 }
 
 func (c *FakeOperatorsV1alpha1) CatalogSources(namespace string) v1alpha1.CatalogSourceInterface {
-	return &FakeCatalogSources{c, namespace}
+	return newFakeCatalogSources(c, namespace)
 }
 
 func (c *FakeOperatorsV1alpha1) ClusterServiceVersions(namespace string) v1alpha1.ClusterServiceVersionInterface {
-	return &FakeClusterServiceVersions{c, namespace}
+	return newFakeClusterServiceVersions(c, namespace)
 }
 
 func (c *FakeOperatorsV1alpha1) InstallPlans(namespace string) v1alpha1.InstallPlanInterface {
-	return &FakeInstallPlans{c, namespace}
+	return newFakeInstallPlans(c, namespace)
 }
 
 func (c *FakeOperatorsV1alpha1) Subscriptions(namespace string) v1alpha1.SubscriptionInterface {
-	return &FakeSubscriptions{c, namespace}
+	return newFakeSubscriptions(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
