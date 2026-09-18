@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -72,13 +73,14 @@ import (
 const ReconcileLoopRequeueTime = 180 * time.Second
 
 const (
-	secretFieldUsername   = "username"
-	secretFieldPassword   = "password"
-	acmNamespace          = "open-cluster-management"
-	searchFilterProperty  = "property"
-	searchFilterCluster   = "cluster"
-	searchFilterNamespace = "namespace"
-	searchFilterValues    = "values"
+	secretFieldUsername       = "username"
+	secretFieldPassword       = "password"
+	acmNamespace              = "open-cluster-management"
+	searchFilterProperty      = "property"
+	searchFilterCluster       = "cluster"
+	searchFilterNamespace     = "namespace"
+	searchFilterValues        = "values"
+	searchResultOperationName = "searchResult"
 )
 
 // PatternReconciler reconciles a Pattern object
@@ -103,6 +105,8 @@ type PatternReconciler struct {
 	mgr                ctrl.Manager
 	ctrl               crcontroller.Controller
 	argoCDWatchStarted bool
+
+	tokenPath string
 }
 
 //+kubebuilder:rbac:groups=gitops.hybrid-cloud-patterns.io,resources=patterns,verbs=get;list;watch;create;update;patch;delete
@@ -1241,7 +1245,10 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 		var tokenBytes []byte
 		var err error
 
-		tokenPath := "/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
+		tokenPath := r.tokenPath
+		if tokenPath == "" {
+			tokenPath = "/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec
+		}
 
 		if tokenBytes, err = os.ReadFile(tokenPath); err != nil {
 			return false, fmt.Errorf("failed to read serviceaccount token: %w", err)
@@ -1256,8 +1263,8 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 		ns = []string{getClusterWideArgoNamespace()}
 	}
 	query := map[string]any{
-		"operationName": "searchResult",
-		"query":         "query searchResult($input: [SearchInput]) { searchResult: search(input: $input) { items related { kind items } } }",
+		"operationName": searchResultOperationName,
+		"query":         "query " + searchResultOperationName + "($input: [SearchInput]) { " + searchResultOperationName + ": search(input: $input) { items related { kind items } } }",
 		"variables": map[string]any{
 			"input": []map[string]any{
 				{
@@ -1303,13 +1310,28 @@ func (r *PatternReconciler) checkSpokeApplicationsGone(appOfApps bool) (bool, er
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	// Create HTTP client
-	// Use insecure TLS (self-signed certs)
+	caCertPool := x509.NewCertPool()
+	caLoaded := false
+	for _, caPath := range []string{
+		"/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+		"/run/secrets/kubernetes.io/serviceaccount/service-ca.crt",
+	} {
+		if caCert, err := os.ReadFile(caPath); err == nil {
+			caCertPool.AppendCertsFromPEM(caCert)
+			caLoaded = true
+		}
+	}
+	tlsConfig := &tls.Config{}
+	if caLoaded {
+		tlsConfig.RootCAs = caCertPool
+	} else {
+		// No in-cluster CA bundles found; assume a development environment
+		// where the API server uses self-signed certificates.
+		tlsConfig.InsecureSkipVerify = true //nolint:gosec
+	}
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true, //nolint:gosec
-			},
+			TLSClientConfig: tlsConfig,
 		},
 	}
 
