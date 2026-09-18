@@ -41,7 +41,7 @@ export async function fetchCatalogImage(): Promise<string> {
     const data = await response.json();
     const containers = data.spec?.template?.spec?.containers || [];
     const catalogContainer = containers.find(
-      (c: any) => c.name === 'patterns-operator-pattern-ui-catalog',
+      (c: { name?: string }) => c.name === 'patterns-operator-pattern-ui-catalog',
     );
     return catalogContainer?.image || 'unknown';
   } catch (error) {
@@ -77,11 +77,19 @@ export async function fetchAllPatterns(): Promise<{
   };
 }
 
+export interface ResourceCondition {
+  type?: string;
+  status?: string;
+  reason?: string;
+  message?: string;
+  lastTransitionTime?: string;
+}
+
 export interface VaultJobStatus {
   jobName?: string;
   status: 'not-found' | 'pending' | 'running' | 'succeeded' | 'failed';
   message: string;
-  conditions?: any[];
+  conditions?: ResourceCondition[];
 }
 
 export interface VaultInjectionRequest {
@@ -426,15 +434,16 @@ PLAYBOOK_EOF
       secretName,
     };
   } catch (error) {
+    const err = error as { name?: string; message?: string; stack?: string };
     console.error('🔴 [API] Error triggering vault injection:', error);
     console.error('🔴 [API] Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
     });
     return {
       success: false,
-      message: `Error triggering vault injection: ${error.message || error}`,
+      message: `Error triggering vault injection: ${err.message || error}`,
     };
   }
 }
@@ -457,11 +466,16 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
     console.log(`📋 [API] Jobs response received:`, {
       itemCount: data.items?.length || 0,
       items:
-        data.items?.map((job) => ({
-          name: job.metadata?.name,
-          creationTimestamp: job.metadata?.creationTimestamp,
-          status: job.status,
-        })) || [],
+        data.items?.map(
+          (job: {
+            metadata?: { name?: string; creationTimestamp?: string };
+            status?: unknown;
+          }) => ({
+            name: job.metadata?.name,
+            creationTimestamp: job.metadata?.creationTimestamp,
+            status: job.status,
+          }),
+        ) || [],
     });
 
     if (!data.items || data.items.length === 0) {
@@ -481,8 +495,11 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
       creationTimestamp: job.metadata?.creationTimestamp,
       status: jobStatus,
       conditions:
-        jobStatus.conditions?.map((c) => ({ type: c.type, status: c.status, reason: c.reason })) ||
-        [],
+        jobStatus.conditions?.map((c: ResourceCondition) => ({
+          type: c.type,
+          status: c.status,
+          reason: c.reason,
+        })) || [],
     });
 
     let status: VaultJobStatus['status'] = 'pending';
@@ -514,15 +531,16 @@ export async function fetchVaultJobStatus(patternName: string): Promise<VaultJob
     console.log(`📋 [API] Final job status result:`, result);
     return result;
   } catch (error) {
+    const err = error as { name?: string; message?: string; stack?: string };
     console.error(`🔴 [API] Error fetching vault job status for pattern ${patternName}:`, error);
     console.error(`🔴 [API] Error details:`, {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
     });
     return {
       status: 'not-found',
-      message: `Error checking vault job status: ${error.message || error}`,
+      message: `Error checking vault job status: ${err.message || error}`,
     };
   }
 }
@@ -535,7 +553,9 @@ export async function fetchInstalledPatterns(): Promise<string[]> {
     throw new Error(`Failed to fetch installed patterns: ${response.status}`);
   }
   const data = await response.json();
-  return (data.items || []).map((item: any) => item.metadata.name as string);
+  return (data.items || []).map(
+    (item: { metadata: { name: string } }) => item.metadata.name as string,
+  );
 }
 
 export interface PatternApplicationInfo {
@@ -551,7 +571,7 @@ export interface PatternCRStatus {
   lastStep?: string;
   lastError?: string;
   deletionPhase?: string;
-  conditions?: any[];
+  conditions?: ResourceCondition[];
   applications?: PatternApplicationInfo[];
   version?: number;
 }
@@ -578,8 +598,9 @@ export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
       applications: status.applications,
       version: status.version,
     };
-  } catch (err) {
+  } catch (error) {
     // consoleFetch may throw on 404 instead of returning a response
+    const err = error as { response?: { status?: number }; status?: number; message?: string };
     if (
       err?.response?.status === 404 ||
       err?.status === 404 ||
@@ -587,7 +608,7 @@ export async function fetchPatternCR(name: string): Promise<PatternCRStatus> {
     ) {
       return { exists: false };
     }
-    throw err;
+    throw error;
   }
 }
 

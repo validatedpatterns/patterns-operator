@@ -1,16 +1,22 @@
 import * as React from 'react';
 import * as ReactRouterDom from 'react-router-dom';
 
-const hasUseNavigate = typeof (ReactRouterDom as any).useNavigate === 'function';
+type RouterCompat = {
+  useNavigate: () => (path: string) => void;
+  useHistory: () => { push: (path: string) => void };
+};
+
+const router = ReactRouterDom as unknown as RouterCompat;
+const hasUseNavigate = typeof router.useNavigate === 'function';
 
 // React Router v6 removed useHistory in favor of useNavigate.
 // OCP 4.22+ ships v6; OCP 4.21 and earlier ship v5.
 export const useNavigateCompat: () => (path: string) => void = hasUseNavigate
   ? () => {
-      const navigate = (ReactRouterDom as any).useNavigate();
+      const navigate = router.useNavigate();
       return React.useCallback((path: string) => navigate(path), [navigate]);
     }
   : () => {
-      const history = (ReactRouterDom as any).useHistory();
+      const history = router.useHistory();
       return React.useCallback((path: string) => history.push(path), [history]);
     };

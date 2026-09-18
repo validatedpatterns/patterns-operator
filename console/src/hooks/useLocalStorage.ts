@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState } from 'react';
 
 interface StoredValue<T> {
   version: number;
@@ -33,9 +33,7 @@ export default function useLocalStorage<T>(
   initialValue: T,
   version = 1,
 ): [T, (value: T | ((prev: T) => T)) => void] {
-  const [storedValue, setStoredValue] = useState<T>(() =>
-    readValue(key, initialValue, version),
-  );
+  const [storedValue, setStoredValue] = useState<T>(() => readValue(key, initialValue, version));
 
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {
