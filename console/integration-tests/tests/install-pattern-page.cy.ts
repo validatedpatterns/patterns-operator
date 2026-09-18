@@ -58,8 +58,10 @@ describe('Install Pattern Page', () => {
 
   it('has Install and Cancel buttons', () => {
     navigateToInstallPage();
-    cy.contains('button', 'Install').scrollIntoView().should('be.visible');
-    cy.contains('button', 'Cancel').scrollIntoView().should('be.visible');
+    cy.contains('button', 'Install').scrollIntoView();
+    cy.contains('button', 'Install').should('be.visible');
+    cy.contains('button', 'Cancel').scrollIntoView();
+    cy.contains('button', 'Cancel').should('be.visible');
   });
 
   it('Cancel button returns to the catalog', () => {
