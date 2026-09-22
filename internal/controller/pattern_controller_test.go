@@ -32,6 +32,7 @@ import (
 	operatorclient "github.com/openshift/client-go/operator/clientset/versioned/fake"
 	olmclient "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/fake"
 	gomock "go.uber.org/mock/gomock"
+	"gopkg.in/yaml.v3"
 
 	kubeclient "k8s.io/client-go/kubernetes/fake"
 
@@ -616,6 +617,134 @@ var _ = Describe("pattern controller - buildPatternManifest helpers", func() {
 		p := buildPatternManifest()
 		Expect(p.Status.ClusterPlatform).To(Equal("AWS"))
 		Expect(p.Status.ClusterVersion).To(Equal("1.2.3"))
+	})
+})
+
+var _ = Describe("pattern controller - singleArgoCD secret copy", func() {
+	const (
+		srcNamespace   = "openshift-operators"
+		srcSecretName  = "private-repo"
+		destSecretName = "vp-private-repo-credentials" //nolint:gosec
+	)
+
+	var reconciler *PatternReconciler
+
+	createSourceSecret := func(r *PatternReconciler) {
+		srcSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      srcSecretName,
+				Namespace: srcNamespace,
+			},
+			Data: map[string][]byte{
+				"sshPrivateKey": []byte("fake-key"),
+				"url":           []byte("git@github.com:example/repo.git"),
+				"type":          []byte("git"),
+			},
+		}
+		_, err := r.fullClient.CoreV1().Secrets(srcNamespace).Create(
+			context.TODO(), srcSecret, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	secretExistsIn := func(r *PatternReconciler, ns string) bool {
+		_, err := r.fullClient.CoreV1().Secrets(ns).Get(
+			context.TODO(), destSecretName, metav1.GetOptions{})
+		return err == nil
+	}
+
+	writeValuesGlobal := func(dir string, singleArgoCD any) {
+		Expect(os.MkdirAll(dir, 0755)).To(Succeed())
+		content := map[string]any{"global": map[string]any{}}
+		if singleArgoCD != nil {
+			content["global"] = map[string]any{"singleArgoCD": singleArgoCD}
+		}
+		data, err := yaml.Marshal(content)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.WriteFile(filepath.Join(dir, "values-global.yaml"), data, 0600)).To(Succeed())
+	}
+
+	BeforeEach(func() {
+		nsOperators := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+		reconciler = newFakeReconciler(nsOperators, buildPatternManifest())
+		createSourceSecret(reconciler)
+		activeArgoNamespace = ApplicationNamespace
+		activeArgoName = ClusterWideArgoName
+	})
+
+	Context("singleArgoCD is true", func() {
+		It("skips copying the secret to the application-name namespace", func() {
+			patternDir := filepath.Join(tempDir, "single-argo-test")
+			writeValuesGlobal(patternDir, true)
+
+			p := buildPatternManifest()
+			enabled := true
+			p.Spec.MultiSourceConfig.Enabled = &enabled
+			p.Spec.ClusterGroupName = "standalone"
+			p.Spec.GitConfig.TokenSecret = srcSecretName
+			p.Spec.GitConfig.TokenSecretNamespace = srcNamespace
+			p.Status.LocalCheckoutPath = patternDir
+
+			singleArgo := false
+			mergedValues, err := getPatternMergedValues(p)
+			Expect(err).NotTo(HaveOccurred())
+			if v := getGlobalValue("singleArgoCD", mergedValues); v != nil {
+				singleArgo = v == true || v == "true"
+			}
+			Expect(singleArgo).To(BeTrue())
+
+			appNS := applicationName(p)
+			Expect(appNS).To(Equal("foo-standalone"))
+			Expect(secretExistsIn(reconciler, appNS)).To(BeFalse())
+		})
+	})
+
+	Context("singleArgoCD is false or absent (multi-Argo)", func() {
+		It("copies the secret to the application-name namespace", func() {
+			patternDir := filepath.Join(tempDir, "multi-argo-test")
+			writeValuesGlobal(patternDir, nil)
+
+			p := buildPatternManifest()
+			enabled := true
+			p.Spec.MultiSourceConfig.Enabled = &enabled
+			p.Spec.ClusterGroupName = "standalone"
+			p.Spec.GitConfig.TokenSecret = srcSecretName
+			p.Spec.GitConfig.TokenSecretNamespace = srcNamespace
+			p.Status.LocalCheckoutPath = patternDir
+
+			singleArgo := false
+			mergedValues, err := getPatternMergedValues(p)
+			Expect(err).NotTo(HaveOccurred())
+			if v := getGlobalValue("singleArgoCD", mergedValues); v != nil {
+				singleArgo = v == true || v == "true"
+			}
+			Expect(singleArgo).To(BeFalse())
+
+			appNS := applicationName(p)
+			err = reconciler.copyAuthGitSecret(srcNamespace, srcSecretName, appNS, destSecretName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(secretExistsIn(reconciler, appNS)).To(BeTrue())
+		})
+	})
+
+	Context("legacy ArgoCD namespace", func() {
+		BeforeEach(func() {
+			activeArgoNamespace = LegacyApplicationNamespace
+			activeArgoName = LegacyClusterWideArgoName
+		})
+
+		AfterEach(func() {
+			activeArgoNamespace = ApplicationNamespace
+			activeArgoName = ClusterWideArgoName
+		})
+
+		It("application-name namespace differs from legacy argo namespace", func() {
+			p := buildPatternManifest()
+			p.Spec.ClusterGroupName = "standalone"
+			appNS := applicationName(p)
+			Expect(appNS).To(Equal("foo-standalone"))
+			Expect(appNS).NotTo(Equal(getClusterWideArgoNamespace()))
+			Expect(getClusterWideArgoNamespace()).To(Equal(LegacyApplicationNamespace))
+		})
 	})
 })
 

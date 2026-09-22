@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
@@ -146,4 +147,42 @@ func countApplicationsAndSets(a any) (appCount, appSetsCount int) {
 		}
 	}
 	return applicationCount, applicationSetsCount
+}
+
+func getPatternMergedValues(p *api.Pattern) (map[string]any, error) {
+	gitDir := p.Status.LocalCheckoutPath
+	if _, err := os.Stat(gitDir); err != nil {
+		return nil, fmt.Errorf("%s path does not exist", gitDir)
+	}
+
+	useVariantsDir := HasVariantsFolderLayout(gitDir)
+	valueFiles := newApplicationValueFiles(p, gitDir, useVariantsDir)
+
+	mergedValues, err := mergeHelmValues(valueFiles...)
+	if err != nil {
+		return nil, fmt.Errorf("could not merge value files: %w", err)
+	}
+
+	extraParams := convertArgoHelmParametersToMap(newApplicationParameters(p))
+	mergedValues = chartutil.CoalesceTables(extraParams, mergedValues)
+
+	return mergedValues, nil
+}
+
+func getGlobalValue(key string, values map[string]any) any { //nolint:unparam
+	global, ok := values["global"]
+	if !ok {
+		return nil
+	}
+
+	globalMap, ok := global.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	v, ok := globalMap[key]
+	if !ok {
+		return nil
+	}
+	return v
 }
