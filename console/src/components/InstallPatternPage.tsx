@@ -202,7 +202,7 @@ export default function InstallPatternPage() {
       }
     } catch (err) {
       console.error('🔴 [InstallPatternPage] Error triggering vault injection:', err);
-      const errorMessage = err.message || err.toString();
+      const errorMessage = err instanceof Error ? err.message : String(err);
       setVaultJobStatus({
         status: 'not-found',
         message: `Failed to trigger vault injection: ${errorMessage}`,
@@ -347,7 +347,8 @@ export default function InstallPatternPage() {
       }
     } catch (err) {
       console.error('🔴 [InstallPatternPage] Pattern installation failed:', err);
-      setSubmitError(err?.message || String(err));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setSubmitError(errorMessage);
     } finally {
       setSubmitting(false);
       console.log('🏁 [InstallPatternPage] Pattern installation process finished');

@@ -114,7 +114,7 @@ function RequirementsPopoverBody({ pattern, clouds }: { pattern: Pattern; clouds
       {clouds.map((cloud) => (
         <StackItem key={cloud}>
           <Label color="blue" isCompact>
-            {CLOUD_LABELS[cloud] || cloud}
+            {CLOUD_LABELS[cloud as CloudLabelKey] || cloud}
           </Label>
           <Table variant="compact" borders={false}>
             <Thead>
@@ -164,9 +164,7 @@ export default function PatternCard({
   const clouds = getCloudProviders(pattern);
 
   return (
-    <Card
-      className={isDisabled ? 'patterns-operator__card--disabled' : ''}
-    >
+    <Card className={isDisabled ? 'patterns-operator__card--disabled' : ''}>
       <CardHeader>
         <Flex
           justifyContent={{ default: 'justifyContentSpaceBetween' }}
@@ -215,8 +213,8 @@ export default function PatternCard({
                       aria-label={t('Tested requirements details')}
                       maxWidth="500px"
                       isVisible={isVisible}
-                      shouldOpen={(_event, _fn) => setIsVisible(true)}
-                      shouldClose={(_event, _fn) => setIsVisible(false)}
+                      shouldOpen={() => setIsVisible(true)}
+                      shouldClose={() => setIsVisible(false)}
                       headerContent={t('Tested requirements')}
                       bodyContent={<RequirementsPopoverBody pattern={pattern} clouds={clouds} />}
                     >
@@ -235,7 +233,7 @@ export default function PatternCard({
                   <LabelGroup>
                     {clouds.map((cloud) => (
                       <Label key={cloud} color="blue" isCompact>
-                        {CLOUD_LABELS[cloud] || cloud}
+                        {CLOUD_LABELS[cloud as CloudLabelKey] || cloud}
                       </Label>
                     ))}
                   </LabelGroup>

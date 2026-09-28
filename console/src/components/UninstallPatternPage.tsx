@@ -68,7 +68,8 @@ export default function UninstallPatternPage() {
         }
       } catch (err) {
         // If the fetch fails with a 404-like error, treat as deleted
-        if (err?.message && /404|not found/i.test(err.message)) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage && /404|not found/i.test(errorMessage)) {
           setDeleted(true);
           setDeleting(false);
           clearInterval(interval);
@@ -95,7 +96,8 @@ export default function UninstallPatternPage() {
         setConfirmed(true);
       }
     } catch (err) {
-      setError(err?.message || String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
       setDeleting(false);
     }
   };
