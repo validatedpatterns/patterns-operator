@@ -1,6 +1,6 @@
 module github.com/hybrid-cloud-patterns/patterns-operator
 
-go 1.25.5
+go 1.26.0
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.9.0 // indirect
+	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	cyphar.com/go-pathrs v0.2.6 // indirect
 	github.com/42wim/httpsig v1.2.4 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.1 // indirect
