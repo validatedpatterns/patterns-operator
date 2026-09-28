@@ -125,7 +125,8 @@ export default function ManageSecretsPage() {
         setSubmitError(result.message);
       }
     } catch (err) {
-      setSubmitError(err?.message || String(err));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setSubmitError(errorMessage);
     } finally {
       setSubmitting(false);
     }
