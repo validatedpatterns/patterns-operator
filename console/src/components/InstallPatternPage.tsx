@@ -1,5 +1,4 @@
 import * as React from 'react';
-import Helmet from 'react-helmet';
 import { useTranslation } from 'react-i18next';
 import { useNavigateCompat } from '../hooks/useNavigateCompat';
 import { useParamsCompat } from '../hooks/useParamsCompat';
@@ -26,7 +25,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table';
-import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
+import { DocumentTitle, k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import {
   fetchPattern,
   fetchPatternCR,
@@ -396,9 +395,7 @@ export default function InstallPatternPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{t('Install Pattern')}</title>
-      </Helmet>
+      <DocumentTitle>{t('Install Pattern')}</DocumentTitle>
       <PageSection>
         <Title headingLevel="h1">{t('Install Pattern')}</Title>
       </PageSection>

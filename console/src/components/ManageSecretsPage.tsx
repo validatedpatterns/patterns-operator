@@ -1,5 +1,5 @@
 import * as React from 'react';
-import Helmet from 'react-helmet';
+import { DocumentTitle } from '@openshift-console/dynamic-plugin-sdk';
 import { useTranslation } from 'react-i18next';
 import { useNavigateCompat } from '../hooks/useNavigateCompat';
 import { useParamsCompat } from '../hooks/useParamsCompat';
@@ -181,9 +181,7 @@ export default function ManageSecretsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{t('Manage Secrets')}</title>
-      </Helmet>
+      <DocumentTitle>{t('Manage Secrets')}</DocumentTitle>
       <PageSection>
         <Title headingLevel="h1">{t('Manage Secrets for {{displayName}}', { displayName })}</Title>
       </PageSection>
