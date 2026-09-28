@@ -6,6 +6,11 @@ DEFAULT_NS="patterns-operator"
 OPERATOR="patterns-operator"
 VERSION="${VERSION:-6.6.6}"
 UPLOADREGISTRY="${UPLOADREGISTRY:-kuemper.int.rhx/bandini}"
+SKIP_BUILD=false
+
+if [[ "${1:-}" == "--skip-build" ]]; then
+    SKIP_BUILD=true
+fi
 
 wait_for_resource() {
     local resource_type=$1  # Either "packagemanifest", "operator", or "csv"
@@ -61,11 +66,6 @@ apply_subscription() {
 EOF
 }
 
-if [[ -n $(git status --porcelain) ]]; then
-    echo "Uncommitted changes detected."
-    exit 1
-fi
-
 echo "Checking for cluster reachability:"
 OUT=$(oc cluster-info 2>&1)
 ret=$?
@@ -74,9 +74,20 @@ if [ $ret -ne 0 ]; then
     exit 1
 fi
 
-make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" CHANNELS=fast USE_IMAGE_DIGESTS="" \
-    manifests bundle generate docker-build docker-push console-build-amd64 console-push bundle-build bundle-push catalog-build \
-    catalog-push catalog-install
+if [[ "$SKIP_BUILD" == true ]]; then
+    echo "Skipping build, installing catalog only"
+    make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" CHANNELS=fast USE_IMAGE_DIGESTS="" \
+        catalog-install
+else
+    if [[ -n $(git status --porcelain) ]]; then
+        echo "Uncommitted changes detected."
+        exit 1
+    fi
+
+    make VERSION=${VERSION} UPLOADREGISTRY="${UPLOADREGISTRY}" CHANNELS=fast USE_IMAGE_DIGESTS="" \
+        manifests bundle generate docker-build docker-push console-build-amd64 console-push bundle-build bundle-push catalog-build \
+        catalog-push catalog-install
+fi
 
 # If the operator already exists in openshift-operators, keep using that namespace;
 # otherwise use the new dedicated namespace.
