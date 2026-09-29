@@ -433,7 +433,16 @@ func (r *PatternReconciler) reconcileArgoInfra(qualifiedInstance *api.Pattern, p
 		return true, res, e
 	}
 
-	if argoErr := createOrUpdateArgoCD(r.dynamicClient, r.fullClient, getClusterWideArgoName(), clusterWideNS, patternsOperatorConfig); argoErr != nil {
+	var sshKnownHosts string
+	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
+		if secretData, secretErr := r.authGitFromSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace, qualifiedInstance.Spec.GitConfig.TokenSecret); secretErr == nil {
+			if kh, ok := secretData["sshKnownHosts"]; ok {
+				sshKnownHosts = string(kh)
+			}
+		}
+	}
+
+	if argoErr := createOrUpdateArgoCD(r.dynamicClient, r.fullClient, getClusterWideArgoName(), clusterWideNS, patternsOperatorConfig, sshKnownHosts); argoErr != nil {
 		res, e := r.actionPerformed(qualifiedInstance, "created or updated clusterwide argo instance", argoErr)
 		return true, res, e
 	}

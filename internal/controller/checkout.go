@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 
 	stdssh "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/go-git/go-git/v5"
@@ -350,9 +351,38 @@ func getSshPublicKey(url string, secret map[string][]byte) (*ssh.PublicKeys, err
 	if keyError != nil {
 		return nil, fmt.Errorf("could not get publicKey: %s", keyError)
 	}
-	// FIXME(bandini): in the future we might want to support passing some known hosts
-	publicKey.HostKeyCallback = stdssh.InsecureIgnoreHostKey() //nolint:gosec
+
+	if cb, err := hostKeyCallbackFromSecret(secret); err == nil {
+		publicKey.HostKeyCallback = cb
+	} else {
+		publicKey.HostKeyCallback = stdssh.InsecureIgnoreHostKey() //nolint:gosec
+	}
 	return publicKey, nil
+}
+
+func hostKeyCallbackFromSecret(secret map[string][]byte) (stdssh.HostKeyCallback, error) {
+	khData := getField(secret, "sshKnownHosts")
+	if len(khData) == 0 {
+		return nil, fmt.Errorf("no sshKnownHosts in secret")
+	}
+
+	tmpFile, err := os.CreateTemp("", "known_hosts")
+	if err != nil {
+		return nil, fmt.Errorf("could not create temp known_hosts file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(khData); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("could not write known_hosts: %w", err)
+	}
+	tmpFile.Close()
+
+	cb, err := knownhosts.New(tmpFile.Name())
+	if err != nil {
+		return nil, fmt.Errorf("could not parse known_hosts: %w", err)
+	}
+	return cb, nil
 }
 
 func getGitHubAppAuthTransport(fullClient kubernetes.Interface, secret map[string][]byte) (*ghinstallation.Transport, error) {
