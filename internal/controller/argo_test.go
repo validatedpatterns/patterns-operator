@@ -901,7 +901,7 @@ var _ = Describe("NewArgoCD", func() {
 		name = "test-argocd"
 		namespace = "test-namespace"
 		patternsOperatorConfig = DefaultPatternsOperatorConfig
-		argoCD = newArgoCD(name, namespace, patternsOperatorConfig)
+		argoCD = newArgoCD(name, namespace, patternsOperatorConfig, "")
 	})
 
 	Context("when creating a new ArgoCD object", func() {
@@ -1050,7 +1050,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 
 	Context("when the ArgoCD instance does not exist", func() {
 		It("should create a new ArgoCD instance", func() {
-			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig)
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig, "")
 			Expect(err).ToNot(HaveOccurred())
 
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -1078,7 +1078,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 		})
 
 		It("should update the existing ArgoCD instance", func() {
-			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig)
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig, "")
 			Expect(err).ToNot(HaveOccurred())
 
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -1113,7 +1113,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 		})
 
 		It("should preserve spec fields not managed by patterns-operator during update", func() {
-			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig)
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig, "")
 			Expect(err).ToNot(HaveOccurred())
 
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -1156,7 +1156,7 @@ var _ = Describe("CreateOrUpdateArgoCD", func() {
 		})
 
 		It("should propagate the error and not update the existing argocd", func() {
-			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig)
+			err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, patternsOperatorConfig, "")
 			Expect(err).To(HaveOccurred())
 
 			argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -1178,45 +1178,45 @@ var _ = Describe("CompareArgoCD", func() {
 
 	Context("when one is nil and the other is not", func() {
 		It("should return false when goal is nil", func() {
-			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			Expect(compareArgoCD(nil, argo)).To(BeFalse())
 		})
 		It("should return false when actual is nil", func() {
-			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			Expect(compareArgoCD(argo, nil)).To(BeFalse())
 		})
 	})
 
 	Context("when both are identical", func() {
 		It("should return true", func() {
-			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			argo := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			Expect(compareArgoCD(argo, argo)).To(BeTrue())
 		})
 	})
 
 	Context("when spec fields differ", func() {
 		It("should return false when Controller resources change", func() {
-			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
-			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			actual.Spec.Controller.Resources.Limits[v1.ResourceMemory] = resource.MustParse("16Gi")
 			Expect(compareArgoCD(goal, actual)).To(BeFalse())
 		})
 		It("should return false when RBAC policy changes", func() {
-			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
-			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			newPolicy := "role:admin"
 			actual.Spec.RBAC.DefaultPolicy = &newPolicy
 			Expect(compareArgoCD(goal, actual)).To(BeFalse())
 		})
 		It("should return false when Server route changes", func() {
-			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
-			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			actual.Spec.Server.Route.Enabled = false
 			Expect(compareArgoCD(goal, actual)).To(BeFalse())
 		})
 		It("should return false when SSO changes", func() {
-			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
-			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			actual.Spec.SSO = nil
 			Expect(compareArgoCD(goal, actual)).To(BeFalse())
 		})
@@ -1224,8 +1224,8 @@ var _ = Describe("CompareArgoCD", func() {
 
 	Context("when overlay is applied to typed spec", func() {
 		It("should return false when overlay changes a known field", func() {
-			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
-			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			overlay := `controller:
   resources:
     limits:
@@ -1234,10 +1234,15 @@ var _ = Describe("CompareArgoCD", func() {
 			Expect(compareArgoCD(goal, actual)).To(BeFalse())
 		})
 		It("should return true when overlay matches existing values", func() {
-			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
-			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig)
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
 			Expect(applyCustomArgoOverlayToSpec(goal, "")).To(Succeed())
 			Expect(compareArgoCD(goal, actual)).To(BeTrue())
+		})
+		It("should detect InitialSSHKnownHosts changes", func() {
+			goal := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "myhost ssh-ed25519 AAAA")
+			actual := newArgoCD(argoName, argoNS, DefaultPatternsOperatorConfig, "")
+			Expect(compareArgoCD(goal, actual)).To(BeFalse())
 		})
 	})
 })
@@ -1263,14 +1268,14 @@ var _ = Describe("CreateOrUpdateArgoCD skips update when unchanged", func() {
 	It("should skip the update when the existing ArgoCD matches desired state", func() {
 		config := DefaultPatternsOperatorConfig
 
-		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		rvAfterCreate := argoCD.GetResourceVersion()
 
-		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		argoCD, err = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -2329,33 +2334,33 @@ var _ = Describe("newArgoCD", func() {
 	var argo *argooperator.ArgoCD
 
 	It("should create an ArgoCD with the correct name and namespace", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Name).To(Equal("test-argo"))
 		Expect(argo.Namespace).To(Equal("test-ns"))
 	})
 
 	It("should have the argoproj.io/finalizer", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Finalizers).To(ContainElement("argoproj.io/finalizer"))
 	})
 
 	It("should have HA disabled", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.HA.Enabled).To(BeFalse())
 	})
 
 	It("should have monitoring disabled", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.Monitoring.Enabled).To(BeFalse())
 	})
 
 	It("should have notifications disabled", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.Notifications.Enabled).To(BeFalse())
 	})
 
 	It("should have SSO configured with Dex provider", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.SSO).ToNot(BeNil())
 		Expect(argo.Spec.SSO.Provider).To(Equal(argooperator.SSOProviderTypeDex))
 		Expect(argo.Spec.SSO.Dex).ToNot(BeNil())
@@ -2363,21 +2368,21 @@ var _ = Describe("newArgoCD", func() {
 	})
 
 	It("should have server route enabled with reencrypt TLS", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.Server.Route.Enabled).To(BeTrue())
 		Expect(argo.Spec.Server.Route.TLS).ToNot(BeNil())
 		Expect(argo.Spec.Server.Route.TLS.Termination).To(Equal(routev1.TLSTerminationReencrypt))
 	})
 
 	It("should have resource exclusions for tekton", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("tekton.dev"))
 		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("TaskRun"))
 		Expect(argo.Spec.ResourceExclusions).To(ContainSubstring("PipelineRun"))
 	})
 
 	It("should have resource health checks for PersistentVolumeClaim and Subscription", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
 		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
@@ -2385,19 +2390,19 @@ var _ = Describe("newArgoCD", func() {
 	})
 
 	It("should have init containers for CA cert fetching", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.Repo.InitContainers).To(HaveLen(1))
 		Expect(argo.Spec.Repo.InitContainers[0].Name).To(Equal("fetch-ca"))
 	})
 
 	It("should have correct RBAC policy with defaults", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.RBAC.Policy).ToNot(BeNil())
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
 	})
 
 	It("should have correct RBAC policy with additional admin", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.additionalArgoAdmins": "test-admins"})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.additionalArgoAdmins": "test-admins"}, "")
 		Expect(argo.Spec.RBAC.Policy).ToNot(BeNil())
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("test-admins"))
@@ -2410,7 +2415,7 @@ policy: |
   p, role:viewer, applications, get, */*, allow
 scopes: "[groups]"
 policyMatcherMode: "glob"`
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: rbacYAML})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: rbacYAML}, "")
 		Expect(*argo.Spec.RBAC.DefaultPolicy).To(Equal("role:admin"))
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("my-custom-group"))
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("role:viewer"))
@@ -2426,27 +2431,27 @@ scopes: "[groups,email]"`
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{
 			configKeyArgoRBAC:         rbacYAML,
 			configKeyAdditionalAdmins: "extra-admin-group",
-		})
+		}, "")
 		Expect(*argo.Spec.RBAC.Policy).To(Equal("g, custom-admins, role:admin"))
 		Expect(*argo.Spec.RBAC.Policy).NotTo(ContainSubstring("extra-admin-group"))
 	})
 
 	It("should fall back to defaults when gitops.argoRBAC has invalid YAML", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: "not: valid: {yaml"})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: "not: valid: {yaml"}, "")
 		Expect(*argo.Spec.RBAC.DefaultPolicy).To(Equal("role:readonly"))
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
 		Expect(*argo.Spec.RBAC.Scopes).To(Equal("[groups,email]"))
 	})
 
 	It("should use default RBAC when gitops.argoRBAC is empty", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: ""})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyArgoRBAC: ""}, "")
 		Expect(*argo.Spec.RBAC.DefaultPolicy).To(Equal("role:readonly"))
 		Expect(*argo.Spec.RBAC.Policy).To(ContainSubstring("cluster-admins"))
 		Expect(*argo.Spec.RBAC.Scopes).To(Equal("[groups,email]"))
 	})
 
 	It("should have PersistentVolumeClaim and Subscription ResourceHealthChecks", func() {
-		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
@@ -2455,7 +2460,7 @@ scopes: "[groups,email]"`
 	})
 
 	It("should have also Application ResourceHealthChecks when gitops.applicationHealthCheckEnabled is set to true", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.applicationHealthCheckEnabled": "true"})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{"gitops.applicationHealthCheckEnabled": "true"}, "")
 		Expect(argo.Spec.ResourceHealthChecks).ToNot(BeNil())
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(3))
 		Expect(argo.Spec.ResourceHealthChecks[2].Group).To(Equal("argoproj.io"))
@@ -2475,7 +2480,7 @@ scopes: "[groups,email]"`
     hs = {}
     hs.status = "Progressing"
     return hs`
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: customYAML})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: customYAML}, "")
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(4))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
 		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
@@ -2495,7 +2500,7 @@ scopes: "[groups,email]"`
 		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{
 			"gitops.applicationHealthCheckEnabled": "true",
 			configKeyCustomHealthCheck:             customYAML,
-		})
+		}, "")
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(4))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
 		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
@@ -2504,15 +2509,28 @@ scopes: "[groups,email]"`
 	})
 
 	It("should handle invalid YAML in gitops.customHealthChecks gracefully", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: "not: valid: yaml: list"})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: "not: valid: yaml: list"}, "")
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
 		Expect(argo.Spec.ResourceHealthChecks[0].Kind).To(Equal("PersistentVolumeClaim"))
 		Expect(argo.Spec.ResourceHealthChecks[1].Group).To(Equal("operators.coreos.com"))
 	})
 
 	It("should not add custom health checks when gitops.customHealthChecks is empty", func() {
-		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: ""})
+		argo = newArgoCD("test-argo", "test-ns", PatternsOperatorConfig{configKeyCustomHealthCheck: ""}, "")
 		Expect(argo.Spec.ResourceHealthChecks).To(HaveLen(2))
+	})
+
+	It("should set InitialSSHKnownHosts.Keys when sshKnownHosts is provided", func() {
+		knownHosts := "myhost.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest"
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, knownHosts)
+		Expect(argo.Spec.InitialSSHKnownHosts.Keys).To(Equal(knownHosts))
+		Expect(argo.Spec.InitialSSHKnownHosts.ExcludeDefaultHosts).To(BeFalse())
+	})
+
+	It("should leave InitialSSHKnownHosts.Keys empty when sshKnownHosts is empty", func() {
+		argo = newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
+		Expect(argo.Spec.InitialSSHKnownHosts.Keys).To(BeEmpty())
+		Expect(argo.Spec.InitialSSHKnownHosts.ExcludeDefaultHosts).To(BeFalse())
 	})
 
 })
@@ -2521,7 +2539,7 @@ var _ = Describe("applyCustomArgoOverlay", func() {
 	var baseArgo *unstructured.Unstructured
 
 	BeforeEach(func() {
-		argo := newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig)
+		argo := newArgoCD("test-argo", "test-ns", DefaultPatternsOperatorConfig, "")
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(argo)
 		Expect(err).ToNot(HaveOccurred())
 		baseArgo = &unstructured.Unstructured{Object: obj}
@@ -2619,7 +2637,7 @@ var _ = Describe("createOrUpdateArgoCD with custom overlay", func() {
 			configKeyCustomArgoYaml: `extraConfig:
   customField: customValue`,
 		}
-		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -2638,7 +2656,7 @@ var _ = Describe("createOrUpdateArgoCD with custom overlay", func() {
     limits:
       cpu: "2"`,
 		}
-		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		cpu, found, err := unstructured.NestedString(
@@ -2652,7 +2670,7 @@ var _ = Describe("createOrUpdateArgoCD with custom overlay", func() {
   resources:
     limits:
       cpu: "16"`
-		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		cpu, found, err = unstructured.NestedString(
@@ -2670,14 +2688,14 @@ var _ = Describe("createOrUpdateArgoCD with custom overlay", func() {
     limits:
       cpu: "4"`,
 		}
-		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		rvAfterCreate := argoCD.GetResourceVersion()
 
-		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err = createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		argoCD, err = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -2692,7 +2710,7 @@ var _ = Describe("createOrUpdateArgoCD with custom overlay", func() {
     limits:
       cpu: "8"`,
 		}
-		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config)
+		err := createOrUpdateArgoCD(dynamicClient, nil, name, namespace, config, "")
 		Expect(err).ToNot(HaveOccurred())
 
 		argoCD, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})

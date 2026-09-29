@@ -94,7 +94,7 @@ const (
 	ConsoleLinkResource = "consolelinks"
 )
 
-func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorConfig) *argooperator.ArgoCD {
+func newArgoCD(name, namespace string, patternsOperatorConfig PatternsOperatorConfig, sshKnownHosts string) *argooperator.ArgoCD {
 	var argoRBAC argooperator.ArgoCDRBACSpec
 	if argoRBACYAML := patternsOperatorConfig.getStringValue(configKeyArgoRBAC); argoRBACYAML != "" {
 		if err := yaml.Unmarshal([]byte(argoRBACYAML), &argoRBAC); err != nil {
@@ -467,7 +467,10 @@ return health_status`,
   - TaskRun
   - PipelineRun`,
 			// We can drop this custom Subscription healthcheck once https://www.github.com/argoproj/argo-cd/issues/25921 is fixed
-			ResourceHealthChecks:   resourceHealthChecks,
+			ResourceHealthChecks: resourceHealthChecks,
+			InitialSSHKnownHosts: argooperator.SSHHostsSpec{
+				Keys: sshKnownHosts,
+			},
 			ResourceTrackingMethod: "annotation",
 			Server: argooperator.ArgoCDServerSpec{
 				Autoscale: argooperator.ArgoCDServerAutoscaleSpec{
@@ -576,8 +579,8 @@ func haveArgo(client dynamic.Interface, name, namespace string) bool {
 	return err == nil
 }
 
-func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interface, name, namespace string, patternsOperatorConfig PatternsOperatorConfig) error {
-	argo := newArgoCD(name, namespace, patternsOperatorConfig)
+func createOrUpdateArgoCD(client dynamic.Interface, fullClient kubernetes.Interface, name, namespace string, patternsOperatorConfig PatternsOperatorConfig, sshKnownHosts string) error {
+	argo := newArgoCD(name, namespace, patternsOperatorConfig, sshKnownHosts)
 	gvr := schema.GroupVersionResource{Group: ArgoCDGroup, Version: ArgoCDVersion, Resource: ArgoCDResource}
 
 	// we skip this check if fullClient is explicitly nil for simpler testing
