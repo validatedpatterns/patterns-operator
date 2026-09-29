@@ -384,25 +384,6 @@ return health_status`,
 					},
 				},
 			},
-			Grafana: argooperator.ArgoCDGrafanaSpec{
-				Enabled: false,
-				Ingress: argooperator.ArgoCDIngressSpec{
-					Enabled: false,
-				},
-				Route: argooperator.ArgoCDRouteSpec{
-					Enabled: false,
-				},
-				Resources: &v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("500m"),
-						v1.ResourceMemory: resource.MustParse("256Mi"),
-					},
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("250m"),
-						v1.ResourceMemory: resource.MustParse("128Mi"),
-					},
-				},
-			},
 			HA: argooperator.ArgoCDHASpec{
 				Enabled: false,
 				Resources: &v1.ResourceRequirements{
