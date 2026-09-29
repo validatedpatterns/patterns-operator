@@ -244,7 +244,7 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return result, argoErr
 	}
 
-	// Copy the bootstrap secret to the namespaced argo namespace
+	// Copy the bootstrap secret to the clusterwide argo namespace
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
 		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
 			qualifiedInstance.Spec.GitConfig.TokenSecret, getClusterWideArgoNamespace(), "vp-private-repo-credentials"); err != nil {
@@ -280,11 +280,21 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return result, appErr
 	}
 
-	// Copy the bootstrap secret to the namespaced argo namespace
+	// Copy the bootstrap secret to the per-pattern namespaced argo namespace.
+	// Under singleArgoCD the application lives in the clusterwide ArgoCD namespace
+	// (which already received the secret above), so skip this copy.
 	if qualifiedInstance.Spec.GitConfig.TokenSecret != "" {
-		if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
-			qualifiedInstance.Spec.GitConfig.TokenSecret, applicationName(qualifiedInstance), "vp-private-repo-credentials"); err != nil {
-			return r.actionPerformed(qualifiedInstance, "copying clusterwide git auth secret to namespaced argo", err)
+		singleArgo := false
+		if mergedValues, valErr := getPatternMergedValues(qualifiedInstance); valErr == nil {
+			if v := getGlobalValue("singleArgoCD", mergedValues); v != nil {
+				singleArgo = v == true || v == boolTrue
+			}
+		}
+		if !singleArgo {
+			if err = r.copyAuthGitSecret(qualifiedInstance.Spec.GitConfig.TokenSecretNamespace,
+				qualifiedInstance.Spec.GitConfig.TokenSecret, applicationName(qualifiedInstance), "vp-private-repo-credentials"); err != nil {
+				return r.actionPerformed(qualifiedInstance, "copying git auth secret to namespaced argo", err)
+			}
 		}
 	}
 	// Perform validation of the site values file(s)

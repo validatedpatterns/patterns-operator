@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
@@ -405,3 +406,85 @@ var _ = Describe("CountApplicationsAndSets", func() {
 		})
 	})
 })
+
+var _ = Describe("getGlobalValue", func() {
+	It("returns the value when global key exists", func() {
+		values := map[string]any{
+			"global": map[string]any{"singleArgoCD": true},
+		}
+		Expect(getGlobalValue("singleArgoCD", values)).To(BeTrue())
+	})
+
+	It("returns nil when global key is missing", func() {
+		values := map[string]any{
+			"global": map[string]any{"otherKey": "val"},
+		}
+		Expect(getGlobalValue("singleArgoCD", values)).To(BeNil())
+	})
+
+	It("returns nil when global section is absent", func() {
+		values := map[string]any{"clusterGroup": map[string]any{"foo": "bar"}}
+		Expect(getGlobalValue("singleArgoCD", values)).To(BeNil())
+	})
+
+	It("returns nil when global is not a map", func() {
+		values := map[string]any{"global": "notAMap"}
+		Expect(getGlobalValue("singleArgoCD", values)).To(BeNil())
+	})
+
+	It("returns string value for string-typed booleans", func() {
+		values := map[string]any{
+			"global": map[string]any{"singleArgoCD": "true"},
+		}
+		Expect(getGlobalValue("singleArgoCD", values)).To(Equal("true"))
+	})
+})
+
+var _ = Describe("getPatternMergedValues", func() {
+	It("merges values-global.yaml and extraParameters", func() {
+		patternDir := filepath.Join(tempDir, "merge-test")
+		Expect(os.MkdirAll(patternDir, 0755)).To(Succeed())
+
+		createTempValueFileAt(patternDir, "values-global.yaml", map[string]any{
+			"global": map[string]any{
+				"singleArgoCD": true,
+				"pattern":      "from-file",
+			},
+		})
+
+		p := &api.Pattern{}
+		enabled := true
+		p.Spec.MultiSourceConfig.Enabled = &enabled
+		p.Name = "test-pattern"
+		p.Spec.ClusterGroupName = "default"
+		p.Status.LocalCheckoutPath = patternDir
+
+		merged, err := getPatternMergedValues(p)
+		Expect(err).NotTo(HaveOccurred())
+
+		global, ok := merged["global"].(map[string]any)
+		Expect(ok).To(BeTrue())
+		Expect(global["singleArgoCD"]).To(BeTrue())
+		// extraParameters override file values for global.pattern
+		Expect(global["pattern"]).To(Equal("test-pattern"))
+	})
+
+	It("returns error when checkout path does not exist", func() {
+		p := &api.Pattern{}
+		p.Status.LocalCheckoutPath = "/nonexistent/path"
+
+		_, err := getPatternMergedValues(p)
+		Expect(err).To(HaveOccurred())
+	})
+})
+
+func createTempValueFileAt(dir, name string, content any) string {
+	filePath := filepath.Join(dir, name)
+	data, err := yaml.Marshal(content)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = os.WriteFile(filePath, data, 0600)
+	Expect(err).NotTo(HaveOccurred())
+
+	return filePath
+}
