@@ -126,8 +126,8 @@ github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/argoproj-labs/argocd-operator v0.17.0
-## explicit; go 1.24.6
+# github.com/argoproj-labs/argocd-operator v0.18.0
+## explicit; go 1.25.9
 github.com/argoproj-labs/argocd-operator/api/v1beta1
 github.com/argoproj-labs/argocd-operator/common
 # github.com/argoproj/argo-cd/v3 v3.3.10
@@ -165,7 +165,7 @@ github.com/argoproj/argo-cd/v3/util/regex
 github.com/argoproj/argo-cd/v3/util/security
 github.com/argoproj/argo-cd/v3/util/versions
 github.com/argoproj/argo-cd/v3/util/workloadidentity
-# github.com/argoproj/gitops-engine v0.7.1-0.20250908182407-97ad5b59a627
+# github.com/argoproj/gitops-engine v0.7.1-0.20251217140045-5baed5604d2d
 ## explicit; go 1.24.0
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/api/v1/endpoints
 github.com/argoproj/gitops-engine/internal/kubernetes_vendor/pkg/util/hash
@@ -1806,7 +1806,7 @@ oras.land/oras-go/v2/registry/remote/credentials/trace
 oras.land/oras-go/v2/registry/remote/errcode
 oras.land/oras-go/v2/registry/remote/internal/errutil
 oras.land/oras-go/v2/registry/remote/retry
-# sigs.k8s.io/controller-runtime v0.21.0
+# sigs.k8s.io/controller-runtime v0.22.3
 ## explicit; go 1.24.0
 sigs.k8s.io/controller-runtime
 sigs.k8s.io/controller-runtime/pkg/builder
@@ -1860,6 +1860,7 @@ sigs.k8s.io/controller-runtime/pkg/webhook
 sigs.k8s.io/controller-runtime/pkg/webhook/admission
 sigs.k8s.io/controller-runtime/pkg/webhook/admission/metrics
 sigs.k8s.io/controller-runtime/pkg/webhook/conversion
+sigs.k8s.io/controller-runtime/pkg/webhook/conversion/metrics
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 # sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250308055145-5fe7bb3edc86
 ## explicit; go 1.22.0
