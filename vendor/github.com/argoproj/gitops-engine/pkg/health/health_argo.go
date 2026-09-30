@@ -2,6 +2,7 @@ package health
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type nodePhase string
@@ -16,17 +17,28 @@ const (
 	nodeError     nodePhase = "Error"
 )
 
-func getArgoWorkflowHealth(obj *unstructured.Unstructured) (*HealthStatus, error) {
-	phase, _, _ := unstructured.NestedString(obj.Object, "status", "phase")
-	message, _, _ := unstructured.NestedString(obj.Object, "status", "message")
-
-	switch nodePhase(phase) {
-	case "", nodePending, nodeRunning:
-		return &HealthStatus{Status: HealthStatusProgressing, Message: message}, nil
-	case nodeSucceeded:
-		return &HealthStatus{Status: HealthStatusHealthy, Message: message}, nil
-	case nodeFailed, nodeError:
-		return &HealthStatus{Status: HealthStatusDegraded, Message: message}, nil
+// An agnostic workflow object only considers Status.Phase and Status.Message. It is agnostic to the API version or any
+// other fields.
+type argoWorkflow struct {
+	Status struct {
+		Phase   nodePhase
+		Message string
 	}
-	return &HealthStatus{Status: HealthStatusUnknown, Message: message}, nil
+}
+
+func getArgoWorkflowHealth(obj *unstructured.Unstructured) (*HealthStatus, error) {
+	var wf argoWorkflow
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &wf)
+	if err != nil {
+		return nil, err
+	}
+	switch wf.Status.Phase {
+	case "", nodePending, nodeRunning:
+		return &HealthStatus{Status: HealthStatusProgressing, Message: wf.Status.Message}, nil
+	case nodeSucceeded:
+		return &HealthStatus{Status: HealthStatusHealthy, Message: wf.Status.Message}, nil
+	case nodeFailed, nodeError:
+		return &HealthStatus{Status: HealthStatusDegraded, Message: wf.Status.Message}, nil
+	}
+	return &HealthStatus{Status: HealthStatusUnknown, Message: wf.Status.Message}, nil
 }
