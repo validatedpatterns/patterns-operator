@@ -1,6 +1,6 @@
 module github.com/hybrid-cloud-patterns/patterns-operator
 
-go 1.25.5
+go 1.26.0
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -19,7 +19,7 @@ require (
 	github.com/operator-framework/operator-lifecycle-manager v0.29.0
 	github.com/segmentio/analytics-go/v3 v3.3.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.57.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.20.2
 	k8s.io/api v0.35.1
@@ -39,7 +39,7 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cyphar.com/go-pathrs v0.2.6 // indirect
-	github.com/42wim/httpsig v1.2.4 // indirect
+	github.com/42wim/httpsig v1.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
@@ -176,15 +176,15 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.48.0 // indirect
+	golang.org/x/tools v0.49.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.83.2 // indirect
