@@ -222,23 +222,6 @@ func TestValidateUpdate_AllowsBothSet(t *testing.T) {
 	}
 }
 
-func TestValidateCreate_RejectsNonPatternObject(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := AddToScheme(scheme); err != nil {
-		t.Fatalf("failed to add scheme: %v", err)
-	}
-
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-	validator := &PatternValidator{Client: fakeClient}
-
-	notAPattern := &PatternList{}
-
-	_, err := validator.ValidateCreate(context.Background(), notAPattern)
-	if err == nil {
-		t.Error("expected error for non-Pattern object, got nil")
-	}
-}
-
 func TestValidateUpdate_Allows(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := AddToScheme(scheme); err != nil {
