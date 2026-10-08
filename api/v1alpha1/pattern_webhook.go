@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -42,23 +40,18 @@ type PatternValidator struct {
 //nolint:lll
 // +kubebuilder:webhook:verbs=create;update;delete,path=/validate-gitops-hybrid-cloud-patterns-io-v1alpha1-pattern,mutating=false,failurePolicy=fail,groups=gitops.hybrid-cloud-patterns.io,resources=patterns,versions=v1alpha1,name=vpattern.gitops.hybrid-cloud-patterns.io,admissionReviewVersions=v1,sideEffects=none
 
-var _ webhook.CustomValidator = &PatternValidator{}
+var _ admission.Validator[*Pattern] = &PatternValidator{}
 
 // SetupWebhookWithManager will setup the manager to manage the webhooks
 func (r *PatternValidator) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	r.Client = mgr.GetClient()
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&Pattern{}).
+	return ctrl.NewWebhookManagedBy(mgr, &Pattern{}).
 		WithValidator(r).
 		Complete()
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *PatternValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	p, err := convertToPattern(obj)
-	if err != nil {
-		return nil, err
-	}
+func (r *PatternValidator) ValidateCreate(ctx context.Context, p *Pattern) (admission.Warnings, error) {
 	patternlog.Info("validate create", "name", p.Name)
 
 	if err := validateVariantAlias(p); err != nil {
@@ -67,7 +60,7 @@ func (r *PatternValidator) ValidateCreate(ctx context.Context, obj runtime.Objec
 	}
 
 	var patterns PatternList
-	if err = r.Client.List(ctx, &patterns); err != nil {
+	if err := r.Client.List(ctx, &patterns); err != nil {
 		return nil, fmt.Errorf("failed to list Pattern resources: %v", err)
 	}
 	if len(patterns.Items) > 0 {
@@ -78,11 +71,7 @@ func (r *PatternValidator) ValidateCreate(ctx context.Context, obj runtime.Objec
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *PatternValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	p, err := convertToPattern(newObj)
-	if err != nil {
-		return nil, err
-	}
+func (r *PatternValidator) ValidateUpdate(_ context.Context, _, p *Pattern) (admission.Warnings, error) {
 	patternlog.Info("validate update", "name", p.Name)
 
 	if err := validateVariantAlias(p); err != nil {
@@ -94,11 +83,7 @@ func (r *PatternValidator) ValidateUpdate(_ context.Context, _, newObj runtime.O
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type
-func (r *PatternValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	p, err := convertToPattern(obj)
-	if err != nil {
-		return nil, err
-	}
+func (r *PatternValidator) ValidateDelete(_ context.Context, p *Pattern) (admission.Warnings, error) {
 	patternlog.Info("validate delete", "name", p.Name)
 
 	if !strings.EqualFold(p.Annotations[PruneAnnotation], "true") {
@@ -107,14 +92,6 @@ func (r *PatternValidator) ValidateDelete(_ context.Context, obj runtime.Object)
 	}
 
 	return nil, nil
-}
-
-func convertToPattern(obj runtime.Object) (*Pattern, error) {
-	p, ok := obj.(*Pattern)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pattern object but got %T", obj)
-	}
-	return p, nil
 }
 
 func validateVariantAlias(p *Pattern) error {
