@@ -25,7 +25,7 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/util/versions"
 
-	"github.com/argoproj/pkg/sync"
+	"github.com/argoproj/pkg/v2/sync"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/argoproj/argo-cd/v3/util/cache"
@@ -401,7 +401,7 @@ func (c *nativeOCIClient) resolveRevision(ctx context.Context, revision string, 
 		}
 
 		// Look to see if revision is a semver constraint
-		version, err := versions.MaxVersion(revision, tags)
+		version, err := versions.MaxVersion(revision, tags, "")
 		if err != nil {
 			return "", fmt.Errorf("no version for constraints: %w", err)
 		}

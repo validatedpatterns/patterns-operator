@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +24,12 @@ type RedisCompressionType string
 var (
 	RedisCompressionNone RedisCompressionType = "none"
 	RedisCompressionGZip RedisCompressionType = "gzip"
+)
+
+const (
+	// redisNoSuchKeyErr is the error string Redis returns from RENAME when the source key does not
+	// exist. It is treated as a cache miss rather than a failed request.
+	redisNoSuchKeyErr = "ERR no such key"
 )
 
 func CompressionTypeFromString(s string) (RedisCompressionType, error) {
@@ -105,7 +112,7 @@ func (r *redisCache) unmarshal(data []byte, obj any) error {
 
 func (r *redisCache) Rename(oldKey string, newKey string, _ time.Duration) error {
 	err := r.client.Rename(context.TODO(), r.getKey(oldKey), r.getKey(newKey)).Err()
-	if err != nil && err.Error() == "ERR no such key" {
+	if err != nil && err.Error() == redisNoSuchKeyErr {
 		err = ErrCacheMiss
 	}
 
@@ -169,12 +176,40 @@ func (r *redisCache) NotifyUpdated(key string) error {
 }
 
 type MetricsRegistry interface {
-	IncRedisRequest(failed bool)
+	IncRedisRequest(command string, failed bool)
 	ObserveRedisRequestDuration(duration time.Duration)
 }
 
 type redisHook struct {
 	registry MetricsRegistry
+}
+
+// ignoredRedisCommandNames are commands that go-redis may issue during connection setup / bookkeeping
+// and which we don't want to count as application-level requests in metrics.
+var ignoredRedisCommandNames = map[string]struct{}{
+	"hello":  {},
+	"client": {},
+	// Optional: we can enable if we want also want to exclude other setup/noise commands.
+	// "auth":   {},
+	// "select": {},
+	// "ping":   {},
+}
+
+// redisCmdName returns the normalized (lower-cased, trimmed) name of a Redis command
+func redisCmdName(cmd redis.Cmder) string {
+	return strings.ToLower(strings.TrimSpace(cmd.Name()))
+}
+
+func shouldIgnoreRedisCmd(cmd redis.Cmder) bool {
+	_, ok := ignoredRedisCommandNames[redisCmdName(cmd)]
+	return ok
+}
+
+// isBenignRedisMiss reports whether err represents a benign cache miss rather than a real Redis
+// failure. redis.Nil is the normal "key not found" reply, and "ERR no such key" is returned by
+// RENAME when the source key is absent; neither should be counted as a failed request.
+func isBenignRedisMiss(err error) bool {
+	return errors.Is(err, redis.Nil) || (err != nil && err.Error() == redisNoSuchKeyErr)
 }
 
 func (rh *redisHook) DialHook(next redis.DialHook) redis.DialHook {
@@ -189,7 +224,12 @@ func (rh *redisHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
 		startTime := time.Now()
 
 		err := next(ctx, cmd)
-		rh.registry.IncRedisRequest(err != nil && !errors.Is(err, redis.Nil))
+
+		if shouldIgnoreRedisCmd(cmd) {
+			return err
+		}
+
+		rh.registry.IncRedisRequest(redisCmdName(cmd), err != nil && !isBenignRedisMiss(err))
 		rh.registry.ObserveRedisRequestDuration(time.Since(startTime))
 
 		return err

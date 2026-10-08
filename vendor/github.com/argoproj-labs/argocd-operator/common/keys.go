@@ -131,6 +131,27 @@ const (
 	// ArgoCDKeyServerSecretKey is the server secret key property name for the Argo secret.
 	ArgoCDKeyServerSecretKey = "server.secretkey"
 
+	// ArgoCDKeyGitHubWebhookSecret is the key in argocd-secret for the GitHub webhook shared secret (see Argo CD settings).
+	ArgoCDKeyGitHubWebhookSecret = "webhook.github.secret" // #nosec G101
+
+	// ArgoCDKeyGitLabWebhookSecret is the key in argocd-secret for the GitLab webhook shared secret.
+	ArgoCDKeyGitLabWebhookSecret = "webhook.gitlab.secret" // #nosec G101
+
+	// ArgoCDKeyBitbucketCloudWebhookSecret is the key in argocd-secret for the Bitbucket Cloud webhook UUID.
+	// Argo CD treats Bitbucket Cloud and Bitbucket Server as two rows, not as one generic “Bitbucket secret”,
+	// see https://argo-cd.readthedocs.io/en/stable/operator-manual/webhook/#2-configure-argo-cd-with-the-webhook-secret-optional
+	ArgoCDKeyBitbucketCloudWebhookSecret = "webhook.bitbucket.uuid" // #nosec G101
+
+	// ArgoCDKeyBitbucketServerWebhookSecret is the key in argocd-secret for the Bitbucket Server webhook secret.
+	ArgoCDKeyBitbucketServerWebhookSecret = "webhook.bitbucketserver.secret" // #nosec G101
+
+	// ArgoCDKeyGogsWebhookSecret is the key in argocd-secret for the Gogs webhook shared secret.
+	ArgoCDKeyGogsWebhookSecret = "webhook.gogs.secret" // #nosec G101
+
+	// ArgoCDKeyAzureDevOpsWebhookUsername and ArgoCDKeyAzureDevOpsWebhookPassword are keys in argocd-secret for Azure DevOps webhooks.
+	ArgoCDKeyAzureDevOpsWebhookUsername = "webhook.azuredevops.username" // #nosec G101
+	ArgoCDKeyAzureDevOpsWebhookPassword = "webhook.azuredevops.password" // #nosec G101
+
 	// ArgoCDKeyServerURL is the key for server url.
 	ArgoCDKeyServerURL = "url"
 
@@ -174,6 +195,9 @@ const (
 	// ArgoCDKeyUsersAnonymousEnabled is the configuration key for anonymous user access.
 	ArgoCDKeyUsersAnonymousEnabled = "users.anonymous.enabled"
 
+	// ArgoCDKeyResourceSensitiveMaskAnnotations is the key to mask metadata.annotations values in UI/CLI on Secrets.
+	ArgoCDKeyResourceSensitiveMaskAnnotations = "resource.sensitive.mask.annotations"
+
 	// ArgoCDDexImageEnvName is the environment variable used to get the image
 	// to used for the Dex container.
 	ArgoCDDexImageEnvName = "ARGOCD_DEX_IMAGE"
@@ -184,7 +208,10 @@ const (
 
 	// ArgoCDExtensionImageEnvName is the environment variable used to get the image
 	// to be used for the Argo-CD extension image
-	ArgoCDExtensionImageEnvName = "ARGOCD_EXTENSION_IMAGE"
+	ArgoCDRolloutsExtensionImageEnvName = "ROLLOUTS_EXTENSION_IMAGE"
+
+	// ArgoCDPromoterExtensionEnvName is the environment variable used to get the image for the GitOps Promoter Extension
+	ArgoCDPromoterExtensionImageEnvName = "PROMOTER_EXTENSION_IMAGE"
 
 	// ArgoCDRedisHAProxyImageEnvName is the environment variable used to get the image
 	// to used for the Redis HA Proxy container.
@@ -223,11 +250,26 @@ const (
 	// ArgoCDNotificationsManagedByClusterArgoCDLabel is needed to identify namespace mentioned as notifications sourceNamespaces on ArgoCD
 	ArgoCDNotificationsManagedByClusterArgoCDLabel = "argocd.argoproj.io/notifications-managed-by-cluster-argocd"
 
+	// ArgoCDCATrustChecksum is applied to repo-server Deployment to trigger reconciliation when some of the SystemCATrust sources changes
+	ArgoCDCATrustChecksum = "argocd.argoproj.io/ca-trust-checksum"
+
 	// ArgoCDControllerClusterRoleEnvName is an environment variable to specify a custom cluster role for Argo CD application controller
 	ArgoCDControllerClusterRoleEnvName = "CONTROLLER_CLUSTER_ROLE"
 
 	// ArgoCDServerClusterRoleEnvName is an environment variable to specify a custom cluster role for Argo CD server
 	ArgoCDServerClusterRoleEnvName = "SERVER_CLUSTER_ROLE"
+
+	// ArgoCDPrincipalClusterRoleEnvName is an environment variable to specify a custom cluster role for the principal component of Argo CD Agent
+	ArgoCDPrincipalClusterRoleEnvName = "PRINCIPAL_CLUSTER_ROLE"
+
+	// ArgoCDAgentClusterRoleEnvName is an environment variable to specify a custom cluster role for the agent component of Argo CD Agent
+	ArgoCDAgentClusterRoleEnvName = "AGENT_CLUSTER_ROLE"
+
+	// GitOpsPromoterControllerClusterRoleEnvName is an environment variable to specify a custom cluster role for the GitOps Promoter Controller
+	GitOpsPromoterControllerClusterRoleEnvName = "PROMOTER_CONTROLLER_CLUSTER_ROLE"
+
+	// GitOpsPromoterAPIServerClusterRoleEnvName is an environment variable to specify a custom cluster role for the GitOps Promoter API Server
+	GitOpsPromoterAPIServerClusterRoleEnvName = "PROMOTER_API_SERVER_CLUSTER_ROLE"
 
 	// ArgoCDDexSecretKey is used to reference Dex secret from Argo CD secret into Argo CD configmap
 	ArgoCDDexSecretKey = "oidc.dex.clientSecret" // #nosec G101
@@ -237,6 +279,13 @@ const (
 
 	// ArgoCDKeyInstallationID is the configuration key for the installation ID.
 	ArgoCDKeyInstallationID = "installationID"
+
+	// ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey is the upstream argocd-cmd-params-cm key.
+	// consumed by ARGOCD_APPLICATIONSET_CONTROLLER_TOKENREF_STRICT_MODE.
+	ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey = "applicationsetcontroller.enable.tokenref.strict.mode"
+
+	// ArgoCDApplicationSetControllerTokenRefStrictModeEnvName is the env variable to enable tokenRef strict mode in the ApplicationSet controller.
+	ArgoCDApplicationSetControllerTokenRefStrictModeEnvName = "ARGOCD_APPLICATIONSET_CONTROLLER_TOKENREF_STRICT_MODE" // #nosec G101
 
 	// ArgoCDTrackedByOperatorLabel for resources tracked by the operator
 	ArgoCDTrackedByOperatorLabel = "operator.argoproj.io/tracked-by"
@@ -252,4 +301,17 @@ const (
 	// ArgoCDImagePullPolicyEnvName is the environment variable used to get the global image pull policy
 	// for all ArgoCD components managed by the operator.
 	ArgoCDImagePullPolicyEnvName = "IMAGE_PULL_POLICY"
+
+	// ArgoCDImagePullSecretPropagateLabel is the label applied to Secrets in the operator namespace
+	// that should be copied to all ArgoCD instance namespaces and referenced as imagePullSecrets.
+	ArgoCDImagePullSecretPropagateLabel = "operator.argoproj.io/propagate-image-pull-secret"
+
+	// ArgoCDImagePullSecretCopiedLabel marks a Secret as a copy of a propagated image pull secret.
+	// The value is the source secret name.
+	ArgoCDImagePullSecretCopiedLabel = "operator.argoproj.io/image-pull-secret-source"
+
+	// ArgoCDWebTerminalEnabledKey is the configuration key for enabling the web terminal.
+	ArgoCDWebTerminalEnabledKey = "exec.enabled"
+	// ArgoCDWebTerminalEnabledDefaultValue is the default value for enabling the web terminal.
+	ArgoCDWebTerminalEnabledDefaultValue = false
 )
