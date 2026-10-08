@@ -280,7 +280,3 @@ const (
 	DeleteHubChildApps   PatternDeletionPhase = "DeleteHubChildApps"
 	DeleteHub            PatternDeletionPhase = "DeleteHub"
 )
-
-func init() {
-	SchemeBuilder.Register(&Pattern{}, &PatternList{})
-}
