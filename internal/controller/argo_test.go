@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 
 	api "github.com/hybrid-cloud-patterns/patterns-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -127,7 +128,7 @@ var _ = Describe("Argo Pattern", func() {
 				Project: "default",
 				SyncPolicy: &argoapi.SyncPolicy{
 					Automated: &argoapi.SyncPolicyAutomated{
-						SelfHeal: true,
+						SelfHeal: ptr.To(true),
 					},
 					SyncOptions: []string{},
 					Retry: &argoapi.RetryStrategy{
@@ -687,7 +688,7 @@ var _ = Describe("Argo Pattern", func() {
 			})
 			It("should return false and log the appropriate message", func() {
 				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
-				automatedSyncPolicyChanged.Prune = true
+				automatedSyncPolicyChanged.Prune = ptr.To(true)
 				logBuffer := new(bytes.Buffer)
 				log.SetOutput(logBuffer)
 				defer log.SetOutput(os.Stderr)
@@ -698,7 +699,7 @@ var _ = Describe("Argo Pattern", func() {
 			})
 			It("should return false and log the appropriate message", func() {
 				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
-				automatedSyncPolicyChanged.AllowEmpty = true
+				automatedSyncPolicyChanged.AllowEmpty = ptr.To(true)
 				logBuffer := new(bytes.Buffer)
 				log.SetOutput(logBuffer)
 				defer log.SetOutput(os.Stderr)
@@ -709,7 +710,7 @@ var _ = Describe("Argo Pattern", func() {
 			})
 			It("should return false and log the appropriate message", func() {
 				automatedSyncPolicyChanged := automatedSyncPolicy.DeepCopy()
-				automatedSyncPolicyChanged.SelfHeal = false
+				automatedSyncPolicyChanged.SelfHeal = ptr.To(false)
 				logBuffer := new(bytes.Buffer)
 				log.SetOutput(logBuffer)
 				defer log.SetOutput(os.Stderr)

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/yaml"
 
@@ -940,7 +941,7 @@ func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 		syncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision
 			Automated: &argoapi.SyncPolicyAutomated{
-				Prune: true,
+				Prune: ptr.To(true),
 			},
 			// Options allow you to specify whole app sync-SyncOptions
 			SyncOptions: []string{"Prune=true"},
@@ -950,7 +951,7 @@ func commonSyncPolicy(p *api.Pattern) *argoapi.SyncPolicy {
 		syncPolicy = &argoapi.SyncPolicy{
 			// Automated will keep an application synced to the target revision
 			Automated: &argoapi.SyncPolicyAutomated{
-				SelfHeal: true,
+				SelfHeal: ptr.To(true),
 			},
 			// Options allow you to specify whole app sync-options
 			SyncOptions: []string{},
@@ -1295,16 +1296,16 @@ func compareAutomatedSyncPolicy(goal, actual *argoapi.SyncPolicyAutomated) bool 
 	if (goal == nil) != (actual == nil) {
 		return false
 	}
-	if goal.Prune != actual.Prune {
-		log.Printf("SyncPolicy Prune changed %t -> %t\n", actual.Prune, goal.Prune)
+	if goal.GetPrune() != actual.GetPrune() {
+		log.Printf("SyncPolicy Prune changed %t -> %t\n", actual.GetPrune(), goal.GetPrune())
 		return false
 	}
-	if goal.AllowEmpty != actual.AllowEmpty {
-		log.Printf("SyncPolicy AllowEmpty changed %t -> %t\n", actual.AllowEmpty, goal.AllowEmpty)
+	if goal.GetAllowEmpty() != actual.GetAllowEmpty() {
+		log.Printf("SyncPolicy AllowEmpty changed %t -> %t\n", actual.GetAllowEmpty(), goal.GetAllowEmpty())
 		return false
 	}
-	if goal.SelfHeal != actual.SelfHeal {
-		log.Printf("SyncPolicy SelfHeal changed %t -> %t\n", actual.SelfHeal, goal.SelfHeal)
+	if goal.GetSelfHeal() != actual.GetSelfHeal() {
+		log.Printf("SyncPolicy SelfHeal changed %t -> %t\n", actual.GetSelfHeal(), goal.GetSelfHeal())
 		return false
 	}
 	return true
