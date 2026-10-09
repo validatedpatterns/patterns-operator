@@ -769,7 +769,7 @@ github.com/segmentio/backo-go
 # github.com/sergi/go-diff v1.4.0
 ## explicit; go 1.13
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/shopspring/decimal v1.4.0
+# github.com/shopspring/decimal v1.5.0
 ## explicit; go 1.10
 github.com/shopspring/decimal
 # github.com/sirupsen/logrus v1.9.4
