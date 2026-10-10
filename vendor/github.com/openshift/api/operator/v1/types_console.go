@@ -60,7 +60,7 @@ type ConsoleSpec struct {
 	// This field is intended for clusters without ingress capability,
 	// where access to routes is not possible.
 	// +optional
-	Ingress Ingress `json:"ingress"`
+	Ingress ConsoleIngress `json:"ingress"`
 }
 
 // ConsoleConfigRoute holds information on external route access to console.
@@ -107,6 +107,9 @@ const (
 
 	// gettingStartedBanner is the name of the 'Getting started resources' banner in the console UI Overview page.
 	GettingStartedBanner ConsoleCapabilityName = "GettingStartedBanner"
+
+	// guidedTour is the name of the 'Guided Tour' feature in console UI.
+	GuidedTour ConsoleCapabilityName = "GuidedTour"
 )
 
 // CapabilityState defines the state of the capability in the console UI.
@@ -134,8 +137,8 @@ type CapabilityVisibility struct {
 // Capabilities contains set of UI capabilities and their state in the console UI.
 type Capability struct {
 	// name is the unique name of a capability.
-	// Available capabilities are LightspeedButton and GettingStartedBanner.
-	// +kubebuilder:validation:Enum:="LightspeedButton";"GettingStartedBanner"
+	// Available capabilities are LightspeedButton, GettingStartedBanner, and GuidedTour.
+	// +kubebuilder:validation:Enum:="LightspeedButton";"GettingStartedBanner";"GuidedTour"
 	// +required
 	Name ConsoleCapabilityName `json:"name"`
 	// visibility defines the visibility state of the capability.
@@ -281,10 +284,10 @@ type ConsoleCustomization struct {
 
 	// capabilities defines an array of capabilities that can be interacted with in the console UI.
 	// Each capability defines a visual state that can be interacted with the console to render in the UI.
-	// Available capabilities are LightspeedButton and GettingStartedBanner.
+	// Available capabilities are LightspeedButton, GettingStartedBanner, and GuidedTour.
 	// Each of the available capabilities may appear only once in the list.
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=2
+	// +kubebuilder:validation:MaxItems=3
 	// +listType=map
 	// +listMapKey=name
 	// +optional
@@ -556,7 +559,7 @@ const (
 )
 
 // Ingress allows cluster admin to configure alternative ingress for the console.
-type Ingress struct {
+type ConsoleIngress struct {
 	// consoleURL is a URL to be used as the base console address.
 	// If not specified, the console route hostname will be used.
 	// This field is required for clusters without ingress capability,
