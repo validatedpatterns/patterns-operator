@@ -324,7 +324,6 @@ func (r *PatternReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	result := ctrl.Result{
-		Requeue:      false,
 		RequeueAfter: ReconcileLoopRequeueTime,
 	}
 
