@@ -56,7 +56,7 @@ jobs:
           buildah push "${OPERATOR_IMG}-${TARGETARCH}" "docker-archive:/tmp/image-${TARGETARCH}.tar:${OPERATOR_IMG}-${TARGETARCH}"
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: image-${{ matrix.targetarch }}-${{ github.run_id }}
           path: /tmp/image-${{ matrix.targetarch }}.tar
@@ -89,7 +89,7 @@ jobs:
           buildah push "${CONSOLE_PLUGIN_IMAGE_BASE}-${TARGETARCH}" "docker-archive:/tmp/console-image-${TARGETARCH}.tar:${CONSOLE_PLUGIN_IMAGE_BASE}-${TARGETARCH}"
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: console-image-${{ matrix.targetarch }}-${{ github.run_id }}
           path: /tmp/console-image-${{ matrix.targetarch }}.tar
