@@ -306,7 +306,9 @@ endef
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q
-	$(KUSTOMIZE) build config/manifests | envsubst | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	(cd config/manager && $(KUSTOMIZE) edit set image \\\$${IMG}=${IMG})
+	(cd config/console-plugin && $(KUSTOMIZE) edit set image \\\$${CONSOLE_PLUGIN_IMAGE}=${CONSOLE_PLUGIN_IMAGE})
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(MAKE) bundle-fixes bundle-date
 	./hack/set_openshift_minimum_version.sh
 	$(OPERATOR_SDK) bundle validate ./bundle
