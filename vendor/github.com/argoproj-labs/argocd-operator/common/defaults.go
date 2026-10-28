@@ -33,8 +33,17 @@ const (
 	// ArgoCDDefaultLogFormat is the default log format to be used by all ArgoCD components.
 	ArgoCDDefaultLogFormat = "text"
 
-	// ArgoCDServerComponent is the name of the Dex server control plane component
+	// ArgoCDServerComponent is the name of the server component
 	ArgoCDServerComponent = "argocd-server"
+
+	// ArgoCDCommitServerComponent is the name of the Commit Server component
+	ArgoCDCommitServerComponent = "argocd-commit-server"
+
+	// ArgoCDDefaultCommitServerPort is the default port for the Commit Server.
+	ArgoCDDefaultCommitServerPort = 8086
+
+	// ArgoCDDefaultCommitServerMetricsPort is the default port for the Commit Server metrics.
+	ArgoCDDefaultCommitServerMetricsPort = 8087
 
 	// ArgoCDRedisComponent is the name of the Redis control plane component
 	ArgoCDRedisComponent = "argocd-redis"
@@ -44,6 +53,9 @@ const (
 
 	// ArgoCDDexServerComponent is the name of the Dex server control plane component
 	ArgoCDDexServerComponent = "argocd-dex-server"
+
+	// ArgoCDRepoServerComponent is the name of the repo server control plane component
+	ArgoCDRepoServerComponent = "argocd-repo-server"
 
 	// ArgoCDNotificationsControllerComponent is the name of the Notifications controller control plane component
 	ArgoCDNotificationsControllerComponent = "argocd-notifications-controller"
@@ -70,7 +82,7 @@ const (
 	ArgoCDDefaultArgoImage = "quay.io/argoproj/argocd"
 
 	// ArgoCDDefaultArgoVersion is the Argo CD container image digest to use when version not specified.
-	ArgoCDDefaultArgoVersion = "sha256:db23e2148b3d8ebc7683707da6d0b0c376d194890691222cba5d164776ea8980" // v3.1.11
+	ArgoCDDefaultArgoVersion = "sha256:e2aadfae709d904e87f46ba4aa49601d827b3022db22cd4d03aae816a2e7097b" // v3.5.2
 
 	// ArgoCDDefaultBackupKeyLength is the length of the generated default backup key.
 	ArgoCDDefaultBackupKeyLength = 32
@@ -118,14 +130,26 @@ const (
 	// ArgoCDDefaultDexServiceAccountName is the default Service Account name for the Dex server.
 	ArgoCDDefaultDexServiceAccountName = "argocd-dex-server"
 
+	// ArgoCDDexServerTokenExpirySecs is the Dex SA token lifetime in seconds (1 hour).
+	ArgoCDDexServerTokenExpirySecs = int64(3600)
+
+	// ArgoCDDexServerTokenRenewalThresholdPercent (1-99): renew the Dex token when less than this percent
+	// of ArgoCDDexServerTokenExpirySecs remains (default 33 is approximately equivalent to the last third
+	// of a 1h nominal lifetime).
+	ArgoCDDexServerTokenRenewalThresholdPercent int64 = 33
+
 	// ArgoCDDefaultDexVersion is the Dex container image tag to use when not specified.
-	ArgoCDDefaultDexVersion = "sha256:b08a58c9731c693b8db02154d7afda798e1888dc76db30d34c4a0d0b8a26d913" // v2.43.0
+	ArgoCDDefaultDexVersion = "sha256:8499afd690c437f52301efd2b05b2455da5bd2dfc20332cd697dc9937f808462" // v2.45.1
+
+	// ArgoCDDefaultDexRunAsUser is the numeric UID of the "dex" user declared in the Dex image.
+	// Kubernetes requires a numeric runAsUser when runAsNonRoot is true and the image USER is a named string.
+	ArgoCDDefaultDexRunAsUser = int64(1001)
 
 	// ArgoCDDefaultExportJobImage is the export job container image to use when not specified.
 	ArgoCDDefaultExportJobImage = "quay.io/argoprojlabs/argocd-operator-util"
 
 	// ArgoCDDefaultExportJobVersion is the export job container image tag to use when not specified.
-	ArgoCDDefaultExportJobVersion = "sha256:392ea9e4961c21d496efede212f208b3aacef3e0a55631312d60f93b04600e9b" // 0.17.0
+	ArgoCDDefaultExportJobVersion = "sha256:0745934cb55d95c266daa5423ece9c149bb67db99eb2b3d9215597903724c636" // 0.13.0
 
 	// ArgoCDDefaultExportLocalCapicity is the default capacity to use for local export.
 	ArgoCDDefaultExportLocalCapicity = "2Gi"
@@ -187,14 +211,14 @@ const (
 	// ArgoCDDefaultRedisSentinelPort is the default listen port for Redis sentinel.
 	ArgoCDDefaultRedisSentinelPort = 26379
 
-	//ArgoCDDefaultRedisSuffix is the default suffix to use for Redis resources.
+	// ArgoCDDefaultRedisSuffix is the default suffix to use for Redis resources.
 	ArgoCDDefaultRedisSuffix = "redis"
 
 	// ArgoCDDefaultRedisVersion is the Redis container image tag to use when not specified.
-	ArgoCDDefaultRedisVersion = "sha256:1a34bdba051ecd8a58ec8a3cc460acef697a1605e918149cc53d920673c1a0a7" // 7.2.11-alpine
+	ArgoCDDefaultRedisVersion = "sha256:08ad0b1d280850169a790dba1393ff7a90aef951fc19632cf4d3ce4f78e679ba" // 8.2.3-alpine
 
 	// ArgoCDDefaultRedisVersionHA is the Redis container image tag to use when not specified in HA mode.
-	ArgoCDDefaultRedisVersionHA = "sha256:1a34bdba051ecd8a58ec8a3cc460acef697a1605e918149cc53d920673c1a0a7" // 7.2.11-alpine
+	ArgoCDDefaultRedisVersionHA = "sha256:08ad0b1d280850169a790dba1393ff7a90aef951fc19632cf4d3ce4f78e679ba" // 8.2.3-alpine
 
 	// ArgoCDDefaultRepoMetricsPort is the default listen port for the Argo CD repo server metrics.
 	ArgoCDDefaultRepoMetricsPort = 8084
@@ -288,16 +312,27 @@ vs-ssh.visualstudio.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7Hr1oTWqNqOlzGJOf
 	ArgoCDCmdParamsConfigMapName = "argocd-cmd-params-cm"
 
 	// ArgoCDAgentPrincipalDefaultImageName is the default image name for the ArgoCD agent's principal component.
-	ArgoCDAgentPrincipalDefaultImageName = "quay.io/argoprojlabs/argocd-agent:v0.3.2"
+	ArgoCDAgentPrincipalDefaultImageName = "quay.io/argoprojlabs/argocd-agent:v0.9.0"
 
 	// ArgoCDAgentAgentDefaultImageName is the default image name for the ArgoCD agent's agent component.
-	ArgoCDAgentAgentDefaultImageName = "quay.io/argoprojlabs/argocd-agent:v0.3.2"
+	ArgoCDAgentAgentDefaultImageName = "quay.io/argoprojlabs/argocd-agent:v0.9.0"
 
 	// ArgoCDImageUpdaterControllerComponent is the name of the Image Updater controller control plane component
 	ArgoCDImageUpdaterControllerComponent = "argocd-image-updater-controller"
 
 	// DefaultImagePullPolicy is the default image pull policy to use when not specified.
 	DefaultImagePullPolicy = "IfNotPresent"
+
+	// ArgoCDDefaultClusterDomain is the default cluster domain suffix for service FQDNs.
+	ArgoCDDefaultClusterDomain = "cluster.local"
+	// ArgoCDDefaultWebTerminalEnabled is the default web terminal enabled switch.
+	ArgoCDDefaultWebTerminalEnabled = "false"
+
+	// GitOpsPromoterDefaultImageName is the default image name for the GitOps Promoter
+	GitOpsPromoterDefaultImageName = "quay.io/argoprojlabs/gitops-promoter:v0.35.0"
+
+	// GitopsPromoterExtensionInstallerName is the default url for the GitOps Promoter extension
+	GitopsPromoterExtensionURL = "https://github.com/argoproj-labs/gitops-promoter/releases/download/v0.35.0/gitops-promoter-argocd-extension.tar.gz"
 )
 
 // DefaultLabels returns the default set of labels for controllers.
