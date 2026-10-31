@@ -213,7 +213,7 @@ replace (
 	// Usually not needed unless we have newer k8s.io deps and argocd still uses an old gitops-engine
 	// github.com/argoproj/gitops-engine => github.com/argoproj/gitops-engine v0.0.0-20240905010810-bd7681ae3f8b
 	github.com/argoproj/argo-cd/gitops-engine => github.com/argoproj/argo-cd/gitops-engine v0.0.0-20260827090335-e258ee23c3e5
-	github.com/openshift/api => github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20261031042726-f677639a402f
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c
 	// Caused by Argo importing 'k8s.io/api'
 	// Override all the v0.0.0 entries
