@@ -52,7 +52,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
-	github.com/argoproj/argo-cd/gitops-engine v0.7.1-0.20250908182407-97ad5b59a627 // indirect
+	github.com/argoproj/argo-cd/gitops-engine c158f568db97 // indirect
 	github.com/argoproj/pkg/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -212,7 +212,7 @@ require (
 replace (
 	// Usually not needed unless we have newer k8s.io deps and argocd still uses an old gitops-engine
 	// github.com/argoproj/gitops-engine => github.com/argoproj/gitops-engine v0.0.0-20240905010810-bd7681ae3f8b
-	github.com/argoproj/argo-cd/gitops-engine => github.com/argoproj/argo-cd/gitops-engine v0.0.0-20260827090335-e258ee23c3e5
+	github.com/argoproj/argo-cd/gitops-engine => github.com/argoproj/argo-cd/gitops-engine c158f568db97
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c
 	// Caused by Argo importing 'k8s.io/api'
