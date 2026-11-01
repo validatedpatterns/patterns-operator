@@ -973,11 +973,11 @@ golang.org/x/tools/internal/versions
 # gomodules.xyz/jsonpatch/v2 v2.5.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.84.0
-## explicit; go 1.25.0
+# google.golang.org/grpc v1.85.0
+## explicit; go 1.26.0
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/grpclog
