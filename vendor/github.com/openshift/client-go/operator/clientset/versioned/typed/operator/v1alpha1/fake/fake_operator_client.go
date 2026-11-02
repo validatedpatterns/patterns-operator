@@ -12,6 +12,10 @@ type FakeOperatorV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeOperatorV1alpha1) ClusterAPIs() v1alpha1.ClusterAPIInterface {
+	return newFakeClusterAPIs(c)
+}
+
 func (c *FakeOperatorV1alpha1) ClusterVersionOperators() v1alpha1.ClusterVersionOperatorInterface {
 	return newFakeClusterVersionOperators(c)
 }
@@ -22,6 +26,10 @@ func (c *FakeOperatorV1alpha1) EtcdBackups() v1alpha1.EtcdBackupInterface {
 
 func (c *FakeOperatorV1alpha1) ImageContentSourcePolicies() v1alpha1.ImageContentSourcePolicyInterface {
 	return newFakeImageContentSourcePolicies(c)
+}
+
+func (c *FakeOperatorV1alpha1) Ingresses() v1alpha1.IngressInterface {
+	return newFakeIngresses(c)
 }
 
 func (c *FakeOperatorV1alpha1) OLMs() v1alpha1.OLMInterface {

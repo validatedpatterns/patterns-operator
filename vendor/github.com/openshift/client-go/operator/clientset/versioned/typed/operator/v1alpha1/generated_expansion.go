@@ -2,10 +2,14 @@
 
 package v1alpha1
 
+type ClusterAPIExpansion interface{}
+
 type ClusterVersionOperatorExpansion interface{}
 
 type EtcdBackupExpansion interface{}
 
 type ImageContentSourcePolicyExpansion interface{}
+
+type IngressExpansion interface{}
 
 type OLMExpansion interface{}
