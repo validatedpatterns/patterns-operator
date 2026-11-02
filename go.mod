@@ -16,7 +16,7 @@ require (
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 // release-4.21
 	github.com/operator-framework/api v0.45.0
-	github.com/operator-framework/operator-lifecycle-manager v0.45.0
+	github.com/operator-framework/operator-lifecycle-manager v0.46.0
 	github.com/segmentio/analytics-go/v3 v3.3.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.58.0
@@ -197,7 +197,7 @@ require (
 	k8s.io/controller-manager v0.36.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
-	k8s.io/kube-aggregator v0.36.1 // indirect
+	k8s.io/kube-aggregator v0.36.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
 	k8s.io/kubectl v0.37.1 // indirect
 	k8s.io/kubernetes v1.36.1 // indirect
