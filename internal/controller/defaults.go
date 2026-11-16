@@ -46,7 +46,7 @@ const (
 const (
 	GitOpsDefaultSubscriptionNamespace  = "openshift-gitops-operator"
 	GitOpsLegacySubscriptionNamespace   = LegacyOperatorNamespace
-	GitOpsDefaultChannel                = "gitops-1.21"
+	GitOpsDefaultChannel                = "gitops-1.22"
 	GitOpsDefaultPackageName            = "openshift-gitops-operator"
 	GitOpsDefaultCatalogSource          = "redhat-operators"
 	GitOpsDefaultCatalogSourceNamespace = "openshift-marketplace"
