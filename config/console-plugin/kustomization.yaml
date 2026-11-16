@@ -5,3 +5,7 @@ resources:
 - service.yaml
 - deployment.yaml
 - configmap.yaml
+images:
+- name: \${CONSOLE_PLUGIN_IMAGE}
+  newName: quay.io/validatedpatterns/patterns-operator-console
+  newTag: 0.0.83
