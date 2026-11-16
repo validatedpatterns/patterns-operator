@@ -118,6 +118,10 @@ var _ = Describe("Argo Pattern", func() {
 				Labels: map[string]string{
 					"validatedpatterns.io/pattern": pattern.Name,
 				},
+				Annotations: map[string]string{
+					"notice.argocd.argoproj.io/severity": "info",
+					"notice.argocd.argoproj.io/content":  "App of Apps",
+				},
 			},
 			Spec: argoapi.ApplicationSpec{
 				Source: appSource,

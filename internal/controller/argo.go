@@ -344,12 +344,8 @@ return health_status`,
 			APIVersion: ArgoCDAPIVersion,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Annotations: map[string]string{
-				"notice.argocd.argoproj.io/severity": "info",
-				"notice.argocd.argoproj.io/content":  "App of Apps",
-			},
+			Name:       name,
+			Namespace:  namespace,
 			Finalizers: []string{"argoproj.io/finalizer"},
 		},
 		Spec: argooperator.ArgoCDSpec{
@@ -1039,6 +1035,10 @@ func newArgoOperatorApplication(p *api.Pattern, spec *argoapi.ApplicationSpec) *
 			Name:      applicationName(p),
 			Namespace: getClusterWideArgoNamespace(),
 			Labels:    labels,
+			Annotations: map[string]string{
+				"notice.argocd.argoproj.io/severity": "info",
+				"notice.argocd.argoproj.io/content":  "App of Apps",
+			},
 		},
 		Spec: *spec,
 	}
