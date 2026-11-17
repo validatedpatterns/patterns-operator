@@ -11,7 +11,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-logr/logr v1.4.4
 	github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518
-	github.com/onsi/ginkgo/v2 v2.33.1
+	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 // release-4.21
