@@ -24,6 +24,10 @@ func (c *FakeOperatorV1) CloudCredentials() v1.CloudCredentialInterface {
 	return newFakeCloudCredentials(c)
 }
 
+func (c *FakeOperatorV1) ClusterAPIs() v1.ClusterAPIInterface {
+	return newFakeClusterAPIs(c)
+}
+
 func (c *FakeOperatorV1) ClusterCSIDrivers() v1.ClusterCSIDriverInterface {
 	return newFakeClusterCSIDrivers(c)
 }
@@ -42,6 +46,10 @@ func (c *FakeOperatorV1) DNSes() v1.DNSInterface {
 
 func (c *FakeOperatorV1) Etcds() v1.EtcdInterface {
 	return newFakeEtcds(c)
+}
+
+func (c *FakeOperatorV1) Ingresses() v1.IngressInterface {
+	return newFakeIngresses(c)
 }
 
 func (c *FakeOperatorV1) IngressControllers(namespace string) v1.IngressControllerInterface {
