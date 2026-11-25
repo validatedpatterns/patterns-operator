@@ -13,7 +13,7 @@ kind: Kustomization
 images:
 - name: \${IMG}
   newName: quay.io/validatedpatterns/patterns-operator
-  newTag: 0.0.83
+  newTag: 0.0.84
 - name: controller
   newName: quay.io/validatedpatterns/patterns-operator
   newTag: 0.0.82
