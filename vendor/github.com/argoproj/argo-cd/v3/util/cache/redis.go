@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/argoproj/argo-cd/v3/util/env"
 	utilio "github.com/argoproj/argo-cd/v3/util/io"
 
 	rediscache "github.com/go-redis/cache/v9"
@@ -27,6 +28,8 @@ var (
 )
 
 const (
+	// envRedisKeyPrefix is an env variable name which stores the prefix for redis keys
+	envRedisKeyPrefix = "ARGOCD_REDIS_KEY_PREFIX"
 	// redisNoSuchKeyErr is the error string Redis returns from RENAME when the source key does not
 	// exist. It is treated as a cache miss rather than a failed request.
 	redisNoSuchKeyErr = "ERR no such key"
@@ -48,6 +51,7 @@ func NewRedisCache(client *redis.Client, expiration time.Duration, compressionTy
 		expiration:           expiration,
 		cache:                rediscache.New(&rediscache.Options{Redis: client}),
 		redisCompressionType: compressionType,
+		prefix:               env.StringFromEnv(envRedisKeyPrefix, ""),
 	}
 }
 
@@ -59,14 +63,17 @@ type redisCache struct {
 	client               *redis.Client
 	cache                *rediscache.Cache
 	redisCompressionType RedisCompressionType
+	// prefix is added to all keys stored in redis
+	prefix string
 }
 
 func (r *redisCache) getKey(key string) string {
+	prefixedKey := r.prefix + key
 	switch r.redisCompressionType {
 	case RedisCompressionGZip:
-		return key + ".gz"
+		return prefixedKey + ".gz"
 	default:
-		return key
+		return prefixedKey
 	}
 }
 
