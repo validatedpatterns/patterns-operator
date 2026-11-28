@@ -1230,9 +1230,9 @@
     csstype "^3.2.2"
 
 "@types/react@^17.0.37":
-  version "17.0.93"
-  resolved "https://registry.yarnpkg.com/@types/react/-/react-17.0.93.tgz#1f8d44a7ea97fb0cbd3935235949d7fda43f64ea"
-  integrity sha512-KM4Ty/ZTLZupiYxZVAlP+InNJS3De6uBMdq0ePa6/04+eG9Y7ftnWfst1xTLQ5rwAhgHwQ4momt/O4KepdGBTw==
+  version "17.0.94"
+  resolved "https://registry.yarnpkg.com/@types/react/-/react-17.0.94.tgz#62b24b4f7614f2bd3cc9f2bc7509c6a6e1606185"
+  integrity sha512-TQlmXBtYaxrixGTQOiNFRNgG3eyj8H7St/YtrcHChMHy5WT81Rt8WMfMhXoFez3UG/YTNXckvhmAKBcmlEyOlQ==
   dependencies:
     "@types/prop-types" "*"
     "@types/scheduler" "^0.16"
@@ -2585,9 +2585,9 @@ cssesc@^3.0.0:
   integrity sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==
 
 csstype@^3.2.2:
-  version "3.2.3"
-  resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.2.3.tgz#ec48c0f3e993e50648c86da559e2610995cf989a"
-  integrity sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==
+  version "3.2.4"
+  resolved "https://registry.yarnpkg.com/csstype/-/csstype-3.2.4.tgz#e3c565add00793c36f089cc14b70d04d784daa19"
+  integrity sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ==
 
 cypress-multi-reporters@^1.6.2:
   version "1.6.4"
